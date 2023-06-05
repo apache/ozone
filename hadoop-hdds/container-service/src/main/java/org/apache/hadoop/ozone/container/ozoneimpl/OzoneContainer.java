@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -66,7 +65,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -108,8 +106,8 @@ public class OzoneContainer {
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
-  private ContainerMetadataScanner metadataScanner;
-  private List<ContainerDataScanner> dataScanners;
+  private BackgroundContainerMetadataScanner metadataScanner;
+  private List<BackgroundContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
@@ -118,6 +116,9 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
+
+
+  private final ContainerMetrics metrics;
 
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
@@ -162,7 +163,7 @@ public class OzoneContainer {
     metadataScanner = null;
 
     buildContainerSet();
-    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
     IncrementalReportSender<Container> icrSender = container -> {
@@ -248,11 +249,9 @@ public class OzoneContainer {
             containerSet);
 
     if (certClient != null && secConf.isGrpcTlsEnabled()) {
-      List<X509Certificate> x509Certificates =
-          HAUtils.buildCAX509List(certClient, conf);
       tlsClientConfig = new GrpcTlsConfig(
-          certClient.getPrivateKey(), certClient.getCertificate(),
-          x509Certificates, true);
+          certClient.getClientKeyStoresFactory().getKeyManagers()[0],
+          certClient.getClientKeyStoresFactory().getTrustManagers()[0], true);
     } else {
       tlsClientConfig = null;
     }
@@ -329,8 +328,8 @@ public class OzoneContainer {
     }
     dataScanners = new ArrayList<>();
     for (StorageVolume v : volumeSet.getVolumesList()) {
-      ContainerDataScanner s = new ContainerDataScanner(c, controller,
-          (HddsVolume) v);
+      BackgroundContainerDataScanner s =
+          new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
     }
@@ -338,7 +337,8 @@ public class OzoneContainer {
 
   private void initMetadataScanner(ContainerScannerConfiguration c) {
     if (this.metadataScanner == null) {
-      this.metadataScanner = new ContainerMetadataScanner(c, controller);
+      this.metadataScanner =
+          new BackgroundContainerMetadataScanner(c, controller);
     }
     this.metadataScanner.start();
   }
@@ -349,7 +349,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerScanner.init(c, controller);
+    OnDemandContainerDataScanner.init(c, controller);
   }
 
   /**
@@ -365,10 +365,10 @@ public class OzoneContainer {
     if (dataScanners == null) {
       return;
     }
-    for (ContainerDataScanner s : dataScanners) {
+    for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerScanner.shutdown();
+    OnDemandContainerDataScanner.shutdown();
   }
 
   /**
@@ -520,5 +520,9 @@ public class OzoneContainer {
   @VisibleForTesting
   StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
     return new StorageVolumeChecker(conf, new Timer());
+  }
+
+  public ContainerMetrics getMetrics() {
+    return metrics;
   }
 }

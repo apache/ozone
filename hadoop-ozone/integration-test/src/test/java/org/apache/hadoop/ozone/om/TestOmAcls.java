@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -23,6 +24,7 @@ import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -67,6 +69,7 @@ public class TestOmAcls {
   private static boolean keyAclAllow = true;
   private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static GenericTestUtils.LogCapturer logCapturer;
 
   static {
@@ -94,12 +97,14 @@ public class TestOmAcls {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
   }
 
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -122,7 +127,7 @@ public class TestOmAcls {
     TestOmAcls.volumeAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
-            () -> TestDataUtil.createVolumeAndBucket(cluster));
+            () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
     assertTrue(logCapturer.getOutput()
@@ -132,9 +137,9 @@ public class TestOmAcls {
 
   @Test
   public void testReadVolumePermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestOmAcls.volumeAclAllow = false;
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     OMException exception = assertThrows(OMException.class, () ->
             objectStore.getVolume(bucket.getVolumeName()));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
@@ -149,7 +154,7 @@ public class TestOmAcls {
     TestOmAcls.bucketAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
-            () -> TestDataUtil.createVolumeAndBucket(cluster));
+            () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
     assertTrue(logCapturer.getOutput()
@@ -159,9 +164,9 @@ public class TestOmAcls {
 
   @Test
   public void testReadBucketPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestOmAcls.bucketAclAllow = false;
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     OMException exception = assertThrows(OMException.class,
             () -> objectStore.getVolume(
                     bucket.getVolumeName()).getBucket(bucket.getName())
@@ -177,7 +182,7 @@ public class TestOmAcls {
   public void testCreateKeyPermissionDenied() throws Exception {
     TestOmAcls.keyAclAllow = false;
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     OMException exception = assertThrows(OMException.class,
             () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
@@ -188,7 +193,7 @@ public class TestOmAcls {
 
   @Test
   public void testReadKeyPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestDataUtil.createKey(bucket, "testKey", "testcontent");
 
     TestOmAcls.keyAclAllow = false;
@@ -203,7 +208,7 @@ public class TestOmAcls {
 
   @Test
   public void testSetACLPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     TestOmAcls.bucketAclAllow = false;
 

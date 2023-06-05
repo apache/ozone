@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -34,6 +33,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotDeleteResponse;
+import org.apache.hadoop.ozone.om.snapshot.RequireSnapshotFeatureState;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -51,6 +52,7 @@ import java.io.IOException;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles DeleteSnapshot Request.
@@ -64,6 +66,8 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  @RequireSnapshotFeatureState(true)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
@@ -178,12 +182,14 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(tableKey),
-          new CacheValue<>(Optional.of(snapshotInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, snapshotInfo));
 
       omResponse.setDeleteSnapshotResponse(
           DeleteSnapshotResponse.newBuilder());
       omClientResponse = new OMSnapshotDeleteResponse(
           omResponse.build(), tableKey, snapshotInfo);
+
+      // No longer need to invalidate the entry in the snapshot cache here.
 
     } catch (IOException ex) {
       exception = ex;
@@ -205,7 +211,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     if (snapshotInfo == null) {
       // Dummy SnapshotInfo for logging and audit logging when erred
       snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-          snapshotName, null);
+          snapshotName, null, Time.now());
     }
 
     // Perform audit logging outside the lock
@@ -214,6 +220,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     final String snapshotPath = snapshotInfo.getSnapshotPath();
     if (exception == null) {
+      omMetrics.decNumSnapshotActive();
       LOG.info("Deleted snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
     } else {

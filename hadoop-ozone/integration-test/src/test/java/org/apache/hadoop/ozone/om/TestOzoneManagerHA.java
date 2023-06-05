@@ -20,12 +20,15 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -82,6 +85,7 @@ public abstract class TestOzoneManagerHA {
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
+  private static OzoneClient client;
 
 
   public MiniOzoneHAClusterImpl getCluster() {
@@ -90,6 +94,10 @@ public abstract class TestOzoneManagerHA {
 
   public ObjectStore getObjectStore() {
     return objectStore;
+  }
+
+  public static OzoneClient getClient() {
+    return client;
   }
 
   public OzoneConfiguration getConf() {
@@ -151,6 +159,8 @@ public abstract class TestOzoneManagerHA {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Some subclasses check RocksDB directly as part of their tests. These
     // depend on OBS layout.
@@ -179,8 +189,8 @@ public abstract class TestOzoneManagerHA {
 
     cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();
     cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    objectStore = client.getObjectStore();
   }
 
 
@@ -190,6 +200,7 @@ public abstract class TestOzoneManagerHA {
   @AfterEach
   public void resetCluster()
       throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
@@ -247,6 +258,40 @@ public abstract class TestOzoneManagerHA {
     Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
 
     return ozoneBucket;
+  }
+
+  protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String linkedVolName = "volume-link-" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+
+    BucketArgs createBucketArgs = new BucketArgs.Builder()
+        .setSourceVolume(srcBuk.getVolumeName())
+        .setSourceBucket(srcBuk.getName())
+        .build();
+
+    objectStore.createVolume(linkedVolName, createVolumeArgs);
+    OzoneVolume linkedVolumeInfo = objectStore.getVolume(linkedVolName);
+
+    Assert.assertTrue(linkedVolumeInfo.getName().equals(linkedVolName));
+    Assert.assertTrue(linkedVolumeInfo.getOwner().equals(userName));
+    Assert.assertTrue(linkedVolumeInfo.getAdmin().equals(adminName));
+
+    String linkedBucketName = UUID.randomUUID().toString();
+    linkedVolumeInfo.createBucket(linkedBucketName, createBucketArgs);
+
+    OzoneBucket linkedBucket = linkedVolumeInfo.getBucket(linkedBucketName);
+
+    Assert.assertTrue(linkedBucket.getName().equals(linkedBucketName));
+    Assert.assertTrue(linkedBucket.getVolumeName().equals(linkedVolName));
+    Assert.assertTrue(linkedBucket.isLink());
+
+    return linkedBucket;
   }
 
   /**
@@ -344,11 +389,11 @@ public abstract class TestOzoneManagerHA {
         ozoneKeyDetails.getVolumeName());
     Assert.assertEquals(data.length(), ozoneKeyDetails.getDataSize());
 
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-    ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent, UTF_8));
+    try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+      byte[] fileContent = new byte[data.getBytes(UTF_8).length];
+      ozoneInputStream.read(fileContent);
+      Assert.assertEquals(data, new String(fileContent, UTF_8));
+    }
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
@@ -386,11 +431,11 @@ public abstract class TestOzoneManagerHA {
       ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
       ozoneOutputStream.close();
 
-      OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-      byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
-      Assert.assertEquals(value, new String(fileContent, UTF_8));
+      try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
+        byte[] fileContent = new byte[value.getBytes(UTF_8).length];
+        ozoneInputStream.read(fileContent);
+        Assert.assertEquals(value, new String(fileContent, UTF_8));
+      }
 
     } catch (IOException e) {
       if (!checkSuccess) {

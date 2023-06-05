@@ -33,8 +33,10 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.Principal;
 import java.security.PrivateKey;
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -49,10 +51,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
 
   public static final Logger LOG =
-      LoggerFactory.getLogger(ReloadingX509TrustManager.class);
-
-  static final String RELOAD_ERROR_MESSAGE =
-      "Could not reload keystore (keep using existing one) : ";
+      LoggerFactory.getLogger(ReloadingX509KeyManager.class);
 
   private final String type;
   /**
@@ -66,7 +65,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    * materials are changed.
    */
   private PrivateKey currentPrivateKey;
-  private String currentCertId;
+  private List<String> currentCertIdsList = new ArrayList<>();
 
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
@@ -79,7 +78,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   public ReloadingX509KeyManager(String type, CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     this.type = type;
-    keyManagerRef = new AtomicReference<X509ExtendedKeyManager>();
+    keyManagerRef = new AtomicReference<>();
     keyManagerRef.set(loadKeyManager(caClient));
   }
 
@@ -121,12 +120,18 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
 
   @Override
   public X509Certificate[] getCertificateChain(String s) {
-    return keyManagerRef.get().getCertificateChain(s);
+    // see https://bugs.openjdk.org/browse/JDK-4891485
+    // the KeyManager stores the chain in a case-insensitive way making the
+    // alias lowercase upon initialization.
+    return keyManagerRef.get().getCertificateChain(s.toLowerCase(Locale.ROOT));
   }
 
   @Override
   public PrivateKey getPrivateKey(String s) {
-    return keyManagerRef.get().getPrivateKey(s);
+    // see: https://bugs.openjdk.org/browse/JDK-4891485
+    // the KeyManager stores the chain in a case-insensitive way making the
+    // alias lowercase upon initialization.
+    return keyManagerRef.get().getPrivateKey(s.toLowerCase(Locale.ROOT));
   }
 
   public ReloadingX509KeyManager loadFrom(CertificateClient caClient) {
@@ -146,11 +151,14 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   private X509ExtendedKeyManager loadKeyManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     PrivateKey privateKey = caClient.getPrivateKey();
-    X509Certificate cert = caClient.getCertificate();
-    String certId = cert.getSerialNumber().toString();
-    // Security materials keep the same
-    if (currentCertId != null && currentPrivateKey != null &&
-        currentCertId.equals(certId) && currentPrivateKey.equals(privateKey)) {
+    List<X509Certificate> newCertList = caClient.getTrustChain();
+    if (currentPrivateKey != null && currentPrivateKey.equals(privateKey) &&
+        currentCertIdsList.size() > 0 &&
+        newCertList.size() == currentCertIdsList.size() &&
+        !newCertList.stream().filter(
+            c -> !currentCertIdsList.contains(c.getSerialNumber().toString()))
+            .findAny().isPresent()) {
+      // Security materials(key and certificates) keep the same.
       return null;
     }
 
@@ -159,7 +167,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     keystore.load(null, null);
 
     keystore.setKeyEntry(caClient.getComponentName() + "_key",
-        privateKey, EMPTY_PASSWORD, new Certificate[]{cert});
+        privateKey, EMPTY_PASSWORD,
+        newCertList.toArray(new X509Certificate[0]));
 
     KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
         KeyManagerFactory.getDefaultAlgorithm());
@@ -172,7 +181,10 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     }
 
     currentPrivateKey = privateKey;
-    currentCertId = cert.getSerialNumber().toString();
+    currentCertIdsList.clear();
+    for (X509Certificate cert: newCertList) {
+      currentCertIdsList.add(cert.getSerialNumber().toString());
+    }
     return keyManager;
   }
 }

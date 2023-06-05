@@ -37,7 +37,6 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
@@ -70,19 +69,6 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    return getCSRBuilder(new KeyPair(getPublicKey(), getPrivateKey()));
-  }
-
-  /**
-   * Returns a CSR builder that can be used to creates a Certificate signing
-   * request.
-   * The default flag is added to allow basic SSL handshake.
-   *
-   * @return CertificateSignRequest.Builder
-   */
-  @Override
-  public CertificateSignRequest.Builder getCSRBuilder(KeyPair keyPair)
-      throws CertificateException {
     CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
@@ -92,7 +78,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
       String subject = UserGroupInformation.getCurrentUser()
           .getShortUserName() + "@" + hostname;
       builder.setCA(false)
-          .setKey(keyPair)
+          .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
           .setConfiguration(getConfig())
           .setSubject(subject);
 
@@ -133,9 +119,9 @@ public class DNCertificateClient extends DefaultCertificateClient {
               CAType.ROOT, certCodec, false);
         }
         // Return the default certificate ID
-        String dnCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        return dnCertSerialId;
+        return CertificateCodec.getX509Certificate(pemEncodedCert)
+            .getSerialNumber()
+            .toString();
       } else {
         throw new CertificateException("Unable to retrieve datanode " +
             "certificate chain.");

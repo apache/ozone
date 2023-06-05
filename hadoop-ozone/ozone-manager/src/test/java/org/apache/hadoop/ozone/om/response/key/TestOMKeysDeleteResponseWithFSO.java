@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -167,7 +166,7 @@ public class TestOMKeysDeleteResponseWithFSO
   private void deleteBucket() throws IOException {
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.absent(), 10001));
+        CacheValue.get(10001));
 
     OMBucketDeleteResponse omBucketDeleteResponse =
         new OMBucketDeleteResponse(OMResponse.newBuilder()

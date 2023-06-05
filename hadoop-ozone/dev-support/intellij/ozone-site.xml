@@ -16,6 +16,10 @@
 -->
 <configuration>
   <property>
+    <name>ozone.default.bucket.layout</name>
+    <value>LEGACY</value>
+  </property>
+  <property>
     <name>hdds.profiler.endpoint.enabled</name>
     <value>true</value>
   </property>
@@ -64,6 +68,10 @@
     <value>localhost:9891</value>
   </property>
   <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value>org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl</value>
+  </property>
+  <property>
     <name>ozone.recon.db.dir</name>
     <value>/tmp/recon</value>
   </property>
@@ -90,5 +98,10 @@
   <property>
     <name>ozone.scm.dead.node.interval</name>
     <value>10m</value>
+  </property>
+
+  <property>
+    <name>ozone.metastore.rocksdb.statistics</name>
+    <value>ALL</value>
   </property>
 </configuration>

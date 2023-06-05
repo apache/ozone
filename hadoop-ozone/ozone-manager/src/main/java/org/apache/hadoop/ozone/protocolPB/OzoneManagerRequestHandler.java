@@ -121,6 +121,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import com.google.common.collect.Lists;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -358,6 +359,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
     builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
+    builder.setDbUpdateSuccess(dbUpdatesWrapper.isDBUpdateSuccess());
     return builder.build();
   }
 
@@ -620,7 +622,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getVolumeName(),
         request.getStartKey(),
         request.getPrefix(),
-        request.getCount());
+        request.getCount(),
+        request.getHasSnapshot());
     for (OmBucketInfo bucket : buckets) {
       resp.addBucketInfo(bucket.getProtobuf());
     }
@@ -1217,13 +1220,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl.getS3VolumeContext().getProtobuf();
   }
 
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   private SnapshotDiffResponse snapshotDiff(
       SnapshotDiffRequest snapshotDiffRequest) throws IOException {
-    return SnapshotDiffResponse.newBuilder().setSnapshotDiffReport(
-        impl.snapshotDiff(snapshotDiffRequest.getVolumeName(),
+    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response =
+        impl.snapshotDiff(
+            snapshotDiffRequest.getVolumeName(),
             snapshotDiffRequest.getBucketName(),
             snapshotDiffRequest.getFromSnapshot(),
-            snapshotDiffRequest.getToSnapshot()).toProtobuf()).build();
+            snapshotDiffRequest.getToSnapshot(),
+            snapshotDiffRequest.getToken(),
+            snapshotDiffRequest.getPageSize(),
+            snapshotDiffRequest.getForceFullDiff());
+
+    SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
+        .setJobStatus(response.getJobStatus().toProtobuf())
+        .setWaitTimeInMs(response.getWaitTimeInMs());
+
+    if (response.getSnapshotDiffReport() != null) {
+      builder.setSnapshotDiffReport(
+          response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
   }
 
 
@@ -1246,6 +1265,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
       OzoneManagerProtocolProtos.ListSnapshotRequest request)
       throws IOException {

@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -63,6 +64,7 @@ import org.apache.hadoop.util.Daemon;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -467,9 +469,11 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMBucketCreateResponse createBucket(String volumeName,
       String bucketName, long transactionID)  {
 
+    BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
     OzoneManagerProtocolProtos.OMRequest omRequest =
-        OMRequestTestUtils.createBucketRequest(bucketName, volumeName, false,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+        OMRequestTestUtils.newCreateBucketRequest(bucketInfo).build();
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);

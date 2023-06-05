@@ -18,10 +18,10 @@
 
 package org.apache.ozone.rocksdb.util;
 
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.DBOptions;
-import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 
 import java.io.File;
@@ -50,9 +50,10 @@ public final class RdbUtil {
     }
     cfd.add(
         new ColumnFamilyDescriptor("default".getBytes(StandardCharsets.UTF_8)));
-    try (DBOptions options = new DBOptions(); RocksDB rocksDB = RocksDB
-        .openReadOnly(options, dbLocation, cfd, columnFamilyHandles)) {
-      return rocksDB.getLiveFilesMetaData().stream()
+    try (ManagedDBOptions options = new ManagedDBOptions();
+         ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(options,
+             dbLocation, cfd, columnFamilyHandles)) {
+      return rocksDB.get().getLiveFilesMetaData().stream()
           .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
           .collect(Collectors.toCollection(HashSet::new));
     }

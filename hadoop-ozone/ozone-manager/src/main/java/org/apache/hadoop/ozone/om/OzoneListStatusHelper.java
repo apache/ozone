@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -339,13 +340,9 @@ public class OzoneListStatusHelper {
             String prefixKey, String startKey) throws IOException {
       this.iterType = iterType;
       this.table = table;
-      this.tableIterator = table.iterator();
+      this.tableIterator = table.iterator(prefixKey);
       this.prefixKey = prefixKey;
       this.currentKey = null;
-
-      if (!StringUtils.isBlank(prefixKey)) {
-        tableIterator.seek(prefixKey);
-      }
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
@@ -444,6 +441,10 @@ public class OzoneListStatusHelper {
           continue;
         }
 
+        // Copy cache value to local copy and work on it
+        if (cacheOmInfo instanceof CopyObject) {
+          cacheOmInfo = ((CopyObject<Value>) cacheOmInfo).copyObject();
+        }
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"
           if (cacheKey.startsWith(prefixKey)) {

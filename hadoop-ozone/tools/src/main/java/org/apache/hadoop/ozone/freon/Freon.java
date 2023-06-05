@@ -70,7 +70,8 @@ import picocli.CommandLine.Option;
         OmRPCLoadGenerator.class,
         OzoneClientKeyReadWriteOps.class,
         RangeKeysGenerator.class,
-        DatanodeSimulator.class
+        DatanodeSimulator.class,
+        OmMetadataGenerator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)

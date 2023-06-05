@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -36,19 +38,44 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
+  private OmSnapshot fromSnapshot;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> keyList) {
+      @Nonnull List<String> keyList, OmSnapshot fromSnapshot) {
     super(omResponse);
     this.purgeKeyList = keyList;
+    this.fromSnapshot = fromSnapshot;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyPurgeResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    if (fromSnapshot != null) {
+      DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
+      // Init Batch Operation for snapshot db.
+      try (BatchOperation writeBatch = fromSnapshotStore.initBatchOperation()) {
+        processKeys(writeBatch, fromSnapshot.getMetadataManager());
+        fromSnapshotStore.commitBatchOperation(writeBatch);
+      }
+    } else {
+      processKeys(batchOperation, omMetadataManager);
+    }
+  }
+
+  private void processKeys(BatchOperation batchOp,
+      OMMetadataManager metadataManager) throws IOException {
     for (String key : purgeKeyList) {
-      omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
+      metadataManager.getDeletedTable().deleteWithBatch(batchOp,
           key);
     }
   }

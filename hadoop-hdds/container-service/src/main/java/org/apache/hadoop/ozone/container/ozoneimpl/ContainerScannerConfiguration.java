@@ -28,6 +28,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
+
 /**
  * This class defines configuration parameters for the container scanners.
  **/
@@ -48,6 +50,11 @@ public class ContainerScannerConfiguration {
       "hdds.container.scrub.volume.bytes.per.second";
   public static final String ON_DEMAND_VOLUME_BYTES_PER_SECOND_KEY =
       "hdds.container.scrub.on.demand.volume.bytes.per.second";
+  public static final String CONTAINER_SCAN_MIN_GAP =
+      "hdds.container.scrub.min.gap";
+
+  static final long CONTAINER_SCAN_MIN_GAP_DEFAULT =
+      Duration.ofMinutes(15).toMillis();
 
   public static final long METADATA_SCAN_INTERVAL_DEFAULT =
       Duration.ofHours(3).toMillis();
@@ -101,6 +108,16 @@ public class ContainerScannerConfiguration {
   private long onDemandBandwidthPerVolume
       = ON_DEMAND_BANDWIDTH_PER_VOLUME_DEFAULT;
 
+  @Config(key = "min.gap",
+      defaultValue = "15m",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "The minimum gap between two successive scans of the same"
+          + " container. Unit could be defined with"
+          + " postfix (ns,ms,s,m,h,d)."
+  )
+  private long containerScanMinGap = CONTAINER_SCAN_MIN_GAP_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (metadataScanInterval < 0) {
@@ -115,6 +132,13 @@ public class ContainerScannerConfiguration {
               " must be >= 0 and was set to {}. Defaulting to {}",
           dataScanInterval, DATA_SCAN_INTERVAL_DEFAULT);
       dataScanInterval = DATA_SCAN_INTERVAL_DEFAULT;
+    }
+
+    if (containerScanMinGap < 0) {
+      LOG.warn(CONTAINER_SCAN_MIN_GAP +
+              " must be >= 0 and was set to {}. Defaulting to {}",
+          containerScanMinGap, CONTAINER_SCAN_MIN_GAP);
+      containerScanMinGap = CONTAINER_SCAN_MIN_GAP_DEFAULT;
     }
 
     if (bandwidthPerVolume < 0) {
@@ -161,5 +185,9 @@ public class ContainerScannerConfiguration {
 
   public long getOnDemandBandwidthPerVolume() {
     return onDemandBandwidthPerVolume;
+  }
+
+  public long getContainerScanMinGap() {
+    return containerScanMinGap;
   }
 }

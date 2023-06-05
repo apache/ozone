@@ -146,15 +146,17 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     healthyNodes = filterNodesWithSpace(healthyNodes, nodesRequired,
         metadataSizeRequired, dataSizeRequired);
     boolean multipleRacks = multipleRacksAvailable(healthyNodes);
+    int excludedNodesSize = 0;
     if (excludedNodes != null) {
+      excludedNodesSize = excludedNodes.size();
       healthyNodes.removeAll(excludedNodes);
     }
     int initialHealthyNodesCount = healthyNodes.size();
 
     if (initialHealthyNodesCount < nodesRequired) {
       msg = String.format("Pipeline creation failed due to no sufficient" +
-              " healthy datanodes. Required %d. Found %d.",
-          nodesRequired, initialHealthyNodesCount);
+              " healthy datanodes. Required %d. Found %d. Excluded %d.",
+          nodesRequired, initialHealthyNodesCount, excludedNodesSize);
       LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -178,14 +180,16 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to find enough nodes that meet the criteria that" +
             " cannot engage in more than" + heavyNodeCriteria +
-            " pipelines. Nodes required: " + nodesRequired + " Found:" +
+            " pipelines. Nodes required: " + nodesRequired + " Excluded: " +
+            excludedNodesSize + " Found:" +
             healthyList.size() + " healthy nodes count in NodeManager: " +
             initialHealthyNodesCount);
       }
       msg = String.format("Pipeline creation failed because nodes are engaged" +
               " in other pipelines and every node can only be engaged in" +
-              " max %d pipelines. Required %d. Found %d",
-          heavyNodeCriteria, nodesRequired, healthyList.size());
+              " max %d pipelines. Required %d. Found %d. Excluded: %d.",
+          heavyNodeCriteria, nodesRequired, healthyList.size(),
+          excludedNodesSize);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
@@ -331,16 +335,29 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     // Then choose nodes close to anchor based on network topology
     int nodesToFind = nodesRequired - results.size();
+    boolean bCheckNodeInAnchorRack = true;
     for (int x = 0; x < nodesToFind; x++) {
       // Pick remaining nodes based on the existence of rack awareness.
       DatanodeDetails pick = null;
-      if (rackAwareness) {
+      if (rackAwareness && bCheckNodeInAnchorRack) {
         pick = chooseNodeBasedOnSameRack(
             healthyNodes, exclude,
             nodeManager.getClusterNetworkTopologyMap(), anchor);
+        if (pick == null) {
+          // No available node to pick from first anchor node
+          // Make nextNode as anchor node and pick remaining node
+          anchor = nextNode;
+          pick = chooseNodeBasedOnSameRack(
+              healthyNodes, exclude,
+              nodeManager.getClusterNetworkTopologyMap(), anchor);
+        }
       }
       // fall back protection
       if (pick == null) {
+        // Make bNodeFoundInAnchorRack to false so that from next node search
+        // it will just search in fallback nodes and avoid searching in
+        // anchor node rack.
+        bCheckNodeInAnchorRack = false;
         pick = fallBackPickNodes(healthyNodes, exclude);
         if (rackAwareness) {
           LOG.debug("Failed to choose node based on topology. Fallback " +

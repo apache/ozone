@@ -93,6 +93,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
     // Verify key name
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
@@ -134,7 +135,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .resolveReplicationConfigPreference(type, factor,
               keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
@@ -271,7 +272,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),

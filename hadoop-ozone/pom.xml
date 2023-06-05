@@ -26,7 +26,7 @@
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
-    <spring.version>5.3.23</spring.version>
+    <spring.version>5.3.27</spring.version>
     <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
@@ -45,6 +45,8 @@
     <module>csi</module>
     <module>fault-injection-test</module>
     <module>insight</module>
+    <module>httpfsgateway</module>
+    <module>s3-secret-store</module>
   </modules>
 
   <repositories>
@@ -149,6 +151,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-s3-secret-store</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-test-utils</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
@@ -242,6 +249,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-httpfsgateway</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-recon</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -261,6 +273,11 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocks-native</artifactId>
+        <version>${hdds.rocks.native.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

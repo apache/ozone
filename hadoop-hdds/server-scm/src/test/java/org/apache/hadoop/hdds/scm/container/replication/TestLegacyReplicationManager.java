@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,12 +40,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.LegacyReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager.MoveResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -63,6 +62,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
@@ -78,6 +78,7 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -134,8 +135,6 @@ public class TestLegacyReplicationManager {
   private TestClock clock;
   private File testDir;
   private DBStore dbStore;
-  private PipelineManager pipelineManager;
-  private SCMHAManager scmhaManager;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   int getInflightCount(InflightType type) {
@@ -157,13 +156,13 @@ public class TestLegacyReplicationManager {
     containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    pipelineManager = Mockito.mock(PipelineManager.class);
+    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
     when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
         .thenReturn(true);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -172,6 +171,8 @@ public class TestLegacyReplicationManager {
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
+            Clock.system(ZoneId.systemDefault())))
         .build();
     serviceManager = new SCMServiceManager();
 
@@ -219,8 +220,8 @@ public class TestLegacyReplicationManager {
         )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(conf, clock);
-    createReplicationManager(new ReplicationManagerConfiguration());
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    createReplicationManager(newRMConfig());
   }
 
   void createReplicationManager(int replicationLimit, int deletionLimit)
@@ -237,7 +238,7 @@ public class TestLegacyReplicationManager {
   void createReplicationManager(
       LegacyReplicationManagerConfiguration conf)
       throws Exception {
-    createReplicationManager(null, conf);
+    createReplicationManager(newRMConfig(), conf);
   }
 
   private void createReplicationManager(ReplicationManagerConfiguration rmConf)
@@ -313,18 +314,6 @@ public class TestLegacyReplicationManager {
       replicationManager.start();
       Assertions.assertTrue(replicationManager.isRunning());
     }
-
-    @Test
-    public void testGeneratedConfig() {
-      ReplicationManagerConfiguration rmc = OzoneConfiguration.newInstanceOf(
-          ReplicationManagerConfiguration.class);
-
-      //default is not included in ozone-site.xml but generated from annotation
-      //to the ozone-site-generated.xml which should be loaded by the
-      // OzoneConfiguration.
-      Assertions.assertEquals(1800000, rmc.getEventTimeout());
-
-    }
   }
 
   /**
@@ -395,6 +384,62 @@ public class TestLegacyReplicationManager {
               SCMCommandProto.Type.closeContainerCommand));
       ReplicationManagerReport report = replicationManager.getContainerReport();
       Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+    }
+
+    /**
+     * Create closing container with 1 replica.
+     * Expectation: Missing containers 0.
+     * Remove the only replica.
+     * Expectation: Missing containers 1.
+     */
+    @Test
+    public void testClosingMissingContainer()
+            throws IOException, TimeoutException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+      final ContainerID id = container.containerID();
+
+      containerStateManager.addContainer(container.getProtobuf());
+
+      // One replica in OPEN state
+      final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
+              randomDatanodeDetails());
+
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.updateContainerReplica(id, replica);
+      }
+
+      final int currentCloseCommandCount = datanodeCommandHandler
+              .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+              datanodeCommandHandler.getInvocationCount(
+                      SCMCommandProto.Type.closeContainerCommand));
+
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(0, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
+
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.removeContainerReplica(id, replica);
+      }
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+              datanodeCommandHandler.getInvocationCount(
+                      SCMCommandProto.Type.closeContainerCommand));
+
+      report = replicationManager.getContainerReport();
+      Assertions.assertEquals(1, report.getStat(LifeCycleState.CLOSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.MISSING));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      Assertions.assertEquals(1, report.getStat(
+              ReplicationManagerReport.HealthState.MIS_REPLICATED));
     }
 
     @Test
@@ -1545,7 +1590,7 @@ public class TestLegacyReplicationManager {
      * decommissioned replicas.
      */
     @Test
-    public void testUnderReplicatedDueToDecommission()
+    public void testUnderReplicatedDueToOutOfService()
         throws IOException, TimeoutException {
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
       addReplica(container, new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
@@ -1621,8 +1666,7 @@ public class TestLegacyReplicationManager {
     public void testNotUnderReplicatedDueToMaintenanceMinRepOne()
         throws Exception {
       replicationManager.stop();
-      ReplicationManagerConfiguration newConf =
-          new ReplicationManagerConfiguration();
+      ReplicationManagerConfiguration newConf = newRMConfig();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1642,8 +1686,7 @@ public class TestLegacyReplicationManager {
     public void testUnderReplicatedDueToMaintenanceMinRepOne()
         throws Exception {
       replicationManager.stop();
-      ReplicationManagerConfiguration newConf =
-          new ReplicationManagerConfiguration();
+      ReplicationManagerConfiguration newConf = newRMConfig();
       newConf.setMaintenanceReplicaMinimum(1);
       dbStore.close();
       createReplicationManager(newConf);
@@ -1770,6 +1813,13 @@ public class TestLegacyReplicationManager {
     }
   }
 
+  private static ReplicationManagerConfiguration newRMConfig() {
+    ReplicationManagerConfiguration conf =
+        new ReplicationManagerConfiguration();
+    conf.setEnableLegacy(true);
+    return conf;
+  }
+
   /**
    * Tests replication manager move command.
    */
@@ -1790,7 +1840,7 @@ public class TestLegacyReplicationManager {
       addReplica(container,
               new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
-      CompletableFuture<MoveResult> cf =
+      CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(scmLogs.getOutput().contains(
               "receive a move request about container"));
@@ -1815,7 +1865,8 @@ public class TestLegacyReplicationManager {
       replicationManager.processAll();
       eventQueue.processAll(1000);
 
-      Assertions.assertTrue(cf.isDone() && cf.get() == MoveResult.COMPLETED);
+      Assertions.assertTrue(
+          cf.isDone() && cf.get() == MoveManager.MoveResult.COMPLETED);
     }
 
     /**
@@ -1930,7 +1981,7 @@ public class TestLegacyReplicationManager {
       addReplica(container,
               new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       DatanodeDetails dn4 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
-      CompletableFuture<MoveResult> cf =
+      CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn4);
       Assertions.assertTrue(scmLogs.getOutput().contains(
               "receive a move request about container"));
@@ -1955,7 +2006,7 @@ public class TestLegacyReplicationManager {
               dn1.getDatanodeDetails()));
 
       Assertions.assertTrue(cf.isDone() &&
-              cf.get() == MoveResult.DELETE_FAIL_POLICY);
+              cf.get() == MoveManager.MoveResult.DELETE_FAIL_POLICY);
     }
 
 
@@ -1975,7 +2026,7 @@ public class TestLegacyReplicationManager {
       addReplica(container,
               new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
-      CompletableFuture<MoveResult> cf =
+      CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(scmLogs.getOutput().contains(
               "receive a move request about container"));
@@ -1985,7 +2036,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
 
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
+              MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
 
       nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
@@ -1998,7 +2049,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
 
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
+              MoveManager.MoveResult.DELETION_FAIL_NODE_UNHEALTHY);
     }
 
     /**
@@ -2020,7 +2071,7 @@ public class TestLegacyReplicationManager {
       ContainerReplica dn4 = addReplica(container,
               new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
 
-      CompletableFuture<MoveResult> cf;
+      CompletableFuture<MoveManager.MoveResult> cf;
       //the above move is executed successfully, so there may be some item in
       //inflightReplication or inflightDeletion. here we stop replication
       // manager to clear these states, which may impact the tests below.
@@ -2029,26 +2080,26 @@ public class TestLegacyReplicationManager {
       Thread.sleep(100L);
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.FAIL_NOT_RUNNING);
+              MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR);
       replicationManager.start();
       Thread.sleep(100L);
 
       //container in not in OPEN state
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+              MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
       //open -> closing
       containerStateManager.updateContainerState(id.getProtobuf(),
               LifeCycleEvent.FINALIZE);
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+              MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
       //closing -> quasi_closed
       containerStateManager.updateContainerState(id.getProtobuf(),
               LifeCycleEvent.QUASI_CLOSE);
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
+              MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED);
 
       //quasi_closed -> closed
       containerStateManager.updateContainerState(id.getProtobuf(),
@@ -2063,10 +2114,10 @@ public class TestLegacyReplicationManager {
                   new NodeStatus(IN_SERVICE, state));
           cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
           Assertions.assertTrue(cf.isDone() && cf.get() ==
-                  MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
+                  MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
           cf = replicationManager.move(id, dn3, dn1.getDatanodeDetails());
           Assertions.assertTrue(cf.isDone() && cf.get() ==
-                  MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
+                  MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY);
         }
       }
       nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
@@ -2079,10 +2130,10 @@ public class TestLegacyReplicationManager {
                   new NodeStatus(state, HEALTHY));
           cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
           Assertions.assertTrue(cf.isDone() && cf.get() ==
-                  MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
+                  MoveManager.MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
           cf = replicationManager.move(id, dn3, dn1.getDatanodeDetails());
           Assertions.assertTrue(cf.isDone() && cf.get() ==
-                  MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
+                  MoveManager.MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE);
         }
       }
       nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, HEALTHY));
@@ -2091,12 +2142,12 @@ public class TestLegacyReplicationManager {
       cf = replicationManager.move(id, dn1.getDatanodeDetails(),
               dn2.getDatanodeDetails());
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
+              MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET);
 
       //container does not exist in source datanode
       cf = replicationManager.move(id, dn3, dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
+              MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
 
       //make container over relplicated to test the
       // case that container is in inflightDeletion
@@ -2107,7 +2158,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
+              MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION);
       resetReplicationManager();
 
       //make the replica num be 2 to test the case
@@ -2120,7 +2171,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
       cf = replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
       Assertions.assertTrue(cf.isDone() && cf.get() ==
-              MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
+              MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION);
     }
   }
 
@@ -2537,8 +2588,7 @@ public class TestLegacyReplicationManager {
     // Using the same originID for all replica in the container set. If each
     // replica has a unique originID, it causes problems in ReplicationManager
     // when processing over-replicated containers.
-    final UUID originNodeId =
-        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final UUID originNodeId = getUUID(container.getContainerID());
     final ContainerReplica replica = getReplicas(container.containerID(),
         replicaState, container.getUsedBytes(), container.getNumberOfKeys(),
         bcsId, originNodeId, dn);
@@ -2547,14 +2597,16 @@ public class TestLegacyReplicationManager {
     return replica;
   }
 
+  static UUID getUUID(long id) {
+    return UUID.nameUUIDFromBytes(LongCodec.get().toPersistedFormat(id));
+  }
+
   private ContainerReplica addReplicaToDn(ContainerInfo container,
-      DatanodeDetails dn, State replicaState, long usedBytes, long numOfKeys)
-      throws ContainerNotFoundException {
+      DatanodeDetails dn, State replicaState, long usedBytes, long numOfKeys) {
     // Using the same originID for all replica in the container set. If each
     // replica has a unique originID, it causes problems in ReplicationManager
     // when processing over-replicated containers.
-    final UUID originNodeId =
-        UUID.nameUUIDFromBytes(Longs.toByteArray(container.getContainerID()));
+    final UUID originNodeId = getUUID(container.getContainerID());
     final ContainerReplica replica = getReplicas(container.containerID(),
         replicaState, usedBytes, numOfKeys, 1000L, originNodeId, dn);
     containerStateManager

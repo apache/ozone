@@ -356,8 +356,8 @@ public class BlockManagerImpl implements BlockManager {
 
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {
-      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
-          NO_SUCH_BLOCK);
+      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG +
+              " BlockID : " + blockID, NO_SUCH_BLOCK);
     }
 
     return blockData;

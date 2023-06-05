@@ -63,7 +63,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
   <properties>
     <hadoop2.version>2.7.3</hadoop2.version>
-    <hadoop.version>3.3.4</hadoop.version>
+    <hadoop.version>3.3.5</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
@@ -72,11 +72,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
+    <!-- HDDS Rocks Native dependency version-->
+    <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>2.4.2-8b8bdda-SNAPSHOT</ratis.version>
+    <ratis.version>2.5.1</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.3</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.4</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -100,7 +102,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.4.49.v20220914</jetty.version>
+    <jetty.version>9.4.51.v20230217</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <curator.version>4.2.0</curator.version>
     <test.exclude>_</test.exclude>
@@ -126,6 +128,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.4</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
+    <download-maven-plugin.version>1.6.8</download-maven-plugin.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <test.build.data>${test.build.dir}</test.build.data>
@@ -147,7 +150,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaxb-api.version>2.3.0</jaxb-api.version>
     <jaxb-runtime.version>2.3.0.1</jaxb-runtime.version>
     <jsch.version>0.1.54</jsch.version>
-    <cdi-api.version>1.2</cdi-api.version>
+    <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <glassfish-servlet.version>3.1</glassfish-servlet.version>
     <jsp-api.version>2.1</jsp-api.version>
@@ -158,6 +161,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jersey2.version>2.34</jersey2.version>
 
     <!-- jackson versions -->
+    <jackson1.version>1.9.13</jackson1.version>
+    <jackson-jaxr.version>1.9.13</jackson-jaxr.version>
     <jackson2-bom.version>2.13.4.20221013</jackson2-bom.version>
     <woodstox.version>5.4.0</woodstox.version>
 
@@ -205,11 +210,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <compile-testing.version>0.19</compile-testing.version>
     <errorprone-annotations.version>2.2.0</errorprone-annotations.version>
     <guava.version>31.1-jre</guava.version>
-    <guice.version>4.0</guice.version>
+    <guice.version>5.1.0</guice.version>
     <gson.version>2.9.0</gson.version>
 
     <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
+    <okio.version>2.8.0</okio.version>
     <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
     <mockito2.version>2.28.2</mockito2.version>
     <hamcrest.version>1.3</hamcrest.version>
@@ -219,6 +225,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <junit4.version>4.13.1</junit4.version>
     <junit.jupiter.version>5.8.2</junit.jupiter.version>
     <junit.platform.version>1.8.2</junit.platform.version>
+    <zookeeper.version>3.5.6</zookeeper.version>
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
@@ -231,8 +238,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <io.grpc.version>1.51.1</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
-    <sqlite.version>3.25.2</sqlite.version>
-    <weld-servlet.version>2.4.7.Final</weld-servlet.version>
+    <sqlite.version>3.41.2.2</sqlite.version>
+    <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -255,7 +262,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>2.5.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.4.1</maven-shade-plugin.version>
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
     <maven-war-plugin.version>3.1.0</maven-war-plugin.version>
     <maven-source-plugin.version>2.3</maven-source-plugin.version>
@@ -285,18 +292,30 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
-    <snakeyaml.version>1.33</snakeyaml.version>
+    <snakeyaml.version>2.0</snakeyaml.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
     <awaitility.version>4.2.0</awaitility.version>
+    <bzip2.version>1.0.8</bzip2.version>
+    <zlib.version>1.2.13</zlib.version>
+    <lz4.version>1.9.3</lz4.version>
+    <snappy.version>1.1.8</snappy.version>
+    <zstd.version>1.4.9</zstd.version>
+
+    <vault.driver.version>5.1.0</vault.driver.version>
   </properties>
 
 
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio</artifactId>
+        <version>${okio.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
@@ -980,11 +999,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>com.google.inject.extensions</groupId>
-        <artifactId>guice-multibindings</artifactId>
-        <version>${guice.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.inject.extensions</groupId>
         <artifactId>guice-servlet</artifactId>
         <version>${guice.version}</version>
       </dependency>
@@ -1222,6 +1236,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${commons-text.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.zookeeper</groupId>
+        <artifactId>zookeeper</artifactId>
+        <version>${zookeeper.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
         <version>${slf4j.version}</version>
@@ -1442,7 +1461,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.jboss.weld.servlet</groupId>
-        <artifactId>weld-servlet</artifactId>
+        <artifactId>weld-servlet-shaded</artifactId>
         <version>${weld-servlet.version}</version>
       </dependency>
       <dependency>
@@ -1532,6 +1551,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.apache.curator</groupId>
         <artifactId>curator-client</artifactId>
         <version>${curator.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.bettercloud</groupId>
+        <artifactId>vault-java-driver</artifactId>
+        <version>${vault.driver.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1741,6 +1765,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
+                      <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
                       <allowedImport>org.rocksdb.HistogramType</allowedImport>
                       <allowedImport>org.rocksdb.Holder</allowedImport>
@@ -1762,6 +1787,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     </allowedImports>
                     <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                   </RestrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use directly from Guava</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
@@ -1791,6 +1823,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>io.fabric8</groupId>
           <artifactId>docker-maven-plugin</artifactId>
           <version>${docker-maven-plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <artifactId>download-maven-plugin</artifactId>
+          <version>${download-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

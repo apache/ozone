@@ -30,8 +30,20 @@ public interface PipelineChoosePolicy {
    * Given an initial list of pipelines, return one of the pipelines.
    *
    * @param pipelineList list of pipelines.
-   * @return one of the pipelines.
+   * @return one of the pipelines or null if no pipeline can be selected.
    */
   Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri);
+
+  /**
+   * Given a list of pipelines, return the index of the chosen pipeline.
+   * @param pipelineList List of pipelines
+   * @param pri          PipelineRequestInformation
+   * @return Index in the list of the chosen pipeline, or -1 if no pipeline
+   *         could be selected.
+   */
+  default int choosePipelineIndex(List<Pipeline> pipelineList,
+      PipelineRequestInformation pri) {
+    return pipelineList == null || pipelineList.isEmpty() ? -1 : 0;
+  }
 }

@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
 import java.io.IOException;
-import java.util.Set;
 
 /**
  * Class used to pick messages from the ReplicationManager over replicated
@@ -40,18 +35,25 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
 
   @Override
   protected ContainerHealthResult.OverReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueOverReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueOverReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.OverReplicatedHealthResult healthResult) {
-    replicationManager.requeueOverReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.OverReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
   }
+
   @Override
-  protected Set<Pair<DatanodeDetails, SCMCommand<?>>> getDatanodeCommands(
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    // No limit for delete operations
+    return false;
+  }
+
+  @Override
+  protected int sendDatanodeCommands(
       ReplicationManager replicationManager,
       ContainerHealthResult.OverReplicatedHealthResult healthResult)
       throws IOException {

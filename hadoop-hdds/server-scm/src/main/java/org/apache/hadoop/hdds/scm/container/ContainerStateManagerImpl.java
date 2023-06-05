@@ -38,9 +38,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
-import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,8 +85,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
  */
 public final class ContainerStateManagerImpl
     implements ContainerStateManager {
-
-  private ConfigurationSource confSrc;
 
   private final LockManager<ContainerID> lockManager;
 
@@ -123,6 +122,13 @@ public final class ContainerStateManagerImpl
   private final StateMachine<LifeCycleState, LifeCycleEvent> stateMachine;
 
   /**
+   * Pending Ops table used by Replication Manager to track pending moves. As
+   * replicas are added or removed, we make a call to the pendingOps object to
+   * mark the pending operations as completed.
+   */
+  private final ContainerReplicaPendingOps containerReplicaPendingOps;
+
+  /**
    * We use the containers in round-robin fashion for operations like block
    * allocation. This map is used for remembering the last used container.
    */
@@ -147,9 +153,9 @@ public final class ContainerStateManagerImpl
   private ContainerStateManagerImpl(final Configuration conf,
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore,
-      final DBTransactionBuffer buffer)
-      throws IOException {
-    this.confSrc = OzoneConfiguration.of(conf);
+      final DBTransactionBuffer buffer,
+      final ContainerReplicaPendingOps pendingOps) throws IOException {
+    ConfigurationSource confSrc = OzoneConfiguration.of(conf);
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
@@ -160,6 +166,7 @@ public final class ContainerStateManagerImpl
     this.transactionBuffer = buffer;
     this.lockManager =
         new LockManager<>(confSrc, true);
+    this.containerReplicaPendingOps = pendingOps;
     initialize();
   }
 
@@ -376,8 +383,8 @@ public final class ContainerStateManagerImpl
             transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
-          containerStateChangeActions.getOrDefault(event, info -> {
-          }).execute(oldInfo);
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
         }
       }
     } finally {
@@ -402,6 +409,9 @@ public final class ContainerStateManagerImpl
     lockManager.writeLock(id);
     try {
       containers.updateContainerReplica(id, replica);
+      // Clear any pending additions for this replica as we have now seen it.
+      containerReplicaPendingOps.completeAddReplica(id,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } finally {
       lockManager.writeUnlock(id);
     }
@@ -412,8 +422,11 @@ public final class ContainerStateManagerImpl
                                      final ContainerReplica replica) {
     lockManager.writeLock(id);
     try {
-      containers.removeContainerReplica(id,
-          replica);
+      containers.removeContainerReplica(id, replica);
+      // Remove any pending delete replication operations for the deleted
+      // replica.
+      containerReplicaPendingOps.completeDeleteReplica(id,
+          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } finally {
       lockManager.writeUnlock(id);
     }
@@ -470,8 +483,8 @@ public final class ContainerStateManagerImpl
       // space in the headset, we need to pass true to deal with the
       // situation that we have a lone container that has space. That is we
       // ignored the last used container under the assumption we can find
-      // other containers with space, but if have a single container that is
-      // not true. Hence we need to include the last used container as the
+      // other containers with space, but if we have a single container that is
+      // not true. Hence, we need to include the last used container as the
       // last element in the sorted set.
 
       resultSet = containerIDs.headSet(lastID, true);
@@ -562,6 +575,7 @@ public final class ContainerStateManagerImpl
     private SCMRatisServer scmRatisServer;
     private Table<ContainerID, ContainerInfo> table;
     private DBTransactionBuffer transactionBuffer;
+    private ContainerReplicaPendingOps containerReplicaPendingOps;
 
     public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
@@ -588,13 +602,20 @@ public final class ContainerStateManagerImpl
       return this;
     }
 
+    public Builder setContainerReplicaPendingOps(
+        final ContainerReplicaPendingOps pendingOps) {
+      containerReplicaPendingOps = pendingOps;
+      return this;
+    }
+
     public ContainerStateManager build() throws IOException {
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(pipelineMgr);
       Preconditions.checkNotNull(table);
 
       final ContainerStateManager csm = new ContainerStateManagerImpl(
-          conf, pipelineMgr, table, transactionBuffer);
+          conf, pipelineMgr, table, transactionBuffer,
+          containerReplicaPendingOps);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(RequestType.CONTAINER, csm,

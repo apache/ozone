@@ -35,6 +35,7 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -156,6 +157,16 @@ abstract class GrpcOutputStreamTest<T> {
     subject.close();
 
     verifyResponses(concat(bytes1, bytes2));
+  }
+
+  @Test
+  void rejectsWriteAfterClose() throws IOException {
+    subject.close();
+
+    assertThrows(IllegalStateException.class, () -> subject.write(42));
+    assertThrows(IllegalStateException.class, () -> writeBytes(subject, 42));
+
+    subject.close(); // close is idempotent
   }
 
   private void verifyResponses(byte[] bytes) {

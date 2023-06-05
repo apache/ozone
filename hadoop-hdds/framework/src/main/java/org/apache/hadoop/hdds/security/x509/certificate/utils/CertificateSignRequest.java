@@ -30,17 +30,19 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 
 import com.google.common.base.Preconditions;
 import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.ASN1Set;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DERUTF8String;
+import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -66,6 +68,8 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
  * PKCS10CertificationRequest to CertificateServer.
  */
 public final class CertificateSignRequest {
+  // Ozone Certificate distinguished format: (CN=Subject,OU=ScmID,O=ClusterID).
+  private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
   private final KeyPair keyPair;
   private final SecurityConfig config;
   private final Extensions extensions;
@@ -94,10 +98,46 @@ public final class CertificateSignRequest {
     this.extensions = extensions;
   }
 
+  public static String getDistinguishedNameFormat() {
+    return DISTINGUISHED_NAME_FORMAT;
+  }
+
+  public static X500Name getDistinguishedName(String subject, String scmID,
+      String clusterID) {
+    return new X500Name(String.format(getDistinguishedNameFormat(), subject,
+        scmID, clusterID));
+  }
+
+  public static Extensions getPkcs9Extensions(PKCS10CertificationRequest csr)
+      throws CertificateException {
+    ASN1Set pkcs9ExtReq = getPkcs9ExtRequest(csr);
+    Object extReqElement = pkcs9ExtReq.getObjects().nextElement();
+    if (extReqElement instanceof Extensions) {
+      return (Extensions) extReqElement;
+    } else {
+      if (extReqElement instanceof ASN1Sequence) {
+        return Extensions.getInstance((ASN1Sequence) extReqElement);
+      } else {
+        throw new CertificateException("Unknown element type :" + extReqElement
+            .getClass().getSimpleName());
+      }
+    }
+  }
+
+  public static ASN1Set getPkcs9ExtRequest(PKCS10CertificationRequest csr)
+      throws CertificateException {
+    for (Attribute attr : csr.getAttributes()) {
+      ASN1ObjectIdentifier oid = attr.getAttrType();
+      if (oid.equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+        return attr.getAttrValues();
+      }
+    }
+    throw new CertificateException("No PKCS#9 extension found in CSR");
+  }
+
   private PKCS10CertificationRequest generateCSR() throws
       OperatorCreationException {
-    X500Name dnName = SecurityUtil.getDistinguishedName(subject, scmID,
-        clusterID);
+    X500Name dnName = getDistinguishedName(subject, scmID, clusterID);
     PKCS10CertificationRequestBuilder p10Builder =
         new JcaPKCS10CertificationRequestBuilder(dnName, keyPair.getPublic());
 
@@ -331,13 +371,12 @@ public final class CertificateSignRequest {
         return csr.generateCSR();
       } catch (IOException ioe) {
         throw new CertificateException(String.format("Unable to create " +
-            "extension for certificate sign request for %s.", SecurityUtil
-            .getDistinguishedName(subject, scmID, clusterID)), ioe.getCause());
+            "extension for certificate sign request for %s.",
+            getDistinguishedName(subject, scmID, clusterID)), ioe.getCause());
       } catch (OperatorCreationException ex) {
         throw new CertificateException(String.format("Unable to create " +
-            "certificate sign request for %s.", SecurityUtil
-            .getDistinguishedName(subject, scmID, clusterID)),
-            ex.getCause());
+            "certificate sign request for %s.",
+            getDistinguishedName(subject, scmID, clusterID)), ex.getCause());
       }
     }
   }

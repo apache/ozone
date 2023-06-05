@@ -130,8 +130,11 @@ enum Type {
   ListSnapshot = 113;
   SnapshotDiff = 114;
   DeleteSnapshot = 115;
-
-  TransferLeadership = 116;
+  SnapshotMoveDeletedKeys = 116;
+  TransferLeadership = 117;
+  SnapshotPurge = 118;
+  RecoverLease = 119;
+  SetTimes = 120;
 }
 
 message OMRequest {
@@ -244,9 +247,13 @@ message OMRequest {
   optional ListSnapshotRequest              ListSnapshotRequest            = 113;
   optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
   optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
 
-  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 116;
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
+  optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
+  optional SetTimesRequest                   SetTimesRequest               = 120;
 }
 
 message OMResponse {
@@ -352,8 +359,12 @@ message OMResponse {
   optional ListSnapshotResponse              ListSnapshotResponse          = 113;
   optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
   optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
-  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 116;
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
+  optional SetTimesResponse                   SetTimesResponse             = 120;
 }
 
 enum Status {
@@ -464,10 +475,11 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
-
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
+    SSL_CONNECTION_FAILURE = 89;
+    RENAME_OPEN_FILE = 90;
 }
 
 /**
@@ -891,6 +903,7 @@ message ListBucketsRequest {
     optional string startKey = 2;
     optional string prefix = 3;
     optional int32 count = 4;
+    optional bool hasSnapshot = 5;
 }
 
 message ListBucketsResponse {
@@ -1190,10 +1203,10 @@ message DeletedKeys {
     repeated string keys = 3;
 }
 
-
-
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
+    // if set, will purge keys in a snapshot DB instead of active DB
+    optional string snapshotTableKey = 2;
 }
 
 message PurgeKeysResponse {
@@ -1215,6 +1228,7 @@ message PurgePathsResponse {
 
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
+  optional string snapshotTableKey = 2;
 }
 
 message PurgeDirectoriesResponse {
@@ -1333,6 +1347,7 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+    optional bool dbUpdateSuccess = 4;
 }
 
 message RangerBGSyncRequest {
@@ -1676,6 +1691,7 @@ message CreateSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional string snapshotId = 4;
+  optional uint64 creationTime = 5;
 }
 
 message ListSnapshotRequest {
@@ -1688,6 +1704,9 @@ message SnapshotDiffRequest {
   optional string bucketName = 2;
   optional string fromSnapshot = 3;
   optional string toSnapshot = 4;
+  optional string token = 5;
+  optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7;
 }
 
 message DeleteSnapshotRequest {
@@ -1695,6 +1714,23 @@ message DeleteSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional uint64 deletionTime = 4;
+}
+
+message SnapshotMoveDeletedKeysRequest {
+  optional SnapshotInfo fromSnapshot = 1;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 2;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+  repeated string deletedDirsToMove = 5;
+}
+
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
 }
 
 message DeleteTenantRequest {
@@ -1743,10 +1779,27 @@ message ListSnapshotResponse {
 }
 
 message SnapshotDiffResponse {
+  enum JobStatusProto {
+    QUEUED = 1;
+    IN_PROGRESS = 2;
+    DONE = 3;
+    REJECTED = 4;
+    FAILED = 5;
+  }
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional JobStatusProto jobStatus = 2;
+  optional int64 waitTimeInMs = 3;
 }
 
 message DeleteSnapshotResponse {
+
+}
+
+message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
 
 }
 
@@ -1756,6 +1809,7 @@ message SnapshotDiffReportProto {
   optional string fromSnapshot = 3;
   optional string toSnapshot = 4;
   repeated DiffReportEntryProto diffList = 5;
+  optional string token = 6;
 }
 
 message DiffReportEntryProto {
@@ -1815,6 +1869,25 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+}
+
+message RecoverLeaseRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string keyName = 3;
+}
+
+message RecoverLeaseResponse {
+  optional bool response = 1;
+}
+
+message SetTimesRequest {
+  required KeyArgs keyArgs = 1;
+  required uint64 mtime    = 2;
+  required uint64 atime    = 3;
+}
+
+message SetTimesResponse {
 }
 
 /**

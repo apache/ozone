@@ -123,4 +123,8 @@ public abstract class SCMCommand<T extends Message> implements
     return deadlineMsSinceEpoch > 0 &&
         currentEpochMs > deadlineMsSinceEpoch;
   }
+
+  public boolean contributesToQueueSize() {
+    return true;
+  }
 }

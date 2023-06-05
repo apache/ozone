@@ -220,7 +220,7 @@ public class BlockDeletingService extends BackgroundService {
           long minReplicatedIndex =
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
-          if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
+          if (minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
@@ -294,11 +294,11 @@ public class BlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
       try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-        if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
           crr = deleteViaSchema2(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
           crr = deleteViaSchema3(meta, container, dataDir, startTime);
         } else {
           throw new UnsupportedOperationException(
@@ -480,8 +480,15 @@ public class BlockDeletingService extends BackgroundService {
           delBlocks.add(delTx);
         }
         if (delBlocks.isEmpty()) {
-          LOG.debug("No transaction found in container : {}",
-              containerData.getContainerID());
+          LOG.info("No transaction found in container {} with pending delete " +
+                  "block count {}",
+              containerData.getContainerID(),
+              containerData.getNumPendingDeletionBlocks());
+          // If the container was queued for delete, it had a positive
+          // pending delete block count. After checking the DB there were
+          // actually no delete transactions for the container, so reset the
+          // pending delete block count to the correct value of zero.
+          containerData.resetPendingDeleteBlockCount(meta);
           return crr;
         }
 
@@ -529,7 +536,7 @@ public class BlockDeletingService extends BackgroundService {
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            deletedBlocksCount, Time.monotonicNow() - startTime);
+            deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
         return crr;
       } catch (IOException exception) {

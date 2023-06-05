@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +89,12 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
         removeContainerReplicas(datanodeDetails);
       }
+      
+      // remove commands in command queue for the DN
+      final List<SCMCommand> cmdList = nodeManager.getCommandQueue(
+          datanodeDetails.getUuid());
+      LOG.info("Clearing command queue of size {} for DN {}",
+          cmdList.size(), datanodeDetails);
 
       //move dead datanode out of ClusterNetworkTopology
       NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();

@@ -149,12 +149,6 @@ public class OzoneKey {
     return modificationTime;
   }
 
-  /**
-   * Returns the replication type of the key.
-   *
-   * @return replicationType
-   */
-
   public Map<String, String> getMetadata() {
     return metadata;
   }
@@ -163,6 +157,11 @@ public class OzoneKey {
     this.metadata.putAll(metadata);
   }
 
+  /**
+   * Returns the replication type of the key.
+   *
+   * @return replicationType
+   */
   @Deprecated
   @JsonIgnore
   public ReplicationType getReplicationType() {

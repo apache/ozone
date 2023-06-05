@@ -87,6 +87,7 @@ public class TestRandomKeyGenerator {
     Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
     Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    randomKeyGenerator.printStats(System.out);
   }
 
   @Test

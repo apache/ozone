@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.retry.Idempotent;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
@@ -31,9 +32,15 @@ import java.util.List;
  **********************************************************************/
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public interface ReconfigureProtocol {
+public interface ReconfigureProtocol extends Closeable {
 
   long VERSIONID = 1L;
+
+  /**
+   * Get the name of service to be reconfigured.
+   */
+  @Idempotent
+  String getServerName() throws IOException;
 
   /**
    * Asynchronously reload configuration on disk and apply changes.

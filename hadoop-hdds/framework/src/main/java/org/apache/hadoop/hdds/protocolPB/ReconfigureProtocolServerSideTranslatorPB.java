@@ -22,6 +22,8 @@ import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil.PropertyChange;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusResponseProto;
@@ -53,6 +55,17 @@ public class ReconfigureProtocolServerSideTranslatorPB implements
   public ReconfigureProtocolServerSideTranslatorPB(
       ReconfigureProtocol impl) {
     this.impl = impl;
+  }
+
+  @Override
+  public GetServerNameResponseProto getServerName(RpcController controller,
+      GetServerNameRequestProto request) throws ServiceException {
+    try {
+      return GetServerNameResponseProto.newBuilder()
+          .setName(impl.getServerName()).build();
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
   }
 
   @Override

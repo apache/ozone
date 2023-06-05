@@ -45,6 +45,9 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of failed delete blocks.")
   private MutableCounterLong failureCount;
 
+  @Metric(about = "The number of out of order delete block transaction.")
+  private MutableCounterLong outOfOrderDeleteBlockTransactionCount;
+
   private BlockDeletingServiceMetrics() {
   }
 
@@ -91,12 +94,22 @@ public final class BlockDeletingServiceMetrics {
     return failureCount.value();
   }
 
+  public void incOutOfOrderDeleteBlockTransactionCount() {
+    this.outOfOrderDeleteBlockTransactionCount.incr();
+  }
+
+  public long getOutOfOrderDeleteBlockTransactionCount() {
+    return outOfOrderDeleteBlockTransactionCount.value();
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
     buffer.append("successCount = " + successCount.value()).append("\t")
         .append("successBytes = " + successBytes.value()).append("\t")
-        .append("failureCount = " + failureCount.value()).append("\t");
+        .append("failureCount = " + failureCount.value()).append("\t")
+        .append("outOfOrderDeleteBlockTransactionCount = "
+            + outOfOrderDeleteBlockTransactionCount.value()).append("\t");
     return buffer.toString();
   }
 }

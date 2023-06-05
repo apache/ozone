@@ -49,6 +49,11 @@ public class ContainerMetrics {
   public static final String STORAGE_CONTAINER_METRICS =
       "StorageContainerMetrics";
   @Metric private MutableCounterLong numOps;
+  @Metric private MutableCounterLong containerDeleteFailedNonEmptyDir;
+  @Metric private MutableCounterLong containerDeleteFailedBlockCountNotZero;
+  @Metric private MutableCounterLong containerForceDelete;
+  @Metric private MutableCounterLong containerDeleteFailedNonEmptyBlockDB;
+
   private MutableCounterLong[] numOpsArray;
   private MutableCounterLong[] opsBytesArray;
   private MutableRate[] opsLatency;
@@ -124,5 +129,36 @@ public class ContainerMetrics {
 
   public long getContainerBytesMetrics(ContainerProtos.Type type) {
     return opsBytesArray[type.ordinal()].value();
+  }
+
+  public void incContainerDeleteFailedBlockCountNotZero() {
+    containerDeleteFailedBlockCountNotZero.incr();
+  }
+  public void incContainerDeleteFailedNonEmpty() {
+    containerDeleteFailedNonEmptyDir.incr();
+  }
+
+  public void incContainersForceDelete() {
+    containerForceDelete.incr();
+  }
+
+  public long getContainerDeleteFailedNonEmptyDir() {
+    return containerDeleteFailedNonEmptyDir.value();
+  }
+
+  public long getContainerDeleteFailedBlockCountNotZero() {
+    return containerDeleteFailedBlockCountNotZero.value();
+  }
+
+  public long getContainerForceDelete() {
+    return containerForceDelete.value();
+  }
+
+  public void incContainerDeleteFailedNonEmptyBlocksDB() {
+    containerDeleteFailedNonEmptyBlockDB.incr();
+  }
+
+  public long getContainerDeleteFailedNonEmptyBlockDB() {
+    return containerDeleteFailedNonEmptyBlockDB.value();
   }
 }

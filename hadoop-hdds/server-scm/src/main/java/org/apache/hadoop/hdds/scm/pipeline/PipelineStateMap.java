@@ -276,6 +276,9 @@ class PipelineStateMap {
     if (state == PipelineState.OPEN) {
       pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
           replicationConfig, Collections.emptyList()));
+      if (excludeDns.isEmpty() && excludePipelines.isEmpty()) {
+        return pipelines;
+      }
     } else {
       pipelines = new ArrayList<>(pipelineMap.values());
     }

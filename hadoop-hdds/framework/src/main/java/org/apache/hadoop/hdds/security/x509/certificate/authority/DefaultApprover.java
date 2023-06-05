@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
-import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.util.Time;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -49,6 +48,9 @@ import java.math.BigInteger;
 import java.security.PrivateKey;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
 /**
  * Default Approver used the by the DefaultCA.
@@ -119,7 +121,7 @@ public class DefaultApprover extends BaseApprover {
         // will succeed only after datanode has a valid certificate.
         String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
             .toASN1Primitive().toString();
-        x500Name = SecurityUtil.getDistinguishedName(cn, scmId, clusterId);
+        x500Name = getDistinguishedName(cn, scmId, clusterId);
       } else {
         // Throw exception if scmId and clusterId doesn't match.
         throw new SCMSecurityException("ScmId and ClusterId in CSR subject" +
@@ -142,7 +144,7 @@ public class DefaultApprover extends BaseApprover {
             validTill,
             x500Name, keyInfo);
 
-    Extensions exts = SecurityUtil.getPkcs9Extensions(certificationRequest);
+    Extensions exts = getPkcs9Extensions(certificationRequest);
     for (ASN1ObjectIdentifier extId : getProfile().getSupportedExtensions()) {
       Extension ext = exts.getExtension(extId);
       if (ext != null) {

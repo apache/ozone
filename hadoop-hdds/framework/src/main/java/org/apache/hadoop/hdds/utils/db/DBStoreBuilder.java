@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import java.util.concurrent.TimeUnit;
+import com.google.protobuf.MessageLite;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -45,10 +45,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -74,7 +72,7 @@ public final class DBStoreBuilder {
   public static final Logger ROCKS_DB_LOGGER =
       LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
-  private static final String DEFAULT_COLUMN_FAMILY_NAME =
+  public static final String DEFAULT_COLUMN_FAMILY_NAME =
       StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.
@@ -93,7 +91,7 @@ public final class DBStoreBuilder {
   // any options. On build, this will be replaced with defaultCfOptions.
   private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
-  private CodecRegistry registry;
+  private final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
   private String rocksDbStat;
   // RocksDB column family write buffer size
   private long rocksDbCfWriteBufferSize;
@@ -102,9 +100,11 @@ public final class DBStoreBuilder {
   private boolean openReadOnly = false;
   private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
-  private boolean enableCompactionLog;
-  private long maxTimeAllowedForSnapshotInDag;
-  private long pruneCompactionDagDaemonRunInterval;
+  private boolean enableCompactionDag;
+  private boolean createCheckpointDirs = true;
+  // this is to track the total size of dbUpdates data since sequence
+  // number in request to avoid increase in heap memory.
+  private long maxDbUpdatesSizeThreshold;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -137,7 +137,6 @@ public final class DBStoreBuilder {
       RocksDBConfiguration rocksDBConfiguration) {
     cfOptions = new HashMap<>();
     this.configuration = configuration;
-    this.registry = new CodecRegistry();
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
@@ -153,15 +152,9 @@ public final class DBStoreBuilder {
           HDDS_DEFAULT_DB_PROFILE);
     LOG.debug("Default DB profile:{}", defaultCfProfile);
 
-    maxTimeAllowedForSnapshotInDag = configuration.getTimeDuration(
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    pruneCompactionDagDaemonRunInterval = configuration.getTimeDuration(
-        OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
-        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
+    this.maxDbUpdatesSizeThreshold = (long) configuration.getStorageSize(
+        OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT,
+        OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT, StorageUnit.BYTES);
   }
 
   private void applyDBDefinition(DBDefinition definition) {
@@ -217,9 +210,9 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-          registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionLog, maxTimeAllowedForSnapshotInDag,
-          pruneCompactionDagDaemonRunInterval);
+          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
+          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
+          configuration);
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }
@@ -254,6 +247,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
+  public <T extends MessageLite> DBStoreBuilder addProto2Codec(Class<T> type) {
+    return addCodec(type, Proto2Codec.get(type));
+  }
+
   public DBStoreBuilder setDBOptions(ManagedDBOptions option) {
     rocksDBOption = option;
     return this;
@@ -276,11 +273,15 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setEnableCompactionLog(boolean enableCompactionLog) {
-    this.enableCompactionLog = enableCompactionLog;
+  public DBStoreBuilder setEnableCompactionDag(boolean enableCompactionDag) {
+    this.enableCompactionDag = enableCompactionDag;
     return this;
   }
 
+  public DBStoreBuilder setCreateCheckpointDirs(boolean createCheckpointDirs) {
+    this.createCheckpointDirs = createCheckpointDirs;
+    return this;
+  }
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
@@ -324,6 +325,20 @@ public final class DBStoreBuilder {
   private ManagedColumnFamilyOptions getDefaultCfOptions() {
     return Optional.ofNullable(defaultCfOptions)
         .orElseGet(defaultCfProfile::getColumnFamilyOptions);
+  }
+
+  /**
+   * Pass true to disable auto compaction for Column Family by default.
+   * Sets Disable auto compaction flag for Default Column Family option
+   * @param defaultCFAutoCompaction
+   */
+  public DBStoreBuilder disableDefaultCFAutoCompaction(
+          boolean defaultCFAutoCompaction) {
+    ManagedColumnFamilyOptions defaultCFOptions =
+            getDefaultCfOptions();
+    defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
+    setDefaultCFOptions(defaultCFOptions);
+    return this;
   }
 
   /**
@@ -375,6 +390,10 @@ public final class DBStoreBuilder {
       logger.setInfoLogLevel(level);
       dbOptions.setLogger(logger);
     }
+
+    // Apply WAL settings.
+    dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
+    dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {

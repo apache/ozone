@@ -62,12 +62,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_CONNECTION_FAILURE;
 
 /**
  * Grpc transport for grpc between s3g and om.
  */
 public class GrpcOmTransport implements OmTransport {
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
@@ -142,21 +143,16 @@ public class GrpcOmTransport implements OmTransport {
               .usePlaintext()
               .maxInboundMessageSize(maxSize);
 
-      if (secConfig.isGrpcTlsEnabled()) {
+      if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
         try {
           SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-          if (secConfig.isSecurityEnabled()) {
-            if (caCerts != null) {
-              sslContextBuilder.trustManager(caCerts);
-            } else {
-              LOG.error("x509Certicates empty");
-            }
-            channelBuilder.useTransportSecurity().
-                sslContext(sslContextBuilder.build());
+          if (caCerts != null) {
+            sslContextBuilder.trustManager(caCerts);
           } else {
-            LOG.error("ozone.security not enabled when TLS specified," +
-                " using plaintext");
+            LOG.error("x509Certificates empty");
           }
+          channelBuilder.useTransportSecurity().
+              sslContext(sslContextBuilder.build());
         } catch (Exception ex) {
           LOG.error("cannot establish TLS for grpc om transport client");
         }
@@ -189,7 +185,12 @@ public class GrpcOmTransport implements OmTransport {
       try {
         resp = clients.get(host.get()).submitRequest(payload);
       } catch (StatusRuntimeException e) {
+        LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
+          if (e.getCause() != null &&
+              e.getCause() instanceof javax.net.ssl.SSLHandshakeException) {
+            throw new OMException(SSL_CONNECTION_FAILURE);
+          }
           resultCode = ResultCodes.TIMEOUT;
         }
         Exception exp = new Exception(e);
@@ -302,6 +303,7 @@ public class GrpcOmTransport implements OmTransport {
             entry.getKey(), e);
       }
     }
+    LOG.info("{}: stopped", CLIENT_NAME);
   }
 
   @Override

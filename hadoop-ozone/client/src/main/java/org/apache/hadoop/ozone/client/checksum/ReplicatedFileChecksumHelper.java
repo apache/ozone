@@ -78,7 +78,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
             "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode : {}" + getCombineMode());
+                + ", checksum combine mode: " + getCombineMode());
       }
 
       currentLength += keyLocationInfo.getLength();
@@ -143,7 +143,6 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
           .build();
     }
 
-    boolean success = false;
     List<ContainerProtos.ChunkInfo> chunks;
     XceiverClientSpi xceiverClientSpi = null;
     try {
@@ -160,9 +159,8 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
           .getBlock(xceiverClientSpi, datanodeBlockID, token);
 
       chunks = response.getBlockData().getChunksList();
-      success = true;
     } finally {
-      if (!success && xceiverClientSpi != null) {
+      if (xceiverClientSpi != null) {
         getXceiverClientFactory().releaseClientForReadData(
             xceiverClientSpi, false);
       }

@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -88,13 +88,13 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSING, 1, 2, 3, 4, 5);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assert.assertFalse(deletingContainerHandler.handle(request));
+    Assertions.assertFalse(deletingContainerHandler.handle(request));
   }
 
   @Test
@@ -106,13 +106,13 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSING, 0, 0, 0);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assert.assertFalse(deletingContainerHandler.handle(request));
+    Assertions.assertFalse(deletingContainerHandler.handle(request));
   }
 
   /**
@@ -139,13 +139,13 @@ public class TestDeletingContainerHandler {
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assert.assertTrue(deletingContainerHandler.handle(request));
+    Assertions.assertTrue(deletingContainerHandler.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))
         .updateContainerState(Mockito.any(ContainerID.class),
             Mockito.any(HddsProtos.LifeCycleEvent.class));
@@ -229,7 +229,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assert.assertTrue(deletingContainerHandler.handle(request));
+    Assertions.assertTrue(deletingContainerHandler.handle(request));
 
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),

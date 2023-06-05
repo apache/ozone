@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,6 +66,7 @@ public class TestOzoneManagerRestart {
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -94,7 +96,7 @@ public class TestOzoneManagerRestart {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-
+    client = cluster.newClient();
   }
 
   /**
@@ -102,6 +104,7 @@ public class TestOzoneManagerRestart {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -111,7 +114,6 @@ public class TestOzoneManagerRestart {
   public void testRestartOMWithVolumeOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
 
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     objectStore.createVolume(volumeName);
@@ -141,8 +143,6 @@ public class TestOzoneManagerRestart {
   public void testRestartOMWithBucketOperation() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -183,8 +183,6 @@ public class TestOzoneManagerRestart {
 
     String newKey1 = "key1new" + RandomStringUtils.randomNumeric(5);
     String newKey2 = "key2new" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
 
     ObjectStore objectStore = client.getObjectStore();
 

@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
@@ -291,15 +291,18 @@ public interface ClientProtocol {
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.
-   * @param volumeName Name of the Volume
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Starting point of the list, this bucket is excluded
+   *
+   * @param volumeName    Name of the Volume
+   * @param bucketPrefix  Bucket prefix to match
+   * @param prevBucket    Starting point of the list, this bucket is excluded
    * @param maxListResult Max number of buckets to return.
+   * @param hasSnapshot   flag to list the buckets which have snapshot.
    * @return {@code List<OzoneBucket>}
    * @throws IOException
    */
   List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                String prevBucket, int maxListResult)
+                                String prevBucket, int maxListResult,
+                                boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -1057,10 +1060,28 @@ public interface ClientProtocol {
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param fromSnapshot The name of the starting snapshot
    * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                  String fromSnapshot, String toSnapshot)
+  SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
+                                    String fromSnapshot, String toSnapshot,
+                                    String token, int pageSize,
+                                    boolean forceFullDiff)
+      throws IOException;
+
+  /**
+   * Time to be set for given Ozone object. This operations updates modification
+   * time and access time for the given key.
+   * @param obj Ozone object.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   *
+   * @throws IOException if there is error.
+   * */
+  void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException;
 }

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -139,6 +141,7 @@ public class TestValidateBCSIDOnRestart {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -189,7 +192,8 @@ public class TestValidateBCSIDOnRestart {
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     stateMachine.takeSnapshot();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    final Path parentPath = StatemachineImplTestUtil.findLatestSnapshot(storage)
+        .getFile().getPath();
     stateMachine.buildMissingContainerSet(parentPath.toFile());
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots

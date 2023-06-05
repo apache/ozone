@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,6 +92,9 @@ public class TestCapacityVolumeChoosingPolicy {
   @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
+    FileUtil.fullyDelete(new File(VOLUME_1));
+    FileUtil.fullyDelete(new File(VOLUME_2));
+    FileUtil.fullyDelete(new File(VOLUME_3));
   }
 
   @Test

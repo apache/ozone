@@ -22,7 +22,6 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Objects;
 
 /**
@@ -34,6 +33,7 @@ public class ECReconstructionCoordinatorTask
       LoggerFactory.getLogger(ECReconstructionCoordinatorTask.class);
   private final ECReconstructionCoordinator reconstructionCoordinator;
   private final ECReconstructionCommandInfo reconstructionCommandInfo;
+  private final String debugString;
 
   public ECReconstructionCoordinatorTask(
       ECReconstructionCoordinator coordinator,
@@ -43,6 +43,7 @@ public class ECReconstructionCoordinatorTask
         reconstructionCommandInfo.getTerm());
     this.reconstructionCoordinator = coordinator;
     this.reconstructionCommandInfo = reconstructionCommandInfo;
+    debugString = reconstructionCommandInfo.toString();
   }
 
   @Override
@@ -59,12 +60,10 @@ public class ECReconstructionCoordinatorTask
     // 4. Write the recovered chunks to given targets/write locally to
     // respective container. HDDS-6582
     // 5. Close/finalize the recovered containers.
-    long containerID = this.reconstructionCommandInfo.getContainerID();
     long start = Time.monotonicNow();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Starting the EC reconstruction of the container {}",
-          containerID);
-    }
+
+    LOG.info("{}", this);
+
     try {
       reconstructionCoordinator.reconstructECContainerGroup(
           reconstructionCommandInfo.getContainerID(),
@@ -72,18 +71,18 @@ public class ECReconstructionCoordinatorTask
           reconstructionCommandInfo.getSourceNodeMap(),
           reconstructionCommandInfo.getTargetNodeMap());
       long elapsed = Time.monotonicNow() - start;
-      LOG.info("Completed {} in {} ms", reconstructionCommandInfo, elapsed);
       setStatus(Status.DONE);
-    } catch (IOException e) {
+      LOG.info("{} in {} ms", this, elapsed);
+    } catch (Exception e) {
       long elapsed = Time.monotonicNow() - start;
-      LOG.warn("Failed {} after {} ms", reconstructionCommandInfo, elapsed, e);
       setStatus(Status.FAILED);
+      LOG.warn("{} after {} ms", this, elapsed, e);
     }
   }
 
   @Override
-  public String toString() {
-    return "ECReconstructionTask{info=" + reconstructionCommandInfo + '}';
+  protected Object getCommandForDebug() {
+    return debugString;
   }
 
   @Override

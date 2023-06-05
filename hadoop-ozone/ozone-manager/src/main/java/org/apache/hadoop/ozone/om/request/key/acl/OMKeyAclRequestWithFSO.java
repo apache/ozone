@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import com.google.common.base.Optional;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -74,9 +75,10 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           OzoneManagerProtocolProtos.OzoneObj.ObjectType.KEY);
-
-      volume = objectParser.getVolume();
-      bucket = objectParser.getBucket();
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
       key = objectParser.getKey();
 
       // check Acl
@@ -121,12 +123,12 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
         Table<String, OmDirectoryInfo> dirTable =
             omMetadataManager.getDirectoryTable();
         dirTable.addCacheEntry(new CacheKey<>(dbKey),
-            new CacheValue<>(Optional.of(OMFileRequest.
-                getDirectoryInfo(omKeyInfo)), trxnLogIndex));
+            CacheValue.get(trxnLogIndex,
+                OMFileRequest.getDirectoryInfo(omKeyInfo)));
       } else {
         omMetadataManager.getKeyTable(getBucketLayout())
             .addCacheEntry(new CacheKey<>(dbKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+                CacheValue.get(trxnLogIndex, omKeyInfo));
       }
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);

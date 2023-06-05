@@ -71,18 +71,16 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       // handler so return as unhandled so any further handlers will be tried.
       return false;
     }
-    // TODO - should the report have a HEALTHY state, rather than just bad
-    //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       if (underHealth.isUnrecoverable()) {
-        // TODO - do we need a new health state for unrecoverable EC?
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.MISSING, containerID);
+      } else {
+        report.incrementAndSample(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
@@ -117,7 +115,9 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
       LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending "
-          + "is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
+              + "is [{}]. Reason for mis replication is [{}].", container,
+          misRepHealth.isReplicatedOkAfterPending(),
+          misRepHealth.getMisReplicatedReason());
       return true;
     }
     // Should not get here, but in case it does the container is not healthy,
@@ -141,19 +141,19 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     if (!replicaCount.isSufficientlyReplicated(false)) {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
-      boolean dueToDecommission = true;
+      boolean dueToOutOfService = true;
       if (missingIndexes.size() > 0) {
         // The container has reduced redundancy and will need reconstructed
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under
         // replication is not caused only by decommission, we say it is not
         // due to decommission/
-        dueToDecommission = false;
+        dueToOutOfService = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
       ContainerHealthResult.UnderReplicatedHealthResult result =
           new ContainerHealthResult.UnderReplicatedHealthResult(
-              container, remainingRedundancy, dueToDecommission,
+              container, remainingRedundancy, dueToOutOfService,
               replicaCount.isSufficientlyReplicated(true),
               replicaCount.isUnrecoverable());
       if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
@@ -177,7 +177,8 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           replicas, container.getReplicationConfig().getRequiredNodes(),
           request.getPendingOps());
       return new ContainerHealthResult.MisReplicatedHealthResult(
-          container, placementAfterPending.isPolicySatisfied());
+          container, placementAfterPending.isPolicySatisfied(),
+          placementAfterPending.misReplicatedReason());
     }
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
@@ -187,7 +188,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
    * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
    * and then check if the list meets the container placement policy.
    * @param replicas List of containerReplica
-   * @param replicationFactor Expected Replication Factor of the containe
+   * @param replicationFactor Expected Replication Factor of the container
    * @return ContainerPlacementStatus indicating if the policy is met or not
    */
   private ContainerPlacementStatus getPlacementStatus(

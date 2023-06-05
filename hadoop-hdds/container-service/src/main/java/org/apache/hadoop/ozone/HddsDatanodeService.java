@@ -22,14 +22,18 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.collect.ImmutableSortedSet;
 import org.apache.hadoop.conf.Configurable;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -44,6 +48,8 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -56,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -67,6 +74,8 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
@@ -107,6 +116,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) { };
   private ObjectName dnInfoBeanName;
   private DatanodeCRLStore dnCRLStore;
+  private HddsDatanodeClientProtocolServer clientProtocolServer;
+  private final SortedSet<String> reconfigurableProperties =
+      ImmutableSortedSet.of();
+  private OzoneAdmins admins;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -116,8 +129,27 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
+  private void cleanTmpDir() {
+    if (datanodeStateMachine != null) {
+      MutableVolumeSet volumeSet =
+          datanodeStateMachine.getContainer().getVolumeSet();
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        if (volume instanceof HddsVolume) {
+          HddsVolume hddsVolume = (HddsVolume) volume;
+          try {
+            KeyValueContainerUtil.ContainerDeleteDirectory
+                .cleanTmpDir(hddsVolume);
+          } catch (IOException ex) {
+            LOG.error("Error while cleaning tmp delete directory " +
+                "under {}", hddsVolume.getWorkingDir(), ex);
+          }
+        }
+      }
+    }
+  }
+
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    * <p>
    * This method is intended for unit tests only. It suppresses the
    * startup/shutdown message and skips registering Unix signal handlers.
@@ -132,7 +164,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   /**
-   * Create an Datanode instance based on the supplied command-line arguments.
+   * Create a Datanode instance based on the supplied command-line arguments.
    *
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
@@ -162,11 +194,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public Void call() throws Exception {
+    OzoneConfiguration configuration = createOzoneConfiguration();
     if (printBanner) {
       StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-          HddsDatanodeService.class, args, LOG);
+          HddsDatanodeService.class, args, LOG, configuration);
     }
-    start(createOzoneConfiguration());
+    start(configuration);
     ShutdownHookManager.get().addShutdownHook(() -> {
       try {
         stop();
@@ -275,9 +308,29 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
+        HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
+        if (policy.isHttpEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTP,
+                  httpServer.getHttpAddress().getPort()));
+        }
+        if (policy.isHttpsEnabled()) {
+          datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS,
+                  httpServer.getHttpsAddress().getPort()));
+        }
       } catch (Exception ex) {
         LOG.error("HttpServer failed to start.", ex);
       }
+
+      clientProtocolServer = new HddsDatanodeClientProtocolServer(
+          this, datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO);
+
+      // Get admin list
+      String starterUser =
+          UserGroupInformation.getCurrentUser().getShortUserName();
+      admins = OzoneAdmins.getOzoneAdmins(starterUser, conf);
+      LOG.info("Datanode start with admins: {}", admins.getAdminUsernames());
+
+      clientProtocolServer.start();
       startPlugins();
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
@@ -334,6 +387,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
+      certClient.close();
       LOG.info("Re-initialize certificate client.");
       certClient = new DNCertificateClient(secConf, datanodeDetails, null,
           this::saveNewCertId, this::terminateDatanode);
@@ -351,8 +405,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // persist cert ID to VERSION file
       datanodeDetails.setCertSerialId(dnCertSerialId);
       persistDatanodeDetails(datanodeDetails);
-      // set new certificate ID
-      certClient.setCertificateId(dnCertSerialId);
       LOG.info("Successfully stored SCM signed certificate, case:{}.",
           response);
       break;
@@ -421,7 +473,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
-    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile);
+    ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
 
   /**
@@ -473,6 +525,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     return datanodeStateMachine;
   }
 
+  public HddsDatanodeClientProtocolServer getClientProtocolServer() {
+    return clientProtocolServer;
+  }
+
   @VisibleForTesting
   public DatanodeCRLStore getCRLStore() {
     return dnCRLStore;
@@ -487,6 +543,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.info("Interrupted during StorageContainerManager join.");
       }
     }
+    if (getClientProtocolServer() != null) {
+      try {
+        getClientProtocolServer().join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOG.info("Interrupted during HddsDatanodeClientProtocolServer join.");
+      }
+    }
   }
 
   public void terminateDatanode() {
@@ -497,6 +561,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void stop() {
     if (!isStopped.getAndSet(true)) {
+      // Clean <HddsVolume>/tmp/container_delete_service dir.
+      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {
@@ -516,6 +582,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         } catch (Exception e) {
           LOG.error("Stopping HttpServer is failed.", e);
         }
+      }
+      if (getClientProtocolServer() != null) {
+        getClientProtocolServer().stop();
       }
       unregisterMXBean();
       // stop dn crl store
@@ -561,7 +630,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   @VisibleForTesting
-  public void setCertificateClient(CertificateClient client) {
+  public void setCertificateClient(CertificateClient client)
+      throws IOException {
+    if (dnCertClient != null) {
+      dnCertClient.close();
+    }
     dnCertClient = client;
   }
 
@@ -583,4 +656,22 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       terminateDatanode();
     }
   }
+
+  /**
+   * Check ozone admin privilege, throws exception if not admin.
+   */
+  public void checkAdminUserPrivilege(UserGroupInformation ugi)
+      throws IOException {
+    admins.checkAdminUserPrivilege(ugi);
+  }
+
+  public String reconfigurePropertyImpl(String property, String newVal)
+      throws ReconfigurationException {
+    return "";
+  }
+
+  public Collection<String> getReconfigurableProperties() {
+    return reconfigurableProperties;
+  }
+
 }

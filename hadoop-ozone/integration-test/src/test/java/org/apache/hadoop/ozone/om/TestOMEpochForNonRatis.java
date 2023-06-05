@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.HashMap;
 import java.util.UUID;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -57,6 +59,7 @@ public class TestOMEpochForNonRatis {
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = Timeout.seconds(240);
@@ -74,7 +77,7 @@ public class TestOMEpochForNonRatis {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-
+    client = cluster.newClient();
   }
 
   /**
@@ -82,6 +85,7 @@ public class TestOMEpochForNonRatis {
    */
   @AfterClass
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -98,7 +102,6 @@ public class TestOMEpochForNonRatis {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
     OzoneManager om = cluster.getOzoneManager();
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -160,7 +163,6 @@ public class TestOMEpochForNonRatis {
     // Create a volume and check the objectID has the epoch as
     // EPOCH_FOR_RATIS_NOT_ENABLED in the first 2 bits.
 
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);

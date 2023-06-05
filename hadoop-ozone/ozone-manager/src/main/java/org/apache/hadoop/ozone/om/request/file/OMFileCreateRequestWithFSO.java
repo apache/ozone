@@ -171,7 +171,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,

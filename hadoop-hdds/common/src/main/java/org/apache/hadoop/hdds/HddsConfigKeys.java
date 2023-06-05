@@ -62,6 +62,14 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
+      "hdds.datanode.volume.min.free.space";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
+      "5GB";
+
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
+      "hdds.datanode.volume.min.free.space.percent";
+
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for
@@ -236,19 +244,6 @@ public final class HddsConfigKeys {
       ".test.cert";
   public static final boolean HDDS_GRPC_TLS_TEST_CERT_DEFAULT = false;
 
-  /**
-   * The default time interval used to check if either of the truststore or
-   * keystore certificates file has changed and needs reloading.
-   */
-  public static final String HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL =
-      "hdds.security.ssl.keystore.reload.interval";
-  public static final String HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL =
-      "hdds.security.ssl.truststore.reload.interval";
-  public static final String
-      HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
-  public static final String
-      HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL_DEFAULT = "60s";
-
   // Comma separated acls (users, groups) allowing clients accessing
   // datanode container protocol
   // when hadoop.security.authorization is true, this needs to be set in
@@ -294,7 +289,18 @@ public final class HddsConfigKeys {
       "hdds.datanode.http-address";
   public static final String HDDS_DATANODE_HTTPS_ADDRESS_KEY =
       "hdds.datanode.https-address";
-
+  public static final String HDDS_DATANODE_CLIENT_ADDRESS_KEY =
+      "hdds.datanode.client.address";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_KEY =
+      "hdds.datanode.client.bind.host";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT =
+      "0.0.0.0";
+  public static final String HDDS_DATANODE_CLIENT_PORT_KEY =
+      "hdds.datanode.client.port";
+  public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 9864;
+  public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
+      "hdds.datanode.handler.count";
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;

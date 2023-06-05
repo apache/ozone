@@ -296,7 +296,8 @@ public class TestDeletedBlockLog {
   private List<DeletedBlocksTransaction> getTransactions(
       int maximumAllowedBlocksNum) throws IOException, TimeoutException {
     DatanodeDeletedBlockTransactions transactions =
-        deletedBlockLog.getTransactions(maximumAllowedBlocksNum);
+        deletedBlockLog.getTransactions(maximumAllowedBlocksNum,
+            dnList.stream().collect(Collectors.toSet()));
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
     for (DatanodeDetails dn : dnList) {
       txns.addAll(Optional.ofNullable(
@@ -441,6 +442,17 @@ public class TestDeletedBlockLog {
   }
 
   @Test
+  public void testDNOnlyOneNodeHealthy() throws Exception {
+    Map<Long, List<Long>> deletedBlocks = generateData(50);
+    addTransactions(deletedBlocks, true);
+    DatanodeDeletedBlockTransactions transactions
+        = deletedBlockLog.getTransactions(
+        30 * BLOCKS_PER_TXN * THREE,
+        dnList.subList(0, 1).stream().collect(Collectors.toSet()));
+    Assertions.assertEquals(1, transactions.getDatanodeTransactionMap().size());
+  }
+
+  @Test
   public void testInadequateReplicaCommit() throws Exception {
     Map<Long, List<Long>> deletedBlocks = generateData(50);
     addTransactions(deletedBlocks, true);
@@ -461,7 +473,8 @@ public class TestDeletedBlockLog {
     // For the rest txn, txn will be got from all dns.
     // Committed txn will be: 1-40. 1-40. 31-40
     commitTransactions(deletedBlockLog.getTransactions(
-        30 * BLOCKS_PER_TXN * THREE));
+        30 * BLOCKS_PER_TXN * THREE,
+        dnList.stream().collect(Collectors.toSet())));
 
     // The rest txn shall be: 41-50. 41-50. 41-50
     List<DeletedBlocksTransaction> blocks = getAllTransactions();

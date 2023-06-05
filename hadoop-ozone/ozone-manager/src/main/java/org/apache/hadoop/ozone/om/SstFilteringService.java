@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
@@ -45,12 +46,14 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -64,7 +67,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
  * all the irrelevant and safe to delete sst files that don't correspond
  * to the bucket on which the snapshot was taken.
  */
-public class SstFilteringService extends BackgroundService {
+public class SstFilteringService extends BackgroundService
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SstFilteringService.class);
@@ -99,6 +103,9 @@ public class SstFilteringService extends BackgroundService {
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
   }
+
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
 
   private class SstFilteringTask implements BackgroundTask {
 
@@ -143,11 +150,18 @@ public class SstFilteringService extends BackgroundService {
 
           String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
 
-          RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(), new File(snapshotDir),
-                  dbName, true);
-          RocksDatabase db = rdbStore.getDb();
-          db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+          String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
+              OM_SNAPSHOT_CHECKPOINT_DIR;
+          try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
+              .loadDB(ozoneManager.getConfiguration(),
+                      new File(snapshotCheckpointDir),
+                      dbName, true, Optional.of(Boolean.TRUE), false, false)) {
+            RocksDatabase db = rdbStore.getDb();
+            try (BootstrapStateHandler.Lock lock =
+                getBootstrapStateLock().lock()) {
+              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            }
+          }
 
           // mark the snapshot as filtered by writing to the file
           String content = snapshotInfo.getSnapshotID() + "\n";
@@ -209,4 +223,8 @@ public class SstFilteringService extends BackgroundService {
     return snapshotFilteredCount;
   }
 
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
 }

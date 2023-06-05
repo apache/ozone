@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Adapter from {@code OutputStream} to gRPC {@code StreamObserver}.
@@ -43,6 +45,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   private final int bufferSize;
 
+  private final AtomicBoolean closed = new AtomicBoolean();
+
   private long writtenBytes;
 
   GrpcOutputStream(StreamObserver<T> streamObserver,
@@ -55,6 +59,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   @Override
   public void write(int b) {
+    Preconditions.checkState(!closed.get(), "stream is closed");
+
     try {
       buffer.write(b);
       if (buffer.size() >= bufferSize) {
@@ -67,6 +73,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   @Override
   public void write(@Nonnull byte[] data, int offset, int length) {
+    Preconditions.checkState(!closed.get(), "stream is closed");
+
     if ((offset < 0) || (offset > data.length) || (length < 0) ||
         ((offset + length) > data.length) || ((offset + length) < 0)) {
       throw new IndexOutOfBoundsException();
@@ -98,11 +106,13 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   @Override
   public void close() throws IOException {
-    flushBuffer(true);
-    LOG.info("Sent {} bytes for container {}",
-        writtenBytes, containerId);
-    streamObserver.onCompleted();
-    buffer.close();
+    if (!closed.getAndSet(true)) {
+      flushBuffer(true);
+      LOG.info("Sent {} bytes for container {}",
+          writtenBytes, containerId);
+      streamObserver.onCompleted();
+      buffer.close();
+    }
   }
 
   protected long getContainerId() {

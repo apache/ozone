@@ -172,6 +172,35 @@ public class TestBucketList {
   }
 
   @Test
+  public void listWithPrefixAndEmptyStrDelimiter()
+      throws OS3Exception, IOException {
+    BucketEndpoint getBucket = new BucketEndpoint();
+
+    OzoneClient ozoneClient =
+        createClientWithKeys("dir1/", "dir1/dir2/", "dir1/dir2/file1",
+          "dir1/dir2/file2");
+
+    getBucket.setClient(ozoneClient);
+
+    // Should behave the same if delimiter is null
+    ListObjectResponse getBucketResponse =
+        (ListObjectResponse) getBucket.get("b1", "", null, null, 100, "dir1/",
+          null, null, null, null, null).getEntity();
+
+    Assert.assertEquals(0, getBucketResponse.getCommonPrefixes().size());
+    Assert.assertEquals(4, getBucketResponse.getContents().size());
+    Assert.assertEquals("dir1/",
+        getBucketResponse.getContents().get(0).getKey().getName());
+    Assert.assertEquals("dir1/dir2/",
+        getBucketResponse.getContents().get(1).getKey().getName());
+    Assert.assertEquals("dir1/dir2/file1",
+        getBucketResponse.getContents().get(2).getKey().getName());
+    Assert.assertEquals("dir1/dir2/file2",
+        getBucketResponse.getContents().get(3).getKey().getName());
+
+  }
+
+  @Test
   public void listWithContinuationToken() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();

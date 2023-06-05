@@ -195,8 +195,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(newOmDBAccessIdInfo),
-              transactionLogIndex));
+          CacheValue.get(transactionLogIndex, newOmDBAccessIdInfo));
 
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeTenantAdmin(accessId);

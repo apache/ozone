@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.thirdparty.com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -430,7 +431,27 @@ public class TestSCMCommonPlacementPolicy {
     Assertions.assertEquals(replicasToRemove.size(), 0);
   }
 
-
+  @Test
+  public void testIdentityUsedNodesWhenUsedNotPassed() throws SCMException {
+    AtomicBoolean usedNodesIdentity = new AtomicBoolean(true);
+    DummyPlacementPolicy dummyPlacementPolicy =
+        new DummyPlacementPolicy(nodeManager, conf, 5) {
+          @Override
+          protected List<DatanodeDetails> chooseDatanodesInternal(
+              List<DatanodeDetails> usedNodes,
+              List<DatanodeDetails> excludedNodes,
+              List<DatanodeDetails> favoredNodes,
+              int nodesRequired, long metadataSizeRequired,
+              long dataSizeRequired) {
+            usedNodesIdentity.set(usedNodesPassed(usedNodes));
+            return null;
+          }
+        };
+    dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
+    Assertions.assertFalse(usedNodesIdentity.get());
+    dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
+    Assertions.assertTrue(usedNodesIdentity.get());
+  }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> rackMap;

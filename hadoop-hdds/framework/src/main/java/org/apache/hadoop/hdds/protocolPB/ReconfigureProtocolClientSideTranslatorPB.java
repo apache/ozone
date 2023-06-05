@@ -27,6 +27,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetServerNameResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetConfigurationChangeProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.GetReconfigureStatusRequestProto;
@@ -44,7 +46,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -59,11 +60,15 @@ import java.util.Optional;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public class ReconfigureProtocolClientSideTranslatorPB implements
-    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator, Closeable {
+    ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator {
   public static final Logger LOG = LoggerFactory
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
   private static final RpcController NULL_CONTROLLER = null;
+
+  private static final GetServerNameRequestProto VOID_GET_SERVER_NAME =
+      GetServerNameRequestProto.newBuilder().build();
+
   private static final StartReconfigureRequestProto VOID_START_RECONFIG =
       StartReconfigureRequestProto.newBuilder().build();
 
@@ -107,6 +112,17 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
   @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
+  }
+
+  @Override
+  public String getServerName() throws IOException {
+    try {
+      GetServerNameResponseProto response =
+          rpcProxy.getServerName(NULL_CONTROLLER, VOID_GET_SERVER_NAME);
+      return response.getName();
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
+    }
   }
 
   @Override

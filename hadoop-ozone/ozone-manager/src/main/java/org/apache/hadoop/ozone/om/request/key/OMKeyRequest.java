@@ -86,6 +86,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
@@ -795,25 +796,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Prepare key for deletion service on overwrite.
    *
-   * @param dbOzoneKey key to point to an object in RocksDB
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
-   * @param omMetadataManager
    * @param trxnLogIndex
    * @param isRatisEnabled
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull String dbOzoneKey, @Nonnull OmKeyInfo keyToDelete,
-      OMMetadataManager omMetadataManager, long trxnLogIndex,
+      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex,
       boolean isRatisEnabled) throws IOException {
-
-    // Past keys that was deleted but still in deleted table,
-    // waiting for deletion service.
-    RepeatedOmKeyInfo keysToDelete =
-        omMetadataManager.getDeletedTable().get(dbOzoneKey);
-
-    return OmUtils.prepareKeyForDelete(keyToDelete, keysToDelete,
+    return OmUtils.prepareKeyForDelete(keyToDelete,
           trxnLogIndex, isRatisEnabled);
   }
 
@@ -834,9 +826,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (uncommitted.isEmpty()) {
       return null;
     }
-    LOG.info("Detect allocated but uncommitted blocks {} in key {}.",
+    LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
     OmKeyInfo pseudoKeyInfo = omKeyInfo.copyObject();
+    // This is a special marker to indicate that SnapshotDeletingService
+    // can reclaim this key's blocks unconditionally.
+    pseudoKeyInfo.setObjectID(OBJECT_ID_RECLAIM_BLOCKS);
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,

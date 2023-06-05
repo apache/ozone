@@ -33,7 +33,6 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
  */
 public class TestReplicationManagerMetrics {
 
-  private ReplicationManager replicationManager;
   private ReplicationManagerMetrics metrics;
 
   @BeforeEach
@@ -58,7 +57,8 @@ public class TestReplicationManagerMetrics {
         LegacyReplicationManager.class);
     Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
         .thenReturn(0);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    ReplicationManager replicationManager =
+        Mockito.mock(ReplicationManager.class);
     Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);

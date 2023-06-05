@@ -47,10 +47,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -209,6 +211,7 @@ public class TestOzoneAtRestEncryption {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     createAndVerifyKeyData(bucket);
+    createAndVerifyStreamKeyData(bucket);
   }
 
   @Test
@@ -226,27 +229,45 @@ public class TestOzoneAtRestEncryption {
         linkVolumeName, linkBucketName);
 
     createAndVerifyKeyData(linkBucket);
+    createAndVerifyStreamKeyData(linkBucket);
   }
 
+  static void createAndVerifyStreamKeyData(OzoneBucket bucket)
+      throws Exception {
+    Instant testStartTime = Instant.now();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+  }
 
-  private void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
+  static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
     Instant testStartTime = Instant.now();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>())) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+  }
 
+  static void verifyKeyData(OzoneBucket bucket, String keyName, String value,
+      Instant testStartTime) throws Exception {
     // Verify content.
     OzoneKeyDetails key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
 
     // Check file encryption info is set,
     // if set key will use this encryption info and encrypt data.
-    Assert.assertTrue(key.getFileEncryptionInfo() != null);
+    Assert.assertNotNull(key.getFileEncryptionInfo());
 
     byte[] fileContent;
     int len = 0;
@@ -323,8 +344,8 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, keyMetadata)) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -353,18 +374,17 @@ public class TestOzoneAtRestEncryption {
     bucket.deleteKey(key.getName());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return omMetadataManager.getDeletedTable().isExist(objectKey);
+        return getMatchedKeyInfo(keyName, omMetadataManager) != null;
       } catch (IOException e) {
         return false;
       }
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
-        omMetadataManager.getDeletedTable().get(objectKey);
+        getMatchedKeyInfo(keyName, omMetadataManager);
+    Assert.assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
     Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
@@ -375,7 +395,7 @@ public class TestOzoneAtRestEncryption {
         deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
-  private boolean verifyRatisReplication(String volumeName, String bucketName,
+  static boolean verifyRatisReplication(String volumeName, String bucketName,
       String keyName, ReplicationType type, ReplicationFactor factor)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -462,8 +482,8 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
-        ONE);
+    String uploadID = initiateMultipartUpload(bucket, keyName,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
 
     // Upload Parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -496,47 +516,48 @@ public class TestOzoneAtRestEncryption {
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
     // Create an input stream to read the data
-    OzoneInputStream inputStream = bucket.readKey(keyName);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
-    Assert.assertTrue(inputStream.getInputStream()
-        instanceof MultipartInputStream);
+      Assert.assertTrue(inputStream.getInputStream()
+          instanceof MultipartInputStream);
 
-    // Test complete read
-    byte[] completeRead = new byte[keySize];
-    int bytesRead = inputStream.read(completeRead, 0, keySize);
-    Assert.assertEquals(bytesRead, keySize);
-    Assert.assertArrayEquals(inputData, completeRead);
+      // Test complete read
+      byte[] completeRead = new byte[keySize];
+      int bytesRead = inputStream.read(completeRead, 0, keySize);
+      Assert.assertEquals(bytesRead, keySize);
+      Assert.assertArrayEquals(inputData, completeRead);
 
-    // Read different data lengths and starting from different offsets and
-    // verify the data matches.
-    Random random = new Random();
-    int randomSize = random.nextInt(keySize / 2);
-    int randomOffset = random.nextInt(keySize - randomSize);
+      // Read different data lengths and starting from different offsets and
+      // verify the data matches.
+      Random random = new Random();
+      int randomSize = random.nextInt(keySize / 2);
+      int randomOffset = random.nextInt(keySize - randomSize);
 
-    int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
-        BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
-        DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
-        randomSize};
+      int[] readDataSizes = {keySize, keySize / 3 + 1, BLOCK_SIZE,
+          BLOCK_SIZE * 2 + 1, CHUNK_SIZE, CHUNK_SIZE / 4 - 1,
+          DEFAULT_CRYPTO_BUFFER_SIZE, DEFAULT_CRYPTO_BUFFER_SIZE / 2, 1,
+          randomSize};
 
-    int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
-        BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
-        keySize - 1, randomOffset};
+      int[] readFromPositions = {0, DEFAULT_CRYPTO_BUFFER_SIZE + 10, CHUNK_SIZE,
+          BLOCK_SIZE - DEFAULT_CRYPTO_BUFFER_SIZE + 1, BLOCK_SIZE, keySize / 3,
+          keySize - 1, randomOffset};
 
-    for (int readDataLen : readDataSizes) {
-      for (int readFromPosition : readFromPositions) {
-        // Check that offset + buffer size does not exceed the key size
-        if (readFromPosition + readDataLen > keySize) {
-          continue;
+      for (int readDataLen : readDataSizes) {
+        for (int readFromPosition : readFromPositions) {
+          // Check that offset + buffer size does not exceed the key size
+          if (readFromPosition + readDataLen > keySize) {
+            continue;
+          }
+
+          byte[] readData = new byte[readDataLen];
+          inputStream.seek(readFromPosition);
+          int actualReadLen = inputStream.read(readData, 0, readDataLen);
+
+          assertReadContent(inputData, readData, readFromPosition);
+          Assert.assertEquals(readFromPosition + readDataLen,
+              inputStream.getPos());
+          Assert.assertEquals(readDataLen, actualReadLen);
         }
-
-        byte[] readData = new byte[readDataLen];
-        inputStream.seek(readFromPosition);
-        int actualReadLen = inputStream.read(readData, 0, readDataLen);
-
-        assertReadContent(inputData, readData, readFromPosition);
-        Assert.assertEquals(readFromPosition + readDataLen,
-            inputStream.getPos());
-        Assert.assertEquals(readDataLen, actualReadLen);
       }
     }
   }
@@ -548,10 +569,10 @@ public class TestOzoneAtRestEncryption {
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
-      ReplicationType replicationType, ReplicationFactor replicationFactor)
+      ReplicationConfig replicationConfig)
       throws Exception {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationType, replicationFactor);
+        replicationConfig);
 
     String uploadID = multipartInfo.getUploadID();
     Assert.assertNotNull(uploadID);
@@ -616,5 +637,18 @@ public class TestOzoneAtRestEncryption {
     // Restore ozClient and store
     TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
     TestOzoneRpcClient.setStore(ozClient.getObjectStore());
+  }
+
+  private static RepeatedOmKeyInfo getMatchedKeyInfo(
+      String keyName, OMMetadataManager omMetadataManager) throws IOException {
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, "/");
+    for (int i = 0; i < rangeKVs.size(); ++i) {
+      if (rangeKVs.get(i).getKey().contains(keyName)) {
+        return rangeKVs.get(i).getValue();
+      }
+    }
+    return null;
   }
 }

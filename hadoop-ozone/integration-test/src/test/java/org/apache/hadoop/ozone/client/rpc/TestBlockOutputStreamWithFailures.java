@@ -151,7 +151,7 @@ public class TestBlockOutputStreamWithFailures {
    */
   @AfterEach
   public void shutdown() {
-    IOUtils.close(null, client);
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

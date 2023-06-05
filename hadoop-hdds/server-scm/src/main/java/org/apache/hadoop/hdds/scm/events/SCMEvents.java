@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandQueueReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
@@ -48,15 +47,6 @@ public final class SCMEvents {
    */
   public static final TypedEvent<NodeReportFromDatanode> NODE_REPORT =
       new TypedEvent<>(NodeReportFromDatanode.class, "Node_Report");
-
-  /**
-   * Queued Command counts are sent out by Datanodes. This report is received by
-   * SCMDatanodeHeartbeatDispatcher and the COMMAND_QUEUE_REPORT Event is
-   * generated.
-   */
-  public static final TypedEvent<CommandQueueReportFromDatanode>
-      COMMAND_QUEUE_REPORT = new TypedEvent<>(
-          CommandQueueReportFromDatanode.class, "Command_Queue_Report");
 
   /**
    * After node manager processes a COMMAND_QUEUE_REPORT it fires

@@ -24,6 +24,8 @@ import java.util.UUID;
 
 import mockit.Mock;
 import mockit.MockUp;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -42,6 +44,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
 import static org.mockito.Mockito.when;
 
 /**
@@ -93,16 +97,18 @@ public class TestOMClientRequestWithUserInfo {
 
     String bucketName = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
-    OzoneManagerProtocolProtos.OMRequest omRequest =
-        OMRequestTestUtils.createBucketRequest(bucketName, volumeName, true,
-            OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+    BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setIsVersionEnabled(true)
+            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+    OMRequest omRequest = newCreateBucketRequest(bucketInfo).build();
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
     Assert.assertFalse(omRequest.hasUserInfo());
 
-    OzoneManagerProtocolProtos.OMRequest modifiedRequest =
+    OMRequest modifiedRequest =
         omBucketCreateRequest.preExecute(ozoneManager);
 
     Assert.assertTrue(modifiedRequest.hasUserInfo());

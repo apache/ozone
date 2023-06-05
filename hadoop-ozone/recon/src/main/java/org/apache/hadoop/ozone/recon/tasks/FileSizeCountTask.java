@@ -150,37 +150,51 @@ public class FileSizeCountTask implements ReconOmTask {
     final Collection<String> taskTables = getTaskTables();
 
     while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       // Filter event inside process method to avoid duping
       if (!taskTables.contains(omdbUpdateEvent.getTable())) {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
-      OmKeyInfo omKeyInfo = omdbUpdateEvent.getValue();
+      Object value = omdbUpdateEvent.getValue();
+      Object oldValue = omdbUpdateEvent.getOldValue();
 
-      try {
-        switch (omdbUpdateEvent.getAction()) {
-        case PUT:
-          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-          break;
+      if (value instanceof OmKeyInfo) {
+        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
-        case DELETE:
-          handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
-          break;
+        try {
+          switch (omdbUpdateEvent.getAction()) {
+          case PUT:
+            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            break;
 
-        case UPDATE:
-          handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue(),
-              fileSizeCountMap);
-          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-          break;
+          case DELETE:
+            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+            break;
 
-        default: LOG.trace("Skipping DB update event : {}",
-            omdbUpdateEvent.getAction());
+          case UPDATE:
+            if (omKeyInfoOld != null) {
+              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
+            }
+            break;
+
+          default:
+            LOG.trace("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
+          }
+        } catch (Exception e) {
+          LOG.error("Unexpected exception while processing key {}.",
+              updatedKey, e);
+          return new ImmutablePair<>(getTaskName(), false);
         }
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while processing key {}.",
-                updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+      } else {
+        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+            value.getClass().getName(), updatedKey);
       }
     }
     writeCountsToDB(false, fileSizeCountMap);

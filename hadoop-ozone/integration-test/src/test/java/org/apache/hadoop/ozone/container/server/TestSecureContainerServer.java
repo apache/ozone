@@ -49,10 +49,10 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
-import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -97,6 +97,7 @@ import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.After;
 
 import static org.junit.Assert.assertEquals;
@@ -199,11 +200,6 @@ public class TestSecureContainerServer {
     return hddsDispatcher;
   }
 
-  @FunctionalInterface
-  interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
-    OUT apply(LEFT left, RIGHT right) throws THROWABLE;
-  }
-
   @Test
   public void testClientServerRatisGrpc() throws Exception {
     runTestClientServerRatis(GRPC, 1);
@@ -241,7 +237,7 @@ public class TestSecureContainerServer {
       int numDatanodes,
       CheckedBiConsumer<Pipeline, OzoneConfiguration, IOException> initConf,
       CheckedBiFunction<Pipeline, OzoneConfiguration, XceiverClientSpi,
-          IOException> createClient,
+                IOException> createClient,
       CheckedBiFunction<DatanodeDetails, OzoneConfiguration, XceiverServerSpi,
           IOException> createServer,
       CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer,

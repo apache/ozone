@@ -32,11 +32,13 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.ToLongFunction;
 import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -104,7 +107,9 @@ class TestContainerReplication {
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
-    queueAndWaitForSuccess(cmd, source);
+
+    queueAndWaitForCompletion(cmd, source,
+        ReplicationSupervisor::getReplicationSuccessCount);
   }
 
   @ParameterizedTest
@@ -118,23 +123,69 @@ class TestContainerReplication {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(containerID,
             ImmutableList.of(source));
-    queueAndWaitForSuccess(cmd, target);
+
+    queueAndWaitForCompletion(cmd, target,
+        ReplicationSupervisor::getReplicationSuccessCount);
   }
 
-  private void queueAndWaitForSuccess(ReplicateContainerCommand cmd,
-      DatanodeDetails dn)
+  /**
+   * Replication fails because target tries to pull the container from wrong
+   * port at source datanode.
+   */
+  @Test
+  void targetPullsFromWrongService() throws Exception {
+    DatanodeDetails source = cluster.getHddsDatanodes().get(0)
+        .getDatanodeDetails();
+    DatanodeDetails target = cluster.getHddsDatanodes().get(1)
+        .getDatanodeDetails();
+    long containerID = createNewClosedContainer(source);
+    DatanodeDetails invalidPort = new DatanodeDetails(source);
+    invalidPort.setPort(Port.Name.REPLICATION,
+        source.getPort(Port.Name.STANDALONE).getValue());
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(containerID,
+            ImmutableList.of(invalidPort));
+
+    queueAndWaitForCompletion(cmd, target,
+        ReplicationSupervisor::getReplicationFailureCount);
+  }
+
+  /**
+   * Replication fails because source tries to push a non-existent container.
+   */
+  @Test
+  void pushUnknownContainer() throws Exception {
+    DatanodeDetails source = cluster.getHddsDatanodes().get(0)
+        .getDatanodeDetails();
+    DatanodeDetails target = selectOtherNode(source);
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(CONTAINER_ID.incrementAndGet(),
+            target);
+
+    queueAndWaitForCompletion(cmd, source,
+        ReplicationSupervisor::getReplicationFailureCount);
+  }
+
+  /**
+   * Queues {@code cmd} in {@code dn}'s state machine, and waits until the
+   * command is completed, as indicated by {@code counter} having been
+   * incremented.
+   * @param counter ReplicationSupervisor's counter expected to be incremented
+   */
+  private static void queueAndWaitForCompletion(ReplicateContainerCommand cmd,
+      DatanodeDetails dn, ToLongFunction<ReplicationSupervisor> counter)
       throws IOException, InterruptedException, TimeoutException {
 
     DatanodeStateMachine datanodeStateMachine =
         cluster.getHddsDatanode(dn).getDatanodeStateMachine();
     final ReplicationSupervisor supervisor =
         datanodeStateMachine.getSupervisor();
-    final long replicationCount = supervisor.getReplicationSuccessCount();
+    final long previousCount = counter.applyAsLong(supervisor);
     StateContext context = datanodeStateMachine.getContext();
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
     context.addCommand(cmd);
     waitFor(
-        () -> supervisor.getReplicationSuccessCount() == replicationCount + 1,
+        () -> counter.applyAsLong(supervisor) == previousCount + 1,
         100, 30000);
   }
 

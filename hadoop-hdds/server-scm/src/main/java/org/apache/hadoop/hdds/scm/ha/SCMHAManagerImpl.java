@@ -18,9 +18,11 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -29,6 +31,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -42,6 +45,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -65,6 +71,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
+  private BackgroundSCMService trxBufferMonitorService = null;
 
   /**
    * Creates SCMHAManager instance.
@@ -123,6 +130,26 @@ public class SCMHAManagerImpl implements SCMHAManager {
           ratisServer.getDivision().getGroup().getPeers());
     }
     grpcServer.start();
+    createStartTransactionBufferMonitor();
+  }
+
+  private void createStartTransactionBufferMonitor() {
+    long interval = conf.getTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    SCMHATransactionBufferMonitorTask monitorTask
+        = new SCMHATransactionBufferMonitorTask(
+        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+    trxBufferMonitorService =
+        new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
+            .setScmContext(scm.getScmContext())
+            .setServiceName("SCMHATransactionMonitor")
+            .setIntervalInMillis(interval)
+            .setWaitTimeInMillis(interval)
+            .setPeriodicalTask(monitorTask).build();
+    scm.getSCMServiceManager().register(trxBufferMonitorService);
+    trxBufferMonitorService.start();
   }
 
   public SCMRatisServer getRatisServer() {
@@ -338,7 +365,19 @@ public class SCMHAManagerImpl implements SCMHAManager {
     if (ratisServer != null) {
       ratisServer.stop();
       grpcServer.stop();
+      close();
     }
+    if (trxBufferMonitorService != null) {
+      trxBufferMonitorService.stop();
+    }
+  }
+
+  /**
+   * Releases resources that are allocated even if not {@link #start()}ed.
+   */
+  @Override
+  public void close() {
+    IOUtils.close(LOG, transactionBuffer);
   }
 
   @Override
@@ -354,6 +393,24 @@ public class SCMHAManagerImpl implements SCMHAManager {
         getRatisServer().getDivision().getGroup().getGroupId());
     return getRatisServer().addSCM(request);
   }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+
+    String clusterId = scm.getClusterId();
+    if (!request.getClusterId().equals(scm.getClusterId())) {
+      throw new IOException("SCM " + request.getScmId() +
+          " with address " + request.getRatisAddr() +
+          " has cluster Id " + request.getClusterId() +
+          " but leader SCM cluster id is " + clusterId);
+    }
+    Preconditions.checkNotNull(ratisServer.getDivision().getGroup());
+    return ratisServer.removeSCM(request);
+  }
+
 
   void stopServices() throws Exception {
 

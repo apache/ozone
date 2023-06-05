@@ -122,32 +122,38 @@ public class TestSecureOzoneManager {
     // boot-up. Get certificate will fail when SCM is not running.
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId);
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     privateKey = client.getPrivateKey();
     publicKey = client.getPublicKey();
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 2: If key pair already exist than response should be RECOVER.
-    client = new OMCertificateClient(securityConfig, omStorage, scmId);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.RECOVER, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 3: When public key as well as certificate is missing.
-    client = new OMCertificateClient(securityConfig);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 4: When private key and certificate is missing.
-    client = new OMCertificateClient(securityConfig);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, null, null, null);
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
     keyCodec.writePublicKey(publicKey);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
@@ -156,6 +162,7 @@ public class TestSecureOzoneManager {
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNull(client.getCertificate());
+    client.close();
 
     // Case 5: When only certificate is present.
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
@@ -168,14 +175,17 @@ public class TestSecureOzoneManager {
     certCodec.writeCertificate(new X509CertificateHolder(
         x509Certificate.getEncoded()));
     omStorage.setOmCertSerialId(x509Certificate.getSerialNumber().toString());
-    client = new OMCertificateClient(securityConfig, omStorage, scmId);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
 
     // Case 6: When private key and certificate is present.
-    client = new OMCertificateClient(securityConfig, omStorage, scmId);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     keyCodec.writePrivateKey(privateKey);
@@ -183,13 +193,16 @@ public class TestSecureOzoneManager {
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
 
     // Case 7 When keypair and certificate is present.
-    client = new OMCertificateClient(securityConfig, omStorage, scmId);
+    client =
+        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
     Assert.assertNotNull(client.getCertificate());
+    client.close();
   }
 
   /**

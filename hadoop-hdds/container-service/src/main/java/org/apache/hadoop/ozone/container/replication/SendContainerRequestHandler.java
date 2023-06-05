@@ -63,7 +63,7 @@ class SendContainerRequestHandler
   public void onNext(SendContainerRequest req) {
     try {
       final long length = req.getData().size();
-      LOG.info("Received part for container id:{} offset:{} len:{}",
+      LOG.debug("Received part for container id:{} offset:{} len:{}",
           req.getContainerID(), req.getOffset(), length);
 
       assertSame(nextOffset, req.getOffset(), "offset");
@@ -76,6 +76,8 @@ class SendContainerRequestHandler
         path = dir.resolve(ContainerUtils.getContainerTarName(containerId));
         output = Files.newOutputStream(path);
         compression = CopyContainerCompression.fromProto(req.getCompression());
+
+        LOG.info("Accepting container {}", req.getContainerID());
       }
 
       assertSame(containerId, req.getContainerID(), "containerID");
@@ -90,7 +92,7 @@ class SendContainerRequestHandler
 
   @Override
   public void onError(Throwable t) {
-    LOG.error("Error", t);
+    LOG.warn("Error receiving container {} at {}", containerId, nextOffset, t);
     closeOutput();
     deleteTarball();
     responseObserver.onError(t);
@@ -103,23 +105,24 @@ class SendContainerRequestHandler
       return;
     }
 
-    LOG.info("Received all parts for container {}", containerId);
+    LOG.info("Container {} is downloaded with size {}, starting to import.",
+        containerId, nextOffset);
     closeOutput();
 
     try {
       importer.importContainer(containerId, path, volume, compression);
-      LOG.info("Imported container {}", containerId);
+      LOG.info("Container {} is replicated successfully", containerId);
       responseObserver.onNext(SendContainerResponse.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Throwable t) {
-      LOG.info("Failed to import container {}", containerId, t);
+      LOG.warn("Failed to import container {}", containerId, t);
       deleteTarball();
       responseObserver.onError(t);
     }
   }
 
   private void closeOutput() {
-    IOUtils.cleanupWithLogger(LOG, output);
+    IOUtils.close(LOG, output);
     output = null;
   }
 

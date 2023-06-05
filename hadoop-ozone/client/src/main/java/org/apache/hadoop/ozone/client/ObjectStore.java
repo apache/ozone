@@ -30,9 +30,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -42,7 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReport;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -73,6 +76,7 @@ public class ObjectStore {
    */
   private int listCacheSize;
   private final String defaultS3Volume;
+  private BucketLayout s3BucketLayout;
 
   /**
    * Creates an instance of ObjectStore.
@@ -84,6 +88,10 @@ public class ObjectStore {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
+    s3BucketLayout = OmUtils.validateBucketLayout(
+        conf.getTrimmed(
+            OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY,
+            OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_DEFAULT));
   }
 
   @VisibleForTesting
@@ -125,10 +133,29 @@ public class ObjectStore {
    * @param bucketName - S3 bucket Name.
    * @throws IOException - On failure, throws an exception like Bucket exists.
    */
-  public void createS3Bucket(String bucketName) throws
-      IOException {
+  public void createS3Bucket(String bucketName) throws IOException {
     OzoneVolume volume = getS3Volume();
-    volume.createBucket(bucketName);
+    // Backwards compatibility:
+    // When OM is pre-finalized for the bucket layout feature, it will block
+    // the creation of all bucket types except legacy. If OBS bucket creation
+    // fails for this reason, retry with legacy bucket layout.
+    try {
+      volume.createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(s3BucketLayout).build());
+    } catch (OMException ex) {
+      if (ex.getResult() ==
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION) {
+        final BucketLayout fallbackLayout = BucketLayout.LEGACY;
+        LOG.info("Failed to create S3 bucket with layout {} since OM is " +
+                "pre-finalized for bucket layouts. Retrying creation with a " +
+                "{} bucket.",
+            s3BucketLayout, fallbackLayout);
+        volume.createBucket(bucketName, BucketArgs.newBuilder()
+            .setBucketLayout(fallbackLayout).build());
+      } else {
+        throw ex;
+      }
+    }
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
@@ -347,7 +374,7 @@ public class ObjectStore {
       String volumePrefix, String prevVolume)
       throws IOException {
     if (Strings.isNullOrEmpty(user)) {
-      user = UserGroupInformation.getCurrentUser().getUserName();
+      user = UserGroupInformation.getCurrentUser().getShortUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
   }
@@ -553,7 +580,7 @@ public class ObjectStore {
    * List snapshots in a volume/bucket.
    * @param volumeName volume name
    * @param bucketName bucket name
-   * @return list of snapshots for volume/bucket snapshotpath.
+   * @return list of snapshots for volume/bucket snapshot path.
    * @throws IOException
    */
   public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
@@ -561,9 +588,27 @@ public class ObjectStore {
     return proxy.listSnapshot(volumeName, bucketName);
   }
 
-  public SnapshotDiffReport snapshotDiff(String volumeName, String bucketName,
-                                         String fromSnapshot, String toSnapshot)
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize,
+                                           boolean forceFullDiff)
       throws IOException {
-    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot);
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff);
   }
 }

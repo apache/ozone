@@ -17,59 +17,113 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ZERO;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test ReplicationConfig validator.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestReplicationConfigValidator {
 
-  @Test
-  void testValidation() {
-    MutableConfigurationSource config = new InMemoryConfiguration();
+  private ReplicationConfigValidator defaultValidator;
 
-    final ReplicationConfigValidator validator =
-        config.getObject(ReplicationConfigValidator.class);
-    String ecConfig1 = "rs-3-2-1024k";
-    String ecConfig2 = "xor-6-3-2048k";
-    //Supported data-parity are 3-2,6-3,10-4
-    String invalidEcConfig1 = "xor-6-4-1024k";
+  private ReplicationConfigValidator disabledValidator;
 
-    validator.validate(RatisReplicationConfig.getInstance(THREE));
-    validator.validate(RatisReplicationConfig.getInstance(ONE));
-    validator.validate(StandaloneReplicationConfig.getInstance(THREE));
-    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
-    validator.validate(new ECReplicationConfig(ecConfig1));
-    validator.validate(new ECReplicationConfig(ecConfig2));
-    try {
-      validator.validate(new ECReplicationConfig(invalidEcConfig1));
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains(
-              "Invalid data-parity replication " +
-          "config for type EC and replication xor-6-4-{CHUNK_SIZE}. " +
-                      "Supported data-parity are 3-2,6-3,10-4", ex);
+  @BeforeAll
+  void setup() {
+    defaultValidator = new InMemoryConfiguration()
+        .getObject(ReplicationConfigValidator.class);
+
+    MutableConfigurationSource disabled = new InMemoryConfiguration();
+    disabled.set("ozone.replication.allowed-configs", "");
+    disabledValidator = disabled
+        .getObject(ReplicationConfigValidator.class);
+  }
+
+  static List<String> validConfigsForEC() {
+    List<String> configs = new LinkedList<>();
+    for (EcCodec codec : EcCodec.values()) {
+      for (String dataParity : Arrays.asList("3-2", "6-3", "10-4")) {
+        String[] parts = dataParity.split("-");
+        int data = Integer.parseInt(parts[0]);
+        int parity = Integer.parseInt(parts[1]);
+        for (int chunkSize : Arrays.asList(512, 1024, 2048, 4096)) {
+          ReplicationConfig config =
+              new ECReplicationConfig(data, parity, codec, chunkSize * 1024);
+          configs.add(config.getReplication());
+        }
+      }
     }
+    return configs;
+  }
 
+  static String[] invalidConfigsForEC() {
+    return new String[]{
+        "rs-6-4-1024k", // invalid data-parity
+        "xor-3-2-1024", // invalid chunk size
+        "rs-6-3-1234k", // invalid chunk size
+        // invalid codec is always rejected by ECReplicationConfig
+    };
   }
 
   @Test
-  void testWithoutValidation() {
-    MutableConfigurationSource config = new InMemoryConfiguration();
-    config.set("ozone.replication.allowed-configs", "");
+  void acceptsRatis() {
+    defaultValidator.validate(RatisReplicationConfig.getInstance(THREE));
+    defaultValidator.validate(RatisReplicationConfig.getInstance(ONE));
+  }
 
-    final ReplicationConfigValidator validator =
-        config.getObject(ReplicationConfigValidator.class);
+  @Test
+  void acceptsStandalone() {
+    defaultValidator.validate(StandaloneReplicationConfig.getInstance(THREE));
+    defaultValidator.validate(StandaloneReplicationConfig.getInstance(ONE));
+  }
 
-    validator.validate(RatisReplicationConfig.getInstance(THREE));
-    validator.validate(StandaloneReplicationConfig.getInstance(ONE));
+  @ParameterizedTest
+  @MethodSource("validConfigsForEC")
+  void acceptsValidEC(String config) {
+    defaultValidator.validate(new ECReplicationConfig(config));
+  }
 
+  @ParameterizedTest
+  @MethodSource("invalidConfigsForEC")
+  void rejectsInvalidEC(String config) {
+    assertThrows(IllegalArgumentException.class,
+        () -> defaultValidator.validate(new ECReplicationConfig(config)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidConfigsForEC")
+  void disabledAcceptsInvalidEC(String config) {
+    disabledValidator.validate(new ECReplicationConfig(config));
+  }
+
+  @Test
+  void disabledAcceptsRatis() {
+    disabledValidator.validate(RatisReplicationConfig.getInstance(ONE));
+    disabledValidator.validate(RatisReplicationConfig.getInstance(THREE));
+  }
+
+  @Test
+  void disabledAcceptsStandalone() {
+    disabledValidator.validate(StandaloneReplicationConfig.getInstance(ONE));
+    disabledValidator.validate(StandaloneReplicationConfig.getInstance(THREE));
+    disabledValidator.validate(StandaloneReplicationConfig.getInstance(ZERO));
   }
 
   @Test

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -114,8 +113,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(
-            new OzoneAdmins(ozoneManager.getOmAdminUsernames()));
+        authorizer.setAdminCheck(ozoneManager::isAdmin);
+        authorizer.setReadOnlyAdminCheck(ozoneManager::isReadOnlyAdmin);
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;
@@ -372,12 +371,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws IOException if there is error.
    */
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
+
+    String volumeName = obj.getVolumeName();
+    String bucketName = obj.getBucketName();
+    String keyName = obj.getKeyName();
+    if (obj.getResourceType() == ResourceType.KEY) {
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(volumeName, bucketName));
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
+    }
     boolean auditSuccess = true;
 
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
+            volumeName, bucketName, keyName);
       }
       metrics.incNumGetAcl();
       switch (obj.getResourceType()) {
@@ -483,10 +492,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    *                     and throwOnPermissionDenied set to true.
    */
   public boolean checkAcls(OzoneObj obj, RequestContext context,
-                           boolean throwIfPermissionDenied)
-      throws OMException {
+      boolean throwIfPermissionDenied) throws OMException {
 
-    if (!accessAuthorizer.checkAccess(obj, context)) {
+    if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
+        () -> accessAuthorizer.checkAccess(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -495,9 +504,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            context.getClientUgi().getUserName(), context.getAclRights(),
+            context.getClientUgi().getShortUserName(), context.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
-        throw new OMException("User " + context.getClientUgi().getUserName() +
+        throw new OMException(
+            "User " + context.getClientUgi().getShortUserName() +
             " doesn't have " + context.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);
@@ -579,5 +589,4 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ResourceType.KEY;
   }
 
-  
 }

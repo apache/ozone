@@ -58,6 +58,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +93,7 @@ public abstract class EndpointBase implements Auditor {
     try {
       bucket = volume.getBucket(bucketName);
     } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
@@ -159,10 +160,11 @@ public abstract class EndpointBase implements Auditor {
    */
   protected String createS3Bucket(String bucketName) throws
       IOException, OS3Exception {
+    long startNanos = Time.monotonicNowNanos();
     try {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
-      getMetrics().incCreateBucketFailure();
+      getMetrics().updateCreateBucketFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {

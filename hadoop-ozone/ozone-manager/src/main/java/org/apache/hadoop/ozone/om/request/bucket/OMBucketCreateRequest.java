@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -93,7 +93,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
     // Verify resource name
-    OmUtils.validateBucketName(bucketInfo.getBucketName());
+    OmUtils.validateBucketName(bucketInfo.getBucketName(),
+        ozoneManager.isStrictS3());
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
@@ -126,6 +127,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
     if (hasSourceBucket && bucketInfo.hasBeinfo()) {
       throw new OMException("Encryption cannot be set for bucket links",
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      DefaultReplicationConfig drc = DefaultReplicationConfig.fromProto(
+          bucketInfo.getDefaultReplicationConfig());
+      ozoneManager.validateReplicationConfig(drc.getReplicationConfig());
     }
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
@@ -230,9 +237,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omBucketInfo));
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
@@ -379,7 +386,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
-        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {

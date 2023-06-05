@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.impl.StoreImplementationUtils;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
@@ -37,25 +38,38 @@ import java.io.OutputStream;
  */
 public class CapableOzoneFSOutputStream  extends OzoneFSOutputStream
     implements StreamCapabilities {
-  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream) {
+  private final boolean isHsyncEnabled;
+  public CapableOzoneFSOutputStream(OzoneFSOutputStream outputStream,
+      boolean enabled) {
     super(outputStream.getWrappedOutputStream());
+    this.isHsyncEnabled = enabled;
   }
 
   @Override
   public boolean hasCapability(String capability) {
     OutputStream os = getWrappedOutputStream().getOutputStream();
+
+    if (os instanceof CryptoOutputStream) {
+      OutputStream wrapped = ((CryptoOutputStream) os).getWrappedStream();
+      return hasWrappedCapability(wrapped, capability);
+    }
+    return hasWrappedCapability(os, capability);
+  }
+
+  private boolean hasWrappedCapability(OutputStream os,
+      String capability) {
     if (os instanceof ECKeyOutputStream) {
       return false;
     } else if (os instanceof KeyOutputStream) {
       switch (StringUtils.toLowerCase(capability)) {
       case StreamCapabilities.HFLUSH:
       case StreamCapabilities.HSYNC:
-        return true;
+        return isHsyncEnabled;
       default:
         return false;
       }
     }
-    // deal with CryptoOutputStream
+    // this is unexpected. try last resort
     return StoreImplementationUtils.hasCapability(os, capability);
   }
 }

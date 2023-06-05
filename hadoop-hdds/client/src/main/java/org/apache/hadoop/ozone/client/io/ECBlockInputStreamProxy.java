@@ -51,7 +51,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private final ECReplicationConfig repConfig;
   private final boolean verifyChecksum;
   private final XceiverClientFactory xceiverClientFactory;
-  private final Function<BlockID, Pipeline> refreshFunction;
+  private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final BlockLocationInfo blockInfo;
   private final ECBlockInputStreamFactory ecBlockInputStreamFactory;
 
@@ -99,7 +99,8 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   public ECBlockInputStreamProxy(ECReplicationConfig repConfig,
       BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory, Function<BlockID,
-      Pipeline> refreshFunction, ECBlockInputStreamFactory streamFactory) {
+      BlockLocationInfo> refreshFunction,
+      ECBlockInputStreamFactory streamFactory) {
     this.repConfig = repConfig;
     this.verifyChecksum = verifyChecksum;
     this.blockInfo = blockInfo;

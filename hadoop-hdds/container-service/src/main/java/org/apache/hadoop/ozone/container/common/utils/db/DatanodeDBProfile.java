@@ -25,8 +25,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.apache.ratis.util.MemoizedSupplier;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
@@ -107,7 +109,7 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
-    private final AtomicReference<ManagedColumnFamilyOptions> cfOptions =
+    private final AtomicReference<Supplier<ManagedColumnFamilyOptions>> cfOpts =
         new AtomicReference<>();
     private final DBProfile baseProfile;
 
@@ -121,9 +123,10 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      cfOptions.updateAndGet(op -> op != null ? op :
-          createColumnFamilyOptions(config));
-      return cfOptions.get();
+      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier =
+          MemoizedSupplier.valueOf(() -> createColumnFamilyOptions(config));
+      cfOpts.compareAndSet(null, supplier);
+      return cfOpts.get().get();
     }
 
     private ManagedColumnFamilyOptions createColumnFamilyOptions(

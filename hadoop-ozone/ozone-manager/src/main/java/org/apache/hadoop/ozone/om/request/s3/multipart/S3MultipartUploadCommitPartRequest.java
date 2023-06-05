@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -202,7 +201,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
-      multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
+      multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
       multipartKeyInfo.setUpdateID(trxnLogIndex,
@@ -219,12 +218,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // read/write requests that info for validation.
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo),
-              trxnLogIndex));
+          CacheValue.get(trxnLogIndex, multipartKeyInfo));
 
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+          CacheValue.get(trxnLogIndex));
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 

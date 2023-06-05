@@ -289,7 +289,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Add a new HddsVolume. It should have DB created after DN restart.
     addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
     for (StorageVolume vol:
         dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
@@ -323,7 +324,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Add a new DbVolume
     addDbVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     // HddsVolume should still use the rocksDB under it's volume
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
@@ -352,7 +354,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     addDbVolume();
     File newDataVolume = addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
@@ -424,7 +427,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set SchemaV3 enable status
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         enable);
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     // Write new data
     final long containerID2 = addContainer(pipeline);

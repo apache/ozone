@@ -17,12 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
 import java.io.IOException;
-import java.util.Set;
 
 /**
  * Class used to pick messages from the ReplicationManager under replicated
@@ -39,19 +34,24 @@ public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
 
   @Override
   protected ContainerHealthResult.UnderReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueUnderReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueUnderReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
-    replicationManager.requeueUnderReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.UnderReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
   }
 
   @Override
-  protected Set<Pair<DatanodeDetails, SCMCommand<?>>> getDatanodeCommands(
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    return rm.getInflightReplicationCount() >= pendingOpLimit;
+  }
+
+  @Override
+  protected int sendDatanodeCommands(
           ReplicationManager replicationManager,
           ContainerHealthResult.UnderReplicatedHealthResult healthResult)
           throws IOException {

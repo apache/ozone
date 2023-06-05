@@ -141,6 +141,10 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
+  public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
+      "includeSnapshotData";
+  public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
+      "toExcludeSST";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
@@ -237,6 +241,11 @@ public final class OzoneConsts {
 
   public static final int INVALID_PORT = -1;
 
+  /**
+   * Object ID to identify reclaimable uncommitted blocks.
+   */
+  public static final long OBJECT_ID_RECLAIM_BLOCKS = 0L;
+
 
   /**
    * Default SCM Datanode ID file name.
@@ -282,9 +291,6 @@ public final class OzoneConsts {
   // but have containerID as key prefixes.
   public static final String SCHEMA_V3 = "3";
 
-  public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
-
   // Supported store types.
   public static final String OZONE = "ozone";
   public static final String S3 = "s3";
@@ -316,6 +322,7 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
@@ -394,6 +401,9 @@ public final class OzoneConsts {
 
   public static final int S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB = 2;
 
+  /** Metadata stored in OmKeyInfo. */
+  public static final String HSYNC_CLIENT_ID = "hsyncClientId";
+
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
   public static final String GDPR_ALGORITHM_NAME = "AES";
@@ -447,6 +457,10 @@ public final class OzoneConsts {
   public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
+  // RocksDB snapshot
+  public static final String SNAPSHOT_CANDIDATE_DIR = ".candidate";
+  public static final String ROCKSDB_SST_SUFFIX = ".sst";
 
   // SCM default service Id and node Id in non-HA where config is not defined
   // in non-HA style.
@@ -554,10 +568,34 @@ public final class OzoneConsts {
   public static final int OZONE_MAXIMUM_ACCESS_ID_LENGTH = 100;
 
   public static final String OM_SNAPSHOT_NAME = "snapshotName";
+  public static final String OM_CHECKPOINT_DIR = "db.checkpoints";
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
+      + OM_KEY_PREFIX + "diffState";
+
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
   public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
+
+  /**
+   * Name of the SST file backup directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_SST_BACKUP_DIR =
+      "compaction-sst-backup";
+
+  /**
+   * Name of the compaction log directory placed under metadata dir.
+   * Can be made configurable later.
+   */
+  public static final String DB_COMPACTION_LOG_DIR = "compaction-log";
+
+  /**
+   * DB snapshot info table name. Referenced in RDBStore.
+   */
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
 
 }

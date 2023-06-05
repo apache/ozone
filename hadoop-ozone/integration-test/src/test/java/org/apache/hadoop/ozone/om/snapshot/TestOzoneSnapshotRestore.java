@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -57,10 +59,9 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -71,9 +72,9 @@ public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
   private MiniOzoneCluster cluster;
   private ObjectStore store;
-  private File metaDir;
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
+  private OzoneClient client;
 
   private static Stream<Arguments> bucketTypes() {
     return Stream.of(
@@ -92,6 +93,9 @@ public class TestOzoneSnapshotRestore {
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
@@ -112,7 +116,7 @@ public class TestOzoneSnapshotRestore {
     clientConf = new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    OzoneClient client = cluster.getClient();
+    client = cluster.newClient();
     store = client.getObjectStore();
 
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
@@ -120,12 +124,13 @@ public class TestOzoneSnapshotRestore {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(leaderConfig);
+    OMStorage.getOmDbDir(leaderConfig);
 
   }
 
   @AfterEach
   public void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -157,9 +162,8 @@ public class TestOzoneSnapshotRestore {
             .getMetadataManager()
             .getSnapshotInfoTable()
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
-    String snapshotDirName = metaDir + OM_KEY_PREFIX +
-            OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-            snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
+    String snapshotDirName = OmSnapshotManager
+        .getSnapshotPath(clientConf, snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
             1000, 120000);
     return snapshotKeyPrefix;
@@ -228,8 +232,7 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix));
   }
 
   @ParameterizedTest
@@ -283,8 +286,7 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
   }
 
   @ParameterizedTest
@@ -327,7 +329,20 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    int finalKeyCount = keyCount(buck2, keyPrefix);
-    Assertions.assertEquals(5, finalKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
+  }
+
+  /**
+   * Waits for key count to be equal to expected number of keys.
+   */
+  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return 5 == keyCount(bucket, keyPrefix);
+      } catch (IOException e) {
+        return false;
+      }
+    }, 1000, 10000);
   }
 }

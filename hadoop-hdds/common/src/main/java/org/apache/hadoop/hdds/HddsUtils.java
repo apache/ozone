@@ -32,15 +32,19 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.TreeMap;
 
+import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -62,6 +66,11 @@ import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
@@ -77,6 +86,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -383,6 +393,25 @@ public final class HddsUtils {
       name = DNS.getDefaultHost(dnsInterface, nameServer, fallbackToHosts);
     }
     return name;
+  }
+
+  /**
+   * Retrieve the socket address that is used by Datanode.
+   * @param conf
+   * @return Target InetSocketAddress for the Datanode service endpoint.
+   */
+  public static InetSocketAddress
+      getDatanodeRpcAddress(ConfigurationSource conf) {
+    final String host = getHostNameFromConfigKeys(conf,
+        HDDS_DATANODE_CLIENT_BIND_HOST_KEY)
+        .orElse(HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT);
+
+    final int port = getPortNumberFromConfigKeys(conf,
+        HDDS_DATANODE_CLIENT_ADDRESS_KEY)
+        .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
+            HDDS_DATANODE_CLIENT_PORT_DEFAULT));
+
+    return NetUtils.createSocketAddr(host + ":" + port);
   }
 
   /**
@@ -775,5 +804,45 @@ public final class HddsUtils {
     }
 
     return msg;
+  }
+
+  /**
+   * Redacts sensitive configuration.
+   * Sorts all properties by key name
+   *
+   * @param conf OzoneConfiguration object to be printed.
+   * @return Sorted Map of properties
+   */
+  public static Map<String, String> processForLogging(OzoneConfiguration conf) {
+    Map<String, String> ozoneProps = conf.getOzoneProperties();
+    ConfigRedactor redactor = new ConfigRedactor(conf);
+    Map<String, String> sortedOzoneProps = new TreeMap<>();
+    for (Map.Entry<String, String> entry : ozoneProps.entrySet()) {
+      String value = redactor.redact(entry.getKey(), entry.getValue());
+      if (value != null) {
+        value = value.trim();
+      }
+      sortedOzoneProps.put(entry.getKey(), value);
+    }
+    return sortedOzoneProps;
+  }
+
+  /**
+   * Execute some code and ensure thread name is not changed
+   * (workaround for HADOOP-18433).
+   */
+  public static <T, E extends IOException> T preserveThreadName(
+      CheckedSupplier<T, E> supplier) throws E {
+    final Thread thread = Thread.currentThread();
+    final String threadName = thread.getName();
+
+    try {
+      return supplier.get();
+    } finally {
+      if (!Objects.equals(threadName, thread.getName())) {
+        LOG.info("Restoring thread name: {}", threadName);
+        thread.setName(threadName);
+      }
+    }
   }
 }
