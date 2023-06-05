@@ -66,15 +66,6 @@ public enum Feature {
         "Features enum: " + featureName);
   }
 
-  public String toString() {
-    switch (this) {
-    case HEATMAP:
-      return "HeatMap";
-    default:
-      return "";
-    }
-  }
-
   public static List<Feature> getAllDisabledFeatures() {
     return Arrays.stream(Feature.values())
         .filter(feature -> feature.isDisabled())
