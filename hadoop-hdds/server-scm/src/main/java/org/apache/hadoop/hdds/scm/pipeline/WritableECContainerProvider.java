@@ -94,12 +94,12 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
-    int minimumPipelines = getMinimumPipelines(repConfig);
+    int maximumPipelines = getMaximumPipelines(repConfig);
     int openPipelineCount = 0;
     synchronized (this) {
       openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < minimumPipelines) {
+      if (openPipelineCount < maximumPipelines) {
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
@@ -153,7 +153,7 @@ public class WritableECContainerProvider
     // allocate a new one.
     try {
       synchronized (this) {
-        if (openPipelineCount < minimumPipelines) {
+        if (openPipelineCount < maximumPipelines) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
         throw new IOException("Unable to allocate a pipeline for "
@@ -167,7 +167,7 @@ public class WritableECContainerProvider
     }
   }
 
-  private int getMinimumPipelines(ECReplicationConfig repConfig) {
+  private int getMaximumPipelines(ECReplicationConfig repConfig) {
     final double factor = providerConfig.getPipelinePerVolumeFactor();
     int volumeBasedCount = 0;
     if (factor > 0) {
