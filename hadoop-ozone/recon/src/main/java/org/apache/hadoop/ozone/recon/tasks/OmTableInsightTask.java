@@ -117,9 +117,20 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
 
-    writeDataToDB(objectCountMap);
-    writeDataToDB(unReplicatedSizeCountMap);
-    writeDataToDB(replicatedSizeCountMap);
+    // Write count data to DB if the sizeCountMap is not empty
+        if (!objectCountMap.isEmpty()) {
+          writeDataToDB(objectCountMap);
+        }
+
+    // Write unreplicated size data to DB if the sizeCountMap is not empty
+        if (!unReplicatedSizeCountMap.isEmpty()) {
+          writeDataToDB(unReplicatedSizeCountMap);
+        }
+
+    // Write replicated size data to DB if the sizeCountMap is not empty
+        if (!replicatedSizeCountMap.isEmpty()) {
+          writeDataToDB(replicatedSizeCountMap);
+        }
 
     LOG.info("Completed a 'reprocess' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
@@ -136,7 +147,7 @@ public class OmTableInsightTask implements ReconOmTask {
    *         and replicated size.
    * @throws IOException If an I/O error occurs during the table iteration.
    */
-  public Triple<Long, Long, Long> getTableSizeAndCount(Table table)
+  private Triple<Long, Long, Long> getTableSizeAndCount(Table table)
       throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
@@ -267,12 +278,20 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
 
-    // Write count data to DB
-    writeDataToDB(objectCountMap);
-    // Write unreplicated size data to DB
-    writeDataToDB(unreplicatedSizeCountMap);
-    // Write replicated size data to DB
-    writeDataToDB(replicatedSizeCountMap);
+    // Write count data to DB if the sizeCountMap is not empty
+    if (!objectCountMap.isEmpty()) {
+      writeDataToDB(objectCountMap);
+    }
+
+    // Write unreplicated size data to DB if the sizeCountMap is not empty
+    if (!unreplicatedSizeCountMap.isEmpty()) {
+      writeDataToDB(unreplicatedSizeCountMap);
+    }
+
+    // Write replicated size data to DB if the sizeCountMap is not empty
+    if (!replicatedSizeCountMap.isEmpty()) {
+      writeDataToDB(replicatedSizeCountMap);
+    }
 
     LOG.info("Completed a 'process' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
@@ -358,4 +377,5 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
 }
+
 
