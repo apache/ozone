@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.api.types.Feature;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -74,9 +73,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     String heatMapProviderCls = ozoneConfiguration.get(
         OZONE_RECON_HEATMAP_PROVIDER_KEY, OZONE_RECON_HEATMAP_PROVIDER_DEFAULT);
     LOG.info("HeatMapProvider: {}", heatMapProviderCls);
-    if (StringUtils.isEmpty(heatMapProviderCls)) {
-      Feature.HEATMAP.setDisabled(true);
-    } else {
+    if (!StringUtils.isEmpty(heatMapProviderCls)) {
       try {
         heatMapProvider = loadHeatMapProvider(heatMapProviderCls);
       } catch (Exception e) {

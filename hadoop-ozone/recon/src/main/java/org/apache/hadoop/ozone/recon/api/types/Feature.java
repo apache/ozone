@@ -18,9 +18,15 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
  * The Feature list of Recon. This list may grow in the future.
@@ -70,5 +76,13 @@ public enum Feature {
     return Arrays.stream(Feature.values())
         .filter(feature -> feature.isDisabled())
         .collect(Collectors.toList());
+  }
+
+  public static void initFeatureSupport(OzoneConfiguration ozoneConfiguration) {
+    String heatMapProviderCls = ozoneConfiguration.get(
+        OZONE_RECON_HEATMAP_PROVIDER_KEY, OZONE_RECON_HEATMAP_PROVIDER_DEFAULT);
+    if (StringUtils.isEmpty(heatMapProviderCls)) {
+      Feature.HEATMAP.setDisabled(true);
+    }
   }
 }
