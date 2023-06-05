@@ -28,14 +28,14 @@ const {Sider} = Layout;
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
-  isheatmapavailable: boolean;
+  isHeatmapAvailable: boolean;
 }
 
 class NavBar extends React.Component<INavBarProps> {
   constructor(props = {}) {
     super(props);
     this.state = {
-      isheatmapavailable: false
+      isHeatmapAvailable: false
     };
 
   }
@@ -90,10 +90,10 @@ class NavBar extends React.Component<INavBarProps> {
             <Link to='/DiskUsage'/>
           </Menu.Item>
           {
-            this.state.isheatmapavailable ?
+            this.state.isHeatmapAvailable ?
               <Menu.Item key='/HeatMap'>
                 <Icon type='bar-chart' />
-                <span>HeatMap</span>
+                <span>Heatmap</span>
                 <Link to='/HeatMap' />
               </Menu.Item> : ""
           }

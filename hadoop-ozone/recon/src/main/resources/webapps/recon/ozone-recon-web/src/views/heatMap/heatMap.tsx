@@ -122,14 +122,11 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
       isLoading: true
     });
 
-    console.log("Under Update Tree Map", path, entityType,date);
     const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
     axios.get(treeEndpoint).then(response => {
       minSize = this.minmax(response.data)[0];
       maxSize = this.minmax(response.data)[1];
       let treeResponse: ITreeResponse = this.updateSize(response.data);
-      //let treeResponse = this.updateSize(response.data);
-      console.log("treeResponse", treeResponse);
       this.setState({
         isLoading: false,
         showPanel: false,

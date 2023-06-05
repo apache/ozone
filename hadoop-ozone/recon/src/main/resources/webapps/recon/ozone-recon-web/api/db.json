@@ -1948,7 +1948,7 @@
     "label": "root",
     "children": [
       {
-        "label": "deveshnewvol2",
+        "label": "clusternewvol2",
         "children": [
           {
             "label": "obsbuck11",
@@ -1961,12 +1961,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/obsbuck11",
+            "path": "/clusternewvol2/obsbuck11",
             "minAccessCount": 39202,
             "maxAccessCount": 39202
           },
           {
-            "label": "deveshbuck21",
+            "label": "clusterbuck21",
             "children": [
               {
                 "label": "",
@@ -1976,12 +1976,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/obsbuck21",
+            "path": "/clusternewvol2/obsbuck21",
             "minAccessCount": 5675,
             "maxAccessCount": 5675
           },
           {
-            "label": "deveshbuck31",
+            "label": "clusterbuck31",
             "children": [
               {
                 "label": "",
@@ -1991,7 +1991,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck31",
+            "path": "/clusternewvol2/clusterbuck31",
             "minAccessCount": 4867,
             "maxAccessCount": 4867
           },
@@ -2006,12 +2006,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/obsbuck12",
+            "path": "/clusternewvol2/obsbuck12",
             "minAccessCount": 4655,
             "maxAccessCount": 4655
           },
           {
-            "label": "deveshbuck32",
+            "label": "clusterbuck32",
             "children": [
               {
                 "label": "",
@@ -2021,12 +2021,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck32",
+            "path": "/clusternewvol2/clusterbuck32",
             "minAccessCount": 4606,
             "maxAccessCount": 4606
           },
           {
-            "label": "deveshbuck33",
+            "label": "clusterbuck33",
             "children": [
               {
                 "label": "",
@@ -2036,7 +2036,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck33",
+            "path": "/clusternewvol2/clusterbuck33",
             "minAccessCount": 3832,
             "maxAccessCount": 3832
           },
@@ -2051,7 +2051,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/fsobuck11",
+            "path": "/clusternewvol2/fsobuck11",
             "minAccessCount": 2369,
             "maxAccessCount": 2369
           },
@@ -2066,7 +2066,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/fsobuck13",
+            "path": "/clusternewvol2/fsobuck13",
             "minAccessCount": 2228,
             "maxAccessCount": 2228
           },
@@ -2081,7 +2081,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/obsbuck13",
+            "path": "/clusternewvol2/obsbuck13",
             "minAccessCount": 1984,
             "maxAccessCount": 1984
           },
@@ -2096,12 +2096,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/fsobuck12",
+            "path": "/clusternewvol2/fsobuck12",
             "minAccessCount": 1895,
             "maxAccessCount": 1895
           },
           {
-            "label": "deveshbuck22",
+            "label": "clusterbuck22",
             "children": [
               {
                 "label": "",
@@ -2111,12 +2111,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck22",
+            "path": "/clusternewvol2/clusterbuck22",
             "minAccessCount": 271,
             "maxAccessCount": 271
           },
           {
-            "label": "deveshbuck23",
+            "label": "clusterbuck23",
             "children": [
               {
                 "label": "",
@@ -2126,19 +2126,19 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck23",
+            "path": "/clusternewvol2/clusterbuck23",
             "minAccessCount": 245,
             "maxAccessCount": 245
           }
         ],
         "size": 3072,
-        "path": "/deveshnewvol2"
+        "path": "/clusternewvol2"
       },
       {
-        "label": "deveshnewvol2",
+        "label": "clusternewvol2",
         "children": [
           {
-            "label": "deveshbuck2",
+            "label": "clusterbuck2",
             "children": [
               {
                 "label": "",
@@ -2148,12 +2148,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck2",
+            "path": "/clusternewvol2/clusterbuck2",
             "minAccessCount": 1015,
             "maxAccessCount": 1015
           },
           {
-            "label": "deveshbuck1",
+            "label": "clusterbuck1",
             "children": [
               {
                 "label": "",
@@ -2163,12 +2163,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck1",
+            "path": "/clusternewvol2/clusterbuck1",
             "minAccessCount": 839,
             "maxAccessCount": 839
           },
           {
-            "label": "deveshbuck3",
+            "label": "clusterbuck3",
             "children": [
               {
                 "label": "",
@@ -2178,19 +2178,19 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck3",
+            "path": "/clusternewvol2/clusterbuck3",
             "minAccessCount": 727,
             "maxAccessCount": 727
           }
         ],
         "size": 768,
-        "path": "/deveshnewvol"
+        "path": "/clusternewvol"
       },
       {
-        "label": "deveshvol3",
+        "label": "clustervol3",
         "children": [
           {
-            "label": "deveshbuck2",
+            "label": "clusterbuck2",
             "children": [
               {
                 "label": "",
@@ -2200,12 +2200,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol3/deveshbuck2",
+            "path": "/clusternewvol3/clusterbuck2",
             "minAccessCount": 271,
             "maxAccessCount": 271
           },
           {
-            "label": "deveshbuck1",
+            "label": "clusterbuck1",
             "children": [
               {
                 "label": "",
@@ -2215,12 +2215,12 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck1",
+            "path": "/clusternewvol2/clusterbuck1",
             "minAccessCount": 237,
             "maxAccessCount": 237
           },
           {
-            "label": "deveshbuck3",
+            "label": "clusterbuck3",
             "children": [
               {
                 "label": "",
@@ -2230,13 +2230,13 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/deveshbuck3",
+            "path": "/clusternewvol2/clusterbuck3",
             "minAccessCount": 213,
             "maxAccessCount": 213
           }
         ],
         "size": 768,
-        "path": "/deveshnewvol3"
+        "path": "/clusternewvol3"
       },
       {
         "label": "vol3",
@@ -2267,7 +2267,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/testbuck2",
+            "path": "/clusternewvol2/testbuck2",
             "minAccessCount": 185,
             "maxAccessCount": 185
           },
@@ -2282,7 +2282,7 @@
               }
             ],
             "size": 256,
-            "path": "/deveshnewvol2/testbuck3",
+            "path": "/clusternewvol2/testbuck3",
             "minAccessCount": 73,
             "maxAccessCount": 73
           }
@@ -2417,7 +2417,7 @@
     "label": "root",
     "children": [
       {
-        "label": "deveshnewvol2",
+        "label": "clusternewvol2",
         "children": [
           {
             "label": "obsbuck11",
@@ -2748,7 +2748,7 @@
               }
             ],
             "size": 13824,
-            "path": "/deveshnewvol2/obsbuck11",
+            "path": "/clusternewvol2/obsbuck11",
             "minAccessCount": 22,
             "maxAccessCount": 84
           },
@@ -2769,7 +2769,7 @@
               }
             ],
             "size": 512,
-            "path": "/deveshnewvol2/obsbuck13",
+            "path": "/clusternewvol2/obsbuck13",
             "minAccessCount": 41,
             "maxAccessCount": 65
           },
@@ -2814,12 +2814,12 @@
               }
             ],
             "size": 1536,
-            "path": "/deveshnewvol2/obsbuck12",
+            "path": "/clusternewvol2/obsbuck12",
             "minAccessCount": 29,
             "maxAccessCount": 55
           },
           {
-            "label": "deveshbuck33",
+            "label": "clusterbuck33",
             "children": [
               {
                 "label": "demo6",
@@ -2865,12 +2865,12 @@
               }
             ],
             "size": 1792,
-            "path": "/deveshnewvol2/deveshbuck33",
+            "path": "/clusternewvol2/clusterbuck33",
             "minAccessCount": 24,
             "maxAccessCount": 49
           },
           {
-            "label": "deveshbuck31",
+            "label": "clusterbuck31",
             "children": [
               {
                 "label": "demo9",
@@ -2952,7 +2952,7 @@
               }
             ],
             "size": 3328,
-            "path": "/deveshnewvol2/deveshbuck31",
+            "path": "/clusternewvol2/clusterbuck31",
             "minAccessCount": 23,
             "maxAccessCount": 48
           },
@@ -2973,12 +2973,12 @@
               }
             ],
             "size": 512,
-            "path": "/deveshnewvol2/fsobuck11",
+            "path": "/clusternewvol2/fsobuck11",
             "minAccessCount": 34,
             "maxAccessCount": 45
           },
           {
-            "label": "deveshbuck32",
+            "label": "clusterbuck32",
             "children": [
               {
                 "label": "demo17",
@@ -3054,7 +3054,7 @@
               }
             ],
             "size": 3072,
-            "path": "/deveshnewvol2/deveshbuck32",
+            "path": "/clusternewvol2/clusterbuck32",
             "minAccessCount": 23,
             "maxAccessCount": 44
           },
@@ -3075,13 +3075,13 @@
               }
             ],
             "size": 512,
-            "path": "/deveshnewvol2/fsobuck13",
+            "path": "/clusternewvol2/fsobuck13",
             "minAccessCount": 23,
             "maxAccessCount": 38
           }
         ],
         "size": 25088,
-        "path": "/deveshnewvol2/"
+        "path": "/clusternewvol2/"
       },
       {
         "label": "volume1",
@@ -3174,832 +3174,6 @@
         ],
         "size": 7168,
         "path": "/hivevolTest2"
-      }
-    ],
-    "size": 25600,
-    "minAccessCount": 2924,
-    "maxAccessCount": 155074
-  },
-  "heatmapTestClick": {
-    "label": "root",
-    "children": [
-      {
-        "label": "heatmapTest1/hivevolTest1/hivebucketTest1",
-        "children": [
-          {
-            "label": "Test1",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 155074,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 68567,
-                "color": 0.56
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 36114,
-                "color": 0.45
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 9047,
-                "color": 0.62
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 9044,
-                "color": 0.78
-              },
-              {
-                "label": "enc_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 6463,
-                "color": 0.88
-              },
-              {
-                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 5712,
-                "color": 0.92
-              },
-              {
-                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 5440,
-                "color": 0.98
-              },
-              {
-                "label": "enc_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 4627,
-                "color": 0.100
-              },
-              {
-                "label": "enc_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 4624,
-                "color": 0.150
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales",
-                "size": 256,
-                "accessCount": 4015,
-                "color": 0.200
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales",
-                "size": 256,
-                "accessCount": 3811,
-                "color": 0.250
-              },
-              {
-                "label": "enc_path/hive_tpcds/store",
-                "size": 256,
-                "accessCount": 2927,
-                "color": 0.018
-              },
-              {
-                "label": "enc_path/hive_tpcds/store/store.dat",
-                "size": 256,
-                "accessCount": 2924,
-                "color": 0.300
-              }
-            ],
-            "size": 3584,
-            "minAccessCount": 2924,
-            "maxAccessCount": 155074
-          },
-          {
-            "label": "Test2",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 155069,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 68566,
-                "color": 0.350
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 36119,
-                "color": 0.400
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 9047,
-                "color": 0.450
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 9044,
-                "color": 0.500
-              },
-              {
-                "label": "reg_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 6463,
-                "color": 0.550
-              },
-              {
-                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 5712,
-                "color": 0.600
-              },
-              {
-                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 5440,
-                "color": 0.650
-              },
-              {
-                "label": "reg_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 4627,
-                "color": 0.700
-              },
-              {
-                "label": "reg_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 4624,
-                "color": 0.750
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales",
-                "size": 256,
-                "accessCount": 4015,
-                "color": 0.800
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales",
-                "size": 256,
-                "accessCount": 3811,
-                "color": 0.850
-              },
-              {
-                "label": "reg_path/hive_tpcds/store",
-                "size": 256,
-                "accessCount": 2927,
-                "color": 0.900
-              },
-              {
-                "label": "reg_path/hive_tpcds/store/store.dat",
-                "size": 256,
-                "accessCount": 2924,
-                "color": 0.950
-              }
-            ],
-            "size": 3584,
-            "minAccessCount": 2924,
-            "maxAccessCount": 155069
-          }
-        ],
-        "size": 7168
-      },
-      {
-        "label": "TestVolume 3",
-        "children": [
-          {
-            "label": "hivebuck1675429571",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 129977,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 57481,
-                "color": 0.950
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 30280,
-                "color": 0.900
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 7584,
-                "color": 0.850
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 7581,
-                "color": 0.800
-              },
-              {
-                "label": "reg_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 5418,
-                "color": 0.750
-              },
-              {
-                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 4788,
-                "color": 0.700
-              },
-              {
-                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 4560,
-                "color": 0.650
-              },
-              {
-                "label": "reg_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 3879,
-                "color": 0.600
-              },
-              {
-                "label": "reg_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 3876,
-                "color": 0.550
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales",
-                "size": 256,
-                "accessCount": 3366,
-                "color": 0.500
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales",
-                "size": 256,
-                "accessCount": 3195,
-                "color": 0.450
-              }
-            ],
-            "size": 3072,
-            "minAccessCount": 3195,
-            "maxAccessCount": 129977
-          },
-          {
-            "label": "hiveencbuck1675429572",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 128525,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 56950,
-                "color": 0.400
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 29936,
-                "color": 0.350
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 7494,
-                "color": 0.300
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 7486,
-                "color": 0.250
-              },
-              {
-                "label": "enc_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 5357,
-                "color": 0.200
-              },
-              {
-                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 4718,
-                "color": 0.150
-              },
-              {
-                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 4510,
-                "color": 0.035
-              },
-              {
-                "label": "enc_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 3831,
-                "color": 0.650
-              },
-              {
-                "label": "enc_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 3827,
-                "color": 0.700
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales",
-                "size": 256,
-                "accessCount": 3328,
-                "color": 0.025
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales",
-                "size": 256,
-                "accessCount": 3167,
-                "color": 0.000
-              }
-            ],
-            "size": 3072,
-            "minAccessCount": 3167,
-            "maxAccessCount": 128525
-          }
-        ],
-        "size": 6144
-      },
-      {
-        "label": "hivevol1676910931",
-        "children": [
-          {
-            "label": "hivebuck1676910932",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 110185,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 48869,
-                "color": 0.443
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 25685,
-                "color": 0.633
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 6421,
-                "color": 0.580
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 6418,
-                "color": 0.650
-              },
-              {
-                "label": "reg_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 4593,
-                "color": 0.700
-              },
-              {
-                "label": "reg_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 4046,
-                "color": 0.750
-              },
-              {
-                "label": "reg_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 3865,
-                "color": 0.800
-              },
-              {
-                "label": "reg_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 3283,
-                "color": 0.850
-              },
-              {
-                "label": "reg_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 3280,
-                "color": 0.900
-              }
-            ],
-            "size": 2560,
-            "minAccessCount": 3280,
-            "maxAccessCount": 110185
-          },
-          {
-            "label": "hiveencbuck1676910931",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 109463,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 48397,
-                "color": 0.000
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 25514,
-                "color": 0.555
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 6387,
-                "color": 0.600
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 6384,
-                "color": 0.665
-              },
-              {
-                "label": "enc_path/hive_tpcds/store_sales",
-                "size": 256,
-                "accessCount": 4563,
-                "color": 0.700
-              },
-              {
-                "label": "enc_path/hive_tpcds/inventory/inventory.dat",
-                "size": 256,
-                "accessCount": 4032,
-                "color": 0.750
-              },
-              {
-                "label": "enc_path/hive_tpcds/customer_demographics/customer_demographics.dat",
-                "size": 256,
-                "accessCount": 3840,
-                "color": 0.800
-              },
-              {
-                "label": "enc_path/hive_tpcds/item",
-                "size": 256,
-                "accessCount": 3267,
-                "color": 0.850
-              },
-              {
-                "label": "enc_path/hive_tpcds/item/item.dat",
-                "size": 256,
-                "accessCount": 3264,
-                "color": 0.950
-              }
-            ],
-            "size": 2560,
-            "minAccessCount": 3264,
-            "maxAccessCount": 109463
-          }
-        ],
-        "size": 5120
-      },
-      {
-        "label": "hivevol1676533485",
-        "children": [
-          {
-            "label": "hiveencbuck1676533485",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 52456,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 23190,
-                "color": 0.000
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 12217,
-                "color": 0.050
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 3062,
-                "color": 0.100
-              },
-              {
-                "label": "enc_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 3059,
-                "color": 0.150
-              }
-            ],
-            "size": 1280,
-            "minAccessCount": 3059,
-            "maxAccessCount": 52456
-          },
-          {
-            "label": "hivebuck1676533485",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 52450,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 23193,
-                "color": 0.150
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 12223,
-                "color": 1.000
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim",
-                "size": 256,
-                "accessCount": 3062,
-                "color": 0.058
-              },
-              {
-                "label": "reg_path/hive_tpcds/date_dim/date_dim.dat",
-                "size": 256,
-                "accessCount": 3059,
-                "color": 0.250
-              }
-            ],
-            "size": 1280,
-            "minAccessCount": 3059,
-            "maxAccessCount": 52450
-          }
-        ],
-        "size": 2560
-      },
-      {
-        "label": "hivewritevol1676574237",
-        "children": [
-          {
-            "label": "hivebucket1676574242",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 37446,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 37446,
-            "maxAccessCount": 37446
-          }
-        ],
-        "size": 256
-      },
-      {
-        "label": "hivevol1675358593",
-        "children": [
-          {
-            "label": "hiveencbuck1675358593",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 34205,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 15126,
-                "color": 0.750
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 7975,
-                "color": 0.180
-              }
-            ],
-            "size": 768,
-            "minAccessCount": 7975,
-            "maxAccessCount": 34205
-          },
-          {
-            "label": "hivebuck1675358593",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 32047,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 14151,
-                "color": 0.560
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 7513,
-                "color": 0.670
-              }
-            ],
-            "size": 768,
-            "minAccessCount": 7513,
-            "maxAccessCount": 32047
-          }
-        ],
-        "size": 1536
-      },
-      {
-        "label": "hivewritevol1675429188",
-        "children": [
-          {
-            "label": "hivebucket1675429193",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 32246,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 32246,
-            "maxAccessCount": 32246
-          }
-        ],
-        "size": 256
-      },
-      {
-        "label": "hivewritevol1676910511",
-        "children": [
-          {
-            "label": "hivebucket1676910516",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 26095,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 26095,
-            "maxAccessCount": 26095
-          }
-        ],
-        "size": 256
-      },
-      {
-        "label": "hivevol1676900292",
-        "children": [
-          {
-            "label": "hivebuck1676900292",
-            "children": [
-              {
-                "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 13692,
-                "color": 1.0
-              },
-              {
-                "label": "reg_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 6048,
-                "color": 0.125
-              },
-              {
-                "label": "reg_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 3187,
-                "color": 0.568
-              }
-            ],
-            "size": 768,
-            "minAccessCount": 3187,
-            "maxAccessCount": 13692
-          },
-          {
-            "label": "hiveencbuck1676900293",
-            "children": [
-              {
-                "label": "enc_path/hive_tpcds/store_sales/store_sales.dat",
-                "size": 256,
-                "accessCount": 13681,
-                "color": 1.0
-              },
-              {
-                "label": "enc_path/hive_tpcds/catalog_sales/catalog_sales.dat",
-                "size": 256,
-                "accessCount": 6049,
-                "color": 0.442
-              },
-              {
-                "label": "enc_path/hive_tpcds/web_sales/web_sales.dat",
-                "size": 256,
-                "accessCount": 3188,
-                "color": 0.789
-              }
-            ],
-            "size": 768,
-            "minAccessCount": 3188,
-            "maxAccessCount": 13681
-          }
-        ],
-        "size": 1536,
-        "minAccessCount": 32246,
-        "maxAccessCount": 32246
-      },
-      {
-        "label": "hivewritevol1676533084",
-        "children": [
-          {
-            "label": "hivebucket1676533089",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 12976,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 12976,
-            "maxAccessCount": 12976
-          }
-        ],
-        "size": 256
-      },
-      {
-        "label": "hivewritevol1675358193",
-        "children": [
-          {
-            "label": "hivebucket1675358197",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 8034,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 8034,
-            "maxAccessCount": 8034
-          }
-        ],
-        "size": 256
-      },
-      {
-        "label": "hivewritevol1676899876",
-        "children": [
-          {
-            "label": "hivebucket1676899881",
-            "children": [
-              {
-                "label": "hive_write/vectortab_txt/delta_0000001_0000001_0000/vectortab",
-                "size": 256,
-                "accessCount": 3088,
-                "color": 1.0
-              }
-            ],
-            "size": 256,
-            "minAccessCount": 3088,
-            "maxAccessCount": 3088
-          }
-        ],
-        "size": 256
       }
     ],
     "size": 25600,
