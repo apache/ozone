@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.api.types.Feature;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,9 +63,9 @@ public class FeaturesEndpoint {
   @GET
   @Path("/disabledFeatures")
   public Response getDisabledFeatures() {
-    List<Feature> allDisabledFeatures;
+    List<FeatureProvider.Feature> allDisabledFeatures;
     try {
-      allDisabledFeatures = Feature.getAllDisabledFeatures();
+      allDisabledFeatures = FeatureProvider.getAllDisabledFeatures();
     } catch (Exception ex) {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);

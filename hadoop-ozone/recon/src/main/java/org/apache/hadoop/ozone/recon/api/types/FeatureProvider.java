@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,58 +32,58 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_P
  * The Feature list of Recon. This list may grow in the future.
  * If this list grows bigger, then this may be loaded from Sql DB.
  */
-public enum Feature {
-  HEATMAP("HeatMap", false) {
-    private boolean disabled;
-    @Override
-    public boolean isDisabled() {
-      return this.disabled;
+public class FeatureProvider {
+  private static EnumMap<Feature, Boolean> featureSupportMap =
+      new EnumMap<>(Feature.class);
+
+  public enum Feature {
+
+    HEATMAP("HeatMap");
+    private String featureName;
+
+    public String getFeatureName() {
+      return featureName;
     }
-    @Override
-    public void setDisabled(boolean disabled) {
-      this.disabled = disabled;
+
+    Feature(String featureName) {
+      this.featureName = featureName;
     }
-  };
-  private String featureName;
-  private boolean disabled;
 
-  public abstract boolean isDisabled();
-
-  public abstract void setDisabled(boolean disabled);
-
-  public String getFeatureName() {
-    return featureName;
+    public static Feature of(String featureName) {
+      Feature featureEnum = Arrays.stream(Feature.values())
+          .filter(feature -> feature.getFeatureName().equals(featureName))
+          .findFirst().get();
+      if (null == featureEnum) {
+        throw new IllegalArgumentException("Unrecognized value for " +
+            "Features enum: " + featureName);
+      }
+      return featureEnum;
+    }
   }
 
-  Feature(String featureName, boolean disabled) {
-    this.featureName = featureName;
-    this.disabled = disabled;
-  }
-
-  public static Feature of(String featureName) {
-    if (featureName.equals("HeatMap")) {
-      return HEATMAP;
-    }
-    throw new IllegalArgumentException("Unrecognized value for " +
-        "Features enum: " + featureName);
+  public static EnumMap<Feature, Boolean> getFeatureSupportMap() {
+    return featureSupportMap;
   }
 
   public static List<Feature> getAllDisabledFeatures() {
-    return Arrays.stream(Feature.values())
-        .filter(feature -> feature.isDisabled())
-        .collect(Collectors.toList());
+    return getFeatureSupportMap().keySet().stream().filter(feature ->
+        Boolean.TRUE.equals(getFeatureSupportMap().get(feature))).collect(
+        Collectors.toList());
+
   }
 
-  public static void initFeatureSupport(OzoneConfiguration ozoneConfiguration) {
+  public static void initFeatureSupport(
+      OzoneConfiguration ozoneConfiguration) {
     resetInitOfFeatureSupport();
     String heatMapProviderCls = ozoneConfiguration.get(
         OZONE_RECON_HEATMAP_PROVIDER_KEY);
     if (StringUtils.isEmpty(heatMapProviderCls)) {
-      Feature.HEATMAP.setDisabled(true);
+      getFeatureSupportMap().put(Feature.HEATMAP, true);
     }
   }
 
   private static void resetInitOfFeatureSupport() {
-    Feature.HEATMAP.setDisabled(false);
+    getFeatureSupportMap().keySet()
+        .forEach(feature -> getFeatureSupportMap().put(feature, false));
   }
 }

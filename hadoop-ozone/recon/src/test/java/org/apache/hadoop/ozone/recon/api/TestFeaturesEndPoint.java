@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.Feature;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
+
 import java.util.List;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
@@ -90,13 +91,13 @@ public class TestFeaturesEndPoint {
   @Test
   public void testGetDisabledFeaturesGreaerThanZero() {
     ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY, "");
-    Feature.initFeatureSupport(ozoneConfiguration);
+    FeatureProvider.initFeatureSupport(ozoneConfiguration);
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
-    List<Feature> allDisabledFeatures =
-        (List<Feature>) disabledFeatures.getEntity();
+    List<FeatureProvider.Feature> allDisabledFeatures =
+        (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     Assertions.assertNotNull(allDisabledFeatures);
     Assertions.assertTrue(allDisabledFeatures.size() > 0);
-    Assertions.assertEquals(Feature.HEATMAP.getFeatureName(),
+    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
 
@@ -104,10 +105,10 @@ public class TestFeaturesEndPoint {
   public void testNoDisabledFeatures() {
     ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY,
         "org.apache.hadoop.ozone.recon.heatmap.TestHeatMapProviderImpl");
-    Feature.initFeatureSupport(ozoneConfiguration);
+    FeatureProvider.initFeatureSupport(ozoneConfiguration);
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
-    List<Feature> allDisabledFeatures =
-        (List<Feature>) disabledFeatures.getEntity();
+    List<FeatureProvider.Feature> allDisabledFeatures =
+        (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     Assertions.assertNotNull(allDisabledFeatures);
     Assertions.assertTrue(allDisabledFeatures.size() == 0);
   }
