@@ -167,8 +167,7 @@ public class HddsVolume extends StorageVolume {
    */
   private void createDeleteServiceDir() {
     deletedContainerDir = new File(getTmpDir(), TMP_CONTAINER_DELETE_DIR_NAME);
-
-    if (deletedContainerDir.exists()) {
+    if (!deletedContainerDir.exists()) {
       try {
         Files.createDirectories(deletedContainerDir.toPath());
       } catch (IOException ex) {
@@ -223,6 +222,12 @@ public class HddsVolume extends StorageVolume {
    * makes the deletion atomic.
    */
   public void cleanDeletedContainerDir() {
+    // If the volume was shut down before initialization completed, skip
+    // cleanup.
+    if (deletedContainerDir == null) {
+      return;
+    }
+
     if (!deletedContainerDir.exists()) {
       LOG.warn("Unable to clear deleted containers from {}. Directory does " +
           "not exist.", deletedContainerDir);

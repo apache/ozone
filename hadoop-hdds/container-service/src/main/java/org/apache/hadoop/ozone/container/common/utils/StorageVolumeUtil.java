@@ -236,11 +236,11 @@ public final class StorageVolumeUtil {
       // If we are finalized for SCM HA and there is no cluster ID directory,
       // the volume may have been unhealthy during finalization and been
       // skipped. Create cluster ID symlink now.
-      // Else, We are still pre-finalized.
-      // The existing directory should be left for backwards compatibility.
       return VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(volume, clusterId);
     } else {
+      // Else, We are still pre-finalized.
+      // The existing directory should be left for backwards compatibility.
       if (!clusterDir.exists()) {
         logger.error("Volume {} is in an inconsistent state. {} files found " +
             "but cluster ID directory {} does not exist.", volumeRootPath,

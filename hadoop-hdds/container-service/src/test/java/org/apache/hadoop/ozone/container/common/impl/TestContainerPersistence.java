@@ -172,7 +172,9 @@ public class TestContainerPersistence {
     // Initialize volume directories.
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
         volumeSet.getVolumesList())) {
-      StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID, conf, null, null);
+      boolean success = StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID,
+          conf, null, null);
+      Assert.assertTrue(success);
     }
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
@@ -387,16 +389,6 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithRenaming()
       throws Exception {
-//    HddsVolume hddsVolume;
-//    Files.createDirectories(Paths.get(hddsPath));
-//    HddsVolume.Builder volumeBuilder =
-//        new HddsVolume.Builder(hddsPath)
-//        .datanodeUuid(DATANODE_UUID)
-//        .conf(conf)
-//        .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-//    hddsVolume = volumeBuilder.build();
-//    hddsVolume.format(SCM_ID);
-//    hddsVolume.createWorkingDirs(SCM_ID, null);
 
     // Add two closed containers to test deleting.
     long testContainerID1 = getTestContainerID();
@@ -419,14 +411,21 @@ public class TestContainerPersistence {
     // Since this test only uses one volume, both containers will reside in
     // the same volume.
     HddsVolume hddsVolume = container1Data.getVolume();
+    // Volume setup should have created the tmp directory for container
+    // deletion.
+    File volumeTmpDir = hddsVolume.getTmpDir();
+    Assert.assertTrue(String.format("Volume level tmp dir %s not created.",
+            volumeTmpDir), volumeTmpDir.exists());
+    File deletedContainerDir = hddsVolume.getDeletedContainerDir();
+    Assert.assertTrue(String.format("Volume level container deleted directory" +
+        " %s not created.", deletedContainerDir), deletedContainerDir.exists());
 
     // Move containers to delete directory.
     KeyValueContainerUtil.moveToDeletedContainerDir(container1Data, hddsVolume);
     KeyValueContainerUtil.moveToDeletedContainerDir(container2Data, hddsVolume);
 
     // Both containers should be present in the deleted directory.
-    File[] deleteDirFilesArray =
-        hddsVolume.getDeletedContainerDir().listFiles();
+    File[] deleteDirFilesArray = deletedContainerDir.listFiles();
     Assert.assertNotNull(deleteDirFilesArray);
     Set<File> deleteDirFiles = Arrays.stream(deleteDirFilesArray)
         .collect(Collectors.toSet());
@@ -442,7 +441,7 @@ public class TestContainerPersistence {
     container1.delete();
 
     // Check the delete directory again. Only container 2 should remain.
-    deleteDirFilesArray = hddsVolume.getDeletedContainerDir().listFiles();
+    deleteDirFilesArray = deletedContainerDir.listFiles();
     Assert.assertNotNull(deleteDirFilesArray);
     Assert.assertEquals(1, deleteDirFilesArray.length);
     Assert.assertEquals(deleteDirFilesArray[0], container2Dir);
@@ -459,7 +458,7 @@ public class TestContainerPersistence {
         .containsKey(testContainerID2));
 
     // Deleted containers directory should now be empty.
-    deleteDirFilesArray = hddsVolume.getDeletedContainerDir().listFiles();
+    deleteDirFilesArray = deletedContainerDir.listFiles();
     Assert.assertNotNull(deleteDirFilesArray);
     Assert.assertEquals(0, deleteDirFilesArray.length);
   }
