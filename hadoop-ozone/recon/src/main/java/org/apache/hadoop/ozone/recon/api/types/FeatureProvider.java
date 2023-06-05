@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.google.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -29,13 +30,20 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
- * The Feature list of Recon. This list may grow in the future.
- * If this list grows bigger, then this may be loaded from Sql DB.
+ * This class is responsible for maintaining Recon features metadata.
  */
-public class FeatureProvider {
+@Singleton
+public final class FeatureProvider {
   private static EnumMap<Feature, Boolean> featureSupportMap =
       new EnumMap<>(Feature.class);
 
+  private FeatureProvider() {
+  }
+
+  /**
+   * The Feature list of Recon. This list may grow in the future.
+   * If this list grows bigger, then this may be loaded from Sql DB.
+   */
   public enum Feature {
 
     HEATMAP("HeatMap");
