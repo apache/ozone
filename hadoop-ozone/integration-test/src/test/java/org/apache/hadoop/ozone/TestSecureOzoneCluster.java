@@ -40,6 +40,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
@@ -1296,8 +1297,7 @@ public final class TestSecureOzoneCluster {
       X509CertificateHolder certHolder = generateX509CertHolder(conf, keyPair,
           new KeyPair(scmCertClient.getPublicKey(),
               scmCertClient.getPrivateKey()), scmCert,
-          Duration.ofSeconds(certLifetime),
-          InetAddress.getLocalHost().getCanonicalHostName(), clusterId);
+          "om_cert", clusterId);
       String certId = certHolder.getSerialNumber().toString();
       certCodec.writeCertificate(certHolder);
       certCodec.writeCertificate(CertificateCodec.getCertificateHolder(scmCert),
@@ -1455,7 +1455,7 @@ public final class TestSecureOzoneCluster {
 
   private static X509CertificateHolder generateX509CertHolder(
       OzoneConfiguration conf, KeyPair keyPair, KeyPair rootKeyPair,
-      X509Certificate rootCert, Duration certLifetime, String subject,
+      X509Certificate rootCert, String subject,
       String clusterId) throws Exception {
     // Generate normal certificate, signed by RootCA certificate
     SecurityConfig secConfig = new SecurityConfig(conf);
@@ -1472,7 +1472,8 @@ public final class TestSecureOzoneCluster {
         .setSubject(subject)
         .setDigitalSignature(true)
         .setDigitalEncryption(true);
-
+    
+    addIpAndDnsDataToBuilder(csrBuilder);
     LocalDateTime start = LocalDateTime.now();
     String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
         HDDS_X509_DEFAULT_DURATION_DEFAULT);
@@ -1484,5 +1485,14 @@ public final class TestSecureOzoneCluster {
                 .atZone(ZoneId.systemDefault()).toInstant()),
             csrBuilder.build(), "test", clusterId);
     return certificateHolder;
+  }
+
+  private static void addIpAndDnsDataToBuilder(
+      CertificateSignRequest.Builder csrBuilder) throws IOException {
+    DomainValidator validator = DomainValidator.getInstance();
+    // Add all valid ips.
+    List<InetAddress> inetAddresses =
+        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }
