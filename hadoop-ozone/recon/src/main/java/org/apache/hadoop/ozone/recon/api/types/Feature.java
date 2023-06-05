@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
@@ -47,13 +46,9 @@ public enum Feature {
   private String featureName;
   private boolean disabled;
 
-  public boolean isDisabled() {
-    return disabled;
-  }
+  public abstract boolean isDisabled();
 
-  public void setDisabled(boolean disabled) {
-    this.disabled = disabled;
-  }
+  public abstract void setDisabled(boolean disabled);
 
   public String getFeatureName() {
     return featureName;
@@ -79,10 +74,15 @@ public enum Feature {
   }
 
   public static void initFeatureSupport(OzoneConfiguration ozoneConfiguration) {
+    resetInitOfFeatureSupport();
     String heatMapProviderCls = ozoneConfiguration.get(
-        OZONE_RECON_HEATMAP_PROVIDER_KEY, OZONE_RECON_HEATMAP_PROVIDER_DEFAULT);
+        OZONE_RECON_HEATMAP_PROVIDER_KEY);
     if (StringUtils.isEmpty(heatMapProviderCls)) {
       Feature.HEATMAP.setDisabled(true);
     }
+  }
+
+  private static void resetInitOfFeatureSupport() {
+    Feature.HEATMAP.setDisabled(false);
   }
 }
