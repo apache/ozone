@@ -44,6 +44,7 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
@@ -191,18 +192,22 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public void handleVolumeFailures(StateContext context) {
     AtomicBoolean failedVolume = new AtomicBoolean(false);
+    AtomicInteger containerCount = new AtomicInteger(0);
     containerMap.values().forEach(c -> {
       if (c.getContainerData().getVolume().isFailed()) {
         removeContainer(c.getContainerData().getContainerID());
-        LOG.info("Removing Container {} as the Volume {} " +
+        LOG.debug("Removing Container {} as the Volume {} " +
               "has failed", c.getContainerData().getContainerID(),
             c.getContainerData().getVolume());
         failedVolume.set(true);
+        containerCount.incrementAndGet();
       }
     });
 
     if (failedVolume.get()) {
       try {
+        LOG.info("Removed {} containers on failed volumes",
+            containerCount.get());
         // There are some failed volume(container), send FCR to SCM
         Message report = context.getFullContainerReportDiscardPendingICR();
         context.refreshFullReport(report);
