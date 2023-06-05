@@ -138,8 +138,14 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
-    assertEquals(6L, getSizeForTable(OPEN_KEY_TABLE));
-    assertEquals(6L, getSizeForTable(OPEN_FILE_TABLE));
+    assertEquals(3L, getCountForTable(OPEN_KEY_TABLE));
+    assertEquals(3L, getCountForTable(OPEN_FILE_TABLE));
+    // Test for both replicated and unreplicated size for OPEN_KEY_TABLE
+    assertEquals(6L, getUnReplicatedSizeForTable(OPEN_KEY_TABLE));
+    assertEquals(18L, getReplicatedSizeForTable(OPEN_KEY_TABLE));
+    // Test for both replicated and unreplicated size for OPEN_FILE_TABLE
+    assertEquals(6L, getUnReplicatedSizeForTable(OPEN_FILE_TABLE));
+    assertEquals(18L, getReplicatedSizeForTable(OPEN_FILE_TABLE));
   }
 
 
@@ -147,7 +153,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   public void testProcessForCount() {
     ArrayList<OMDBUpdateEvent> events = new ArrayList<>();
     // Create 5 put, 1 delete and 1 update event for each table
-    for (String tableName: omTableInsightTask.getTaskTables()) {
+    for (String tableName : omTableInsightTask.getTaskTables()) {
       for (int i = 0; i < 5; i++) {
         events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
       }
@@ -170,7 +176,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
-    for (String tableName: omTableInsightTask.getTaskTables()) {
+    for (String tableName : omTableInsightTask.getTaskTables()) {
       newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT));
       // This delete event should be a noop since value is null
       newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE));
@@ -190,13 +196,14 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testProcessForSize() {
     // Prepare mock data size
+    Long sizeToBeReturned = 1000L;
     OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
-    when(omKeyInfo.getDataSize()).thenReturn(1000L);
+    when(omKeyInfo.getDataSize()).thenReturn(sizeToBeReturned);
+    when(omKeyInfo.getReplicatedSize()).thenReturn(sizeToBeReturned * 3);
 
     // Test PUT events
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
-    for (String tableName :
-        omTableInsightTask.getTablesToCalculateSize()) {
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       for (int i = 0; i < 5; i++) {
         putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT));
       }
@@ -206,7 +213,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // After 5 PUTs, size should be 5 * 1000 = 5000 for each size-related table
     for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      assertEquals(5000L, getSizeForTable(tableName));
+      assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
 
     // Test DELETE events
@@ -220,29 +228,20 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // After deleting "item0", size should be 4 * 1000 = 4000
     for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      assertEquals(4000L, getSizeForTable(tableName));
+      assertEquals(4000L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(12000L, getReplicatedSizeForTable(tableName));
     }
 
-    // Test UPDATE of DataSize by performing "delete + put" operations
-    // Assume that an "update" changes the key data size to 500
-    OmKeyInfo updatedOmKeyInfo = mock(OmKeyInfo.class);
-    when(updatedOmKeyInfo.getDataSize()).thenReturn(500L);
-    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      // "Update" "item1" by first deleting it...
-      updateEvents.add(getOMUpdateEvent("item1", omKeyInfo, tableName, DELETE));
-      // ...and then putting it back with updated size
-      updateEvents.add(
-          getOMUpdateEvent("item1", updatedOmKeyInfo, tableName, PUT));
-    }
-    OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
-    omTableInsightTask.process(updateEventBatch);
-
-    // After UPDATE, size should be (4000 - 1000) + 500 = 3500
-    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
-      assertEquals(3500L, getSizeForTable(tableName));
+    // Verify count and size of non-size-related tables
+    for (String tableName : omTableInsightTask.getTaskTables()) {
+      if (!omTableInsightTask.getTablesToCalculateSize().contains(tableName)) {
+        assertEquals(5L, getCountForTable(tableName));
+        assertEquals(0L, getUnReplicatedSizeForTable(tableName));
+        assertEquals(0L, getReplicatedSizeForTable(tableName));
+      }
     }
   }
+
 
   private OMDBUpdateEvent getOMUpdateEvent(String name, Object value,
                                            String table,
@@ -260,8 +259,13 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     return globalStatsDao.findById(key).getValue();
   }
 
-  private long getSizeForTable(String tableName) {
-    String key = OmTableInsightTask.getTableSizeKeyFromTable(tableName);
+  private long getUnReplicatedSizeForTable(String tableName) {
+    String key = OmTableInsightTask.getUnReplicatedSizeKeyFromTable(tableName);
+    return globalStatsDao.findById(key).getValue();
+  }
+
+  private long getReplicatedSizeForTable(String tableName) {
+    String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
   }
 }

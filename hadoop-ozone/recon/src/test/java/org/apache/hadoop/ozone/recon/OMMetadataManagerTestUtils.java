@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -37,6 +38,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -288,7 +290,7 @@ public final class OMMetadataManagerTestUtils {
         .setKeyName(keyName)
         .setDataSize(dataSize)
         .setOmKeyLocationInfos(locationVersions)
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setObjectID(objectId)
         .setParentObjectID(parentObjectId)
         .build();
@@ -318,7 +320,7 @@ public final class OMMetadataManagerTestUtils {
         .setKeyName(keyName)
         .setDataSize(dataSize)
         .setOmKeyLocationInfos(locationVersions)
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
 
     omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY)

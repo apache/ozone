@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -85,7 +86,10 @@ public class OmTableInsightTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     HashMap<String, Long> objectCountMap = initializeCountMap();
-    HashMap<String, Long> sizeCountMap = initializeSizeMap();
+    HashMap<String, Long> unReplicatedSizeCountMap =
+        initializeUnReplicatedSizeMap();
+    HashMap<String, Long> replicatedSizeCountMap =
+        initializeReplicatedSizeMap();
 
     for (String tableName : getTaskTables()) {
       Table table = omMetadataManager.getTable(tableName);
@@ -96,11 +100,13 @@ public class OmTableInsightTask implements ReconOmTask {
 
       try {
         if (getTablesToCalculateSize().contains(tableName)) {
-          Pair<Long, Long> details = getTableSizeAndCount(table);
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              details.getLeft());
-          sizeCountMap.put(getTableSizeKeyFromTable(tableName),
-              details.getRight());
+          Triple<Long, Long, Long> details = getTableSizeAndCount(table);
+          objectCountMap.put(
+              getTableCountKeyFromTable(tableName), details.getLeft());
+          unReplicatedSizeCountMap.put(
+              getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
+          replicatedSizeCountMap.put(
+              getReplicatedSizeKeyFromTable(tableName), details.getRight());
         } else {
           long count = getCount(table.iterator());
           objectCountMap.put(getTableCountKeyFromTable(tableName), count);
@@ -112,28 +118,29 @@ public class OmTableInsightTask implements ReconOmTask {
     }
 
     writeDataToDB(objectCountMap);
-    writeDataToDB(sizeCountMap);
+    writeDataToDB(unReplicatedSizeCountMap);
+    writeDataToDB(replicatedSizeCountMap);
 
     LOG.info("Completed a 'reprocess' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
 
   /**
-   *  Returns a pair with the total count of records (left) and total data size
-   *  (right) in the given table. Increments count for each record and adds the
-   *  dataSize if a record's value is an instance of OmKeyInfo. If the table is
-   *  null, returns (0,0).
+   * Returns a pair with the total count of records (left), total unReplicated
+   * size (middle), and total replicated size (right) in the given table.
+   * Increments count for each record and adds the dataSize if a record's value
+   * is an instance of OmKeyInfo. If the table is null, returns (0, 0, 0).
    *
    * @param table The table from which to get the count and data size.
-   * @return A pair of Long values of count & data size
+   * @return Three Long values representing the count, unReplicated size,
+   *         and replicated size.
    * @throws IOException If an I/O error occurs during the table iteration.
    */
-  public Pair<Long, Long> getTableSizeAndCount(Table table) throws IOException {
-    long size = 0;
+  public Triple<Long, Long, Long> getTableSizeAndCount(Table table)
+      throws IOException {
     long count = 0;
-    if (table == null) {
-      return Pair.of(count, size);
-    }
+    long unReplicatedSize = 0;
+    long replicatedSize = 0;
 
     TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator =
         table.iterator();
@@ -142,12 +149,14 @@ public class OmTableInsightTask implements ReconOmTask {
 
       if (kv != null && kv.getValue() != null) {
         if (kv.getValue() instanceof OmKeyInfo) {
-          size += ((OmKeyInfo) kv.getValue()).getDataSize();
+          OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
+          unReplicatedSize += omKeyInfo.getDataSize();
+          replicatedSize += omKeyInfo.getReplicatedSize();
         }
       }
       count++;  // Increment count for each row
     }
-    return Pair.of(count, size);
+    return Triple.of(count, unReplicatedSize, replicatedSize);
   }
 
   /**
@@ -189,8 +198,10 @@ public class OmTableInsightTask implements ReconOmTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     HashMap<String, Long> objectCountMap = initializeCountMap();
-    HashMap<String, Long> objectSizeMap =
-        initializeSizeMap();  // Initialize a new map for sizes
+    HashMap<String, Long> unreplicatedSizeCountMap =
+        initializeUnReplicatedSizeMap();
+    HashMap<String, Long> replicatedSizeCountMap =
+        initializeReplicatedSizeMap();
     final Collection<String> taskTables = getTaskTables();
     final Collection<String> sizeRelatedTables = getTablesToCalculateSize();
 
@@ -202,37 +213,44 @@ public class OmTableInsightTask implements ReconOmTask {
       }
 
       String countKey = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
-      String sizeKey = getTableSizeKeyFromTable(omdbUpdateEvent.getTable());
+      String unReplicatedSizeKey =
+          getUnReplicatedSizeKeyFromTable(omdbUpdateEvent.getTable());
+      String replicatedSizeKey =
+          getReplicatedSizeKeyFromTable(omdbUpdateEvent.getTable());
 
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
           objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
 
-          // Compute size if the table is size-related
+          // Compute unreplicated and replicated sizes for size-related tables
           if (sizeRelatedTables.contains(omdbUpdateEvent.getTable()) &&
               omdbUpdateEvent.getValue() instanceof OmKeyInfo) {
-            objectSizeMap.computeIfPresent(sizeKey, (k, size) -> size +
-                ((OmKeyInfo) omdbUpdateEvent.getValue()).getDataSize());
+            OmKeyInfo omKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
+            unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+                (k, size) -> size + omKeyInfo.getDataSize());
+            replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+                (k, size) -> size + omKeyInfo.getReplicatedSize());
           }
           break;
 
         case DELETE:
           if (omdbUpdateEvent.getValue() != null) {
-            String key = getTableCountKeyFromTable(omdbUpdateEvent.getTable());
-            objectCountMap.computeIfPresent(key,
+            objectCountMap.computeIfPresent(countKey,
                 (k, count) -> count > 0 ? count - 1L : 0L);
 
-            // Compute size if the table is size-related
+            // Compute unreplicated and replicated sizes for size-related tables
             if (sizeRelatedTables.contains(omdbUpdateEvent.getTable()) &&
                 omdbUpdateEvent.getValue() instanceof OmKeyInfo) {
-              // The code ensures the resulting size isn't negative by setting
-              // values smaller than the OmKeyInfo object's data size to 0L.
-              objectSizeMap.computeIfPresent(sizeKey, (k, size) -> size >
-                  ((OmKeyInfo) omdbUpdateEvent.getValue()).getDataSize() ?
-                  size -
-                      ((OmKeyInfo) omdbUpdateEvent.getValue()).getDataSize() :
-                  0L);
+              OmKeyInfo omKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
+              unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+                  (k, size) ->
+                      size > omKeyInfo.getDataSize() ?
+                          size - omKeyInfo.getDataSize() : 0L);
+              replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+                  (k, size) ->
+                      size > omKeyInfo.getReplicatedSize() ?
+                          size - omKeyInfo.getReplicatedSize() : 0L);
             }
           }
           break;
@@ -249,8 +267,12 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
 
-    writeDataToDB(objectCountMap); // Write count data to DB
-    writeDataToDB(objectSizeMap);  // Write size data to DB
+    // Write count data to DB
+    writeDataToDB(objectCountMap);
+    // Write unreplicated size data to DB
+    writeDataToDB(unreplicatedSizeCountMap);
+    // Write replicated size data to DB
+    writeDataToDB(replicatedSizeCountMap);
 
     LOG.info("Completed a 'process' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
@@ -285,17 +307,27 @@ public class OmTableInsightTask implements ReconOmTask {
     HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
       String key = getTableCountKeyFromTable(tableName);
-      objectCountMap.put(key, getCountForKey(key));
+      objectCountMap.put(key, getValueForKey(key));
     }
     return objectCountMap;
   }
 
-  private HashMap<String, Long> initializeSizeMap() {
+  private HashMap<String, Long> initializeReplicatedSizeMap() {
     Collection<String> tables = getTablesToCalculateSize();
     HashMap<String, Long> sizeCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
-      String key = getTableSizeKeyFromTable(tableName);
-      sizeCountMap.put(key, getSizeForKey(key));
+      String key = getReplicatedSizeKeyFromTable(tableName);
+      sizeCountMap.put(key, getValueForKey(key));
+    }
+    return sizeCountMap;
+  }
+
+  private HashMap<String, Long> initializeUnReplicatedSizeMap() {
+    Collection<String> tables = getTablesToCalculateSize();
+    HashMap<String, Long> sizeCountMap = new HashMap<>(tables.size());
+    for (String tableName : tables) {
+      String key = getUnReplicatedSizeKeyFromTable(tableName);
+      sizeCountMap.put(key, getValueForKey(key));
     }
     return sizeCountMap;
   }
@@ -304,33 +336,26 @@ public class OmTableInsightTask implements ReconOmTask {
     return tableName + "TableCount";
   }
 
-  public static String getTableSizeKeyFromTable(String tableName) {
-    return tableName + "DataSize";
+  public static String getReplicatedSizeKeyFromTable(String tableName) {
+    return tableName + "ReplicatedDataSize";
+  }
+
+  public static String getUnReplicatedSizeKeyFromTable(String tableName) {
+    return tableName + "UnReplicatedDataSize";
   }
 
   /**
-   * Get the count stored for the given key from Global Stats table.
-   * Return 0 if record not found.
+   * Get the value stored for the given key from the Global Stats table.
+   * Return 0 if the record is not found.
    *
-   * @param key Key in the global stats table
-   * @return count
+   * @param key Key in the Global Stats table
+   * @return The value associated with the key
    */
-  private long getCountForKey(String key) {
+  private long getValueForKey(String key) {
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
 
     return (record == null) ? 0L : record.getValue();
   }
 
-  /**
-   * Get the size stored for the given key from Global Stats table.
-   * Return 0 if record not found.
-   *
-   * @param key Key in the global stats table
-   * @return size
-   */
-  private long getSizeForKey(String key) {
-    GlobalStats record = globalStatsDao.fetchOneByKey(key);
-
-    return (record == null) ? 0L : record.getValue();
-  }
 }
+

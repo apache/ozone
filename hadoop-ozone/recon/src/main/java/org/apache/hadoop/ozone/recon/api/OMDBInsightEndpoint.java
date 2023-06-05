@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -42,8 +44,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
@@ -69,13 +75,16 @@ public class OMDBInsightEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final ReconContainerManager containerManager;
+  private final GlobalStatsDao globalStatsDao;
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
-                             ReconOMMetadataManager omMetadataManager) {
+                             ReconOMMetadataManager omMetadataManager,
+                             GlobalStatsDao globalStatsDao) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
+    this.globalStatsDao = globalStatsDao;
   }
 
   /**
@@ -139,6 +148,9 @@ public class OMDBInsightEndpoint {
     KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
+
+    // Create a HashMap for the clusterSummary
+    Map<String, Object> clusterSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
@@ -211,9 +223,44 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
+    // Populate the clusterSummary map
+    createClusterSummary(clusterSummary);
+
+    openKeyInsightInfo.setClusterSummary(clusterSummary);
+
     openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
   }
+
+  private void createClusterSummary(Map<String, Object> clusterSummary) {
+    try {
+      long replicatedSizeOpenKey = globalStatsDao.findById(OmTableInsightTask
+          .getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)).getValue();
+      long replicatedSizeOpenFile = globalStatsDao.findById(OmTableInsightTask
+          .getReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)).getValue();
+      long unreplicatedSizeOpenKey = globalStatsDao.findById(OmTableInsightTask
+          .getUnReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)).getValue();
+      long unreplicatedSizeOpenFile = globalStatsDao.findById(OmTableInsightTask
+          .getUnReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)).getValue();
+      long openKeyCountForKeyTable = globalStatsDao.findById(OmTableInsightTask
+          .getTableCountKeyFromTable(OPEN_KEY_TABLE)).getValue();
+      long openKeyCountForFileTable = globalStatsDao.findById(OmTableInsightTask
+          .getTableCountKeyFromTable(OPEN_FILE_TABLE)).getValue();
+
+      // Calculate the total number of open keys
+      clusterSummary.put("totalOpenKeys",
+          openKeyCountForKeyTable + openKeyCountForFileTable);
+      // Calculate the total replicated and unreplicated sizes
+      clusterSummary.put("totalReplicatedDataSize",
+          replicatedSizeOpenKey + replicatedSizeOpenFile);
+      clusterSummary.put("totalUnreplicatedDataSize",
+          unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
+    } catch (NullPointerException e) {
+      // Handle the null pointer exception
+      e.printStackTrace();
+    }
+  }
+
 
   private void getPendingForDeletionKeyInfo(
       int limit,
