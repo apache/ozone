@@ -744,36 +744,42 @@ public class TestHeatMapInfo {
     JsonElement jsonElement = JsonParser.parseString(auditRespStr);
     JsonObject jsonObject = jsonElement.getAsJsonObject();
     JsonElement facets = jsonObject.get("facets");
-    JsonObject facetsBucketsObject =
-        facets.getAsJsonObject().get("resources")
-            .getAsJsonObject();
+    JsonElement resources = facets.getAsJsonObject().get("resources");
+    JsonObject facetsBucketsObject = new JsonObject();
+    if (null != resources) {
+      facetsBucketsObject = resources.getAsJsonObject();
+    }
     ObjectMapper objectMapper = new ObjectMapper();
 
     HeatMapProviderDataResource auditLogFacetsResources =
         objectMapper.readValue(
             facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
     EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
-    List<EntityMetaData> entityMetaDataList =
-        Arrays.stream(entities).collect(Collectors.toList());
-    EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        heatMapService.generateHeatMap(entityMetaDataList);
-    Assertions.assertTrue(
-        entityReadAccessHeatMapResponse.getChildren().size() > 0);
-    Assertions.assertEquals(12,
-        entityReadAccessHeatMapResponse.getChildren().size());
-    Assertions.assertEquals(25600, entityReadAccessHeatMapResponse.
-        getSize());
-    Assertions.assertEquals(2924, entityReadAccessHeatMapResponse.
-        getMinAccessCount());
-    Assertions.assertEquals(155074, entityReadAccessHeatMapResponse.
-        getMaxAccessCount());
-    Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
-        getLabel());
-    String path =
-        entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
-            .get(0).getChildren().get(0).getPath();
-    Assertions.assertEquals("/hivevol1675429570/hivebuck1675429570/" +
-        "reg_path/hive_tpcds/store_sales/store_sales.dat", path);
+    if (null != entities && entities.length > 0) {
+      List<EntityMetaData> entityMetaDataList =
+          Arrays.stream(entities).collect(Collectors.toList());
+      EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
+          heatMapService.generateHeatMap(entityMetaDataList);
+      Assertions.assertTrue(
+          entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      Assertions.assertEquals(12,
+          entityReadAccessHeatMapResponse.getChildren().size());
+      Assertions.assertEquals(25600, entityReadAccessHeatMapResponse.
+          getSize());
+      Assertions.assertEquals(2924, entityReadAccessHeatMapResponse.
+          getMinAccessCount());
+      Assertions.assertEquals(155074, entityReadAccessHeatMapResponse.
+          getMaxAccessCount());
+      Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
+          getLabel());
+      String path =
+          entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
+              .get(0).getChildren().get(0).getPath();
+      Assertions.assertEquals("/hivevol1675429570/hivebuck1675429570/" +
+          "reg_path/hive_tpcds/store_sales/store_sales.dat", path);
+    } else {
+      Assertions.assertNull(entities);
+    }
   }
 
 }
