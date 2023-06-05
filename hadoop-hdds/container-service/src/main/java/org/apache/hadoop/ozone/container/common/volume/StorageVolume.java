@@ -110,7 +110,7 @@ public abstract class StorageVolume
 
   private final File storageDir;
   private String workingDirName;
-  private Path tmpDir;
+  private File tmpDir;
 
   private final Optional<VolumeInfo> volumeInfo;
 
@@ -409,7 +409,7 @@ public abstract class StorageVolume
     return this.workingDirName;
   }
 
-  public Path getTmpDir() {
+  public File getTmpDir() {
     return this.tmpDir;
   }
 
