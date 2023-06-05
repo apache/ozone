@@ -4023,14 +4023,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return OzoneAdmins.
+   * @param callerUgi Caller UserGroupInformation
+   * @return return true if the {@code ugi} is a read-only OM admin
    */
-  public OzoneAdmins getOmAdmins() {
-    return omAdmins;
-  }
-
-  public OzoneAdmins getReadOnlyAdmins() {
-    return readOnlyAdmins;
+  public boolean isReadOnlyAdmin(UserGroupInformation callerUgi) {
+    return callerUgi != null && readOnlyAdmins.isAdmin(callerUgi);
   }
 
   /**
