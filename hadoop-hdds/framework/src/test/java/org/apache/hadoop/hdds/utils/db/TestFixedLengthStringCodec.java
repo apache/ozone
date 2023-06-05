@@ -23,9 +23,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 /**
- * Test for class FixedLengthStringUtils.
+ * Test for class {@link FixedLengthStringCodec}.
  */
-public class TestFixedLengthStringUtils {
+public class TestFixedLengthStringCodec {
 
   @Test
   public void testStringEncodeAndDecode() {
@@ -35,10 +35,10 @@ public class TestFixedLengthStringUtils {
     };
 
     for (long containerID : testContainerIDs) {
-      String containerPrefix = FixedLengthStringUtils.bytes2String(
+      String containerPrefix = FixedLengthStringCodec.bytes2String(
           Longs.toByteArray(containerID));
       long decodedContainerID = Longs.fromByteArray(
-          FixedLengthStringUtils.string2Bytes(containerPrefix));
+          FixedLengthStringCodec.string2Bytes(containerPrefix));
       assertEquals(containerID, decodedContainerID);
     }
   }
