@@ -1491,15 +1491,8 @@ public final class TestSecureOzoneCluster {
       CertificateSignRequest.Builder csrBuilder) throws IOException {
     DomainValidator validator = DomainValidator.getInstance();
     // Add all valid ips.
-    OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-        ip -> {
-          csrBuilder.addIpAddress(ip.getHostAddress());
-          if (validator.isValid(ip.getCanonicalHostName())) {
-            csrBuilder.addDnsName(ip.getCanonicalHostName());
-          } else {
-            System.err.println(
-                "Invalid domain {}" + ip.getCanonicalHostName());
-          }
-        });
+    List<InetAddress> inetAddresses =
+        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }
