@@ -189,7 +189,7 @@ public final class ContainerTestUtils {
         .thenReturn(scanDataSuccess);
   }
 
-  public static KeyValueContainer setUpTestContainerUnderTmpDir(
+  public static KeyValueContainer addContainerToDeletedDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
@@ -214,8 +214,8 @@ public final class ContainerTestUtils {
     // For testing, we are moving the container
     // under the tmp directory, in order to delete
     // it from there, during datanode startup or shutdown
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
+    KeyValueContainerUtil
+        .moveToDeletedContainerDir(keyValueContainerData, volume);
 
     return container;
   }

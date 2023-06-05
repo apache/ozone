@@ -201,7 +201,7 @@ public class TestEndPoint {
       // Write some data before calling versionTask.call()
       // Create a container and move it under the tmp delete dir.
       KeyValueContainer container = ContainerTestUtils.
-          setUpTestContainerUnderTmpDir(hddsVolume, clusterId,
+          addContainerToDeletedDir(hddsVolume, clusterId,
               conf, OzoneConsts.SCHEMA_V3);
       File containerDBFile = container.getContainerDBFile();
 

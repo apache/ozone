@@ -125,17 +125,12 @@ public class VersionEndpointTask implements
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
 
+        // TODO Move startup cleaning to be invoked by OzoneContainer.
         if (result) {
           // Clean the temporary container delete directory.
           if (volume instanceof HddsVolume) {
             HddsVolume hddsVolume = (HddsVolume) volume;
-            try {
-              KeyValueContainerUtil.ContainerDeleteDirectory
-                  .cleanTmpDir(hddsVolume);
-            } catch (IOException ex) {
-              LOG.error("Error while cleaning tmp delete directory " +
-                  "under {}", hddsVolume.getDeleteServiceDirPath(), ex);
-            }
+            hddsVolume.cleanDeletedContainerDir();
           }
         } else {
           volumeSet.failVolume(volume.getStorageDir().getPath());

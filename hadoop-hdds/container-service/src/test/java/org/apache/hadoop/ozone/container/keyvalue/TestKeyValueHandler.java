@@ -64,11 +64,14 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -376,7 +379,7 @@ public class TestKeyValueHandler {
       List<HddsVolume> hddsVolumeList = StorageVolumeUtil
           .getHddsVolumesList(volumeSet.getVolumesList());
 
-      assertTrue(hddsVolumeList.size() == 1);
+      assertEquals(1, hddsVolumeList.size());
 
       final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -407,8 +410,10 @@ public class TestKeyValueHandler {
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
 
-      assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
-          .getDeleteLeftovers(hddsVolume).hasNext());
+      File[] deletedContainers =
+          hddsVolume.getDeletedContainerDir().listFiles();
+      assertNotNull(deletedContainers);
+      Assertions.assertEquals(0, deletedContainers.length);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

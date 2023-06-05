@@ -21,22 +21,29 @@ package org.apache.hadoop.ozone.container.common.volume;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.slf4j.Logger;
@@ -91,7 +98,7 @@ public class HddsVolume extends StorageVolume {
   // container db path. This is initialized only once together with dbVolume,
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
-  private Path deleteServiceDirPath;
+  private File deletedContainerDir;
   private AtomicBoolean dbLoaded = new AtomicBoolean(false);
 
   /**
@@ -159,13 +166,13 @@ public class HddsVolume extends StorageVolume {
    * This ensures container delete is atomic at the file system level.
    */
   private void createDeleteServiceDir() {
-    deleteServiceDirPath = getTmpDir().resolve(TMP_CONTAINER_DELETE_DIR_NAME);
+    deletedContainerDir = new File(getTmpDir(), TMP_CONTAINER_DELETE_DIR_NAME);
 
-    if (Files.notExists(deleteServiceDirPath)) {
+    if (deletedContainerDir.exists()) {
       try {
-        Files.createDirectories(deleteServiceDirPath);
+        Files.createDirectories(deletedContainerDir.toPath());
       } catch (IOException ex) {
-        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
+        LOG.error("Error creating {}", deletedContainerDir.toString(), ex);
       }
     }
   }
@@ -205,7 +212,101 @@ public class HddsVolume extends StorageVolume {
       volumeInfoMetrics.unregister();
     }
     closeDbStore();
-    // TODO clear delete dir here.
+    cleanDeletedContainerDir();
+  }
+
+  /**
+   * Delete all files under
+   * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
+   * This is the directory where containers are moved when they are deleted
+   * from the system, but before being removed from the filesystem. This
+   * makes the deletion atomic.
+   */
+  public void cleanDeletedContainerDir() {
+    if (!deletedContainerDir.exists()) {
+      LOG.warn("Unable to clear deleted containers from {}. Directory does " +
+          "not exist.", deletedContainerDir);
+      return;
+    }
+
+    if (!deletedContainerDir.isDirectory()) {
+      LOG.warn("Unable to clear deleted containers from {}. Location is not a" +
+          " directory", deletedContainerDir);
+      return;
+    }
+
+    File[] containerDirs = deletedContainerDir.listFiles(File::isDirectory);
+    if (containerDirs == null) {
+      // Either directory does not exist or IO error. Either way we cannot
+      // proceed with deletion.
+      LOG.warn("Failed to clear container delete directory {}. Directory " +
+          "could not be accessed.", deletedContainerDir);
+      return;
+    }
+
+    for (File containerDir: containerDirs) {
+      // Check the case where we have Schema V3 and
+      // removing the container's entries from RocksDB fails.
+      // --------------------------------------------
+      // On datanode restart, we populate the container set
+      // based on the available datanode volumes and
+      // populate the container metadata based on the values in RocksDB.
+      // The container is in the tmp directory,
+      // so it won't be loaded in the container set
+      // but there will be orphaned entries in the volume's RocksDB.
+      // --------------------------------------------
+      // For every .container file we find under /tmp,
+      // we use it to get the RocksDB entries and delete them.
+      // If the .container file doesn't exist then the contents of the
+      // directory are probably leftovers of a failed delete and
+      // the RocksDB entries must have already been removed.
+      // In any case we can proceed with deleting the directory's contents.
+      // --------------------------------------------
+      // Get container file and check Schema version. If Schema is V3
+      // then remove the container from RocksDB.
+      File containerFile = ContainerUtils.getContainerFile(containerDir);
+
+      KeyValueContainerData keyValueContainerData;
+      try {
+        ContainerData containerData =
+            ContainerDataYaml.readContainerFile(containerFile);
+        keyValueContainerData = (KeyValueContainerData) containerData;
+      } catch (IOException ex) {
+        LOG.warn("Failed to read container file {}. Container cannot be " +
+            "removed from the delete directory.", containerFile, ex);
+        continue;
+      }
+
+      if (keyValueContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+        // Container file doesn't include the volume
+        // so we need to set it here in order to get the DB location.
+        keyValueContainerData.setVolume(this);
+        File dbFile = KeyValueContainerLocationUtil
+            .getContainerDBFile(keyValueContainerData);
+        keyValueContainerData.setDbFile(dbFile);
+        try {
+          // Remove container from Rocks DB
+          BlockUtils.removeContainerFromDB(keyValueContainerData, getConf());
+        } catch (IOException ex) {
+          LOG.warn("Failed to remove container data from DB while deleting " +
+              "container {}. Container cannot be removed from the delete " +
+              "directory {}.",
+              keyValueContainerData.getContainerID(), deletedContainerDir, ex);
+          continue;
+        }
+      }
+
+      try {
+        if (containerDir.isDirectory()) {
+          FileUtils.deleteDirectory(containerDir);
+        } else {
+          FileUtils.delete(containerDir);
+        }
+      } catch (IOException ex) {
+        LOG.warn("Failed to remove container directory {}.",
+            deletedContainerDir, ex);
+      }
+    }
   }
 
   @Override
@@ -258,8 +359,8 @@ public class HddsVolume extends StorageVolume {
     return this.dbParentDir;
   }
 
-  public Path getDeleteServiceDirPath() {
-    return this.deleteServiceDirPath;
+  public File getDeletedContainerDir() {
+    return this.deletedContainerDir;
   }
 
   public boolean isDbLoaded() {
