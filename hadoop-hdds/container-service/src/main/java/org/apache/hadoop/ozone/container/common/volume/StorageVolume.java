@@ -205,7 +205,7 @@ public abstract class StorageVolume
           " for datanode.");
     }
     this.workingDirName = workingDirName;
-    this.tmpDir = new File(idDir, TMP_DIR_NAME).toPath();
+    this.tmpDir = new File(idDir, TMP_DIR_NAME);
   }
 
   private VolumeState analyzeVolumeState() {
