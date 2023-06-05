@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,10 +15,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=@hdds.version@
-#TODO: swich to apache/hadoop. Older versions are not supported by apache/hadoop, yet.
-# See: HADOOP-16092 for more details.
-HADOOP_IMAGE=flokkr/hadoop
-HADOOP_VERSION=2.7.3
-OZONE_RUNNER_VERSION=@docker.ozone-runner.version@
-OZONE_RUNNER_IMAGE=apache/ozone-runner
+export COMPOSE_FILE=docker-compose.yaml:../common/hadoop.yaml
+export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
+
+export SECURITY_ENABLED=false
+export OZONE_REPLICATION_FACTOR=3
+export SCM=scm
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+start_docker_env
+
+execute_robot_test ${SCM} createmrenv.robot
+
+# reinitialize the directories to use
+export OZONE_DIR=/opt/ozone
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+for scheme in o3fs ofs; do
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-mapreduce-${scheme}" mapreduce.robot
+done
+
+stop_docker_env
+
+generate_report

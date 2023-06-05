@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,11 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.xml_fs.AbstractFileSystem.o3fs.impl=org.apache.hadoop.fs.ozone.OzFs
-CORE-SITE.xml_fs.AbstractFileSystem.ofs.impl=org.apache.hadoop.fs.ozone.RootedOzFs
-MAPRED-SITE.XML_mapreduce.application.classpath=/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop2-@project.version@.jar
+#suite:MR
 
-HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/ozone-filesystem-hadoop2-@project.version@.jar
-OZONE_CLASSPATH=
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
 
-no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+export HADOOP_VERSION=3.2.2
+
+source ${COMPOSE_DIR}/hadoop-test.sh
