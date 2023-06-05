@@ -380,7 +380,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     GenericTestUtils.waitFor(() -> {
       NodeStatus status;
       try {
-        status = scm.getScmNodeManager().getNodeStatus(dn);
+        status = getStorageContainerManager()
+            .getScmNodeManager().getNodeStatus(dn);
       } catch (NodeNotFoundException e) {
         return true;
       }
@@ -940,6 +941,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY,
           anyHostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY,
+          anyHostWithFreePort());
+      conf.set(HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY,
           anyHostWithFreePort());
       conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
       conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());

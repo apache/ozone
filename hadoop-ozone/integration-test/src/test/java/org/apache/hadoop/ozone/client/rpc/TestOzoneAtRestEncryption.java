@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -210,6 +211,7 @@ public class TestOzoneAtRestEncryption {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     createAndVerifyKeyData(bucket);
+    createAndVerifyStreamKeyData(bucket);
   }
 
   @Test
@@ -227,27 +229,45 @@ public class TestOzoneAtRestEncryption {
         linkVolumeName, linkBucketName);
 
     createAndVerifyKeyData(linkBucket);
+    createAndVerifyStreamKeyData(linkBucket);
   }
 
+  static void createAndVerifyStreamKeyData(OzoneBucket bucket)
+      throws Exception {
+    Instant testStartTime = Instant.now();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
+        value.getBytes(StandardCharsets.UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
+      out.write(value.getBytes(StandardCharsets.UTF_8));
+    }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+  }
 
-  private void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
+  static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
     Instant testStartTime = Instant.now();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, new HashMap<>())) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        new HashMap<>())) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
+    verifyKeyData(bucket, keyName, value, testStartTime);
+  }
 
+  static void verifyKeyData(OzoneBucket bucket, String keyName, String value,
+      Instant testStartTime) throws Exception {
     // Verify content.
     OzoneKeyDetails key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
 
     // Check file encryption info is set,
     // if set key will use this encryption info and encrypt data.
-    Assert.assertTrue(key.getFileEncryptionInfo() != null);
+    Assert.assertNotNull(key.getFileEncryptionInfo());
 
     byte[] fileContent;
     int len = 0;
@@ -324,8 +344,8 @@ public class TestOzoneAtRestEncryption {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes(StandardCharsets.UTF_8).length,
-        ReplicationType.RATIS,
-        ReplicationFactor.ONE, keyMetadata)) {
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
+        keyMetadata)) {
       out.write(value.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -364,6 +384,7 @@ public class TestOzoneAtRestEncryption {
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
         getMatchedKeyInfo(keyName, omMetadataManager);
+    Assert.assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
     Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
@@ -374,7 +395,7 @@ public class TestOzoneAtRestEncryption {
         deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
-  private boolean verifyRatisReplication(String volumeName, String bucketName,
+  static boolean verifyRatisReplication(String volumeName, String bucketName,
       String keyName, ReplicationType type, ReplicationFactor factor)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -461,8 +482,8 @@ public class TestOzoneAtRestEncryption {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
-    String uploadID = initiateMultipartUpload(bucket, keyName, RATIS,
-        ONE);
+    String uploadID = initiateMultipartUpload(bucket, keyName,
+        ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
 
     // Upload Parts
     Map<Integer, String> partsMap = new TreeMap<>();
@@ -548,10 +569,10 @@ public class TestOzoneAtRestEncryption {
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
-      ReplicationType replicationType, ReplicationFactor replicationFactor)
+      ReplicationConfig replicationConfig)
       throws Exception {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationType, replicationFactor);
+        replicationConfig);
 
     String uploadID = multipartInfo.getUploadID();
     Assert.assertNotNull(uploadID);

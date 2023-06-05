@@ -18,27 +18,34 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -54,6 +61,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @Timeout(value = 300)
 public class TestOzoneFileSystemWithStreaming {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestOzoneFileSystemWithStreaming.class);
+  private static final int AUTO_THRESHOLD = 2 << 20;
 
   private static MiniOzoneCluster cluster;
   private static OzoneBucket bucket;
@@ -71,7 +81,8 @@ public class TestOzoneFileSystemWithStreaming {
 
     CONF.setBoolean(DFS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
     CONF.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
-    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    CONF.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, AUTO_THRESHOLD + "B");
+    CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
@@ -107,10 +118,11 @@ public class TestOzoneFileSystemWithStreaming {
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
-    final Path file = new Path("/file");
-
     try (FileSystem fs = FileSystem.get(CONF)) {
-      runTestCreateFile(fs, file);
+      for (int i = 1; i <= 3; i++) {
+        final Path file = new Path("/file" + i);
+        runTestCreateFile(fs, file, i << 20);
+      }
     }
   }
 
@@ -123,18 +135,62 @@ public class TestOzoneFileSystemWithStreaming {
 
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
-    final Path file = new Path(dir, "file");
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      runTestCreateFile(fs, file);
+      for (int i = 1; i <= 3; i++) {
+        final Path file = new Path(dir, "file" + i);
+        runTestCreateFile(fs, file, i << 20);
+      }
     }
   }
 
-  static void runTestCreateFile(FileSystem fs, Path file) throws Exception {
-    final byte[] bytes = new byte[1 << 20];
+  static void createFile(FileSystem fs, Path path, boolean overwrite,
+      byte[] data) throws IOException {
+
+    final FSDataOutputStream out = fs.create(path, overwrite);
+    out.write(data);
+
+    final OutputStream wrapped = out.getWrappedStream();
+    LOG.info("wrapped: {}", wrapped.getClass());
+    Assertions.assertEquals(SelectorOutputStream.class, wrapped.getClass());
+    final SelectorOutputStream<?> selector = (SelectorOutputStream<?>) wrapped;
+    final boolean belowThreshold = data.length <= AUTO_THRESHOLD;
+    LOG.info("data.length={}, threshold={}, belowThreshold? {}",
+        data.length, AUTO_THRESHOLD, belowThreshold);
+    assertUnderlying(selector, belowThreshold);
+
+    out.close();
+    final OutputStream underlying = selector.getUnderlying();
+    Assertions.assertNotNull(underlying);
+    LOG.info("underlying after close: {}", underlying.getClass());
+    if (belowThreshold) {
+      Assertions.assertTrue(underlying instanceof OzoneFSOutputStream);
+    } else {
+      Assertions.assertEquals(OzoneFSDataStreamOutput.class,
+          underlying.getClass());
+    }
+  }
+
+  static void assertUnderlying(SelectorOutputStream<?> selector,
+      boolean belowThreshold) {
+    final OutputStream underlying = selector.getUnderlying();
+    LOG.info("underlying before close: {}", underlying != null ?
+        underlying.getClass() : null);
+    if (belowThreshold) {
+      Assertions.assertNull(underlying);
+    } else {
+      Assertions.assertNotNull(underlying);
+      Assertions.assertEquals(OzoneFSDataStreamOutput.class,
+          underlying.getClass());
+    }
+  }
+
+  static void runTestCreateFile(FileSystem fs, Path file, int size)
+      throws Exception {
+    final byte[] bytes = new byte[size];
     ThreadLocalRandom.current().nextBytes(bytes);
 
-    ContractTestUtils.createFile(fs, file, true, bytes);
+    createFile(fs, file, true, bytes);
 
     final byte[] buffer = new byte[4 << 10];
     int offset = 0;

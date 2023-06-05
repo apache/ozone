@@ -37,7 +37,6 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
@@ -120,9 +119,9 @@ public class DNCertificateClient extends DefaultCertificateClient {
               CAType.ROOT, certCodec, false);
         }
         // Return the default certificate ID
-        String dnCertSerialId = getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString();
-        return dnCertSerialId;
+        return CertificateCodec.getX509Certificate(pemEncodedCert)
+            .getSerialNumber()
+            .toString();
       } else {
         throw new CertificateException("Unable to retrieve datanode " +
             "certificate chain.");

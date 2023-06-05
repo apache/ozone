@@ -52,7 +52,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -178,10 +177,8 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
-    Assert.assertTrue(containerSet.containerCount() == 10);
-    Iterator<Container<?>> it = containerSet.getContainerIterator();
-    while (it.hasNext()) {
-      Container<?> entry = it.next();
+    Assert.assertEquals(10, containerSet.containerCount());
+    for (Container<?> entry : containerSet) {
       Assert.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
@@ -194,10 +191,8 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
-    Assert.assertTrue(containerSet.containerCount() == 15);
-    it = containerSet.getContainerIterator();
-    while (it.hasNext()) {
-      Container<?> entry = it.next();
+    Assert.assertEquals(15, containerSet.containerCount());
+    for (Container<?> entry : containerSet) {
       Assert.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }

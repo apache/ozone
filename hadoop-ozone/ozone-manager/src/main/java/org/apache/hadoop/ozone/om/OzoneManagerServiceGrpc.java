@@ -47,8 +47,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-  private OzoneManagerProtocolServerSideTranslatorPB omTranslator;
-  private OzoneDelegationTokenSecretManager delegationTokenMgr;
+  private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
+  private final OzoneDelegationTokenSecretManager delegationTokenMgr;
   private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(

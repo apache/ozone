@@ -34,6 +34,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -44,13 +47,16 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(ClosePipelineCommandHandler.class);
 
-  private AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicInteger queuedCount = new AtomicInteger(0);
   private long totalTime;
+  private final Executor executor;
 
   /**
    * Constructs a closePipelineCommand handler.
    */
-  public ClosePipelineCommandHandler() {
+  public ClosePipelineCommandHandler(Executor executor) {
+    this.executor = executor;
   }
 
   /**
@@ -64,29 +70,33 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    invocationCount.incrementAndGet();
-    final long startTime = Time.monotonicNow();
-    final DatanodeDetails dn = context.getParent().getDatanodeDetails();
-    ClosePipelineCommand closePipelineCommand = (ClosePipelineCommand) command;
-    final PipelineID pipelineID = closePipelineCommand.getPipelineID();
-    final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
+    queuedCount.incrementAndGet();
+    CompletableFuture.runAsync(() -> {
+      invocationCount.incrementAndGet();
+      final long startTime = Time.monotonicNow();
+      final DatanodeDetails dn = context.getParent().getDatanodeDetails();
+      ClosePipelineCommand closePipelineCommand =
+          (ClosePipelineCommand) command;
+      final PipelineID pipelineID = closePipelineCommand.getPipelineID();
+      final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
 
-    try {
-      XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      if (server.isExist(pipelineIdProto)) {
-        server.removeGroup(pipelineIdProto);
-        LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
-            dn.getUuidString());
-      } else {
-        LOG.debug("Ignoring close pipeline command for pipeline {} " +
-            "as it does not exist", pipelineID);
+      try {
+        XceiverServerSpi server = ozoneContainer.getWriteChannel();
+        if (server.isExist(pipelineIdProto)) {
+          server.removeGroup(pipelineIdProto);
+          LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
+              dn.getUuidString());
+        } else {
+          LOG.debug("Ignoring close pipeline command for pipeline {} " +
+              "as it does not exist", pipelineID);
+        }
+      } catch (IOException e) {
+        LOG.error("Can't close pipeline {}", pipelineID, e);
+      } finally {
+        long endTime = Time.monotonicNow();
+        totalTime += endTime - startTime;
       }
-    } catch (IOException e) {
-      LOG.error("Can't close pipeline {}", pipelineID, e);
-    } finally {
-      long endTime = Time.monotonicNow();
-      totalTime += endTime - startTime;
-    }
+    }, executor).whenComplete((v, e) -> queuedCount.decrementAndGet());
   }
 
   /**
@@ -124,6 +134,6 @@ public class ClosePipelineCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return 0;
+    return queuedCount.get();
   }
 }

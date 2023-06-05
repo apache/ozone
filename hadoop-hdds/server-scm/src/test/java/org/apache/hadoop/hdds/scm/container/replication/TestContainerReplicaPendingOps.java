@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -43,21 +41,18 @@ public class TestContainerReplicaPendingOps {
 
   private ContainerReplicaPendingOps pendingOps;
   private TestClock clock;
-  private ConfigurationSource config;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
-  private ReplicationManager rm;
   private ReplicationManagerMetrics metrics;
   private long deadline;
 
   @BeforeEach
   public void setup() {
-    config = new OzoneConfiguration();
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
-    pendingOps = new ContainerReplicaPendingOps(config, clock);
-    rm = Mockito.mock(ReplicationManager.class);
+    pendingOps = new ContainerReplicaPendingOps(clock);
+    ReplicationManager rm = Mockito.mock(ReplicationManager.class);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -110,7 +105,7 @@ public class TestContainerReplicaPendingOps {
       Assertions.assertEquals(ADD, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
-        .map(s -> s.getTarget()).collect(Collectors.toList());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
     Assertions.assertTrue(allDns.contains(dn1));
     Assertions.assertTrue(allDns.contains(dn2));
     Assertions.assertTrue(allDns.contains(dn3));
@@ -137,7 +132,7 @@ public class TestContainerReplicaPendingOps {
       Assertions.assertEquals(DELETE, op.getOpType());
     }
     List<DatanodeDetails> allDns = ops.stream()
-        .map(s -> s.getTarget()).collect(Collectors.toList());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
     Assertions.assertTrue(allDns.contains(dn1));
     Assertions.assertTrue(allDns.contains(dn2));
     Assertions.assertTrue(allDns.contains(dn3));
@@ -234,7 +229,7 @@ public class TestContainerReplicaPendingOps {
     Assertions.assertEquals(2, ops.size());
     // We should lose the entries for DN1
     List<DatanodeDetails> dns = ops.stream()
-        .map(s -> s.getTarget())
+        .map(ContainerReplicaOp::getTarget)
         .collect(Collectors.toList());
     Assertions.assertFalse(dns.contains(dn1));
     Assertions.assertTrue(dns.contains(dn2));

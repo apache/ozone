@@ -1071,4 +1071,17 @@ public interface ClientProtocol {
                                     String token, int pageSize,
                                     boolean forceFullDiff)
       throws IOException;
+
+  /**
+   * Time to be set for given Ozone object. This operations updates modification
+   * time and access time for the given key.
+   * @param obj Ozone object.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   *
+   * @throws IOException if there is error.
+   * */
+  void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException;
 }

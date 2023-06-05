@@ -119,11 +119,8 @@ public class TestContainerSet {
 
     assertEquals(10, containerSet.containerCount());
 
-    Iterator<Container<?>> iterator = containerSet.getContainerIterator();
-
     int count = 0;
-    while (iterator.hasNext()) {
-      Container kv = iterator.next();
+    for (Container<?> kv : containerSet) {
       ContainerData containerData = kv.getContainerData();
       long containerId = containerData.getContainerID();
       if (containerId % 2 == 0) {

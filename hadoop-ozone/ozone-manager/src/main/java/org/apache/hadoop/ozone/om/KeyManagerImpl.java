@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -52,8 +53,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -864,8 +864,10 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
-    String volume = obj.getVolumeName();
-    String bucket = obj.getBucketName();
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(obj.getVolumeName(), obj.getBucketName()));
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = obj.getKeyName();
     OmKeyInfo keyInfo;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -907,8 +909,15 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(context);
     Objects.requireNonNull(context.getClientUgi());
 
-    String volume = ozObject.getVolumeName();
-    String bucket = ozObject.getBucketName();
+    ResolvedBucket resolvedBucket;
+    try {
+      resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
+    } catch (IOException e) {
+      throw new OMException("Failed to resolveBucketLink:", e, INTERNAL_ERROR);
+    }
+    String volume = resolvedBucket.realVolume();
+    String bucket = resolvedBucket.realBucket();
     String keyName = ozObject.getKeyName();
     String objectKey = metadataManager.getOzoneKey(volume, bucket, keyName);
     OmKeyArgs args = new OmKeyArgs.Builder()
@@ -1689,16 +1698,15 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private String getNextGreaterString(String volumeName, String bucketName,
-      String keyPrefix) throws IOException {
+      String keyPrefix) {
     // Increment the last character of the string and return the new ozone key.
     Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
         "Key prefix is null or empty");
-    CodecRegistry codecRegistry =
-        ((RDBStore) metadataManager.getStore()).getCodecRegistry();
-    byte[] keyPrefixInBytes = codecRegistry.asRawData(keyPrefix);
+    final StringCodec codec = StringCodec.get();
+    final byte[] keyPrefixInBytes = codec.toPersistedFormat(keyPrefix);
     keyPrefixInBytes[keyPrefixInBytes.length - 1]++;
-    String nextPrefix = codecRegistry.asObject(keyPrefixInBytes, String.class);
-    return metadataManager.getOzoneKey(volumeName, bucketName, nextPrefix);
+    return metadataManager.getOzoneKey(volumeName, bucketName,
+        codec.fromPersistedFormat(keyPrefixInBytes));
   }
 
   private FileEncryptionInfo getFileEncryptionInfo(OmBucketInfo bucketInfo)
