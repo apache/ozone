@@ -171,8 +171,7 @@ public class TestSnapshotDiffCleanupService {
     // DiffReportEntry codec for Diff Report.
     b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    b.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 

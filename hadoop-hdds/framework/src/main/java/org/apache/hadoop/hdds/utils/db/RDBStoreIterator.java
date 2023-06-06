@@ -32,13 +32,13 @@ import org.slf4j.LoggerFactory;
  * RocksDB store iterator.
  */
 public class RDBStoreIterator
-    implements TableIterator<byte[], ByteArrayKeyValue> {
+    implements TableIterator<byte[], Table.KeyValue<byte[], byte[]>> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBStoreIterator.class);
 
   private final ManagedRocksIterator rocksDBIterator;
-  private RDBTable rocksDBTable;
+  private final RDBTable rocksDBTable;
   private ByteArrayKeyValue currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
@@ -64,7 +64,7 @@ public class RDBStoreIterator
 
   @Override
   public void forEachRemaining(
-      Consumer<? super ByteArrayKeyValue> action) {
+      Consumer<? super Table.KeyValue<byte[], byte[]>> action) {
     while (hasNext()) {
       action.accept(next());
     }

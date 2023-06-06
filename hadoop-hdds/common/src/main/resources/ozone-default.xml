@@ -712,7 +712,6 @@
       default permissions for OM,SCM,Recon,Datanode are not set.
     </description>
   </property>
-
   <property>
     <name>ozone.metastore.rocksdb.statistics</name>
     <value>OFF</value>
@@ -2614,6 +2613,41 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.client.address</name>
+    <value/>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The address of the Ozone Datanode client service.
+      It is a string in the host:port format.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.bind.host</name>
+    <value>0.0.0.0</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The hostname or IP address used by the Datanode client service
+      endpoint to bind.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.client.port</name>
+    <value>9864</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The port number of the Ozone Datanode client service.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.handler.count</name>
+    <value>1</value>
+    <tag>OZONE, HDDS, MANAGEMENT</tag>
+    <description>
+      The number of RPC handler threads for Datanode client
+      service endpoints.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>500</value>
     <description>
@@ -3436,6 +3470,18 @@
     <description>Wait duration before which close container
       is send to DN.</description>
   </property>
+  <property>
+    <name>ozone.scm.ha.ratis.server.snapshot.creation.gap</name>
+    <value>1024</value>
+    <tag>SCM, OZONE</tag>
+    <description>Raft snapshot gap index after which snapshot can be taken.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
+    <value>600s</value>
+    <tag>SCM, OZONE</tag>
+    <description>Wait duration for flush of buffered transaction.</description>
+  </property>
 
 
   <property>
@@ -3669,11 +3715,30 @@
   </property>
 
   <property>
+    <name>ozone.recon.heatmap.provider</name>
+    <value></value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      Fully qualified heatmap provider implementation class name. If this value is not set,
+      then will use the default implementation class  "org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl".
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
     <description>
       To enable/disable filesystem write via ratis streaming.
+    </description>
+  </property>
+  <property>
+    <name>ozone.fs.datastream.auto.threshold</name>
+    <value>4MB</value>
+    <tag>OZONE, DATANODE</tag>
+    <description>
+      A threshold to auto select datastream to write files
+      in OzoneFileSystem.
     </description>
   </property>
 

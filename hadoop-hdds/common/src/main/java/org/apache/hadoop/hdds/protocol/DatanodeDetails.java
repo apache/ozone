@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
@@ -835,7 +836,9 @@ public class DatanodeDetails extends NodeImpl implements
       @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
       HTTP,
       @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
-      HTTPS;
+      HTTPS,
+      @BelongsToHDDSLayoutVersion(HADOOP_PRC_PORTS_IN_DATANODEDETAILS)
+      CLIENT_RPC;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
           Name.values());

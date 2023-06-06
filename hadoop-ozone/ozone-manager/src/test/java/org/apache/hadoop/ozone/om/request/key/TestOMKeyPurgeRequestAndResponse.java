@@ -216,7 +216,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
         ozoneManager.getOmSnapshotManager().checkForSnapshot(
-            volumeName, bucketName, getSnapshotPrefix("snap1"));
+            volumeName, bucketName, getSnapshotPrefix("snap1"), true);
 
     OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
 

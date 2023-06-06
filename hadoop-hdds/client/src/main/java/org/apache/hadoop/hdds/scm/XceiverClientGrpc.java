@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServi
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
@@ -85,7 +84,8 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
@@ -235,7 +235,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * and the method waits to finish all ongoing communication.
    *
    * Note: the method wait 1 hour per channel tops and if that is not enough
-   * to finish ongoing communication, then interrupts the connection anyways.
+   * to finish ongoing communication, then interrupts the connection anyway.
    */
   @Override
   public synchronized void close() {
@@ -317,7 +317,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public ContainerCommandResponseProto sendCommand(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     try {
       XceiverClientReply reply;
@@ -335,7 +335,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
@@ -352,13 +352,13 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     ContainerCommandResponseProto responseProto = null;
     IOException ioException = null;
 
     // In case of an exception or an error, we will try to read from the
-    // datanodes in the pipeline in a round robin fashion.
+    // datanodes in the pipeline in a round-robin fashion.
     XceiverClientReply reply = new XceiverClientReply(null);
     List<DatanodeDetails> datanodeList = null;
 
@@ -406,8 +406,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         reply.addDatanode(dn);
         responseProto = sendCommandAsync(request, dn).getResponse().get();
         if (validators != null && !validators.isEmpty()) {
-          for (CheckedBiFunction validator : validators) {
-            validator.apply(request, responseProto);
+          for (Validator validator : validators) {
+            validator.accept(request, responseProto);
           }
         }
         if (request.getCmdType() == ContainerProtos.Type.GetBlock) {

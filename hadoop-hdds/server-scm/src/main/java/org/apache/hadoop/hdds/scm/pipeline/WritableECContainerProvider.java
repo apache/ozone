@@ -87,7 +87,7 @@ public class WritableECContainerProvider
    * @param owner The owner of the container
    * @param excludeList A set of datanodes, container and pipelines which should
    *                    not be considered.
-   * @return A containerInfo representing a block group with with space for the
+   * @return A containerInfo representing a block group with space for the
    *         write, or null if no container can be allocated.
    */
   @Override
@@ -116,25 +116,24 @@ public class WritableECContainerProvider
             .setSize(size)
             .build();
     while (existingPipelines.size() > 0) {
-      Pipeline pipeline =
-          pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
-      if (pipeline == null) {
+      int pipelineIndex =
+          pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
+      if (pipelineIndex < 0) {
         LOG.warn("Unable to select a pipeline from {} in the list",
             existingPipelines.size());
         break;
       }
+      Pipeline pipeline = existingPipelines.get(pipelineIndex);
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
-            // This is O(n), which isn't great if there are a lot of pipelines
-            // and we keep finding pipelines without enough space.
-            existingPipelines.remove(pipeline);
+            existingPipelines.remove(pipelineIndex);
             pipelineManager.closePipeline(pipeline, true);
           } else {
             if (containerIsExcluded(containerInfo, excludeList)) {
-              existingPipelines.remove(pipeline);
+              existingPipelines.remove(pipelineIndex);
             } else {
               return containerInfo;
             }
@@ -142,13 +141,13 @@ public class WritableECContainerProvider
         } catch (PipelineNotFoundException | ContainerNotFoundException e) {
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
-          existingPipelines.remove(pipeline);
+          existingPipelines.remove(pipelineIndex);
           pipelineManager.closePipeline(pipeline, true);
         }
       }
     }
     // If we get here, all the pipelines we tried were no good. So try to
-    // allocate a new one and usePipelineManagerV2Impl.java it.
+    // allocate a new one.
     try {
       synchronized (this) {
         return allocateContainer(repConfig, size, owner, excludeList);

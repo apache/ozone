@@ -85,7 +85,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         rcOmFromSnapshot = omSnapshotManager.checkForSnapshot(
             snapshotInfo.getVolumeName(),
             snapshotInfo.getBucketName(),
-            getSnapshotPrefix(snapshotInfo.getName()));
+            getSnapshotPrefix(snapshotInfo.getName()),
+            true);
       }
 
       // Note: OMKeyPurgeResponse is responsible for decrementing ref count

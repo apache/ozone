@@ -290,9 +290,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         // Check if the snapshot exists
         final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        // Block snapshot from loading when it is no longer active
-        // e.g. DELETED, unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo);
+        // Block snapshot from loading when it is no longer active e.g. DELETED,
+        // unless this is called from SnapshotDeletingService.
+        checkSnapshotActive(snapshotInfo, true);
 
         CacheValue<SnapshotInfo> cacheValue = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable()
@@ -346,8 +346,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    registry.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+    registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     return registry.build();
   }
 
@@ -581,8 +580,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   // Get OmSnapshot if the keyname has ".snapshot" key indicator
-  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(String volumeName,
-      String bucketName, String keyname)
+  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(
+      String volumeName, String bucketName, String keyname,
+      boolean skipActiveCheck)
       throws IOException {
     if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
@@ -600,7 +600,9 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName, snapshotName);
 
       // Block FS API reads when snapshot is not active.
-      checkSnapshotActive(ozoneManager, snapshotTableKey);
+      if (!skipActiveCheck) {
+        checkSnapshotActive(ozoneManager, snapshotTableKey);
+      }
 
       // Warn if actual cache size exceeds the soft limit already.
       if (snapshotCache.size() > softCacheSize) {
@@ -689,9 +691,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         volumeName, bucketName, toSnapshotName);
 
     // Block SnapDiff if either of the snapshots is not active.
-    checkSnapshotActive(fromSnapInfo);
-    checkSnapshotActive(toSnapInfo);
-
+    checkSnapshotActive(fromSnapInfo, false);
+    checkSnapshotActive(toSnapInfo, false);
     // Check snapshot creation time
     if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +

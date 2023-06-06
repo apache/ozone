@@ -88,7 +88,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSING, 1, 2, 3, 4, 5);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
@@ -106,7 +106,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSING, 0, 0, 0);
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
@@ -139,7 +139,7 @@ public class TestDeletingContainerHandler {
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)

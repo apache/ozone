@@ -34,6 +34,19 @@ public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
   @SuppressWarnings("java:S2245") // no need for secure random
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
-    return pipelineList.get((int) (Math.random() * pipelineList.size()));
+    return pipelineList.get(choosePipelineIndex(pipelineList, pri));
+  }
+
+  /**
+   * Given a list of pipelines, return the index of the chosen pipeline.
+   * @param pipelineList List of pipelines
+   * @param pri          PipelineRequestInformation
+   * @return Index in the list of the chosen pipeline, or -1 if no pipeline
+   *         could be selected.
+   */
+  @Override
+  public int choosePipelineIndex(List<Pipeline> pipelineList,
+      PipelineRequestInformation pri) {
+    return (int) (Math.random() * pipelineList.size());
   }
 }

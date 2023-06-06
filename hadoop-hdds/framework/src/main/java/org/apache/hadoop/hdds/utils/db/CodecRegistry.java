@@ -49,10 +49,10 @@ public final class CodecRegistry {
 
   public static Builder newBuilder() {
     return new Builder()
-        .addCodec(String.class, new StringCodec())
+        .addCodec(String.class, StringCodec.get())
         .addCodec(Long.class, LongCodec.get())
-        .addCodec(Integer.class, new IntegerCodec())
-        .addCodec(byte[].class, new ByteArrayCodec());
+        .addCodec(Integer.class, IntegerCodec.get())
+        .addCodec(byte[].class, ByteArrayCodec.get());
   }
 
   private static final class CodecMap {

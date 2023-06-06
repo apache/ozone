@@ -77,10 +77,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             ozoneManager.getMetadataManager().getSnapshotInfoTable()
                 .get(fromSnapshot);
         // TODO: [SNAPSHOT] Revisit in HDDS-8529.
-        rcOmFromSnapshot = omSnapshotManager.checkForSnapshot(
-            snapshotInfo.getVolumeName(),
-            snapshotInfo.getBucketName(),
-            getSnapshotPrefix(snapshotInfo.getName()));
+        rcOmFromSnapshot = (OmSnapshot) omSnapshotManager
+            .checkForSnapshot(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName(),
+                getSnapshotPrefix(snapshotInfo.getName()), true);
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
