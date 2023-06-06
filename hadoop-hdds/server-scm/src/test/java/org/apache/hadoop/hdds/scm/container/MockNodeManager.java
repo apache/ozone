@@ -276,7 +276,7 @@ public class MockNodeManager implements NodeManager {
   public List<DatanodeDetails> getNodes(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodestate) {
     if (nodestate == HEALTHY) {
-      // mock storage reports for SCMCommonPlacementPolicy.hasEnoughSpace()
+      // mock storage reports for VolumeUtils..hasEnoughSpace()
       List<DatanodeDetails> healthyNodesWithInfo = new ArrayList<>();
       for (DatanodeDetails dd : healthyNodes) {
         DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),

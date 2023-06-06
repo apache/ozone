@@ -61,6 +61,8 @@ public final class HddsConfigKeys {
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
+  public static final String HDDS_DATANODE_VOLUME_REPLICA_CHOOSING_POLICY =
+      "hdds.datanode.volume.replica.choosing.policy";
 
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
       "hdds.datanode.volume.min.free.space";
