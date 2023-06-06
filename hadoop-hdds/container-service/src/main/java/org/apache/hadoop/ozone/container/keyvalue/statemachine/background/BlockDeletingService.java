@@ -175,19 +175,20 @@ public class BlockDeletingService extends BackgroundService {
   public List<ContainerBlockInfo> chooseContainerForBlockDeletion(
       int blockLimit, ContainerDeletionChoosingPolicy deletionPolicy)
       throws StorageContainerException {
-    long[] totalPendingBlockCount = new long[1];
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> ((KeyValueContainerData) e.getValue()
                 .getContainerData()).getNumPendingDeletionBlocks() > 0)
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
-                deletionPolicy))
-            .peek(e -> totalPendingBlockCount[0] +=
-                ((KeyValueContainerData) e.getValue().getContainerData())
-                    .getNumPendingDeletionBlocks())
-            .collect(Collectors
+                deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
-    metrics.setTotalPendingBlockCount(totalPendingBlockCount[0]);
+
+    long totalPendingBlockCount =
+        containerDataMap.values().stream().mapToLong(
+            containerData -> ((KeyValueContainerData) containerData)
+            .getNumPendingDeletionBlocks())
+        .sum();
+    metrics.setTotalPendingBlockCount(totalPendingBlockCount);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
