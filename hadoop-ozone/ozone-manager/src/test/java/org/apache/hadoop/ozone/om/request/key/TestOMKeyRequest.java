@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -167,8 +168,12 @@ public class TestOMKeyRequest {
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
 
     ReferenceCounted<IOmMetadataReader> rcOmMetadataReader =
-        Mockito.mock(ReferenceCounted.class);
+        mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
+    // Init OmMetadataReader to let the test pass
+    OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
+    when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
+    when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
 
     prepareState = new OzoneManagerPrepareState(ozoneConfiguration);
     when(ozoneManager.getPrepareState()).thenReturn(prepareState);
