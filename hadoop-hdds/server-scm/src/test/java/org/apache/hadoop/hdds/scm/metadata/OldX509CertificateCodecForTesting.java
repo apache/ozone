@@ -19,68 +19,37 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.security.cert.X509Certificate;
-import java.util.function.IntFunction;
-
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.CodecBuffer;
-import org.apache.hadoop.hdds.utils.io.LengthOutputStream;
-import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 
 /**
  * Codec to serialize/deserialize {@link X509Certificate}.
  */
-public final class X509CertificateCodec implements Codec<X509Certificate> {
-  private static final int INITIAL_CAPACITY = 4 << 10; // 4 KB
+public final class OldX509CertificateCodecForTesting
+    implements Codec<X509Certificate> {
 
   private static final Codec<X509Certificate> INSTANCE =
-      new X509CertificateCodec();
+      new OldX509CertificateCodecForTesting();
 
   public static Codec<X509Certificate> get() {
     return INSTANCE;
   }
 
-  private X509CertificateCodec() {
+  private OldX509CertificateCodecForTesting() {
     // singleton
   }
 
   @Override
-  public boolean supportCodecBuffer() {
-    return true;
-  }
-
-  CheckedFunction<OutputStream, Integer, IOException> writeTo(
-      X509Certificate object) {
-    return out -> CertificateCodec.writePEMEncoded(object,
-        new LengthOutputStream(out)).getLength();
-  }
-
-  @Override
-  public CodecBuffer toCodecBuffer(@Nonnull X509Certificate object,
-      IntFunction<CodecBuffer> allocator) throws IOException {
-    return allocator.apply(-INITIAL_CAPACITY).put(writeTo(object));
-  }
-
-  @Override
-  public X509Certificate fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
-    try (InputStream in = buffer.getInputStream()) {
-      return CertificateCodec.readX509Certificate(in);
-    }
-  }
-
-  @Override
   public byte[] toPersistedFormat(X509Certificate object) throws IOException {
-    try (CodecBuffer buffer = toHeapCodecBuffer(object)) {
-      return buffer.getArray();
+    try {
+      return CertificateCodec.getPEMEncodedString(object)
+          .getBytes(StandardCharsets.UTF_8);
     } catch (SCMSecurityException exp) {
       throw new IOException(exp);
     }
@@ -89,8 +58,12 @@ public final class X509CertificateCodec implements Codec<X509Certificate> {
   @Override
   public X509Certificate fromPersistedFormat(byte[] rawData)
       throws IOException {
-    return CertificateCodec.readX509Certificate(
-        new ByteArrayInputStream(rawData));
+    try {
+      String s = new String(rawData, StandardCharsets.UTF_8);
+      return CertificateCodec.getX509Certificate(s);
+    } catch (CertificateException exp) {
+      throw new IOException(exp);
+    }
   }
 
   @Override

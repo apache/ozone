@@ -14,7 +14,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 package org.apache.hadoop.hdds.utils.db;
 
@@ -73,6 +72,17 @@ public interface Codec<T> {
   default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
       throws IOException {
     return toCodecBuffer(object, CodecBuffer::allocateDirect);
+  }
+
+  /**
+   * Serialize the given object to bytes.
+   *
+   * @param object The object to be serialized.
+   * @return a heap buffer storing the serialized bytes.
+   */
+  default CodecBuffer toHeapCodecBuffer(@Nonnull T object)
+      throws IOException {
+    return toCodecBuffer(object, CodecBuffer::allocateHeap);
   }
 
   /**
