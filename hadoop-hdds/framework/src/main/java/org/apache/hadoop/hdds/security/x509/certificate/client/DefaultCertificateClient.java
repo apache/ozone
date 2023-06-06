@@ -115,6 +115,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private CertPath certPath;
   private Map<String, CertPath> certificateMap;
   private Set<CertPath> rootCaCertificates;
+  private Set<CertPath> caCertificates;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -143,6 +144,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
     this.rootCaCertificates = ConcurrentHashMap.newKeySet();
+    this.caCertificates = ConcurrentHashMap.newKeySet();
 
     updateCertSerialId(certSerialId);
   }
@@ -182,6 +184,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.SUBORDINATE.getFileNamePrefix().length()));
+                  caCertificates.add(certificatesFromFile);
                   if (tmpCaCertSerailId > latestCaCertSerailId) {
                     latestCaCertSerailId = tmpCaCertSerailId;
                   }
@@ -906,6 +909,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   @Override
   public Set<X509Certificate> getAllRootCaCerts() {
     return rootCaCertificates.stream().
+        map(this::firstCertificateFrom)
+        .collect(Collectors.toSet());
+  }
+
+  @Override
+  public Set<X509Certificate> getAllCaCerts() {
+    return caCertificates.stream().
         map(this::firstCertificateFrom)
         .collect(Collectors.toSet());
   }

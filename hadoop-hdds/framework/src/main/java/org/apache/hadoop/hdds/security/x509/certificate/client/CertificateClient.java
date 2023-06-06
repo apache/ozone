@@ -122,11 +122,14 @@ public interface CertificateClient extends Closeable {
 
   Set<X509Certificate> getAllRootCaCerts();
 
+  Set<X509Certificate> getAllCaCerts();
+
   /**
    * Return the pem encoded CA certificate list.
-   *
+   * <p>
    * If initialized return list of pem encoded CA certificates, else return
    * null.
+   *
    * @return list of pem encoded CA certificates.
    */
   List<String> getCAList();

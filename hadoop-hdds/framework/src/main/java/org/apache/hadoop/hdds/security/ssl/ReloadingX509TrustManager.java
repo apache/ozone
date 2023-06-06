@@ -29,6 +29,7 @@ import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.atomic.AtomicReference;
@@ -138,10 +139,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    for (X509Certificate cert : caClient.getAllRootCaCerts()) {
-      String certId = cert.getSerialNumber().toString();
-      ks.setCertificateEntry(certId, cert);
-    }
+    insertCertsToKeystore(caClient.getAllRootCaCerts(), ks);
+    insertCertsToKeystore(caClient.getAllCaCerts(), ks);
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -155,5 +154,13 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     }
     currentRootCACertId = rootCACertId;
     return trustManager;
+  }
+
+  private void insertCertsToKeystore(Iterable<X509Certificate> certs,
+      KeyStore ks) throws KeyStoreException {
+    for (X509Certificate certToInsert : certs) {
+      String certId = certToInsert.getSerialNumber().toString();
+      ks.setCertificateEntry(certId, certToInsert);
+    }
   }
 }

@@ -284,6 +284,11 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public Set<X509Certificate> getAllCaCerts() {
+    return rootCerts;
+  }
+
+  @Override
   public List<String> getCAList() {
     return null;
   }
