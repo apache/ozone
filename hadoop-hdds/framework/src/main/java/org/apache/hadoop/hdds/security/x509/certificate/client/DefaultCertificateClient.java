@@ -168,7 +168,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  private void readCertificateFile(Path filePath) {
+  private synchronized void readCertificateFile(Path filePath) {
     CertificateCodec codec = new CertificateCodec(securityConfig, component);
     String fileName = filePath.getFileName().toString();
 
@@ -183,8 +183,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
       certificateMap.putIfAbsent(readCertSerialId, allCertificates);
 
-      updateCachedData(filePath, CAType.SUBORDINATE, this::updateCachedSubCAId);
-      updateCachedData(filePath, CAType.ROOT, this::updateCachedRootCAId);
+      updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
+      updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
 
       getLogger().info("Added certificate {} from file: {}.", cert,
           filePath.toAbsolutePath());
@@ -192,16 +192,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
              | IOException | IndexOutOfBoundsException e) {
       getLogger().error("Error reading certificate from file: {}.",
           filePath.toAbsolutePath(), e);
-      return;
     }
   }
 
   private void updateCachedData(
-      Path file,
+      String fileName,
       CAType tryCAType,
       Consumer<String> updateCachedId
   ) throws IOException {
-    String fileName = file.getFileName().toString();
     String caTypePrefix = tryCAType.getFileNamePrefix();
 
     if (fileName.startsWith(caTypePrefix)) {
@@ -212,14 +210,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  private void updateCachedRootCAId(String s) {
+  private synchronized void updateCachedRootCAId(String s) {
     if (rootCaCertId == null
         || Long.parseLong(s) > Long.parseLong(rootCaCertId)) {
       rootCaCertId = s;
     }
   }
 
-  private void updateCachedSubCAId(String s) {
+  private synchronized void updateCachedSubCAId(String s) {
     if (caCertId == null
         || Long.parseLong(s) > Long.parseLong(caCertId)) {
       caCertId = s;
@@ -1166,9 +1164,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return (OzoneConfiguration)securityConfig.getConfiguration();
   }
 
-  private synchronized void updateCertSerialId(String newCertSerialId) {
+  private synchronized String updateCertSerialId(String newCertSerialId) {
     certSerialId = newCertSerialId;
     loadAllCertificates();
+    return certSerialId;
   }
 
   protected abstract String signAndStoreCertificate(
@@ -1177,9 +1176,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
-    updateCertSerialId(signAndStoreCertificate(request,
+    return updateCertSerialId(signAndStoreCertificate(request,
         getSecurityConfig().getCertificateLocation(getComponentName())));
-    return certSerialId;
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
