@@ -124,15 +124,7 @@ public class VersionEndpointTask implements
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
-
-        // TODO Move startup cleaning to be invoked by OzoneContainer.
-        if (result) {
-          // Clean the temporary container delete directory.
-          if (volume instanceof HddsVolume) {
-            HddsVolume hddsVolume = (HddsVolume) volume;
-            hddsVolume.cleanDeletedContainerDir();
-          }
-        } else {
+        if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }
