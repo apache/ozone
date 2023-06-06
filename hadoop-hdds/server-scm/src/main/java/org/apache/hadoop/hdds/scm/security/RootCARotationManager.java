@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,15 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT;
 
 /**
  * Root CA Rotation Manager is a service in SCM to control the CA rotation.
@@ -58,6 +51,7 @@ public class RootCARotationManager implements SCMService {
   private StorageContainerManager scm;
   private final SCMContext scmContext;
   private OzoneConfiguration ozoneConf;
+  private SecurityConfig secConf;
   private ScheduledExecutorService executorService;
   private Duration checkInterval;
   private Duration renewalGracePeriod;
@@ -66,7 +60,7 @@ public class RootCARotationManager implements SCMService {
   private CertificateClient scmCertClient;
   private AtomicBoolean isRunning = new AtomicBoolean(false);
   private AtomicBoolean isScheduled = new AtomicBoolean(false);
-  private String threadName = this.getClass().getSimpleName() + "-MonitorTask";
+  private String threadName = this.getClass().getSimpleName();
 
   /**
    * Constructs RootCARotationManager with the specified arguments.
@@ -76,36 +70,12 @@ public class RootCARotationManager implements SCMService {
   public RootCARotationManager(StorageContainerManager scm) {
     this.scm = scm;
     this.ozoneConf = scm.getConfiguration();
-
+    this.secConf = new SecurityConfig(ozoneConf);
     this.scmContext = scm.getScmContext();
-    String durationString = ozoneConf.get(
-        HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
-        HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT);
-    checkInterval = Duration.parse(durationString);
 
-    String timeOfDayString = ozoneConf.get(
-        HDDS_X509_CA_ROTATION_TIME_OF_DAY,
-        HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT);
-    Matcher matcher = timePattern.matcher(timeOfDayString);
-    if (!matcher.matches()) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_TIME_OF_DAY +
-          " should follow the hh:mm:ss format.");
-    }
-    timeOfDayString = "1970-01-01T" + timeOfDayString;
-    timeOfDay = Date.from(LocalDateTime.parse(timeOfDayString)
-        .atZone(ZoneId.systemDefault()).toInstant());
-
-    String renewalGraceDurationString = ozoneConf.get(
-        HDDS_X509_RENEW_GRACE_DURATION,
-        HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
-    renewalGracePeriod = Duration.parse(renewalGraceDurationString);
-
-    if (checkInterval.compareTo(renewalGracePeriod) >= 0) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
-          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
-    }
+    checkInterval = secConf.getCaCheckInterval();
+    timeOfDay = secConf.getCaRotationTimeOfDay();
+    renewalGracePeriod = secConf.getRenewalGracePeriod();
 
     executorService = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadName)
@@ -205,12 +175,12 @@ public class RootCARotationManager implements SCMService {
               timeOfDay.getHours(), timeOfDay.getMinutes(),
               timeOfDay.getSeconds());
           if (timeToSchedule.isBefore(now)) {
-            timeToSchedule.plusDays(1);
+            timeToSchedule = timeToSchedule.plusDays(1);
           }
           long delay = Duration.between(now, timeToSchedule).toMillis();
           if (timeToSchedule.isAfter(rootCACert.getNotAfter().toInstant()
               .atZone(ZoneId.systemDefault()).toLocalDateTime())) {
-            LOG.warn("Configured rotation time {} is after root" +
+            LOG.info("Configured rotation time {} is after root" +
                 " certificate {} end time {}. Start the rotation immediately.",
                 timeToSchedule, rootCACert.getSerialNumber().toString(),
                 rootCACert.getNotAfter());
