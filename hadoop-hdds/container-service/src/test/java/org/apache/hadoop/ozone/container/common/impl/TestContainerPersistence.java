@@ -347,37 +347,77 @@ public class TestContainerPersistence {
     long testContainerID = getTestContainerID();
     Container<KeyValueContainerData> container = addContainer(containerSet,
         testContainerID);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    ChunkInfo info = writeChunkHelper(blockID);
-    BlockData blockData = new BlockData(blockID);
-    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
-    chunkList.add(info.getProtoBufMessage());
-    blockData.setChunks(chunkList);
-
-    blockManager.putBlock(container, blockData);
+    BlockID blockID = addBlockToContainer(container);
     container.close();
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID));
     KeyValueContainerData containerData = container.getContainerData();
 
+    // Block data and metadata tables should have data.
+    assertContainerInSchema3DB(containerData, blockID);
+
+    container.delete();
+    containerSet.removeContainer(testContainerID);
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+
+    // Block data and metadata tables should be cleared.
+    assertContainerNotInSchema3DB(containerData, blockID);
+  }
+
+  private void assertContainerInSchema3DB(KeyValueContainerData containerData,
+      BlockID testBlock) throws IOException {
+    // This test is only valid for schema v3. Earlier schemas will have their
+    // own RocksDB that is deleted with the container.
+    if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
           dbHandle.getStore();
       Table<String, BlockData> blockTable = store.getBlockDataTable();
+      Table<String, Long> metadataTable = store.getMetadataTable();
 
-      // Key should exist in Block table.
+      // Block data and metadata tables should have data.
       Assertions.assertNotNull(blockTable
-          .getIfExist(containerData.getBlockKey(blockID.getLocalID())));
-
-      container.delete();
-      containerSet.removeContainer(testContainerID);
-      Assert.assertFalse(containerSet.getContainerMapCopy()
-          .containsKey(testContainerID));
-
-      // Key should not exist in Block table, after container gets deleted.
-      Assertions.assertNull(blockTable
-          .getIfExist(containerData.getBlockKey(blockID.getLocalID())));
+          .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
+      Assertions.assertNotNull(metadataTable
+          .getIfExist(containerData.getBlockCountKey()));
     }
+  }
+
+  private void assertContainerNotInSchema3DB(KeyValueContainerData containerData,
+      BlockID testBlock) throws IOException {
+    // This test is only valid for schema v3. Earlier schemas will have their
+    // own RocksDB that is deleted with the container.
+    if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, BlockData> blockTable = store.getBlockDataTable();
+      Table<String, Long> metadataTable = store.getMetadataTable();
+
+      // Block data and metadata tables should have data.
+      Assertions.assertNull(blockTable
+          .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
+      Assertions.assertNull(metadataTable
+          .getIfExist(containerData.getBlockCountKey()));
+    }
+  }
+
+  private BlockID addBlockToContainer(Container<KeyValueContainerData> container) throws IOException {
+    BlockID blockID = ContainerTestHelper.getTestBlockID(
+            container.getContainerData().getContainerID());
+    ChunkInfo info = writeChunkHelper(blockID);
+    BlockData blockData = new BlockData(blockID);
+    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+    blockManager.putBlock(container, blockData);
+
+    return blockID;
   }
 
   /**
@@ -389,19 +429,23 @@ public class TestContainerPersistence {
   @Test
   public void testDeleteContainerWithRenaming()
       throws Exception {
-
-    // Add two closed containers to test deleting.
+    // Set up container 1.
     long testContainerID1 = getTestContainerID();
     Container<KeyValueContainerData> container1 =
         addContainer(containerSet, testContainerID1);
+    BlockID container1Block = addBlockToContainer(container1);
     container1.close();
     KeyValueContainerData container1Data = container1.getContainerData();
+    assertContainerInSchema3DB(container1Data, container1Block);
 
+    // Set up container 2.
     long testContainerID2 = getTestContainerID();
     Container<KeyValueContainerData> container2 =
         addContainer(containerSet, testContainerID2);
+    BlockID container2Block = addBlockToContainer(container2);
     container2.close();
     KeyValueContainerData container2Data = container2.getContainerData();
+    assertContainerInSchema3DB(container2Data, container2Block);
 
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID1));
@@ -420,9 +464,11 @@ public class TestContainerPersistence {
     Assert.assertTrue(String.format("Volume level container deleted directory" +
         " %s not created.", deletedContainerDir), deletedContainerDir.exists());
 
-    // Move containers to delete directory.
+    // Move containers to delete directory. RocksDB should not yet be updated.
     KeyValueContainerUtil.moveToDeletedContainerDir(container1Data, hddsVolume);
+    assertContainerInSchema3DB(container1Data, container1Block);
     KeyValueContainerUtil.moveToDeletedContainerDir(container2Data, hddsVolume);
+    assertContainerInSchema3DB(container2Data, container2Block);
 
     // Both containers should be present in the deleted directory.
     File[] deleteDirFilesArray = deletedContainerDir.listFiles();
@@ -439,6 +485,8 @@ public class TestContainerPersistence {
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
     container1.delete();
+    assertContainerNotInSchema3DB(container1Data, container1Block);
+    assertContainerInSchema3DB(container2Data, container2Block);
 
     // Check the delete directory again. Only container 2 should remain.
     deleteDirFilesArray = deletedContainerDir.listFiles();
@@ -448,6 +496,8 @@ public class TestContainerPersistence {
 
     // Delete container2 from the disk.
     container2.delete();
+    assertContainerNotInSchema3DB(container1Data, container1Block);
+    assertContainerNotInSchema3DB(container2Data, container2Block);
 
     // Remove containers from containerSet
     containerSet.removeContainer(testContainerID1);

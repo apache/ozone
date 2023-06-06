@@ -200,7 +200,7 @@ public abstract class StorageVolume
   public void createWorkingDirs(String workingDirName,
       MutableVolumeSet dbVolumeSet) throws IOException {
     File idDir = new File(getStorageDir(), workingDirName);
-    if (!idDir.mkdir()) {
+    if (!idDir.exists() && !idDir.mkdir()) {
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
@@ -484,7 +484,6 @@ public abstract class StorageVolume
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
     volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
-    // TODO clear health check dir here.
   }
 
   /**

@@ -106,9 +106,8 @@ public class TestHddsVolume {
     // Create a working directory
     // tmp directory should be initialized.
     volume.createWorkingDirs(CLUSTER_ID, null);
-
-    File tmpDir = new File(volume.getTmpDir().toString());
-    assertTrue(tmpDir.exists());
+    assertTrue(volume.getTmpDir().exists());
+    assertTrue(volume.getDeletedContainerDir().exists());
 
     // Shutdown the volume.
     volume.shutdown();

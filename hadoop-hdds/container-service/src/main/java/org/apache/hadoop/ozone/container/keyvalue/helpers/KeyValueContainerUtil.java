@@ -156,7 +156,7 @@ public final class KeyValueContainerUtil {
       } catch (IOException ex) {
         LOG.error("DB failure, unable to remove container. " +
             "Disk need to be replaced.", ex);
-        throw new IOException(ex);
+        throw ex;
       }
     } else {
       // Close the DB connection and remove the DB handler from cache
