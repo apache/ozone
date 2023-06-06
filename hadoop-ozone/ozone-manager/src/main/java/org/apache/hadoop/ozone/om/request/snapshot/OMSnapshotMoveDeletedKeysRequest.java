@@ -91,8 +91,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<String> movedDirs =
           moveDeletedKeysRequest.getDeletedDirsToMoveList();
 
-      // Passed references of RC<> to Response,
-      // thus Response is responsible for decrementing ref count.
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), fromSnapshot, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);

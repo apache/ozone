@@ -181,7 +181,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
                            OmSnapshot fromOmSnapshot)
       throws IOException {
     for (String movedDirsKey : movedDirs) {
-      OmKeyInfo keyInfo = fromOmSnapshot.getMetadataManager().getDeletedDirTable()
+      OmKeyInfo keyInfo = fromOmSnapshot.getMetadataManager()
+          .getDeletedDirTable()
           .get(movedDirsKey);
       if (keyInfo == null) {
         continue;

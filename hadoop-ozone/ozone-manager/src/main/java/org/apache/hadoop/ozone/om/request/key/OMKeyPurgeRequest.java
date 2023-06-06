@@ -21,15 +21,12 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -38,8 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Handles purging of keys from OM DB.
@@ -59,7 +54,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
         purgeKeysRequest.getSnapshotTableKey() : null;
     List<String> keysToBePurgedList = new ArrayList<>();
@@ -68,7 +62,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
 
-
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
         keysToBePurgedList.add(deletedKey);
@@ -76,23 +69,13 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     try {
-      ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot = null;
+      SnapshotInfo fromSnapshotInfo = null;
       if (fromSnapshot != null) {
-        SnapshotInfo snapshotInfo =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .get(fromSnapshot);
-        // TODO: [SNAPSHOT] Revisit in HDDS-8529.
-        rcOmFromSnapshot = omSnapshotManager.checkForSnapshot(
-            snapshotInfo.getVolumeName(),
-            snapshotInfo.getBucketName(),
-            getSnapshotPrefix(snapshotInfo.getName()),
-            true);
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable().get(fromSnapshot);
       }
-
-      // Note: OMKeyPurgeResponse is responsible for decrementing ref count
-      // for rcOmFromSnapshot.
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList, rcOmFromSnapshot);
+          keysToBePurgedList, fromSnapshotInfo);
     } catch (IOException ex) {
       omClientResponse = new OMKeyPurgeResponse(
           createErrorOMResponse(omResponse, ex));

@@ -21,7 +21,10 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
@@ -33,6 +36,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Response for {@link OMKeyPurgeRequest} request.
@@ -40,14 +44,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
-  private ReferenceCounted<IOmMetadataReader> rcFromSnapshot;
+  private SnapshotInfo fromSnapshot;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> keyList,
-      ReferenceCounted<IOmMetadataReader> rcFromSnapshot) {
+      SnapshotInfo fromSnapshot) {
     super(omResponse);
     this.purgeKeyList = keyList;
-    this.rcFromSnapshot = rcFromSnapshot;
+    this.fromSnapshot = fromSnapshot;
   }
 
   /**
@@ -63,16 +67,28 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (rcFromSnapshot != null) {
-      OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
-      DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
-      // Init Batch Operation for snapshot db.
-      try (BatchOperation writeBatch = fromSnapshotStore.initBatchOperation()) {
-        processKeys(writeBatch, fromSnapshot.getMetadataManager());
-        fromSnapshotStore.commitBatchOperation(writeBatch);
+    if (fromSnapshot != null) {
+      OmSnapshotManager omSnapshotManager =
+          ((OmMetadataManagerImpl) omMetadataManager)
+              .getOzoneManager().getOmSnapshotManager();
+
+      try (ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot =
+          omSnapshotManager.checkForSnapshot(
+              fromSnapshot.getVolumeName(),
+              fromSnapshot.getBucketName(),
+              getSnapshotPrefix(fromSnapshot.getName()),
+              true)) {
+
+        OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
+        DBStore fromSnapshotStore =
+            fromOmSnapshot.getMetadataManager().getStore();
+        // Init Batch Operation for snapshot db.
+        try (BatchOperation writeBatch =
+            fromSnapshotStore.initBatchOperation()) {
+          processKeys(writeBatch, fromOmSnapshot.getMetadataManager());
+          fromSnapshotStore.commitBatchOperation(writeBatch);
+        }
       }
-      // Decrement ref count
-      rcFromSnapshot.close();
     } else {
       processKeys(batchOperation, omMetadataManager);
     }
