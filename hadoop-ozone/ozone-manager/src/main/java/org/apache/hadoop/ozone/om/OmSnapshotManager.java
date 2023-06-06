@@ -611,7 +611,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
 
       // retrieve the snapshot from the cache
-      return snapshotCache.get(snapshotTableKey);
+      return snapshotCache.get(snapshotTableKey, skipActiveCheck);
     } else {
       return ozoneManager.getOmMetadataReader();
     }

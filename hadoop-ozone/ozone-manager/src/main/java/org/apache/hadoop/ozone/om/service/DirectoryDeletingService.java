@@ -219,9 +219,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               .getRenameKey(deletedDirInfo.getVolumeName(),
                   deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
           Table<String, OmDirectoryInfo> prevDirTable =
-              rcLatestSnapshot.getMetadataManager().getDirectoryTable();
+              ((OmSnapshot) rcLatestSnapshot.get())
+                  .getMetadataManager().getDirectoryTable();
           Table<String, OmKeyInfo> prevDeletedDirTable =
-              rcLatestSnapshot.getMetadataManager().getDeletedDirTable();
+              ((OmSnapshot) rcLatestSnapshot.get())
+                  .getMetadataManager().getDeletedDirTable();
           OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
           if (prevDeletedDirInfo != null) {
             return true;

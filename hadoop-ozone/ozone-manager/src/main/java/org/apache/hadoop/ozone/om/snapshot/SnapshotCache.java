@@ -139,14 +139,20 @@ public class SnapshotCache {
     GARBAGE_COLLECTION_WRITE
   }
 
+
+  public ReferenceCounted<IOmMetadataReader> get(String key)
+      throws IOException {
+    return get(key, false);
+  }
+
   /**
-   * Get or load OmSnapshot. Must be close()d after use.
+   * Get or load OmSnapshot. Shall be close()d after use.
    * TODO: [SNAPSHOT] Can add reason enum to param list later.
    * @param key snapshot table key
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<IOmMetadataReader> get(String key)
-      throws IOException {
+  public ReferenceCounted<IOmMetadataReader> get(String key,
+      boolean skipActiveCheck) throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist.
     ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
@@ -182,7 +188,7 @@ public class SnapshotCache {
     // above is ignored. But we would still want to reject all get()s except
     // when called from SDT (and some) if the snapshot is not active any more.
     if (!omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE) &&
-        !SnapshotUtils.isCalledFromSnapshotDeletingService()) {
+        !skipActiveCheck) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
           FILE_NOT_FOUND);

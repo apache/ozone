@@ -4554,7 +4554,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return ReferenceCounted<IOmMetadataReader>
    */
   private ReferenceCounted<IOmMetadataReader> getReader(String volumeName,
-      String bucketName, String key) throws IOException {
+          String bucketName, String key) throws IOException {
     return omSnapshotManager.checkForSnapshot(
         volumeName, bucketName, key, false);
   }

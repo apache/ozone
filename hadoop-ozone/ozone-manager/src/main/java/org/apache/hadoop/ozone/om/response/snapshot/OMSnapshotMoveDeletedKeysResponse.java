@@ -122,7 +122,9 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       throws IOException {
     for (String movedDirsKey : movedDirs) {
       // Delete dirs from current snapshot that are moved to next snapshot.
-      fromSnapshot.getMetadataManager().getDeletedDirTable()
+      ((OmSnapshot) rcFromSnapshot.get())
+          .getMetadataManager()
+          .getDeletedDirTable()
           .deleteWithBatch(batchOp, movedDirsKey);
     }
   }
