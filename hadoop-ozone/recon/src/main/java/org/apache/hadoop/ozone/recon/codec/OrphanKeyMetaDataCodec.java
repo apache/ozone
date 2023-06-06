@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.codec;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 
 import java.io.IOException;
@@ -29,8 +28,7 @@ import java.io.IOException;
 /**
  * Codec for OrphanKeyMetaDataSet.
  */
-public class OrphanKeyMetaDataCodec
-    implements Codec<OrphanKeyMetaData> {
+public final class OrphanKeyMetaDataCodec implements Codec<OrphanKeyMetaData> {
 
   private static final OrphanKeyMetaDataCodec CODEC =
       new OrphanKeyMetaDataCodec();
