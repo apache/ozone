@@ -79,7 +79,7 @@ Delete snapshot
     ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
                         Should not contain      ${output}       Failed
     WHILE   True
-        ${output} =       Execute      ozone sh snapshot ls /snapvolume-1/snapbucket-1 jq '[.[] | select(.name == "snapshot1") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
+        ${output} =       Execute      ozone sh snapshot ls /snapvolume-1/snapbucket-1 | jq '[.[] | select(.name == "snapshot1") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
         IF                "SNAPSHOT_DELETED" in """${output}"""
                           BREAK
         ELSE
