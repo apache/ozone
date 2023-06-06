@@ -113,8 +113,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(ozoneManager.getOmAdmins());
-        authorizer.setOzoneReadOnlyAdmins(ozoneManager.getReadOnlyAdmins());
+        authorizer.setAdminCheck(ozoneManager::isAdmin);
+        authorizer.setReadOnlyAdminCheck(ozoneManager::isReadOnlyAdmin);
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;

@@ -15,30 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.utils.db;
 
-package org.apache.hadoop.ozone.recon.heatmap;
+import com.google.common.primitives.Longs;
+import org.junit.Test;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
-
-import java.util.Arrays;
+import static org.junit.Assert.assertEquals;
 
 /**
- * This class is used to encapsulate entity's access metadata objects.
+ * Test for class {@link FixedLengthStringCodec}.
  */
-public class HeatMapProviderDataResource {
-  @JsonProperty("buckets")
-  private EntityMetaData[] metaDataList;
+public class TestFixedLengthStringCodec {
 
-  public EntityMetaData[] getMetaDataList() {
-    if (null != metaDataList) {
-      return Arrays.copyOfRange(metaDataList, 0, metaDataList.length);
+  @Test
+  public void testStringEncodeAndDecode() {
+    long[] testContainerIDs = {
+        0L, 1L, 2L, 12345L,
+        Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, Long.MAX_VALUE
+    };
+
+    for (long containerID : testContainerIDs) {
+      String containerPrefix = FixedLengthStringCodec.bytes2String(
+          Longs.toByteArray(containerID));
+      long decodedContainerID = Longs.fromByteArray(
+          FixedLengthStringCodec.string2Bytes(containerPrefix));
+      assertEquals(containerID, decodedContainerID);
     }
-    return null;
-  }
-
-  public void setMetaDataList(EntityMetaData[] metaDataList) {
-    this.metaDataList = Arrays.copyOfRange(metaDataList, 0,
-        metaDataList.length);
   }
 }

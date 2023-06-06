@@ -1006,7 +1006,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long certificateGracePeriod = Duration.parse(
         conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
             HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (tokenMaxLifetime > certificateGracePeriod) {
+    boolean tokenSanityChecksEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+    if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
       throw new IllegalArgumentException("Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum delegation token lifetime " +
@@ -1036,7 +1039,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long certificateGracePeriod = Duration.parse(
         conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
             HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (expiryTime > certificateGracePeriod) {
+    boolean tokenSanityChecksEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+    if (tokenSanityChecksEnabled && expiryTime > certificateGracePeriod) {
       throw new IllegalArgumentException("Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum block token lifetime " +
@@ -4052,14 +4058,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return OzoneAdmins.
+   * @param callerUgi Caller UserGroupInformation
+   * @return return true if the {@code ugi} is a read-only OM admin
    */
-  public OzoneAdmins getOmAdmins() {
-    return omAdmins;
-  }
-
-  public OzoneAdmins getReadOnlyAdmins() {
-    return readOnlyAdmins;
+  public boolean isReadOnlyAdmin(UserGroupInformation callerUgi) {
+    return callerUgi != null && readOnlyAdmins.isAdmin(callerUgi);
   }
 
   /**
