@@ -39,7 +39,7 @@ import javax.annotation.Nonnull;
  * Codec to serialize/deserialize {@link X509Certificate}.
  */
 public final class X509CertificateCodec implements Codec<X509Certificate> {
-  private static final int INITIAL_CAPACITY = 1 << 10; // 4 KB
+  private static final int INITIAL_CAPACITY = 4 << 10; // 4 KB
 
   private static final Codec<X509Certificate> INSTANCE =
       new X509CertificateCodec();
