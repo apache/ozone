@@ -3730,7 +3730,8 @@
     <tag>OZONE, RECON</tag>
     <description>
       Fully qualified heatmap provider implementation class name. If this value is not set,
-      then will use the default implementation class  "org.apache.hadoop.ozone.recon.heatmap.HeatMapProviderImpl".
+      then HeatMap feature will be disabled and not exposed in Recon UI. Please refer Ozone doc for more details
+      regarding the implementation of "org.apache.hadoop.ozone.recon.heatmap.IHeatMapProvider" interface.
     </description>
   </property>
 
