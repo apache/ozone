@@ -171,10 +171,14 @@ jobs:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: false
     steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+        if: matrix.check != 'bats' && matrix.check != 'unit'
       - name: Checkout project with history
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+        if: matrix.check == 'bats' || matrix.check == 'unit'
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:
