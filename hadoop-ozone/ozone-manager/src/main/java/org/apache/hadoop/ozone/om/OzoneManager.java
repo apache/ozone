@@ -770,7 +770,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void instantiateServices(boolean withNewSnapshot) throws IOException {
 
     OmMetadataManagerImpl metadataManagerImpl =
-        new OmMetadataManagerImpl(configuration);
+        new OmMetadataManagerImpl(configuration, this);
     this.metadataManager = metadataManagerImpl;
     LOG.info("S3 Multi-Tenancy is {}",
         isS3MultiTenancyEnabled ? "enabled" : "disabled");

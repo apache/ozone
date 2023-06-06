@@ -244,7 +244,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private DBStore store;
 
-  private final IOzoneManagerLock lock;
+  private IOzoneManagerLock lock;
 
   private Table userTable;
   private Table volumeTable;
@@ -279,10 +279,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // This is a stopgap solution. Will remove when HDDS-5905 (HDDS-6483) is done.
   private Map<String, ReentrantReadWriteLock> tableLockMap = new HashMap<>();
 
-  @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return tableLockMap.get(tableName);
-  }
+  private OzoneManager ozoneManager;
 
   // Epoch is used to generate the objectIDs. The most significant 2 bits of
   // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
@@ -291,14 +288,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // non-ratis OM clusters will be binary 01 (= decimal 1)  and for ratis
   // enabled OM cluster will be binary 10 (= decimal 2). This epoch is added
   // to ensure uniqueness of objectIDs.
-  private final long omEpoch;
+  private long omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
 
+  // A variant of the constructor that sets a pointer back to OzoneManager to
+  // minimize disruption.
+  public OmMetadataManagerImpl(OzoneConfiguration conf,
+      OzoneManager ozoneManager) throws IOException {
+    init(conf);
+    this.ozoneManager = ozoneManager;
+  }
+
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
+    init(conf);
+  }
+
+  private void init(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or
@@ -384,6 +393,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       stop();
       throw e;
     }
+  }
+
+  @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return tableLockMap.get(tableName);
+  }
+
+  public OzoneManager getOzoneManager() {
+    return ozoneManager;
   }
 
   @Override
