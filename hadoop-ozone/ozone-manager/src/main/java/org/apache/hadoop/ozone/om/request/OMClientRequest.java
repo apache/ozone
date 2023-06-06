@@ -274,8 +274,13 @@ public abstract class OMClientRequest implements RequestAuditor {
         contextBuilder.setOwnerName(bucketOwner);
       }
 
-      ozoneManager.getOmMetadataReader().checkAcls(obj,
-          contextBuilder.build(), true);
+      try (ReferenceCounted<IOmMetadataReader> rcMetadataReader =
+          ozoneManager.getOmMetadataReader()) {
+        OmMetadataReader omMetadataReader =
+            (OmMetadataReader) rcMetadataReader.get();
+
+        omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
+      }
     }
   }
 
