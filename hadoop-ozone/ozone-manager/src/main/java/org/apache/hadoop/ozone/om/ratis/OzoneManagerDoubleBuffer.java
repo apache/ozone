@@ -479,14 +479,14 @@ public final class OzoneManagerDoubleBuffer {
     CleanupTableInfo cleanupTableInfo =
         responseClass.getAnnotation(CleanupTableInfo.class);
     if (cleanupTableInfo != null) {
-      String[] cleanupTables;
+      final List<String> cleanupTables;
       if (cleanupTableInfo.cleanupAll()) {
-        cleanupTables = Arrays
-            .stream(new OMDBDefinition().getColumnFamilies())
-            .map(DBColumnFamilyDefinition::getTableName)
-            .toArray(String[]::new);
+        cleanupTables = new OMDBDefinition().getColumnFamilies()
+            .stream()
+            .map(DBColumnFamilyDefinition::getName)
+            .collect(Collectors.toList());
       } else {
-        cleanupTables = cleanupTableInfo.cleanupTables();
+        cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())

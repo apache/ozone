@@ -278,7 +278,7 @@ public class ReplicationManager implements SCMService {
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
     containerCheckChain
-        .addNext(new ClosingContainerHandler(this))
+        .addNext(new ClosingContainerHandler(this, clock))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
@@ -927,10 +927,11 @@ public class ReplicationManager implements SCMService {
    * interval and processes all the containers in the system.
    */
   private synchronized void run() {
+    final long interval = rmConf.getInterval().toMillis();
     try {
       while (running) {
         processAll();
-        wait(rmConf.getInterval());
+        wait(interval);
       }
     } catch (Throwable t) {
       if (t instanceof InterruptedException) {
@@ -1296,8 +1297,8 @@ public class ReplicationManager implements SCMService {
       return maintenanceRemainingRedundancy;
     }
 
-    public long getInterval() {
-      return interval;
+    public Duration getInterval() {
+      return Duration.ofMillis(interval);
     }
 
     public long getUnderReplicatedInterval() {

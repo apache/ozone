@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
@@ -49,9 +49,7 @@ import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -227,7 +225,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           String cid = keyStr.substring(0, index);
           String blockId = keyStr.substring(index);
           sb.append(gson.toJson(LongCodec.get().fromPersistedFormat(
-              FixedLengthStringUtils.string2Bytes(cid)) +
+              FixedLengthStringCodec.string2Bytes(cid)) +
               keySeparatorSchemaV3 +
               blockId));
         } else {
@@ -307,20 +305,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return false;
     }
 
-    Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
-    for (DBColumnFamilyDefinition cfDef : dbDefinition.getColumnFamilies()) {
-      LOG.info("Found table: {}", cfDef.getTableName());
-      columnFamilyMap.put(cfDef.getTableName(), cfDef);
-    }
-    if (!columnFamilyMap.containsKey(tableName)) {
+    final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
+        dbDefinition.getColumnFamily(tableName);
+    if (columnFamilyDefinition == null) {
       err().print("Error: Table with name '" + tableName + "' not found");
       return false;
     }
-
-    DBColumnFamilyDefinition columnFamilyDefinition =
-        columnFamilyMap.get(tableName);
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-        columnFamilyDefinition.getTableName().getBytes(UTF_8),
+        columnFamilyDefinition.getName().getBytes(UTF_8),
         columnFamilyHandleList);
     if (columnFamilyHandle == null) {
       throw new IllegalStateException("columnFamilyHandle is null");

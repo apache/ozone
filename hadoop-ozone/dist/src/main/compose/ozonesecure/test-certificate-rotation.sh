@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,28 +15,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[logging]
-default = FILE:/var/log/krb5libs.log
-kdc = FILE:/var/log/krb5kdc.log
-admin_server = FILE:/var/log/kadmind.log
+#suite:secure
 
-[libdefaults]
- dns_canonicalize_hostname = false
- dns_lookup_realm = false
- ticket_lifetime = 24h
- renew_lifetime = 7d
- forwardable = true
- rdns = false
- default_realm = EXAMPLE.COM
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
 
-[realms]
- EXAMPLE.COM = {
-  kdc = kdc
-  admin_server = kdc
-  max_renewable_life = 7d
- }
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
 
-[domain_realm]
- .example.com = EXAMPLE.COM
- example.com = EXAMPLE.COM
+export SECURITY_ENABLED=true
+export COMPOSE_FILE=docker-compose.yaml:certificate-rotation.yaml
 
+: ${OZONE_BUCKET_KEY_NAME:=key1}
+
+start_docker_env
+
+execute_robot_test scm certrotation
+
+stop_docker_env
+
+generate_report

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,21 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:unsecure
+version: "3.4"
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
+x-legacy-bucket-config:
+  &legacy-bucket-config
+  environment:
+    - OZONE-SITE.XML_ozone.om.enable.filesystem.paths=true
+    - OZONE-SITE.XML_ozone.default.bucket.layout=LEGACY
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-start_docker_env 5
-
-execute_robot_test scm -v BUCKET_LAYOUT:LEGACY recon/recon-nssummary.robot
-
-stop_docker_env
-
-generate_report
+services:
+  datanode:
+    <<: *legacy-bucket-config
+  om:
+    <<: *legacy-bucket-config
+  scm:
+    <<: *legacy-bucket-config
+  s3g:
+    <<: *legacy-bucket-config
+  recon:
+    <<: *legacy-bucket-config

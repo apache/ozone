@@ -29,10 +29,11 @@ TL;DR:
    ```
    ./run.sh -d
    ```
-2. three datanodes for replication:
+2. multiple datanodes for replication:
    ```
-   export OZONE_REPLICATION_FACTOR=3
-   ./run.sh -d
+   OZONE_DATANODES=3 ./run.sh -d
+   # or
+   OZONE_DATANODES=5 ./run.sh -d
    ```
 
 ### Basics
@@ -43,7 +44,7 @@ You can change the number of datanodes to start using the `--scale` option.  Eg.
 
 The cluster's replication factor (1 or 3) can be controlled by setting the `OZONE_REPLICATION_FACTOR` environment variable.  It defaults to 1 to match the number of datanodes started by default, without the `--scale` option.
 
-For convenience the `run.sh` script can be used to make sure the replication factor and the number of datanodes match.  It also passes any additional arguments provided on the command-line (eg. `-d`) to `docker-compose`.
+For convenience the `run.sh` script can be used to start multiple datanodes (by setting the `OZONE_DATANODES` variable), while making sure the replication factor and the number of datanodes are compatible.  It also passes any additional arguments provided on the command-line (eg. `-d`) to `docker-compose`.
 
 ### Add-ons
 

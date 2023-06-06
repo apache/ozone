@@ -21,17 +21,20 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
@@ -60,8 +63,11 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * A certificate sign request object that wraps operations to build a
@@ -70,6 +76,8 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 public final class CertificateSignRequest {
   // Ozone Certificate distinguished format: (CN=Subject,OU=ScmID,O=ClusterID).
   private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CertificateSignRequest.class);
   private final KeyPair keyPair;
   private final SecurityConfig config;
   private final Extensions extensions;
@@ -257,6 +265,37 @@ public final class CertificateSignRequest {
     public CertificateSignRequest.Builder addIpAddress(String ip) {
       Preconditions.checkNotNull(ip, "Ip address cannot be null");
       this.addAltName(GeneralName.iPAddress, ip);
+      return this;
+    }
+
+    public CertificateSignRequest.Builder addInetAddresses()
+        throws CertificateException {
+      try {
+        DomainValidator validator = DomainValidator.getInstance();
+        // Add all valid ips.
+        List<InetAddress> inetAddresses =
+            OzoneSecurityUtil.getValidInetsForCurrentHost();
+        this.addInetAddresses(inetAddresses, validator);
+      } catch (IOException e) {
+        throw new CertificateException("Error while getting Inet addresses " +
+            "for the CSR builder", e, CSR_ERROR);
+      }
+      return this;
+    }
+
+    public CertificateSignRequest.Builder addInetAddresses(
+        List<InetAddress> addresses,
+        DomainValidator validator) {
+      // Add all valid ips.
+      addresses.forEach(
+          ip -> {
+            this.addIpAddress(ip.getHostAddress());
+            if (validator.isValid(ip.getCanonicalHostName())) {
+              this.addDnsName(ip.getCanonicalHostName());
+            } else {
+              LOG.error("Invalid domain {}", ip.getCanonicalHostName());
+            }
+          });
       return this;
     }
 
