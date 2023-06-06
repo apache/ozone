@@ -45,6 +45,14 @@ public interface Codec<T> {
   }
 
   /**
+   * @return an upper bound, which should be obtained without serialization,
+   *         of the serialized size of the given object.
+   */
+  default int getSerializedSizeUpperBound(T object) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
    * Serialize the given object to bytes.
    *
    * @param object The object to be serialized.

@@ -22,6 +22,7 @@ import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +33,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -147,6 +149,7 @@ public final class TestCodec {
 
   @Test
   public void testStringCodec() throws Exception {
+    Assertions.assertFalse(StringCodec.get().isFixedLength());
     runTestStringCodec("");
 
     for (int i = 0; i < NUM_LOOPS; i++) {
@@ -187,6 +190,51 @@ public final class TestCodec {
     final int serializedSize = UTF_8.encode(original).remaining();
     runTest(StringCodec.get(), original, serializedSize);
     return serializedSize;
+  }
+
+  @Test
+  public void testFixedLengthStringCodec() throws Exception {
+    Assertions.assertTrue(FixedLengthStringCodec.get().isFixedLength());
+    runTestFixedLengthStringCodec("");
+
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = "test" + ThreadLocalRandom.current().nextLong();
+      runTestFixedLengthStringCodec(original);
+    }
+
+    final String alphabets = "AbcdEfghIjklmnOpqrstUvwxyz";
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final String original = i == 0 ? alphabets : alphabets.substring(0, i);
+      runTestFixedLengthStringCodec(original);
+    }
+
+
+    final String multiByteChars = "Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。";
+    Assertions.assertThrows(IOException.class,
+        tryCatch(() -> runTestFixedLengthStringCodec(multiByteChars)));
+    Assertions.assertThrows(IllegalStateException.class,
+        tryCatch(() -> FixedLengthStringCodec.string2Bytes(multiByteChars)));
+
+    gc();
+  }
+
+  static Executable tryCatch(Executable executable) {
+    return tryCatch(executable, t -> LOG.info("Good!", t));
+  }
+
+  static Executable tryCatch(Executable executable, Consumer<Throwable> log) {
+    return () -> {
+      try {
+        executable.execute();
+      } catch (Throwable t) {
+        log.accept(t);
+        throw t;
+      }
+    };
+  }
+
+  static void runTestFixedLengthStringCodec(String original) throws Exception {
+    runTest(FixedLengthStringCodec.get(), original, original.length());
   }
 
   @Test

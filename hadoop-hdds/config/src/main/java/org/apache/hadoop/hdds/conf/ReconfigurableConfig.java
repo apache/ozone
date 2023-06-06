@@ -15,31 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils.db;
+package org.apache.hadoop.hdds.conf;
 
-import com.google.common.primitives.Longs;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Test for class FixedLengthStringUtils.
+ * Base class for config with reconfigurable properties.
  */
-public class TestFixedLengthStringUtils {
+public abstract class ReconfigurableConfig {
 
-  @Test
-  public void testStringEncodeAndDecode() {
-    long[] testContainerIDs = {
-        0L, 1L, 2L, 12345L,
-        Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, Long.MAX_VALUE
-    };
+  private final Map<String, Field> reconfigurableProperties =
+      ConfigurationReflectionUtil.mapReconfigurableProperties(getClass());
 
-    for (long containerID : testContainerIDs) {
-      String containerPrefix = FixedLengthStringUtils.bytes2String(
-          Longs.toByteArray(containerID));
-      long decodedContainerID = Longs.fromByteArray(
-          FixedLengthStringUtils.string2Bytes(containerPrefix));
-      assertEquals(containerID, decodedContainerID);
+  public void reconfigureProperty(String property, String newValue) {
+    Field field = reconfigurableProperties.get(property);
+    if (field != null) {
+      ConfigurationReflectionUtil.reconfigureProperty(this,
+          field, property, newValue);
     }
+  }
+
+  public Set<String> reconfigurableProperties() {
+    return reconfigurableProperties.keySet();
   }
 }
