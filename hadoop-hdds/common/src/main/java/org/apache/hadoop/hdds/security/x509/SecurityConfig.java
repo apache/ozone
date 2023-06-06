@@ -126,7 +126,7 @@ public class SecurityConfig {
   private final String externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
   private final Duration caCheckInterval;
-  private final Date caRotationTimeOfDay;
+  private final String caRotationTimeOfDay;
   private final Pattern caRotationTimeOfDayPattern =
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
 
@@ -208,9 +208,7 @@ public class SecurityConfig {
           HDDS_X509_CA_ROTATION_TIME_OF_DAY +
           " should follow the hh:mm:ss format.");
     }
-    timeOfDayString = "1970-01-01T" + timeOfDayString;
-    caRotationTimeOfDay = Date.from(LocalDateTime.parse(timeOfDayString)
-        .atZone(ZoneId.systemDefault()).toInstant());
+    caRotationTimeOfDay = "1970-01-01T" + timeOfDayString;
 
     validateCertificateValidityConfig();
 
@@ -492,7 +490,7 @@ public class SecurityConfig {
     return caCheckInterval;
   }
 
-  public Date getCaRotationTimeOfDay() {
+  public String getCaRotationTimeOfDay() {
     return caRotationTimeOfDay;
   }
 
