@@ -1507,60 +1507,60 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               //  4. Further optimization: Skip all snapshotted keys altogether
               //  e.g. by prefixing all unreclaimable keys, then calling seek
 
-            // If the last snapshot is deleted and the keys renamed in between
-            // the snapshots will be cleaned up by KDS. So we need to check
-            // in the renamedTable as well.
-            String dbRenameKey = getRenameKey(info.getVolumeName(),
-                info.getBucketName(), info.getObjectID());
+              // If the last snapshot is deleted and the keys renamed in between
+              // the snapshots will be cleaned up by KDS. So we need to check
+              // in the renamedTable as well.
+              String dbRenameKey = getRenameKey(info.getVolumeName(),
+                  info.getBucketName(), info.getObjectID());
 
-            if (rcLatestSnapshot != null) {
-              Table<String, OmKeyInfo> prevKeyTable =
-                  ((OmSnapshot) rcLatestSnapshot.get())
-                      .getMetadataManager()
-                      .getKeyTable(bucketInfo.getBucketLayout());
+              if (rcLatestSnapshot != null) {
+                Table<String, OmKeyInfo> prevKeyTable =
+                    ((OmSnapshot) rcLatestSnapshot.get())
+                        .getMetadataManager()
+                        .getKeyTable(bucketInfo.getBucketLayout());
 
-              Table<String, RepeatedOmKeyInfo> prevDeletedTable =
-                  ((OmSnapshot) rcLatestSnapshot.get())
-                      .getMetadataManager().getDeletedTable();
-              String prevKeyTableDBKey = getSnapshotRenamedTable()
-                  .get(dbRenameKey);
-              String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
-                  info.getBucketName(), info.getKeyName());
-              // format: /volName/bucketName/keyName/objId
-              prevDelTableDBKey = getOzoneDeletePathKey(info.getObjectID(),
-                  prevDelTableDBKey);
+                Table<String, RepeatedOmKeyInfo> prevDeletedTable =
+                    ((OmSnapshot) rcLatestSnapshot.get())
+                        .getMetadataManager().getDeletedTable();
+                String prevKeyTableDBKey = getSnapshotRenamedTable()
+                    .get(dbRenameKey);
+                String prevDelTableDBKey = getOzoneKey(info.getVolumeName(),
+                    info.getBucketName(), info.getKeyName());
+                // format: /volName/bucketName/keyName/objId
+                prevDelTableDBKey = getOzoneDeletePathKey(info.getObjectID(),
+                    prevDelTableDBKey);
 
-              if (prevKeyTableDBKey == null &&
-                  bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-                long volumeId = getVolumeId(info.getVolumeName());
-                prevKeyTableDBKey = getOzonePathKey(volumeId,
-                    bucketInfo.getObjectID(),
-                    info.getParentObjectID(),
-                    info.getKeyName());
-              } else if (prevKeyTableDBKey == null) {
-                prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
-                    info.getBucketName(),
-                    info.getKeyName());
+                if (prevKeyTableDBKey == null &&
+                    bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+                  long volumeId = getVolumeId(info.getVolumeName());
+                  prevKeyTableDBKey = getOzonePathKey(volumeId,
+                      bucketInfo.getObjectID(),
+                      info.getParentObjectID(),
+                      info.getKeyName());
+                } else if (prevKeyTableDBKey == null) {
+                  prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
+                      info.getBucketName(),
+                      info.getKeyName());
+                }
+
+                OmKeyInfo omKeyInfo = prevKeyTable.get(prevKeyTableDBKey);
+                // When key is deleted it is no longer in keyTable, we also
+                // have to check deletedTable of previous snapshot
+                RepeatedOmKeyInfo delOmKeyInfo =
+                    prevDeletedTable.get(prevDelTableDBKey);
+                if ((omKeyInfo != null &&
+                    info.getObjectID() == omKeyInfo.getObjectID()) ||
+                    delOmKeyInfo != null) {
+                  // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
+                  //  active DB's deletedTable if any one of the keys in
+                  //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
+                  //  Might need to refactor OMKeyDeleteRequest first to take
+                  //  actual reclaimed key objectIDs as input
+                  //  in order to avoid any race condition.
+                  blockGroupList.clear();
+                  break;
+                }
               }
-
-              OmKeyInfo omKeyInfo = prevKeyTable.get(prevKeyTableDBKey);
-              // When key is deleted it is no longer in keyTable, we also
-              // have to check deletedTable of previous snapshot
-              RepeatedOmKeyInfo delOmKeyInfo =
-                  prevDeletedTable.get(prevDelTableDBKey);
-              if ((omKeyInfo != null &&
-                  info.getObjectID() == omKeyInfo.getObjectID()) ||
-                  delOmKeyInfo != null) {
-                // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
-                //  active DB's deletedTable if any one of the keys in
-                //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
-                //  Might need to refactor OMKeyDeleteRequest first to take
-                //  actual reclaimed key objectIDs as input
-                //  in order to avoid any race condition.
-                blockGroupList.clear();
-                break;
-              }
-            }
 
               // Add all blocks from all versions of the key to the deletion
               // list

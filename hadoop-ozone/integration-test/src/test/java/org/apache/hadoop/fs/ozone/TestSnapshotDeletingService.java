@@ -471,4 +471,3 @@ public class TestSnapshotDeletingService {
     return count == expectedCount;
   }
 }
-
