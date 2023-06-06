@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -76,6 +78,8 @@ public class OMDBInsightEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
   private final ReconContainerManager containerManager;
   private final GlobalStatsDao globalStatsDao;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMDBInsightEndpoint.class);
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
@@ -92,8 +96,14 @@ public class OMDBInsightEndpoint {
    *
    * @return the http json response wrapped in below format:
    * {
-   *     replicatedTotal: 13824,
-   *     unreplicatedTotal: 4608,
+   *     "clusterSummary" :
+   *     {
+   *        totalRecords : 1000,
+   *        totalUnReplicatedData : 303600,
+   *        totalReplicatedData : 101200
+   *     }.
+   *     replicatedDataSize: 13824,
+   *     unreplicatedDataSize: 4608,
    *     entities: [
    *     {
    *         path: “/vol1/bucket1/key1”,
@@ -196,11 +206,11 @@ public class OMDBInsightEndpoint {
           keyEntityInfo.setSize(omKeyInfo.getDataSize());
           keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
           keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-          openKeyInsightInfo.setUnreplicatedTotal(
-              openKeyInsightInfo.getUnreplicatedTotal() +
+          openKeyInsightInfo.setUnreplicatedDataSize(
+              openKeyInsightInfo.getUnreplicatedDataSize() +
                   keyEntityInfo.getSize());
-          openKeyInsightInfo.setReplicatedTotal(
-              openKeyInsightInfo.getReplicatedTotal() +
+          openKeyInsightInfo.setReplicatedDataSize(
+              openKeyInsightInfo.getReplicatedDataSize() +
                   keyEntityInfo.getReplicatedSize());
           boolean added =
               isLegacyBucketLayout ? nonFSOKeyInfoList.add(keyEntityInfo) :
@@ -257,7 +267,7 @@ public class OMDBInsightEndpoint {
           unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
     } catch (NullPointerException e) {
       // Handle the null pointer exception
-      e.printStackTrace();
+      LOG.error("Error while fetching the cluster summary", e);
     }
   }
 
@@ -318,8 +328,9 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  /** This method retrieves set of keys/files pending for deletion.
-   *
+  /**
+   * This method retrieves set of keys/files pending for deletion.
+   * <p>
    * limit - limits the number of key/files returned.
    * prevKey - E.g. /vol1/bucket1/key1, this will skip keys till it
    * seeks correctly to the given prevKey.
@@ -426,11 +437,11 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setSize(omKeyInfo.getDataSize());
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-        pendingForDeletionKeyInfo.setUnreplicatedTotal(
-            pendingForDeletionKeyInfo.getUnreplicatedTotal() +
+        pendingForDeletionKeyInfo.setUnreplicatedDataSize(
+            pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
                 keyEntityInfo.getSize());
-        pendingForDeletionKeyInfo.setReplicatedTotal(
-            pendingForDeletionKeyInfo.getReplicatedTotal() +
+        pendingForDeletionKeyInfo.setReplicatedDataSize(
+            pendingForDeletionKeyInfo.getReplicatedDataSize() +
                 keyEntityInfo.getReplicatedSize());
         deletedDirInfoList.add(keyEntityInfo);
         if (deletedDirInfoList.size() == limit) {
@@ -517,11 +528,11 @@ public class OMDBInsightEndpoint {
       KeyInsightInfoResponse deletedKeyAndDirInsightInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo) {
     repeatedOmKeyInfo.getOmKeyInfoList().forEach(omKeyInfo -> {
-      deletedKeyAndDirInsightInfo.setUnreplicatedTotal(
-          deletedKeyAndDirInsightInfo.getUnreplicatedTotal() +
+      deletedKeyAndDirInsightInfo.setUnreplicatedDataSize(
+          deletedKeyAndDirInsightInfo.getUnreplicatedDataSize() +
               omKeyInfo.getDataSize());
-      deletedKeyAndDirInsightInfo.setReplicatedTotal(
-          deletedKeyAndDirInsightInfo.getReplicatedTotal() +
+      deletedKeyAndDirInsightInfo.setReplicatedDataSize(
+          deletedKeyAndDirInsightInfo.getReplicatedDataSize() +
               omKeyInfo.getReplicatedSize());
     });
   }
