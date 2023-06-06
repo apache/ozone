@@ -2247,7 +2247,7 @@
     <name>hdds.x509.ca.rotation.time-of-day</name>
     <value>02:00:00</value>
     <tag>OZONE, HDDS, SECURITY</tag>
-    <description>Time of day to start the rotation. Default 02:00 AM to avoid impact
+    <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
       daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
       and second.
     </description>
