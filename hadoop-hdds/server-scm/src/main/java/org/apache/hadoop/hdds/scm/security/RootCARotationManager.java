@@ -38,7 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 
 /**
  * Root CA Rotation Manager is a service in SCM to control the CA rotation.
@@ -55,7 +54,6 @@ public class RootCARotationManager implements SCMService {
   private ScheduledExecutorService executorService;
   private Duration checkInterval;
   private Duration renewalGracePeriod;
-  private Pattern timePattern = Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
   private Date timeOfDay;
   private CertificateClient scmCertClient;
   private AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -74,7 +72,8 @@ public class RootCARotationManager implements SCMService {
     this.scmContext = scm.getScmContext();
 
     checkInterval = secConf.getCaCheckInterval();
-    timeOfDay = secConf.getCaRotationTimeOfDay();
+    timeOfDay = Date.from(LocalDateTime.parse(secConf.getCaRotationTimeOfDay())
+        .atZone(ZoneId.systemDefault()).toInstant());
     renewalGracePeriod = secConf.getRenewalGracePeriod();
 
     executorService = Executors.newScheduledThreadPool(1,
