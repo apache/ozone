@@ -57,7 +57,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
-  private ReconOMMetadataManager reconOMMetadataManager;
+  private final ReconOMMetadataManager reconOMMetadataManager;
 
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,

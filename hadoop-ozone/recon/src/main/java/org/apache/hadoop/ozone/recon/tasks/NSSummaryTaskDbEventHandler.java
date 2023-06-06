@@ -60,7 +60,7 @@ public class NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private DBStore reconDbStore;
+  private final DBStore reconDbStore;
   private final Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 
   private final long nsSummaryFlushToDBMaxThreshold;
@@ -120,10 +120,14 @@ public class NSSummaryTaskDbEventHandler {
         try {
           OrphanKeyMetaData orphanKeyMetaData =
               orphanKeyMetaDataMap.get(key);
-          orphanKeyMetaData.setStatus(status);
-          reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
-              rdbBatchOperation,
-              key, orphanKeyMetaData);
+          if (orphanKeyMetaData.getObjectIds().size() > 0) {
+            orphanKeyMetaData.setStatus(status);
+            reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
+                rdbBatchOperation,
+                key, orphanKeyMetaData);
+          } else {
+            orphanKeyMetaDataMap.remove(key);
+          }
         } catch (IOException e) {
           LOG.error("Unable to write orphan keys meta data in Recon DB.",
               e);
@@ -218,6 +222,8 @@ public class NSSummaryTaskDbEventHandler {
   private <T extends WithParentObjectId> void removeFromOrphanIfExists(
       T fileDirInfo,
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
+    // If object as parent has come, then its child are not orphan and can
+    // remove parent from orphan map.
     if (null != orphanKeyMetaDataMap) {
       long objectID = fileDirInfo.getObjectID();
       orphanKeyMetaDataMap.remove(objectID);
@@ -277,7 +283,11 @@ public class NSSummaryTaskDbEventHandler {
       if (null != orphanKeyMetaData) {
         Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
         objectIds.remove(objectID);
-        orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
+        if (objectIds.size() > 0) {
+          orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
+        } else {
+          orphanKeyMetaDataMap.remove(parentObjectID);
+        }
       }
     }
   }
@@ -408,6 +418,9 @@ public class NSSummaryTaskDbEventHandler {
     if (null != orphanKeyMetaDataMap) {
       long objectID = fileDirObjInfo.getObjectID();
       long parentObjectID = fileDirObjInfo.getParentObjectID();
+      // if parent exist in NSSummaryMap, need to check if parent is already an
+      // orphan or not using orphanKeyMetaData. If already orphan, then add
+      // this child also in orphan list.
       if (parentExist) {
         OrphanKeyMetaData orphanKeyMetaData =
             orphanKeyMetaDataMap.get(parentObjectID);
@@ -421,6 +434,7 @@ public class NSSummaryTaskDbEventHandler {
           objectIds.add(objectID);
           orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
         }
+      // If parent does not exist in NSSummaryMap, this the child can be orphan.
       } else {
         Set<Long> objectIds = new HashSet<>();
         objectIds.add(objectID);
@@ -435,6 +449,9 @@ public class NSSummaryTaskDbEventHandler {
       Set<Long> bucketObjectIdsSet,
       List<Long> toBeDeletedBucketObjectIdsFromOrphanMap)
       throws IOException {
+    // if orphan parentId matches bucket, and bucket exist, then its not orphan
+    // (as bucket is not present in key/file table as parent) and remove from
+    // orphan map.
     try (TableIterator<Long, ? extends Table.KeyValue<Long,
         OrphanKeyMetaData>> orphanKeysMetaDataIter =
              orphanKeysMetaDataTable.iterator()) {
@@ -452,22 +469,5 @@ public class NSSummaryTaskDbEventHandler {
       }
       return false;
     }
-  }
-
-  /**
-   * Given a bucket name, get the bucket object ID.
-   *
-   * @param volName    volume name
-   * @param bucketName bucket name
-   * @return bucket objectID
-   * @throws IOException
-   */
-  public OmBucketInfo getBucketInfo(String volName, String bucketName,
-                                    OMMetadataManager omMetadataManager)
-      throws IOException {
-    String bucketKey = omMetadataManager.getBucketKey(volName, bucketName);
-    OmBucketInfo bucketInfo = omMetadataManager
-        .getBucketTable().getSkipCache(bucketKey);
-    return bucketInfo;
   }
 }

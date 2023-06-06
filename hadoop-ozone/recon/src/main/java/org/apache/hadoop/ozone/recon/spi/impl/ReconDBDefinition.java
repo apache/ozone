@@ -105,7 +105,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           Long.class,
           LongCodec.get(),
           OrphanKeyMetaData.class,
-          new OrphanKeyMetaDataCodec());
+          OrphanKeyMetaDataCodec.get());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(

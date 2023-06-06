@@ -48,7 +48,7 @@ public class OrphanKeyDetectionTask implements ReconOmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OrphanKeyDetectionTask.class);
-  private DBStore reconDbStore;
+  private final DBStore reconDbStore;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final Table<Long, OrphanKeyMetaData> orphanKeysMetaDataTable;
 

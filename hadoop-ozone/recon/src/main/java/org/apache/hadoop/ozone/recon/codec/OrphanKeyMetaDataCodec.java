@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.codec;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
 
 import java.io.IOException;
@@ -30,6 +31,15 @@ import java.io.IOException;
  */
 public class OrphanKeyMetaDataCodec
     implements Codec<OrphanKeyMetaData> {
+
+  private static final OrphanKeyMetaDataCodec CODEC =
+      new OrphanKeyMetaDataCodec();
+
+  public static OrphanKeyMetaDataCodec get() {
+    return CODEC;
+  }
+
+  private OrphanKeyMetaDataCodec() { }
 
   @Override
   public byte[] toPersistedFormat(OrphanKeyMetaData obj) {
