@@ -57,6 +57,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public class QuotaRepairTask {
   private static final Logger LOG = LoggerFactory.getLogger(
       QuotaRepairTask.class);
+  private static final int BATCH_SIZE = 5000;
+  private static final int TASK_THREAD_CNT = 3;
   private final OMMetadataManager metadataManager;
   private final Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
   private final Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
@@ -73,17 +75,21 @@ public class QuotaRepairTask {
   
   public void repair() throws Exception {
     LOG.info("Starting quota repair task");
-    executor = Executors.newFixedThreadPool(12);
     prepareAllVolumeBucketInfo();
 
     IOzoneManagerLock lock = metadataManager.getLock();
-    nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
-        BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
-    repairCount();
-    nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
-        BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
-    LOG.info("Completed quota repair task");
-    executor.shutdown();
+    // thread pool with 3 Table type * (1 task each + 3 thread each)
+    executor = Executors.newFixedThreadPool(12);
+    try {
+      nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
+          BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
+      repairCount();
+    } finally {
+      nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
+          BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
+      executor.shutdown();
+      LOG.info("Completed quota repair task");
+    }
   }
   
   private void prepareAllVolumeBucketInfo() throws IOException {
@@ -191,11 +197,12 @@ public class QuotaRepairTask {
       UncheckedExecutionException {
     LOG.info("Starting recalculate {}", strType);
 
-    BlockingQueue<Table.KeyValue<String, VALUE>> q
-        = new ArrayBlockingQueue<>(10000);
+    List<Table.KeyValue<String, VALUE>> kvList = new ArrayList<>(BATCH_SIZE);
+    BlockingQueue<List<Table.KeyValue<String, VALUE>>> q
+        = new ArrayBlockingQueue<>(TASK_THREAD_CNT);
     List<Future<?>> tasks = new ArrayList<>();
     AtomicBoolean isRunning = new AtomicBoolean(true);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < TASK_THREAD_CNT; ++i) {
       tasks.add(executor.submit(() -> captureCount(
           prefixUsageMap, q, isRunning, haveValue)));
     }
@@ -205,8 +212,13 @@ public class QuotaRepairTask {
              keyIter = table.iterator()) {
       while (keyIter.hasNext()) {
         count++;
-        q.put(keyIter.next());
+        kvList.add(keyIter.next());
+        if (kvList.size() == BATCH_SIZE) {
+          q.put(kvList);
+          kvList = new ArrayList<>(BATCH_SIZE);
+        }
       }
+      q.put(kvList);
       isRunning.set(false);
       for (Future<?> f : tasks) {
         f.get();
@@ -224,14 +236,16 @@ public class QuotaRepairTask {
   
   private <VALUE> void captureCount(
       Map<String, CountPair> prefixUsageMap,
-      BlockingQueue<Table.KeyValue<String, VALUE>> q,
+      BlockingQueue<List<Table.KeyValue<String, VALUE>>> q,
       AtomicBoolean isRunning, boolean haveValue) throws UncheckedIOException {
     try {
       while (isRunning.get() || !q.isEmpty()) {
-        Table.KeyValue<String, VALUE> kv
+        List<Table.KeyValue<String, VALUE>> kvList
             = q.poll(100, TimeUnit.MILLISECONDS);
-        if (null != kv) {
-          extractCount(kv, prefixUsageMap, haveValue);
+        if (null != kvList) {
+          for (Table.KeyValue<String, VALUE> kv : kvList) {
+            extractCount(kv, prefixUsageMap, haveValue);
+          }
         }
       }
     } catch (InterruptedException ex) {
