@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 
@@ -33,8 +34,12 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 public class QuotaRepairUpgradeAction implements OmUpgradeAction {
   @Override
   public void execute(OzoneManager arg) throws Exception {
-    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(
-        arg.getMetadataManager());
-    quotaRepairTask.repair();
+    boolean enabled = arg.getConfiguration().getBoolean(
+        OMConfigKeys.OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE, false);
+    if (enabled) {
+      QuotaRepairTask quotaRepairTask = new QuotaRepairTask(
+          arg.getMetadataManager());
+      quotaRepairTask.repair();
+    }
   }
 }
