@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,24 +17,27 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.Set;
+
 /**
- * Example configuration to test inherited configuration injection.
+ * Base class for config with reconfigurable properties.
  */
-public class ConfigurationExampleGrandParent extends ReconfigurableConfig {
+public abstract class ReconfigurableConfig {
 
-  @Config(key = "number", defaultValue = "2", description = "Example numeric "
-      + "configuration", tags = ConfigTag.MANAGEMENT)
-  private int number = 1;
+  private final Map<String, Field> reconfigurableProperties =
+      ConfigurationReflectionUtil.mapReconfigurableProperties(getClass());
 
-  @Config(key = "grandpa.dyna", reconfigurable = true, defaultValue = "x",
-      description = "Test inherited dynamic property", tags = {})
-  private String grandpaDynamic;
-
-  public int getNumber() {
-    return number;
+  public void reconfigureProperty(String property, String newValue) {
+    Field field = reconfigurableProperties.get(property);
+    if (field != null) {
+      ConfigurationReflectionUtil.reconfigureProperty(this,
+          field, property, newValue);
+    }
   }
 
-  public void setNumber(int number) {
-    this.number = number;
+  public Set<String> reconfigurableProperties() {
+    return reconfigurableProperties.keySet();
   }
 }
