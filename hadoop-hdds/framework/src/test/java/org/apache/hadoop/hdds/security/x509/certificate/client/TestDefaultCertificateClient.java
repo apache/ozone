@@ -629,9 +629,4 @@ public class TestDefaultCertificateClient {
         .count();
     assertThat(monitorThreadCount, is(0L));
   }
-
-  @Test
-  public void testMultipleCaAndRootCaInFileSystem() {
-
-  }
 }

@@ -876,8 +876,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         rootCertificateServer, scmCertificateServer,
         scmCertificateClient == null ? null :
             scmCertificateClient.getRootCACertificate() != null ?
-                scmCertificateClient.getRootCACertificate() :
-                scmCertificateClient.getCACertificate(), this);
+            scmCertificateClient.getRootCACertificate() :
+            scmCertificateClient.getCACertificate(), this);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
