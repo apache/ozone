@@ -47,17 +47,16 @@ class NavBar extends React.Component<INavBarProps> {
     this.setState({
       isLoading: true
     });
-    // By default render treemap for default path entity type and date
-    this.updateTreeMap();
+    this.fetchDisableFeatures();
   }
   
-  updateTreeMap = () => {
+  fetchDisableFeatures = () => {
     this.setState({
       isLoading: true
     });
 
-    const treeEndpoint = `/api/v1/features/disabledFeatures`;
-    axios.get(treeEndpoint).then(response => {
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    axios.get(disabledfeaturesEndpoint).then(response => {
       const disabledFeaturesFlag = response.data && response.data.includes('HEATMAP');
       // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
       this.setState({
@@ -73,7 +72,7 @@ class NavBar extends React.Component<INavBarProps> {
   };
 
   render() {
-    const { location } = this.props;
+    const {location} = this.props;
     return (
       <Sider
         collapsible
