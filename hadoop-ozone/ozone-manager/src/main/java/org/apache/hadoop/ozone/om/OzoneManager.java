@@ -999,7 +999,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long certificateGracePeriod = Duration.parse(
         conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
             HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (tokenMaxLifetime > certificateGracePeriod) {
+    boolean tokenSanityChecksEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+    if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
       throw new IllegalArgumentException("Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum delegation token lifetime " +
@@ -1029,7 +1032,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long certificateGracePeriod = Duration.parse(
         conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
             HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (expiryTime > certificateGracePeriod) {
+    boolean tokenSanityChecksEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+    if (tokenSanityChecksEnabled && expiryTime > certificateGracePeriod) {
       throw new IllegalArgumentException("Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum block token lifetime " +
