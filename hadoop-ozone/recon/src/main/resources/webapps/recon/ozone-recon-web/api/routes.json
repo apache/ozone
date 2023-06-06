@@ -27,5 +27,6 @@
   "/containers/unhealthy": "/unhealthyContainers",
   "/heatmap/readaccess?startDate=*&path=*&entityType=bucket": "/bucketHeatmap",
   "/heatmap/readaccess?startDate=*&path=*&entityType=key": "/keyHeatmap",
-  "/heatmap/readaccess?startDate=*&path=*&entityType=volume": "/heatmap"
+  "/heatmap/readaccess?startDate=*&path=*&entityType=volume": "/heatmap",
+  "/features/disabledFeatures": "/disabledFeatures"
 }

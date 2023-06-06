@@ -21,7 +21,9 @@ import logo from '../../logo.png';
 import {Layout, Menu, Icon} from 'antd';
 import './navBar.less';
 import {withRouter, Link} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
+import { RouteComponentProps } from 'react-router';
+import axios from 'axios';
+import {showDataFetchError} from 'utils/common';
 
 const {Sider} = Layout;
 
@@ -29,18 +31,49 @@ interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
   isHeatmapAvailable: boolean;
+  isLoading: boolean;
 }
 
 class NavBar extends React.Component<INavBarProps> {
   constructor(props = {}) {
     super(props);
     this.state = {
-      isHeatmapAvailable: false
+      isHeatmapAvailable: false,
+      isLoading: false
     };
-
   }
+
+  componentDidMount(): void {
+    this.setState({
+      isLoading: true
+    });
+    // By default render treemap for default path entity type and date
+    this.updateTreeMap();
+  }
+  
+  updateTreeMap = () => {
+    this.setState({
+      isLoading: true
+    });
+
+    const treeEndpoint = `/api/v1/features/disabledFeatures`;
+    axios.get(treeEndpoint).then(response => {
+      const disabledFeaturesFlag = response.data && response.data.includes('HEATMAP');
+      // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
+      this.setState({
+        isLoading: false,
+        isHeatmapAvailable: !disabledFeaturesFlag
+      });
+    }).catch(error => {
+      this.setState({
+        isLoading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
   render() {
-    const {location} = this.props;
+    const { location } = this.props;
     return (
       <Sider
         collapsible
