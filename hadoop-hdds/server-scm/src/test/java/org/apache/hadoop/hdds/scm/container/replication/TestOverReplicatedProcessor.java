@@ -39,7 +39,6 @@ import static org.mockito.ArgumentMatchers.any;
  */
 public class TestOverReplicatedProcessor {
 
-  private ConfigurationSource conf;
   private ReplicationManager replicationManager;
   private ECReplicationConfig repConfig;
   private OverReplicatedProcessor overReplicatedProcessor;
@@ -47,7 +46,7 @@ public class TestOverReplicatedProcessor {
 
   @Before
   public void setup() {
-    conf = new OzoneConfiguration();
+    ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
     replicationManager = Mockito.mock(ReplicationManager.class);

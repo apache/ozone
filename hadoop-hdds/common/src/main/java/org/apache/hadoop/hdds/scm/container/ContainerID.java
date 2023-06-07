@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -37,7 +36,8 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
  */
 public final class ContainerID implements Comparable<ContainerID> {
   private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
-      LongCodec.get(), ContainerID::valueOf, c -> c.id, true);
+      LongCodec.get(), ContainerID::valueOf, c -> c.id,
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<ContainerID> getCodec() {
     return CODEC;
@@ -83,7 +83,7 @@ public final class ContainerID implements Comparable<ContainerID> {
    */
   @Deprecated
   public byte[] getBytes() {
-    return Longs.toByteArray(id);
+    return LongCodec.get().toPersistedFormat(id);
   }
 
   public HddsProtos.ContainerID getProtobuf() {

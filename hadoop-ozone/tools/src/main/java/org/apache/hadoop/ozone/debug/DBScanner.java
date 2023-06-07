@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.common.primitives.Longs;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -27,7 +26,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -49,9 +49,7 @@ import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -163,7 +161,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     } else if (keyType.equals(ContainerID.class)) {
       return new ContainerID(Long.parseLong(startKey)).getBytes();
     } else if (keyType.equals(Long.class)) {
-      return Longs.toByteArray(Long.parseLong(startKey));
+      return LongCodec.get().toPersistedFormat(Long.parseLong(startKey));
     } else if (keyType.equals(PipelineID.class)) {
       return PipelineID.valueOf(UUID.fromString(startKey)).getProtobuf()
           .toByteArray();
@@ -226,8 +224,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           }
           String cid = keyStr.substring(0, index);
           String blockId = keyStr.substring(index);
-          sb.append(gson.toJson(Longs.fromByteArray(
-              FixedLengthStringUtils.string2Bytes(cid)) +
+          sb.append(gson.toJson(LongCodec.get().fromPersistedFormat(
+              FixedLengthStringCodec.string2Bytes(cid)) +
               keySeparatorSchemaV3 +
               blockId));
         } else {
@@ -307,20 +305,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       return false;
     }
 
-    Map<String, DBColumnFamilyDefinition> columnFamilyMap = new HashMap<>();
-    for (DBColumnFamilyDefinition cfDef : dbDefinition.getColumnFamilies()) {
-      LOG.info("Found table: {}", cfDef.getTableName());
-      columnFamilyMap.put(cfDef.getTableName(), cfDef);
-    }
-    if (!columnFamilyMap.containsKey(tableName)) {
+    final DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
+        dbDefinition.getColumnFamily(tableName);
+    if (columnFamilyDefinition == null) {
       err().print("Error: Table with name '" + tableName + "' not found");
       return false;
     }
-
-    DBColumnFamilyDefinition columnFamilyDefinition =
-        columnFamilyMap.get(tableName);
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-        columnFamilyDefinition.getTableName().getBytes(UTF_8),
+        columnFamilyDefinition.getName().getBytes(UTF_8),
         columnFamilyHandleList);
     if (columnFamilyHandle == null) {
       throw new IllegalStateException("columnFamilyHandle is null");
@@ -340,14 +332,13 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         // Handle SchemaV3 DN DB
         ManagedReadOptions readOptions = new ManagedReadOptions();
         readOptions.setIterateUpperBound(new ManagedSlice(
-            FixedLengthStringUtils.string2Bytes(
-                DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                    containerId + 1L))));
+            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixBytes(
+                containerId + 1L)));
         iterator = new ManagedRocksIterator(
             rocksDB.get().newIterator(columnFamilyHandle, readOptions));
-        iterator.get().seek(FixedLengthStringUtils.string2Bytes(
-            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(
-                containerId)));
+        iterator.get().seek(
+            DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixBytes(
+                containerId));
       } else {
         iterator = new ManagedRocksIterator(
             rocksDB.get().newIterator(columnFamilyHandle));

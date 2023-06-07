@@ -872,8 +872,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean shouldScanData() {
-    return containerData.getState() == ContainerDataProto.State.CLOSED
+    boolean shouldScan =
+        containerData.getState() == ContainerDataProto.State.CLOSED
         || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its data scanned.",
+          containerData.getContainerID(), containerData.getState());
+    }
+    return shouldScan;
   }
 
   @Override
@@ -890,10 +896,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             containerId, containerData.getVolume(), this);
 
     return checker.fullCheck(throttler, canceler);
-  }
-
-  private enum ContainerCheckLevel {
-    NO_CHECK, FAST_CHECK, FULL_CHECK
   }
 
   /**

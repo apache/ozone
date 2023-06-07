@@ -21,10 +21,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 
@@ -49,9 +51,13 @@ public class BucketManagerImpl implements BucketManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketManagerImpl.class);
 
+  private final OzoneManager ozoneManager;
+
   private final OMMetadataManager metadataManager;
 
-  public BucketManagerImpl(OMMetadataManager metadataManager) {
+  public BucketManagerImpl(OzoneManager ozoneManager,
+      OMMetadataManager metadataManager) {
+    this.ozoneManager = ozoneManager;
     this.metadataManager = metadataManager;
   }
 
@@ -117,6 +123,8 @@ public class BucketManagerImpl implements BucketManager {
       throw new IllegalArgumentException("Unexpected argument passed to " +
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
+    // bucket getAcl operation does not need resolveBucketLink in server side
+    // see: hadoop-hdds/docs/content/design/volume-management.md
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
@@ -149,6 +157,32 @@ public class BucketManagerImpl implements BucketManager {
 
     String volume = ozObject.getVolumeName();
     String bucket = ozObject.getBucketName();
+
+    boolean bucketNeedResolved =
+        ozObject.getResourceType() == OzoneObj.ResourceType.BUCKET
+        && (context.getAclRights() != ACLType.DELETE
+            && context.getAclRights() != ACLType.READ_ACL
+            && context.getAclRights() != ACLType.READ);
+
+    if (bucketNeedResolved ||
+        ozObject.getResourceType() == OzoneObj.ResourceType.KEY) {
+      try {
+        ResolvedBucket resolvedBucket =
+            ozoneManager.resolveBucketLink(
+            Pair.of(ozObject.getVolumeName(), ozObject.getBucketName()));
+        volume = resolvedBucket.realVolume();
+        bucket = resolvedBucket.realBucket();
+      } catch (IOException e) {
+        if (e instanceof OMException &&
+            ((OMException) e).getResult() == BUCKET_NOT_FOUND) {
+          LOG.warn("checkAccess on non-exist source bucket " +
+                  "Volume:{} Bucket:{}.", volume, bucket);
+        } else {
+          throw new OMException(e.getMessage(), INTERNAL_ERROR);
+        }
+      }
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       String dbBucketKey = metadataManager.getBucketKey(volume, bucket);

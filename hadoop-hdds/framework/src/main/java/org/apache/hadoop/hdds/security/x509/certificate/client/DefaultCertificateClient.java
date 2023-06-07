@@ -75,7 +75,6 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.commons.validator.routines.DomainValidator;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
@@ -87,7 +86,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CRYPTO_SIGNATURE_VERIFICATION_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CRYPTO_SIGN_ERROR;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.RENEW_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
@@ -490,22 +488,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateSignRequest.Builder builder =
         new CertificateSignRequest.Builder()
         .setConfiguration(securityConfig.getConfiguration());
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if (validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            } else {
-              getLogger().error("Invalid domain {}", ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new CertificateException("Error while adding ip to CSR builder",
-          e, CSR_ERROR);
-    }
+    builder.addInetAddresses();
     return builder;
   }
 

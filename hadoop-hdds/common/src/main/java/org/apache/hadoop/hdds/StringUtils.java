@@ -63,7 +63,26 @@ public final class StringUtils {
   }
 
   public static String bytes2String(ByteBuffer bytes) {
-    return Unpooled.wrappedBuffer(bytes.asReadOnlyBuffer()).toString(UTF8);
+    return bytes2String(bytes, UTF8);
+  }
+
+  public static String bytes2String(ByteBuffer bytes, Charset charset) {
+    return Unpooled.wrappedBuffer(bytes.asReadOnlyBuffer()).toString(charset);
+  }
+
+  public static String bytes2Hex(ByteBuffer buffer, int max) {
+    buffer = buffer.asReadOnlyBuffer();
+    final int remaining = buffer.remaining();
+    final int n = Math.min(max, remaining);
+    final StringBuilder builder = new StringBuilder(3 * n);
+    for (int i = 0; i < n; i++) {
+      builder.append(String.format("%02X ", buffer.get()));
+    }
+    return builder + (remaining > max ? "..." : "");
+  }
+
+  public static String bytes2Hex(ByteBuffer buffer) {
+    return bytes2Hex(buffer, buffer.remaining());
   }
 
   /**

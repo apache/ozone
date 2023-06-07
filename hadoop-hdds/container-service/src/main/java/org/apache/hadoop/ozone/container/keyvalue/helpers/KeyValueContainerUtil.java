@@ -398,8 +398,8 @@ public final class KeyValueContainerUtil {
         blockCount++;
         try {
           usedBytes += getBlockLength(blockIter.nextBlock());
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
+        } catch (Exception ex) {
+          LOG.error(errorMessage, ex);
         }
       }
     }

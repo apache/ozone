@@ -18,6 +18,8 @@
 package org.apache.hadoop.util;
 
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.ratis.util.function.CheckedRunnable;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
 import java.util.function.Consumer;
