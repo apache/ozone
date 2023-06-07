@@ -760,9 +760,6 @@ public class SnapshotDiffManager implements AutoCloseable {
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
-              validateSnapshotsAreActive(volumeName, bucketName,
-                  fromSnapshotName, toSnapshotName);
-
               Table<String, OmDirectoryInfo> fsDirTable =
                   fromSnapshot.getMetadataManager().getDirectoryTable();
               Table<String, OmDirectoryInfo> tsDirTable =
@@ -777,9 +774,6 @@ public class SnapshotDiffManager implements AutoCloseable {
             return null;
           },
           () -> {
-            validateSnapshotsAreActive(volumeName, bucketName,
-                fromSnapshotName, toSnapshotName);
-
             long totalDiffEntries = generateDiffReport(jobKey,
                 jobId,
                 objectIDsToCheckMap,
@@ -801,6 +795,9 @@ public class SnapshotDiffManager implements AutoCloseable {
             .equals(CANCELED)) {
           return;
         }
+
+        validateSnapshotsAreActive(volumeName, bucketName,
+            fromSnapshotName, toSnapshotName);
         methodCall.call();
       }
     } catch (ExecutionException | IOException | RocksDBException exception) {
@@ -1065,8 +1062,14 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       try (ClosableIterator<byte[]>
                objectIdsIterator = objectIDsToCheck.iterator()) {
+        // This counter is used, so that we can check
+        // if the job is canceled every 100 elements.
+        int counter = 0;
+
         while (objectIdsIterator.hasNext()) {
-          if (snapDiffJobTable.get(jobKey).getStatus()
+          if (counter % 100 == 0 &&
+              snapDiffJobTable.get(jobKey) != null &&
+              snapDiffJobTable.get(jobKey).getStatus()
               .equals(CANCELED)) {
             return -1L;
           }
@@ -1118,6 +1121,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                 SnapshotDiffReportOzone.getDiffReportEntry(DiffType.RENAME,
                     oldKey, newKey)));
           }
+
+          counter++;
         }
       }
 

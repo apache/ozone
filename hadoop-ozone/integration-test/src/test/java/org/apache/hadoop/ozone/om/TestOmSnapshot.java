@@ -642,9 +642,6 @@ public class TestOmSnapshot {
     String toSnapName = "snap-2-" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volumeName, bucketName, toSnapName);
 
-    // Cancel works only if the job is IN_PROGRESS, and
-    // it's ignored if the job has any other status.
-
     SnapshotDiffResponse response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
         null, 0, false, true);
