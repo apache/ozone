@@ -56,12 +56,6 @@ public abstract class Handler implements Callable<Void> {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
   public boolean isVerbose() {
     return parent.isVerbose();
   }
@@ -147,10 +141,6 @@ public abstract class Handler implements Callable<Void> {
 
   protected OzoneConfiguration getConf() {
     return conf;
-  }
-
-  protected String getOmServiceId() {
-    return omServiceId;
   }
 
   protected PrintStream out() {

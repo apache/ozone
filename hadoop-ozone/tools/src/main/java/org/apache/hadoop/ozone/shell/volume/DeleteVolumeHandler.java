@@ -61,6 +61,11 @@ public class DeleteVolumeHandler extends VolumeHandler {
       description = "Delete volume recursively"
   )
   private boolean bRecursive = false;
+  @CommandLine.Option(
+      names = {"-id", "--om-service-id"},
+      description = "Ozone Manager Service ID"
+  )
+  private String omServiceId;
   private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
@@ -82,7 +87,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
           out().printf("Use -skipTrash for recursive volume delete%n");
           return;
         }
-        if (Strings.isNullOrEmpty(getOmServiceId())) {
+        if (Strings.isNullOrEmpty(omServiceId)) {
           out().printf("OmServiceID not provided, provide using " +
               "-id <OM_SERVICE_ID>%n");
           return;
@@ -153,7 +158,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
   private boolean cleanFSBucket(OzoneBucket bucket) {
     try {
       final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" +
-          getOmServiceId() + PATH_SEPARATOR_STR;
+          omServiceId + PATH_SEPARATOR_STR;
       String ofsPrefix = hostPrefix + vol.getName() + PATH_SEPARATOR_STR +
           bucket.getName();
       final Path path = new Path(ofsPrefix);
