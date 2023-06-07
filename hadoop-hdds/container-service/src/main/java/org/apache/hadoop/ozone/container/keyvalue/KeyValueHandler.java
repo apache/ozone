@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -1078,32 +1079,32 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void markContainerUnhealthy(Container container)
-      throws IOException {
+      throws StorageContainerException {
     container.writeLock();
     try {
-      if (container.getContainerState() != State.UNHEALTHY) {
-        boolean needsHandling = true;
-        try {
-          container.markContainerUnhealthy();
-        } catch (StorageContainerException ex) {
-          // If the container file update failed due to a volume failure, no
-          // action is needed. The container has already been discarded and
-          // SCM notified. Once a volume is failed, it cannot be restored
-          // without a restart.
-          if (container.getContainerData().getVolume().isFailed()) {
-            needsHandling = false;
-            LOG.debug("Ignoring unhealthy container detected on an " +
-                "already failed volume.");
-          } else {
-            long id = container.getContainerData().getContainerID();
-            LOG.warn("Unexpected error while marking container {} unhealthy",
-                id, ex);
-          }
-        } finally {
-          if (needsHandling) {
-            sendICR(container);
-          }
-        }
+      long containerID = container.getContainerData().getContainerID();
+      if (container.getContainerState() == State.UNHEALTHY) {
+        LOG.debug("Call to mark already unhealthy container {} as unhealthy",
+            containerID);
+        return;
+      }
+      // If the volume is unhealthy, no action is needed. The container has
+      // already been discarded and SCM notified. Once a volume is failed, it
+      // cannot be restored without a restart.
+      HddsVolume containerVolume = container.getContainerData().getVolume();
+      if (containerVolume.isFailed()) {
+        LOG.debug("Ignoring unhealthy container {} detected on an " +
+            "already failed volume {}", containerID, containerVolume);
+        return;
+      }
+
+      try {
+        container.markContainerUnhealthy();
+      } catch (StorageContainerException ex) {
+        LOG.warn("Unexpected error while marking container {} unhealthy",
+            containerID, ex);
+      } finally {
+        sendICR(container);
       }
     } finally {
       container.writeUnlock();
