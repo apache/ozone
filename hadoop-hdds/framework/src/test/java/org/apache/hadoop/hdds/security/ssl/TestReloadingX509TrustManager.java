@@ -62,9 +62,9 @@ public class TestReloadingX509TrustManager {
     assertNotEquals(cert1, cert2);
 
     MatcherAssert.assertThat(tm.getAcceptedIssuers(),
-        Matchers.arrayContaining(cert1));
+        Matchers.hasItemInArray(cert1));
     MatcherAssert.assertThat(tm.getAcceptedIssuers(),
-        Matchers.arrayContaining(cert2));
+        Matchers.hasItemInArray(cert2));
 
     assertTrue(reloaderLog.getOutput().contains(
         "ReloadingX509TrustManager is reloaded"));
