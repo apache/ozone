@@ -138,6 +138,7 @@ public class TestBackgroundContainerDataScanner extends
    * volume fails, the scanner thread should be terminated.
    */
   @Test
+  @Override
   public void testWithVolumeFailure() throws Exception {
     Mockito.when(vol.isFailed()).thenReturn(true);
     // Run the scanner thread in the background. It should be terminated on
@@ -150,6 +151,8 @@ public class TestBackgroundContainerDataScanner extends
     Mockito.verify(vol, atLeastOnce()).isFailed();
     // No iterations should have been run.
     assertEquals(0, metrics.getNumScanIterations());
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
     // All containers were on the unhealthy volume, so they should not have
     // been scanned.
     Mockito.verify(healthy, never()).scanData(any(), any());

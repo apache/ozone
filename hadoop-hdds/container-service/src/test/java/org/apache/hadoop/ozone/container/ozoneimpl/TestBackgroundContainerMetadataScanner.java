@@ -121,6 +121,7 @@ public class TestBackgroundContainerMetadataScanner extends
    * should be skipped but the thread will continue to run.
    */
   @Test
+  @Override
   public void testWithVolumeFailure() throws Exception {
     Mockito.when(vol.isFailed()).thenReturn(true);
 
@@ -135,13 +136,15 @@ public class TestBackgroundContainerMetadataScanner extends
     // Scanner should not have shutdown when it encountered the failed volume.
     assertTrue(scanner.isAlive());
 
-    // Now explicitly shutdown the container.
+    // Now explicitly shutdown the scanner.
     scanner.shutdown();
-    // Wait for shutdown to finish
+    // Wait for shutdown to finish.
     GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
 
-    // All containers were on the unhealthy volume, so they should not have
+    // All containers were on the failed volume, so they should not have
     // been scanned.
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
     Mockito.verify(healthy, never()).scanMetaData();
     Mockito.verify(openContainer, never()).scanMetaData();
     Mockito.verify(corruptData, never()).scanMetaData();
