@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,9 +78,9 @@ public class OMDBInsightEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final ReconContainerManager containerManager;
-  private final GlobalStatsDao globalStatsDao;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
+  private GlobalStatsDao globalStatsDao;
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
@@ -536,4 +537,10 @@ public class OMDBInsightEndpoint {
               omKeyInfo.getReplicatedSize());
     });
   }
+
+  @TestOnly
+  public void setDao(GlobalStatsDao globalStatsDao){
+    this.globalStatsDao = globalStatsDao;
+  }
+
 }

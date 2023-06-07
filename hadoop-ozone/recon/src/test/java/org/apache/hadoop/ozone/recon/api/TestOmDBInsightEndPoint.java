@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -42,6 +43,8 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -49,10 +52,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.sql.Timestamp;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
@@ -61,13 +62,14 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.jooq.impl.DSL.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Unit test for OmDBInsightEndPoint.
  */
-public class TestOmDBInsightEndPoint {
+public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -80,6 +82,7 @@ public class TestOmDBInsightEndPoint {
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
+  private GlobalStatsDao globalStatsDao;
 
   @Before
   public void setUp() throws Exception {
@@ -113,6 +116,7 @@ public class TestOmDBInsightEndPoint {
     pipeline = getRandomPipeline();
     reconPipelineManager.addPipeline(pipeline);
     ozoneConfiguration = new OzoneConfiguration();
+    globalStatsDao = getDao(GlobalStatsDao.class);
     setUpOmData();
   }
 
@@ -207,6 +211,39 @@ public class TestOmDBInsightEndPoint {
     Assertions.assertNotNull(keyInsightInfoResp);
     Assertions.assertEquals("key_one",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
+  }
+
+  @Test
+  public void testClusterSummaryAttribute() throws Exception {
+    Timestamp now = new Timestamp(System.currentTimeMillis());
+
+    // Insert records for replicated and unreplicated data sizes
+    GlobalStats newRecord =
+        new GlobalStats("openFileTableReplicatedDataSize", 30L, now);
+    globalStatsDao.insert(newRecord);
+    newRecord = new GlobalStats("openKeyTableReplicatedDataSize", 30L, now);
+    globalStatsDao.insert(newRecord);
+    newRecord = new GlobalStats("openFileTableUnReplicatedDataSize", 10L, now);
+    globalStatsDao.insert(newRecord);
+    newRecord = new GlobalStats("openKeyTableUnReplicatedDataSize", 10L, now);
+    globalStatsDao.insert(newRecord);
+
+    // Insert records for table counts
+    newRecord = new GlobalStats("openKeyTableTableCount", 3L, now);
+    globalStatsDao.insert(newRecord);
+    newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
+    globalStatsDao.insert(newRecord);
+    omdbInsightEndpoint.setDao(globalStatsDao);
+
+    // Call the API to get the response
+    Response openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(-1, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Map<String, Object> summary = keyInsightInfoResp.getClusterSummary();
+    Assertions.assertEquals(60L, summary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(20L, summary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
   }
 
   @Test
