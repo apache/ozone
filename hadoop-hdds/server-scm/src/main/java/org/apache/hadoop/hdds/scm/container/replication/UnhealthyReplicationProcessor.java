@@ -112,19 +112,18 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         processContainer(healthResult);
         processed++;
         healthStateCntMap.compute(healthResult.getHealthState(),
-                (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+            (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("All targets overloaded when processing Health result of " +
+            "class: {} for container {}", healthResult.getClass(),
+            healthResult.getContainerInfo());
+        overloaded++;
+        failedOnes.add(healthResult);
       } catch (Exception e) {
-        if (e instanceof CommandTargetOverloadedException) {
-          LOG.debug("All targets overloaded when processing Health result of " +
-                  "class: {} for container {}", healthResult.getClass(),
-                  healthResult.getContainerInfo(), e);
-          overloaded++;
-        } else {
-          LOG.error("Error processing Health result of class: {} for " +
-              "container {}", healthResult.getClass(),
-              healthResult.getContainerInfo(), e);
-          failed++;
-        }
+        LOG.error("Error processing Health result of class: {} for " +
+                "container {}", healthResult.getClass(),
+            healthResult.getContainerInfo(), e);
+        failed++;
         failedOnes.add(healthResult);
       }
     }
