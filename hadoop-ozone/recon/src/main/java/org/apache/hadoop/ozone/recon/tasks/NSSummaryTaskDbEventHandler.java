@@ -106,7 +106,13 @@ public class NSSummaryTaskDbEventHandler {
               e);
         }
       });
-      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+      try {
+        reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+      } catch (IOException e) {
+        LOG.error("Failed to commit batch operation for writing NSSummary " +
+            "data in Recon DB.", e);
+        throw e;
+      }
     }
   }
 
@@ -114,7 +120,7 @@ public class NSSummaryTaskDbEventHandler {
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      orphanKeyMetaDataMap.keySet().forEach((Long key) -> {
+      for (Long key : orphanKeyMetaDataMap.keySet()) {
         try {
           OrphanKeyMetaData orphanKeyMetaData =
               orphanKeyMetaDataMap.get(key);
@@ -129,9 +135,16 @@ public class NSSummaryTaskDbEventHandler {
         } catch (IOException e) {
           LOG.error("Unable to write orphan keys meta data in Recon DB.",
               e);
+          throw e;
         }
-      });
-      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+      }
+      try {
+        reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
+      } catch (IOException e) {
+        LOG.error("Failed to commit batch operation for writing orphan keys " +
+            "meta data in Recon DB.", e);
+        throw e;
+      }
     }
   }
 
@@ -232,7 +245,7 @@ public class NSSummaryTaskDbEventHandler {
   protected void handleDeleteKeyEvent(
       OmKeyInfo keyInfo,
       Map<Long, NSSummary> nsSummaryMap,
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap)
       throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
@@ -293,8 +306,7 @@ public class NSSummaryTaskDbEventHandler {
   protected void handleDeleteDirEvent(
       OmDirectoryInfo directoryInfo,
       Map<Long, NSSummary> nsSummaryMap,
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
-      long status)
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap)
       throws IOException {
     long parentObjectId = directoryInfo.getParentObjectID();
     long objectId = directoryInfo.getObjectID();
@@ -363,7 +375,7 @@ public class NSSummaryTaskDbEventHandler {
   protected void deleteOrphanKeysMetaDataFromDB(
       List<Long> orphanKeysParentIdList) throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      orphanKeysParentIdList.forEach(parentId -> {
+      for (Long parentId : orphanKeysParentIdList) {
         try {
           reconNamespaceSummaryManager.batchDeleteOrphanKeyMetaData(
               rdbBatchOperation, parentId);
@@ -371,16 +383,15 @@ public class NSSummaryTaskDbEventHandler {
           LOG.error(
               "Unable to delete orphan keys from orphanKeysMetaDataTable " +
                   "in Recon DB.", e);
+          throw e;
         }
-      });
+      }
       try {
         reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
       } catch (IOException e) {
-        // Logging as Info as we don't want to log as error when any dir not
-        // found in orphan candidate metadata set. This is done to avoid 2
-        // rocks DB operations - check if present and then delete operation.
-        LOG.info("Delete batch unable to delete few entries as dir may not be" +
-            " found in orphan candidate metadata set");
+        LOG.error("Failed to commit batch operation for deleting orphan keys " +
+            "meta data in Recon DB.", e);
+        throw e;
       }
     }
   }

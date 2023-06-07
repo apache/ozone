@@ -124,27 +124,23 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
           switch (action) {
           case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                new HashMap<>(), 1L);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null, 1L);
             break;
 
           case DELETE:
-            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, new HashMap<>(),
-                1L);
+            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, null);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               setKeyParentID(oldKeyInfo);
-              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, new HashMap<>(),
-                  1L);
+              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, null);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                   updatedKey);
             }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                new HashMap<>(), 1L);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null, 1L);
             break;
 
           default:
@@ -176,21 +172,18 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             break;
 
           case DELETE:
-            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                new HashMap<>(), 1L);
+            handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap, null);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
-              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap,
-                  new HashMap<>(), 1L);
+              handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap, null);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                   updatedKey);
             }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                new HashMap<>(), 1L);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null, 1L);
             break;
 
           default:

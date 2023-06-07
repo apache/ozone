@@ -113,14 +113,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
           case DELETE:
             handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataSetMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap,
-                  orphanKeysMetaDataSetMap, 1L);
+                  orphanKeysMetaDataSetMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
@@ -148,14 +148,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
           case DELETE:
             handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataSetMap);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
               handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap,
-                  orphanKeysMetaDataSetMap, 1L);
+                  orphanKeysMetaDataSetMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
