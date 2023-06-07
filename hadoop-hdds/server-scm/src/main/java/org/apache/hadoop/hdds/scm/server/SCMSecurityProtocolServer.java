@@ -30,11 +30,13 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -101,7 +103,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
-  private final X509Certificate rootCACertificate;
+  private final Set<X509Certificate> rootCACertificate;
   private final RPC.Server rpcServer; // HADOOP RPC SERVER
   private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
@@ -116,13 +118,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      X509Certificate rootCACert, StorageContainerManager scm,
+      Set<X509Certificate> rootCACertList, StorageContainerManager scm,
       @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
-    this.rootCACertificate = rootCACert;
+    this.rootCACertificate = rootCACertList;
     this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
@@ -404,12 +406,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
 
   @Override
   public String getRootCACertificate() throws IOException {
-    LOGGER.debug("Getting Root CA certificate.");
-    if (storageContainerManager.getScmStorageConfig()
-        .checkPrimarySCMIdInitialized()) {
-      return CertificateCodec.getPEMEncodedString(rootCACertificate);
+    ArrayList<String> pemEncodedRootCaList = new ArrayList<>();
+    for (X509Certificate cert : rootCACertificate) {
+      pemEncodedRootCaList.add(CertificateCodec.getPEMEncodedString(cert));
     }
-    return null;
+    return StringUtils.join(pemEncodedRootCaList, "\n");
   }
 
   @Override

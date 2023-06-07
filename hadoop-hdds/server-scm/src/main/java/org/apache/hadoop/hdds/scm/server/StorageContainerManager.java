@@ -26,7 +26,11 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.SortedSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -876,14 +880,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     SecretKeyManager secretKeyManager = secretKeyManagerService != null ?
         secretKeyManagerService.getSecretKeyManager() : null;
 
+    X509Certificate rootCaCert = scmCertificateClient == null ? null :
+        scmCertificateClient.getRootCACertificate() != null ?
+            scmCertificateClient.getRootCACertificate() :
+            scmCertificateClient.getCACertificate();
+    //TODO change this functionality once the SCMs can generate the root ca
+    // certs
+    HashSet<X509Certificate> rootCaList = new HashSet<>();
+    rootCaList.add(rootCaCert);
     // We need to pass getCACertificate as rootCA certificate,
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        rootCertificateServer, scmCertificateServer,
-        scmCertificateClient == null ? null :
-            scmCertificateClient.getRootCACertificate() != null ?
-            scmCertificateClient.getRootCACertificate() :
-            scmCertificateClient.getCACertificate(), this, secretKeyManager);
+        rootCertificateServer, scmCertificateServer, rootCaList, this, secretKeyManager);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
