@@ -135,8 +135,6 @@ public class KeyValueHandler extends Handler {
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
-  private final boolean checkIfNoBlockFiles;
-
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
 
@@ -159,13 +157,6 @@ public class KeyValueHandler extends Handler {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
-    checkIfNoBlockFiles =
-        conf.getBoolean(
-            DatanodeConfiguration.
-                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
-        DatanodeConfiguration.
-            OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
