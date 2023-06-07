@@ -27,6 +27,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
@@ -85,7 +87,9 @@ public final class FeatureProvider {
     resetInitOfFeatureSupport();
     String heatMapProviderCls = ozoneConfiguration.get(
         OZONE_RECON_HEATMAP_PROVIDER_KEY);
-    if (StringUtils.isEmpty(heatMapProviderCls)) {
+    boolean heatMapEnabled = ozoneConfiguration.getBoolean(
+        OZONE_RECON_HEATMAP_ENABLE_KEY, OZONE_RECON_HEATMAP_ENABLE_DEFAULT);
+    if (!heatMapEnabled || StringUtils.isEmpty(heatMapProviderCls)) {
       getFeatureSupportMap().put(Feature.HEATMAP, true);
     }
   }
