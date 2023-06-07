@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,6 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+
+export SECURITY_ENABLED=false
+export COMPOSE_FILE=docker-compose.yaml:../common/s3-haproxy.yaml
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+start_docker_env
+
+execute_robot_test scm s3
+
+stop_docker_env
+
+generate_report

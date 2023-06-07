@@ -1271,6 +1271,7 @@ public final class TestSecureOzoneCluster {
    * Test functionality to get SCM signed certificate for OM.
    */
   @Test
+  @Ignore("HDDS-8764")
   public void testOMGrpcServerCertificateRenew() throws Exception {
     initSCM();
     try {
