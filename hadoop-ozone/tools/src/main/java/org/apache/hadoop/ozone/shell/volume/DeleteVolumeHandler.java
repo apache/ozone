@@ -45,6 +45,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
  * Executes deleteVolume call for the shell.
@@ -162,6 +163,9 @@ public class DeleteVolumeHandler extends VolumeHandler {
       String hostPrefix = OZONE_OFS_URI_SCHEME + "://";
       if (!Strings.isNullOrEmpty(omServiceId)) {
         hostPrefix += omServiceId + PATH_SEPARATOR_STR;
+      } else {
+        hostPrefix += getConf().get(OZONE_OM_ADDRESS_KEY) +
+            PATH_SEPARATOR_STR;
       }
       String ofsPrefix = hostPrefix + vol.getName() + PATH_SEPARATOR_STR +
           bucket.getName();
