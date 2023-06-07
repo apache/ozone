@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +60,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.commons.collections.set.UnmodifiableSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -114,8 +116,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private PublicKey publicKey;
   private CertPath certPath;
   private Map<String, CertPath> certificateMap;
-  private Set<CertPath> rootCaCertificates;
-  private Set<CertPath> caCertificates;
+  private Set<X509Certificate> rootCaCertificates;
+  private Set<X509Certificate> caCertificates;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -184,7 +186,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.SUBORDINATE.getFileNamePrefix().length()));
-                  caCertificates.add(certificatesFromFile);
+                  caCertificates.addAll(
+                      certificatesFromFile.getCertificates().stream()
+                          .map(x -> (X509Certificate) x)
+                          .collect(Collectors.toSet()));
                   if (tmpCaCertSerailId > latestCaCertSerailId) {
                     latestCaCertSerailId = tmpCaCertSerailId;
                   }
@@ -197,7 +202,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   long tmpRootCaCertSerailId = NumberUtils.toLong(
                       certFileName.substring(
                           CAType.ROOT.getFileNamePrefix().length()));
-                  rootCaCertificates.add(certificatesFromFile);
+                  rootCaCertificates.add(
+                      firstCertificateFrom(certificatesFromFile));
                   if (tmpRootCaCertSerailId > latestRootCaCertSerialId) {
                     latestRootCaCertSerialId = tmpRootCaCertSerailId;
                   }
@@ -351,8 +357,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       // case before certificate bundle is supported
       X509Certificate lastInsertedCert = getCertificate();
       chain.add(lastInsertedCert);
-      List<X509Certificate> caCertList = getCaCertList();
-      while (!isRootCa(lastInsertedCert)) {
+      List<X509Certificate> caCertList =
+          OzoneSecurityUtil.convertToX509(listCA());
+      while (!getAllRootCaCerts().contains(lastInsertedCert)) {
         Optional<X509Certificate> issuerOpt =
             getIssuerForCert(lastInsertedCert, caCertList);
         if (issuerOpt.isPresent()) {
@@ -364,15 +371,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               lastInsertedCert);
         }
       }
-      //add self-signed certificate to the chain
+      //add root ca to the cert chain at the end
       chain.add(lastInsertedCert);
     }
-
     return chain;
-  }
-
-  private boolean isRootCa(X509Certificate cert) {
-    return cert.getSubjectX500Principal().equals(cert.getIssuerX500Principal());
   }
 
   private Optional<X509Certificate> getIssuerForCert(X509Certificate cert,
@@ -384,15 +386,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     }
     return Optional.empty();
-  }
-
-  private List<X509Certificate> getCaCertList() throws IOException {
-    ArrayList<X509Certificate> certList = new ArrayList<>();
-    for (String pemString : listCA()) {
-      certList.add(CertificateCodec.getX509Certificate(pemString,
-          CertificateCodec::toIOException));
-    }
-    return certList;
   }
 
   @Override
@@ -908,16 +901,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public Set<X509Certificate> getAllRootCaCerts() {
-    return rootCaCertificates.stream().
-        map(this::firstCertificateFrom)
-        .collect(Collectors.toSet());
+    return Collections.unmodifiableSet(rootCaCertificates);
   }
 
   @Override
   public Set<X509Certificate> getAllCaCerts() {
-    return caCertificates.stream().
-        map(this::firstCertificateFrom)
-        .collect(Collectors.toSet());
+    return Collections.unmodifiableSet(caCertificates);
   }
 
   @Override

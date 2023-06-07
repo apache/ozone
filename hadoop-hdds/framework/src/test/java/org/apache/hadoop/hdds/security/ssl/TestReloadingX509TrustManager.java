@@ -21,6 +21,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -49,18 +51,22 @@ public class TestReloadingX509TrustManager {
 
   @Test
   public void testReload() throws Exception {
-    TrustManager tm =
-        caClient.getServerKeyStoresFactory().getTrustManagers()[0];
+    ReloadingX509TrustManager tm =
+        (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
+            .getTrustManagers()[0];
     X509Certificate cert1 = caClient.getRootCACertificate();
-    assertTrue(isCertAcceptedInTrustManager(cert1, tm));
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.arrayContaining(cert1));
 
     caClient.renewRootCA();
     caClient.renewKey();
     X509Certificate cert2 = caClient.getRootCACertificate();
     assertNotEquals(cert1, cert2);
-    
-    assertTrue(isCertAcceptedInTrustManager(cert1, tm));
-    assertTrue(isCertAcceptedInTrustManager(cert2, tm));
+
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.arrayContaining(cert1));
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.arrayContaining(cert2));
 
     assertTrue(reloaderLog.getOutput().contains(
         "ReloadingX509TrustManager is reloaded"));
@@ -68,12 +74,5 @@ public class TestReloadingX509TrustManager {
     // Make sure there are two reload happened, one for server, one for client
     assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),
         "ReloadingX509TrustManager is reloaded"));
-  }
-
-  private boolean isCertAcceptedInTrustManager(X509Certificate cert,
-      TrustManager tm) {
-    X509Certificate[] acceptedIssuers =
-        ((ReloadingX509TrustManager) tm).getAcceptedIssuers();
-    return Arrays.asList(acceptedIssuers).contains(cert);
   }
 }

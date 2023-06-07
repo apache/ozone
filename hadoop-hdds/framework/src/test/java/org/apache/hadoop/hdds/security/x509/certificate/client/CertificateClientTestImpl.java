@@ -97,7 +97,7 @@ public class CertificateClientTestImpl implements CertificateClient {
       throws Exception {
     certificateMap = new ConcurrentHashMap<>();
     securityConfig = new SecurityConfig(conf);
-    rootCerts = ConcurrentHashMap.newKeySet();
+    rootCerts = new HashSet<>();
     keyGen = new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
     rootKeyPair = keyGen.generateKey();
