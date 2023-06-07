@@ -2235,6 +2235,24 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.ca.rotation.check.interval</name>
+    <value>P1D</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Check interval of whether internal root certificate is going
+      to expire and needs to start rotation or not. Default is 1 day. The property
+      value should be less than the value of property hdds.x509.renew.grace.duration.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.time-of-day</name>
+    <value>02:00:00</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
+      daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
+      and second.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.handler.count.key</name>
     <value>2</value>
     <tag>OZONE, HDDS, SECURITY</tag>
