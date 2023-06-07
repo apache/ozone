@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,8 +63,10 @@ public class BackgroundContainerMetadataScanner extends
     // The iterator returned by getContainerIterator may have stale results.
     ContainerData data = container.getContainerData();
     long containerID = data.getContainerID();
-    if (data.getVolume().isFailed()) {
-      LOG.debug("Skipping scan of container {}", containerID);
+    HddsVolume containerVolume = data.getVolume();
+    if (containerVolume.isFailed()) {
+      LOG.debug("Skipping scan of container {}. Its volume {} has failed.",
+          containerID, containerVolume);
       return;
     }
 

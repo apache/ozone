@@ -173,7 +173,7 @@ public final class ContainerTestUtils {
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
       boolean scanMetaDataSuccess, boolean scanDataSuccess,
-      AtomicLong containerIdSeq) {
+      AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
@@ -181,6 +181,7 @@ public final class ContainerTestUtils {
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
         .thenReturn(scanDataSuccess);
     Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    when(c.getContainerData().getVolume()).thenReturn(vol);
   }
 
   public static KeyValueContainer setUpTestContainerUnderTmpDir(

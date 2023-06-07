@@ -133,15 +133,21 @@ public class TestBackgroundContainerDataScanner extends
             eq(corruptData.getContainerData().getContainerID()), any());
   }
 
+  /**
+   * A datanode will have one background data scanner per volume. When the
+   * volume fails, the scanner thread should be terminated.
+   */
   @Test
   public void testWithVolumeFailure() throws Exception {
     Mockito.when(vol.isFailed()).thenReturn(true);
     // Run the scanner thread in the background. It should be terminated on
     // the first iteration because the volume is unhealthy.
-    scanner.start();
     ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    scanner.start();
     GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
 
+    // Volume health should have been checked.
+    Mockito.verify(vol, atLeastOnce()).isFailed();
     // No iterations should have been run.
     assertEquals(0, metrics.getNumScanIterations());
     // All containers were on the unhealthy volume, so they should not have
