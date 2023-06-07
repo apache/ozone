@@ -1408,8 +1408,8 @@ public class TestOzoneShellHA {
   @Test
   public void testRecursiveVolumeDelete()
       throws Exception {
-    String volume1 = "volume1";
-    String volume2 = "volume2";
+    String volume1 = "volume10";
+    String volume2 = "volume20";
 
     // Create volume volume1
     // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
