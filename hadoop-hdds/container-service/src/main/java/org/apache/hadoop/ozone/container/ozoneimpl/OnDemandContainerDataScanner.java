@@ -182,8 +182,7 @@ public final class OnDemandContainerDataScanner {
   private synchronized void shutdownScanner() {
     instance = null;
     metrics.unregister();
-    String shutdownMessage ="On-demand container" +
-        " scanner is shutting down.";
+    String shutdownMessage = "On-demand container scanner is shutting down.";
     LOG.info(shutdownMessage);
     this.canceler.cancel(shutdownMessage);
     if (!scanExecutor.isShutdown()) {
