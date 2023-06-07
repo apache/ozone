@@ -22,6 +22,7 @@ import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -87,7 +88,8 @@ public class DeleteVolumeHandler extends VolumeHandler {
           out().printf("Use -skipTrash for recursive volume delete%n");
           return;
         }
-        if (Strings.isNullOrEmpty(omServiceId)) {
+        if (OmUtils.isServiceIdsDefined(getConf()) &&
+            Strings.isNullOrEmpty(omServiceId)) {
           out().printf("OmServiceID not provided, provide using " +
               "-id <OM_SERVICE_ID>%n");
           return;
@@ -157,8 +159,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
    */
   private boolean cleanFSBucket(OzoneBucket bucket) {
     try {
-      final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" +
-          omServiceId + PATH_SEPARATOR_STR;
+      String hostPrefix = OZONE_OFS_URI_SCHEME + "://";
+      if (!Strings.isNullOrEmpty(omServiceId)) {
+        hostPrefix += omServiceId + PATH_SEPARATOR_STR;
+      }
       String ofsPrefix = hostPrefix + vol.getName() + PATH_SEPARATOR_STR +
           bucket.getName();
       final Path path = new Path(ofsPrefix);
