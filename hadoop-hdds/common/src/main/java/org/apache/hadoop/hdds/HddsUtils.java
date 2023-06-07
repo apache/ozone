@@ -19,6 +19,9 @@
 package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -844,5 +847,27 @@ public final class HddsUtils {
         thread.setName(threadName);
       }
     }
+  }
+
+  /** Concatenate stack trace {@code elements} (one per line) starting at
+   * {@code startIndex}. */
+  public static @Nonnull String formatStackTrace(
+      @Nullable StackTraceElement[] elements, int startIndex) {
+    if (elements != null && elements.length > startIndex) {
+      final StringBuilder sb = new StringBuilder();
+      for (int line = startIndex; line < elements.length; line++) {
+        sb.append(elements[line]).append("\n");
+      }
+      return sb.toString();
+    }
+    return "";
+  }
+
+  /** @return current thread stack trace if {@code logger} has debug enabled */
+  public static @Nullable StackTraceElement[] getStackTrace(
+      @Nonnull Logger logger) {
+    return logger.isDebugEnabled()
+        ? Thread.currentThread().getStackTrace()
+        : null;
   }
 }

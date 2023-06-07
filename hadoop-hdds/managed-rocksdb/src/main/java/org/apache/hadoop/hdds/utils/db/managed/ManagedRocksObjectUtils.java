@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,10 +49,19 @@ public final class ManagedRocksObjectUtils {
           rocksObject.getClass().getSimpleName());
       if (stackTrace != null && LOG.isDebugEnabled()) {
         String debugMessage = String
-            .format("%n StackTrace for unclosed instance: %s", stackTrace);
+            .format("%nStackTrace for unclosed instance: %s", stackTrace);
         warning = warning.concat(debugMessage);
       }
       LOG.warn(warning);
     }
   }
+
+  static StackTraceElement[] getStackTrace() {
+    return HddsUtils.getStackTrace(LOG);
+  }
+
+  static String formatStackTrace(StackTraceElement[] elements) {
+    return HddsUtils.formatStackTrace(elements, 3);
+  }
+
 }
