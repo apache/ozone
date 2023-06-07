@@ -122,6 +122,7 @@ public class OrphanMetaDataManagementTask implements ReconOmTask {
             break;
           case DELETE:
             handleDeleteDirEvent(updatedKeyInfo);
+            break;
           case UPDATE:
             break;
           default:

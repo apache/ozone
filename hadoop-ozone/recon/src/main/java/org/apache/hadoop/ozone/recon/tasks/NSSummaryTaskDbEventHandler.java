@@ -120,15 +120,16 @@ public class NSSummaryTaskDbEventHandler {
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      for (Long key : orphanKeyMetaDataMap.keySet()) {
+      for (Map.Entry<Long, OrphanKeyMetaData> entry :
+          orphanKeyMetaDataMap.entrySet()) {
         try {
+          Long key = entry.getKey();
           OrphanKeyMetaData orphanKeyMetaData =
               orphanKeyMetaDataMap.get(key);
           if (orphanKeyMetaData.getObjectIds().size() > 0) {
             orphanKeyMetaData.setStatus(status);
             reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
-                rdbBatchOperation,
-                key, orphanKeyMetaData);
+                rdbBatchOperation, key, orphanKeyMetaData);
           } else {
             orphanKeyMetaDataMap.remove(key);
           }
