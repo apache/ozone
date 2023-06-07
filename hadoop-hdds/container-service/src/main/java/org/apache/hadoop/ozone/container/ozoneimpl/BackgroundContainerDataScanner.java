@@ -73,7 +73,7 @@ public class BackgroundContainerDataScanner extends
     // There is one background container data scanner per volume.
     // If the volume fails, its scanning thread should terminate.
     if (volume.isFailed()) {
-      shutdown();
+      shutdown("The volume has failed.");
       return;
     }
 
@@ -118,8 +118,13 @@ public class BackgroundContainerDataScanner extends
 
   @Override
   public synchronized void shutdown() {
-    this.canceler.cancel(
-        String.format(NAME_FORMAT, volume) + " is shutting down");
+    shutdown("");
+  }
+
+  private synchronized void shutdown(String reason) {
+    String cancelerMessage = String.format(NAME_FORMAT, volume) + " is " +
+        "shutting down. " + reason;
+    this.canceler.cancel(cancelerMessage);
     super.shutdown();
   }
 
