@@ -205,6 +205,16 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.volume.replica.choosing.policy</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      The class name of the policy for choosing volumes in the list of
+      directories for replicating closed containers.
+      If not set, hdds.datanode.volume.choosing.policy is used.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.min.free.space</name>
     <value>5GB</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>

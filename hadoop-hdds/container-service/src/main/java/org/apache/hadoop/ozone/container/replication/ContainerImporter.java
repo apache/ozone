@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_REPLICA_CHOOSING_POLICY;
 
 /**
  * Imports container from tarball.
@@ -65,9 +66,17 @@ public class ContainerImporter {
     this.controller = controller;
     this.volumeSet = volumeSet;
     try {
-      volumeChoosingPolicy = conf.getClass(
-          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-              .class, VolumeChoosingPolicy.class).newInstance();
+      //we want custom volume choosing policy for container replicating case
+      //if not set, the cluster-wide policy is used
+      String key =
+          conf.isConfigured(HDDS_DATANODE_VOLUME_REPLICA_CHOOSING_POLICY) ?
+              HDDS_DATANODE_VOLUME_REPLICA_CHOOSING_POLICY :
+              HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+      volumeChoosingPolicy =
+          conf.getClass(key,
+                        RoundRobinVolumeChoosingPolicy.class,
+                        VolumeChoosingPolicy.class)
+              .newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
