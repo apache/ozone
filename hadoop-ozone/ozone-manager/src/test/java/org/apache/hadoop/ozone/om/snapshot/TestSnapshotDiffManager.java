@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -64,6 +65,7 @@ public class TestSnapshotDiffManager {
   private static OMMetadataManager omMetadataManager;
   private static SnapshotDiffManager snapshotDiffManager;
   private static PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
+  private static SnapshotDiffCleanupService snapshotDiffCleanupService;
 
   @BeforeAll
   public static void init() throws AuthenticationException,
@@ -83,6 +85,8 @@ public class TestSnapshotDiffManager {
     snapshotDiffManager = ozoneManager
         .getOmSnapshotManager().getSnapshotDiffManager();
     snapDiffJobTable = snapshotDiffManager.getSnapDiffJobTable();
+    snapshotDiffCleanupService = ozoneManager
+        .getOmSnapshotManager().getSnapshotDiffCleanupService();
 
     createVolumeAndBucket();
   }
@@ -167,6 +171,22 @@ public class TestSnapshotDiffManager {
     // Status stored in the table should be CANCELED.
     Assertions.assertEquals(JobStatus.CANCELED,
         diffJob.getStatus());
+
+    String jobId = diffJob.getJobId();
+
+    // Job is still in the snapDiffJobTable,
+    // so it shouldn't exist in the purged job table.
+    Assertions.assertNull(snapshotDiffCleanupService
+        .getEntryFromPurgedJobTable(jobId));
+
+    // Run the cleanup service.
+    snapshotDiffCleanupService.run();
+
+    // Job should have been removed from the snapDiffJobTable
+    // and it should have been moved to the purged job table.
+    Assertions.assertNull(snapDiffJobTable.get(diffJobKey));
+    Assertions.assertNotNull(snapshotDiffCleanupService
+        .getEntryFromPurgedJobTable(jobId));
   }
 
   private void setUpKeysAndSnapshots(String fromSnapshotName,

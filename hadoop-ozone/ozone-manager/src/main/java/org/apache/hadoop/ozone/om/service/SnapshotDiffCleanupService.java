@@ -125,6 +125,16 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     moveOldSnapDiffJobsToPurgeTable();
   }
 
+  @VisibleForTesting
+  public byte[] getEntryFromPurgedJobTable(String jobId) {
+    try {
+      return db.get().get(snapDiffPurgedJobCfh,
+          codecRegistry.asRawData(jobId));
+    } catch (IOException | RocksDBException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Move the snapDiff jobs from snapDiffJobTable to purge table which are
    * older than the allowed time or have FAILED or REJECTED status.
