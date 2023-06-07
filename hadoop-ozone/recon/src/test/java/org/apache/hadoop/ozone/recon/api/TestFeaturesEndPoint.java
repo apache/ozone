@@ -106,6 +106,7 @@ public class TestFeaturesEndPoint {
   public void testNoDisabledFeatures() {
     ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY,
         "org.apache.hadoop.ozone.recon.heatmap.TestHeatMapProviderImpl");
+    ozoneConfiguration.setBoolean(OZONE_RECON_HEATMAP_ENABLE_KEY, true);
     FeatureProvider.initFeatureSupport(ozoneConfiguration);
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
