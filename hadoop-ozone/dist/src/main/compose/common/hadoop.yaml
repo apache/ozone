@@ -14,9 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=@hdds.version@
-HADOOP_IMAGE=flokkr/hadoop
-HADOOP_VERSION=3.3.1
-OZONE_RUNNER_VERSION=@docker.ozone-runner.version@
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_OPTS=
+version: "3.4"
+services:
+  rm:
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    hostname: rm
+    volumes:
+      - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
+    ports:
+      - 8088:8088
+    env_file:
+      - docker-config
+      - ../common/hadoop.conf
+      - ../common/hadoop${HADOOP_MAJOR_VERSION}.conf
+    command: ["yarn", "resourcemanager"]
+  nm:
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    hostname: nm
+    volumes:
+      - ../..:/opt/ozone
+      - ../../libexec/transformation.py:/opt/transformation.py
+    env_file:
+      - docker-config
+      - ../common/hadoop.conf
+      - ../common/hadoop${HADOOP_MAJOR_VERSION}.conf
+    environment:
+      WAITFOR: rm:8088
+    command: ["yarn","nodemanager"]
