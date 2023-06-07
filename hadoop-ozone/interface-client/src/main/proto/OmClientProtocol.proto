@@ -1552,6 +1552,7 @@ message PartInfo {
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
     optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3;
 }
 
 /**

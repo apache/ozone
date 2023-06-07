@@ -257,7 +257,6 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
-    case EchoRPC:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
@@ -317,6 +316,8 @@ public final class OmUtils {
     case RecoverLease:
     case SetTimes:
       return false;
+    case EchoRPC:
+      return omRequest.getEchoRPCRequest().getReadOnly();
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
