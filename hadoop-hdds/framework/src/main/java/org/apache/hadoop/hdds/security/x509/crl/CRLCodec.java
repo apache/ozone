@@ -29,10 +29,10 @@ import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +41,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -123,14 +124,28 @@ public class CRLCodec {
    * @param pemEncodedString - PEM encoded String.
    * @return X509CRL  - Crl.
    * @throws CRLException - Thrown on Failure.
-   * @throws IOException  - Thrown on Failure.
    */
   public static X509CRL getX509CRL(String pemEncodedString)
-      throws CRLException, IOException {
+      throws CRLException {
+    return getX509CRL(pemEncodedString, Function.identity());
+  }
+
+  public static <E extends Exception> X509CRL getX509CRL(String pemEncoded,
+      Function<CRLException, E> convertor)
+      throws E {
     CertificateFactory fact = CertificateCodec.getCertFactory();
-    try (InputStream input = IOUtils.toInputStream(pemEncodedString, UTF_8)) {
+    // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
+    final ByteArrayInputStream input = new ByteArrayInputStream(
+        pemEncoded.getBytes(UTF_8));
+    try {
       return (X509CRL) fact.engineGenerateCRL(input);
+    } catch (CRLException e) {
+      throw convertor.apply(e);
     }
+  }
+
+  public static IOException toIOException(CRLException e) {
+    return new IOException("Failed to engineGenerateCRL", e);
   }
 
   /**

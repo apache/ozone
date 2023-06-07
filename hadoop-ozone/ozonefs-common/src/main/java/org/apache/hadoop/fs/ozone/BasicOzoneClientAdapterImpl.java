@@ -706,4 +706,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
     return snapshotDiffResponse.getSnapshotDiffReport();
   }
+
+  @Override
+  public void setTimes(String key, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    bucket.setTimes(key, mtime, atime);
+  }
 }

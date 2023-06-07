@@ -18,16 +18,15 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.ozone.client.io.ByteBufferOutputStream;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 /**
  * The ByteBuffer output stream for Ozone file system.
  */
-public class OzoneFSDataStreamOutput extends OutputStream
-    implements ByteBufferStreamOutput {
+public class OzoneFSDataStreamOutput extends ByteBufferOutputStream {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
 
@@ -48,34 +47,6 @@ public class OzoneFSDataStreamOutput extends OutputStream
   public void write(ByteBuffer b, int off, int len)
       throws IOException {
     byteBufferStreamOutput.write(b, off, len);
-  }
-
-  @Override
-  public void write(byte[] b, int off, int len)
-      throws IOException {
-    write(ByteBuffer.wrap(b));
-  }
-
-  /**
-   * Writes the specified byte to this output stream. The general
-   * contract for <code>write</code> is that one byte is written
-   * to the output stream. The byte to be written is the eight
-   * low-order bits of the argument <code>b</code>. The 24
-   * high-order bits of <code>b</code> are ignored.
-   * <p>
-   * Subclasses of <code>OutputStream</code> must provide an
-   * implementation for this method.
-   *
-   * @param b the <code>byte</code>.
-   * @throws IOException if an I/O error occurs. In particular,
-   *                     an <code>IOException</code> may be thrown if the
-   *                     output stream has been closed.
-   */
-  @Override
-  public void write(int b) throws IOException {
-    byte[] singleBytes = new byte[1];
-    singleBytes[0] = (byte) b;
-    byteBufferStreamOutput.write(ByteBuffer.wrap(singleBytes));
   }
 
   /**

@@ -66,7 +66,7 @@ class RDBTable implements Table<byte[], byte[]> {
     return family;
   }
 
-  public void put(ByteBuffer key, ByteBuffer value) throws IOException {
+  void put(ByteBuffer key, ByteBuffer value) throws IOException {
     db.put(family, key, value);
   }
 
@@ -75,8 +75,8 @@ class RDBTable implements Table<byte[], byte[]> {
     db.put(family, key, value);
   }
 
-  public void putWithBatch(BatchOperation batch, CodecBuffer key,
-      CodecBuffer value) throws IOException {
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value)
+      throws IOException {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -98,7 +98,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public boolean isEmpty() throws IOException {
-    try (TableIterator<byte[], ByteArrayKeyValue> keyIter = iterator()) {
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> keyIter = iterator()) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }
@@ -107,13 +107,17 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public boolean isExist(byte[] key) throws IOException {
     rdbMetrics.incNumDBKeyMayExistChecks();
-    final Supplier<byte[]> holder = db.keyMayExistHolder(family, key);
+    final Supplier<byte[]> holder = db.keyMayExist(family, key);
     if (holder == null) {
-      return false;
+      return false;  // definitely not exists
     }
     final byte[] value = holder.get();
-    final boolean exists = (value != null && value.length > 0)
-        || db.get(family, key) != null;
+    if (value != null) {
+      return true; // definitely exists
+    }
+
+    // inconclusive: the key may or may not exist
+    final boolean exists = get(key) != null;
     if (!exists) {
       rdbMetrics.incNumDBKeyMayExistMisses();
     }
@@ -122,7 +126,12 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public byte[] get(byte[] key) throws IOException {
+    rdbMetrics.incNumDBKeyGets();
     return db.get(family, key);
+  }
+
+  Integer get(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    return db.get(family, key, outValue);
   }
 
   /**
@@ -141,18 +150,42 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] getIfExist(byte[] key) throws IOException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
-    final boolean keyMayExist = db.keyMayExist(family, key);
-    if (keyMayExist) {
-      // Not using out value from string builder, as that is causing
-      // IllegalArgumentException during protobuf parsing.
-      rdbMetrics.incNumDBKeyGetIfExistGets();
-      final byte[] val = db.get(family, key);
-      if (val == null) {
-        rdbMetrics.incNumDBKeyGetIfExistMisses();
-      }
-      return val;
+    final Supplier<byte[]> value = db.keyMayExist(family, key);
+    if (value == null) {
+      return null; // definitely not exists
     }
-    return null;
+    if (value.get() != null) {
+      return value.get(); // definitely exists
+    }
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final byte[] val = get(key);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
+  }
+
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    rdbMetrics.incNumDBKeyGetIfExistChecks();
+    final Supplier<Integer> value = db.keyMayExist(
+        family, key, outValue.duplicate());
+    if (value == null) {
+      return null; // definitely not exists
+    }
+    if (value.get() != null) {
+      // definitely exists, return value size.
+      return value.get();
+    }
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final Integer val = get(key, outValue);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
   }
 
   @Override
@@ -177,20 +210,20 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], ByteArrayKeyValue> iterator()
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
     return new RDBStoreIterator(db.newIterator(family, false), this);
   }
 
   @Override
-  public TableIterator<byte[], ByteArrayKeyValue> iterator(byte[] prefix)
+  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
     return new RDBStoreIterator(db.newIterator(family, false), this,
         prefix);
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return family.getName();
   }
 
@@ -205,7 +238,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
+  public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
       int count, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
@@ -213,7 +246,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public List<ByteArrayKeyValue> getSequentialRangeKVs(byte[] startKey,
+  public List<KeyValue<byte[], byte[]>> getSequentialRangeKVs(byte[] startKey,
       int count, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
@@ -223,7 +256,8 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix)) {
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
+             = iterator(prefix)) {
       while (iter.hasNext()) {
         deleteWithBatch(batch, iter.next().getKey());
       }
@@ -233,11 +267,12 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], ByteArrayKeyValue> iter = iterator(prefix);
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
+             = iterator(prefix);
          DumpFileWriter fileWriter = new RDBSstFileWriter()) {
       fileWriter.open(externalFile);
       while (iter.hasNext()) {
-        ByteArrayKeyValue entry = iter.next();
+        final KeyValue<byte[], byte[]> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
       }
     }
@@ -250,18 +285,19 @@ class RDBTable implements Table<byte[], byte[]> {
     }
   }
 
-  private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
+  private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
       int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
 
     if (count < 0) {
       throw new IllegalArgumentException(
             "Invalid count given " + count + ", count must be greater than 0");
     }
-    try (TableIterator<byte[], ByteArrayKeyValue> it = iterator(prefix)) {
+    final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> it
+             = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
       } else {
@@ -274,7 +310,7 @@ class RDBTable implements Table<byte[], byte[]> {
       }
 
       while (it.hasNext() && result.size() < count) {
-        ByteArrayKeyValue currentEntry = it.next();
+        final KeyValue<byte[], byte[]> currentEntry = it.next();
         byte[] currentKey = currentEntry.getKey();
 
         if (filters == null) {

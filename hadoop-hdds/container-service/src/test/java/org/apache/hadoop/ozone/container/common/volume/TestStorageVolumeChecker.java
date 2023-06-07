@@ -273,13 +273,8 @@ public class TestStorageVolumeChecker {
     Assert.assertEquals(1, volumeSet.getVolumesList().size());
     Assert.assertEquals(1, volumeSet.getFailedVolumesList().size());
 
-    i = 0;
-    for (ContainerDataProto.State state : ContainerDataProto.State.values()) {
-      if (!state.equals(ContainerDataProto.State.INVALID)) {
-        Assert.assertEquals(ContainerDataProto.State.UNHEALTHY,
-            containerSet.getContainer(++i).getContainerState());
-      }
-    }
+    // All containers should be removed from containerSet
+    Assert.assertEquals(0, containerSet.getContainerMap().size());
 
     ozoneContainer.stop();
   }

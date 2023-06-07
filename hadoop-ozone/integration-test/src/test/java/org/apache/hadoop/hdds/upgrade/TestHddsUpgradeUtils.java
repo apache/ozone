@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -121,14 +120,9 @@ public final class TestHddsUpgradeUtils {
     // pipeline to use.
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     try {
-      GenericTestUtils.waitFor(() -> {
-        int pipelineCount = scmPipelineManager.getPipelines(RATIS_THREE, OPEN)
-            .size();
-        if (pipelineCount >= 1) {
-          return true;
-        }
-        return false;
-      }, 500, 60000);
+      GenericTestUtils.waitFor(
+          () -> scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() >= 1,
+          500, 60000);
     } catch (TimeoutException | InterruptedException e) {
       Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
     }
@@ -169,9 +163,8 @@ public final class TestHddsUpgradeUtils {
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       // Also verify that all the existing containers are open.
-      for (Iterator<Container<?>> it =
-           dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container container = it.next();
+      for (Container<?> container :
+          dsm.getContainer().getController().getContainers()) {
         Assert.assertSame(container.getContainerState(),
             ContainerProtos.ContainerDataProto.State.OPEN);
         countContainers++;
@@ -224,9 +217,8 @@ public final class TestHddsUpgradeUtils {
       Assert.assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);
 
       // Also verify that all the existing containers are closed.
-      for (Iterator<Container<?>> it =
-           dsm.getContainer().getController().getContainers(); it.hasNext();) {
-        Container<?> container = it.next();
+      for (Container<?> container :
+           dsm.getContainer().getController().getContainers()) {
         Assert.assertTrue("Container had unexpected state " +
                 container.getContainerState(),
             closeStates.stream().anyMatch(

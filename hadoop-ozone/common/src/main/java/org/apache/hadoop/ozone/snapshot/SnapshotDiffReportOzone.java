@@ -37,6 +37,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Snapshot diff report.
+ * <p>
+ * This class is immutable.
  */
 public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
@@ -45,7 +47,7 @@ public class SnapshotDiffReportOzone
       Proto2Codec.get(DiffReportEntryProto.class),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
-      true);
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<DiffReportEntry> getDiffReportEntryCodec() {
     return CODEC;

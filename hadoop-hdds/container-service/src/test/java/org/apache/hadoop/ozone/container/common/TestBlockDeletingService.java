@@ -830,7 +830,7 @@ public class TestBlockDeletingService {
 
     // get container meta data
     KeyValueContainer container =
-        (KeyValueContainer) containerSet.getContainerIterator().next();
+        (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);

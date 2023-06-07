@@ -23,20 +23,18 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.protobuf.BlockingService;
 
 import java.time.Duration;
-import java.util.SortedSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -158,9 +156,9 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
@@ -187,9 +185,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -250,6 +251,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private final EventQueue eventQueue;
   private final SCMServiceManager serviceManager;
+  private final ReconfigurationHandler reconfigurationHandler;
 
   /*
    * HTTP endpoint for JMX access.
@@ -271,7 +273,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private CertificateClient scmCertificateClient;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private JvmPauseMonitor jvmPauseMonitor;
+  private final JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
@@ -282,7 +284,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
-  private String primaryScmNodeId;
+  private final String primaryScmNodeId;
 
   /**
    *  Network topology Map.
@@ -293,7 +295,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private final SCMHANodeDetails scmHANodeDetails;
 
-  private ContainerBalancer containerBalancer;
+  private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
   private final MoveManager moveManager;
   private StatefulServiceStateManager statefulServiceStateManager;
@@ -301,12 +303,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
-
-  /** A list of property that are reconfigurable at runtime. */
-  private final SortedSet<String> reconfigurableProperties =
-      ImmutableSortedSet.of(
-          OZONE_ADMINISTRATORS
-      );
 
   private Clock systemClock;
 
@@ -341,22 +337,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Objects.requireNonNull(configurator, "configurator cannot not be null");
     Objects.requireNonNull(conf, "configuration cannot not be null");
-    /**
-     * It is assumed the scm --init command creates the SCM Storage Config.
-     */
+    // It is assumed the scm --init command creates the SCM Storage Config.
     scmStorageConfig = new SCMStorageConfig(conf);
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
     initMetrics();
 
+    boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
-      String errMsg = "Please make sure you have run \'ozone scm --init\' " +
+      String errMsg = "Please make sure you have run 'ozone scm --init' " +
           "command to generate all the required metadata to " +
           scmStorageConfig.getStorageDir();
-      if (SCMHAUtils.isSCMHAEnabled(conf) && !scmStorageConfig
-          .isSCMHAEnabled()) {
-        errMsg += " or make sure you have run \'ozone scm --bootstrap\' cmd to "
+      if (ratisEnabled && !scmStorageConfig.isSCMHAEnabled()) {
+        errMsg += " or make sure you have run 'ozone scm --bootstrap' cmd to "
             + "add the SCM to existing SCM HA group";
       }
       LOG.error(errMsg + ".");
@@ -367,7 +361,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
     initializeCertificateClient();
 
-    /**
+    jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
+
+    /*
      * Important : This initialization sequence is assumed by some of our tests.
      * The testSecureOzoneCluster assumes that security checks have to be
      * passed before any artifacts like SCM DB is created. So please don't
@@ -398,19 +394,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    Collection<String> scmAdminUsernames =
-        getOzoneAdminsFromConfig(conf, scmStarterUser);
-    LOG.info("SCM start with adminUsers: {}", scmAdminUsernames);
-    Collection<String> scmAdminGroups =
-        conf.getTrimmedStringCollection(
-            OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
+    scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
+    LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
-    scmAdmins = new OzoneAdmins(scmAdminUsernames, scmAdminGroups);
+    reconfigurationHandler =
+        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
-    clientProtocolServer = new SCMClientProtocolServer(conf, this);
+    clientProtocolServer = new SCMClientProtocolServer(conf, this,
+        reconfigurationHandler);
 
     initializeEventHandlers();
 
@@ -425,7 +420,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     registerMXBean();
     registerMetricsSource(this);
   }
-
 
   private void initializeEventHandlers() {
     long timeDuration = configuration.getTimeDuration(
@@ -618,7 +612,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     // This needs to be done before initializing Ratis.
     ratisReporterList = RatisDropwizardExports
-        .registerRatisMetricReporters(ratisMetricsMap, () -> isStopped.get());
+        .registerRatisMetricReporters(ratisMetricsMap, isStopped::get);
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
@@ -715,7 +709,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmContext);
 
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(conf, systemClock);
+        new ContainerReplicaPendingOps(systemClock);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -807,7 +801,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf - Config
    * @param configurator - configurator
    * @throws IOException - on Failure
-   * @throws AuthenticationException - on Failure
    */
   private void initializeCAnSecurityProtocol(OzoneConfiguration conf,
       SCMConfigurator configurator) throws IOException {
@@ -884,9 +877,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  /** Persist primary SCM root ca cert and sub-ca certs to DB.
-   *
-   * @throws IOException
+  /**
+   * Persist primary SCM root ca cert and sub-ca certs to DB.
    */
   private void persistPrimarySCMCerts() throws IOException {
     BigInteger certSerial =
@@ -948,8 +940,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     long certificateGracePeriod = Duration.parse(
         conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
             HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    if (expiryTime > certificateGracePeriod) {
-      throw new IllegalArgumentException("Certificate grace period " +
+    boolean tokenSanityChecksEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+    if (tokenSanityChecksEnabled && expiryTime > certificateGracePeriod) {
+      throw new IllegalArgumentException(" Certificate grace period " +
           HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
           " should be greater than maximum block/container token lifetime " +
           HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
@@ -999,8 +994,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   /**
    * Login as the configured user for SCM.
-   *
-   * @param conf
    */
   private static void loginAsSCMUserIfSecurityEnabled(
       SCMHANodeDetails scmhaNodeDetails, ConfigurationSource conf)
@@ -1056,7 +1049,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static String buildRpcServerStartMessage(String description,
                                                   InetSocketAddress addr) {
     return addr != null
-        ? String.format("%s is listening at %s", description, addr.toString())
+        ? String.format("%s is listening at %s", description, addr)
         : String.format("%s not started", description);
   }
 
@@ -1078,16 +1071,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       BlockingService instance,
       int handlerCount)
       throws IOException {
-    RPC.Server rpcServer =
-        new RPC.Builder(conf)
-            .setProtocol(protocol)
-            .setInstance(instance)
-            .setBindAddress(addr.getHostString())
-            .setPort(addr.getPort())
-            .setNumHandlers(handlerCount)
-            .setVerbose(false)
-            .setSecretManager(null)
-            .build();
+
+    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+        .setProtocol(protocol)
+        .setInstance(instance)
+        .setBindAddress(addr.getHostString())
+        .setPort(addr.getPort())
+        .setNumHandlers(handlerCount)
+        .setVerbose(false)
+        .setSecretManager(null)
+        .build());
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
@@ -1198,10 +1191,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Initialize security If Ozone security is enabled and
    * ScmStorageConfig does not have certificate serial id.
-   * @param conf
-   * @param scmhaNodeDetails
-   * @param scmStorageConfig
-   * @throws IOException
    */
   private static void initializeSecurityIfNeeded(
       OzoneConfiguration conf, SCMHANodeDetails scmhaNodeDetails,
@@ -1505,10 +1494,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmBlockManager.start();
     leaseManager.start();
 
-    // Start jvm monitor
-    jvmPauseMonitor = new JvmPauseMonitor();
-    jvmPauseMonitor.init(configuration);
-    jvmPauseMonitor.start();
+    if (jvmPauseMonitor != null) {
+      jvmPauseMonitor.start();
+    }
 
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
@@ -1524,9 +1512,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetricsUpdate(null);
   }
 
-  /** Persist SCM certs to DB on bootstrap scm nodes.
-   *
-   * @throws IOException
+  /**
+   * Persist SCM certs to DB on bootstrap scm nodes.
    */
   private void persistSCMCertificates() throws IOException {
     // Fetch all CA's and persist during startup on bootstrap nodes. This
@@ -1539,20 +1526,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
-        try {
-          X509Certificate x509Certificate =
-              CertificateCodec.getX509Certificate(cert);
-          if (certificateStore.getCertificateByID(
-              x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
-            LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
-                    "{}", x509Certificate.getSerialNumber(),
-                scmStorageConfig.getScmId());
-            certificateStore.storeValidScmCertificate(
-                x509Certificate.getSerialNumber(), x509Certificate);
-          }
-        } catch (CertificateException ex) {
-          LOG.error("Error while decoding CA Certificate", ex);
-          throw new IOException(ex);
+        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
+            cert, CertificateCodec::toIOException);
+        if (certificateStore.getCertificateByID(
+            x509Certificate.getSerialNumber(), VALID_CERTS) == null) {
+          LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
+                  "{}", x509Certificate.getSerialNumber(),
+              scmStorageConfig.getScmId());
+          certificateStore.storeValidScmCertificate(
+              x509Certificate.getSerialNumber(), x509Certificate);
         }
       }
     }
@@ -1855,6 +1837,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  private void checkAdminAccess(String op) throws IOException {
+    checkAdminAccess(getRemoteUser());
+  }
+
   public void checkAdminAccess(UserGroupInformation remoteUser)
       throws IOException {
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
@@ -2097,49 +2083,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(ServerUtils.getScmDbDir(configuration));
   }
 
-  /**
-   * Return list of administrators from config.
-   * The service startup user will default to an admin.
-   */
-  private Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
-      String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
-  }
-
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
   }
 
-  // ReconfigurableBase get base configuration
-  @Override
-  public Configuration getConf() {
-    return getConfiguration();
-  }
-
-  @Override // ReconfigurableBase
-  public Collection<String> getReconfigurableProperties() {
-    return reconfigurableProperties;
-  }
-
-  @Override // ReconfigurableBase
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
-      return reconfOzoneAdmins(newVal);
-    } else {
-      throw new ReconfigurationException(property, newVal,
-          getConfiguration().get(property));
-    }
-  }
-
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
-    Collection<String> admins = getOzoneAdminsFromConfig(
+    Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
         getConfiguration(), scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
@@ -2193,5 +2143,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     SCMHAMetrics.unRegister();
 
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
+  }
+
+  @VisibleForTesting
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
   }
 }

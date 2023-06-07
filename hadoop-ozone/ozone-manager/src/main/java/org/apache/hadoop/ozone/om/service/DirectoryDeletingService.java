@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -74,6 +76,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   // Number of items(dirs/files) to be batched in an iteration.
   private final long pathLimitPerTask;
+  private final AtomicBoolean suspended;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -83,6 +86,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
             OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
+    this.suspended = new AtomicBoolean(false);
   }
 
   private boolean shouldRun() {
@@ -90,7 +94,23 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       // OzoneManager can be null for testing
       return true;
     }
-    return getOzoneManager().isLeaderReady();
+    return getOzoneManager().isLeaderReady() && !suspended.get();
+  }
+
+  /**
+   * Suspend the service.
+   */
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
+  }
+
+  /**
+   * Resume the service if suspended.
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
   }
 
   @Override
@@ -186,16 +206,28 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      OmSnapshot latestSnapshot =
-          metadataManager.getLatestSnapshot(deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(), omSnapshotManager);
+      OmSnapshot latestSnapshot = metadataManager.getLatestActiveSnapshot(
+              deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName(),
+              omSnapshotManager);
 
       if (latestSnapshot != null) {
+        String dbRenameKey = metadataManager
+            .getRenameKey(deletedDirInfo.getVolumeName(),
+                deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
         Table<String, OmDirectoryInfo> prevDirTable =
             latestSnapshot.getMetadataManager().getDirectoryTable();
+        Table<String, OmKeyInfo> prevDeletedDirTable =
+            latestSnapshot.getMetadataManager().getDeletedDirTable();
+        OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
+        if (prevDeletedDirInfo != null) {
+          return true;
+        }
+        String prevDirTableDBKey = metadataManager.getSnapshotRenamedTable()
+            .get(dbRenameKey);
         // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
         // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-        String prevDbKey = metadataManager.getOzoneDeletePathDirKey(key);
+        String prevDbKey = prevDirTableDBKey == null ?
+            metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
         OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
         return prevDirInfo != null &&
             prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
