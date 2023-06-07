@@ -80,18 +80,16 @@ public class BufferPool {
    * chunk size.
    */
   public ChunkBuffer allocateBuffer(int increment) {
-    int nextBufferIndex = currentBufferIndex + 1;
+    final int nextBufferIndex = currentBufferIndex + 1;
+
     Preconditions.assertTrue(nextBufferIndex < capacity, () ->
         "next index: " + nextBufferIndex + " >= capacity: " + capacity);
 
-    currentBufferIndex++;
+    currentBufferIndex = nextBufferIndex;
 
-    int bufferCount = bufferList.size();
-    if (currentBufferIndex < bufferCount) {
+    if (currentBufferIndex < bufferList.size()) {
       return getBuffer(currentBufferIndex);
     } else {
-      Preconditions.assertTrue(bufferCount < capacity, () ->
-          "buffer count: " + bufferCount + " >= capacity: " + capacity);
       final ChunkBuffer newBuffer = ChunkBuffer.allocate(bufferSize, increment);
       bufferList.add(newBuffer);
       return newBuffer;
@@ -147,5 +145,9 @@ public class BufferPool {
 
   public int getCapacity() {
     return capacity;
+  }
+
+  public int getBufferSize() {
+    return bufferSize;
   }
 }
