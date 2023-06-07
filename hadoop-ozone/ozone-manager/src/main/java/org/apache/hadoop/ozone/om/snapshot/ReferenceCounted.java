@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.base.Preconditions;
 
+import java.io.Closeable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -26,7 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Add reference counter to an object instance.
  * TODO: Move this up a package level?
  */
-public class ReferenceCounted<T> implements AutoCloseable {
+public class ReferenceCounted<T extends Closeable> implements AutoCloseable {
 
   /**
    * Object that is being reference counted. e.g. OmSnapshot
