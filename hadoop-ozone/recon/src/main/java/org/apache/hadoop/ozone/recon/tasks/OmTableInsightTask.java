@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
@@ -108,7 +109,7 @@ public class OmTableInsightTask implements ReconOmTask {
           replicatedSizeCountMap.put(
               getReplicatedSizeKeyFromTable(tableName), details.getRight());
         } else {
-          long count = getCount(table.iterator());
+          long count = Iterators.size(table.iterator());
           objectCountMap.put(getTableCountKeyFromTable(tableName), count);
         }
       } catch (IOException ioEx) {
@@ -157,15 +158,15 @@ public class OmTableInsightTask implements ReconOmTask {
         table.iterator();
     while (iterator.hasNext()) {
       Table.KeyValue<String, ?> kv = iterator.next();
-
+      Iterators.size(iterator);
       if (kv != null && kv.getValue() != null) {
         if (kv.getValue() instanceof OmKeyInfo) {
           OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
           unReplicatedSize += omKeyInfo.getDataSize();
           replicatedSize += omKeyInfo.getReplicatedSize();
         }
+        count++;  // Increment count for each row
       }
-      count++;  // Increment count for each row
     }
     return Triple.of(count, unReplicatedSize, replicatedSize);
   }
@@ -178,15 +179,6 @@ public class OmTableInsightTask implements ReconOmTask {
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
     return taskTables;
-  }
-
-  private long getCount(Iterator iterator) {
-    long count = 0L;
-    while (iterator.hasNext()) {
-      count++;
-      iterator.next();
-    }
-    return count;
   }
 
   @Override

@@ -33,7 +33,7 @@ import java.util.Map;
 public class KeyInsightInfoResponse {
 
   /** Cluster summary. Includes aggregated information about the cluster. */
-  private Map<String, Object> clusterSummary = new HashMap<>();
+  private Map<String, Object> clusterSummary;
 
   /** last key sent. */
   @JsonProperty("lastKey")

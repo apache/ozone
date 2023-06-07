@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -235,7 +236,7 @@ public class OMDBInsightEndpoint {
       }
     }
     // Populate the clusterSummary map
-    createClusterSummary(clusterSummary);
+    createClusterSummaryForOpenKey(clusterSummary);
 
     openKeyInsightInfo.setClusterSummary(clusterSummary);
 
@@ -243,35 +244,38 @@ public class OMDBInsightEndpoint {
     return Response.ok(openKeyInsightInfo).build();
   }
 
-  private void createClusterSummary(Map<String, Object> clusterSummary) {
-    try {
-      long replicatedSizeOpenKey = globalStatsDao.findById(OmTableInsightTask
-          .getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)).getValue();
-      long replicatedSizeOpenFile = globalStatsDao.findById(OmTableInsightTask
-          .getReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)).getValue();
-      long unreplicatedSizeOpenKey = globalStatsDao.findById(OmTableInsightTask
-          .getUnReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)).getValue();
-      long unreplicatedSizeOpenFile = globalStatsDao.findById(OmTableInsightTask
-          .getUnReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)).getValue();
-      long openKeyCountForKeyTable = globalStatsDao.findById(OmTableInsightTask
-          .getTableCountKeyFromTable(OPEN_KEY_TABLE)).getValue();
-      long openKeyCountForFileTable = globalStatsDao.findById(OmTableInsightTask
-          .getTableCountKeyFromTable(OPEN_FILE_TABLE)).getValue();
+  private void createClusterSummaryForOpenKey(
+                Map<String, Object> clusterSummary) {
+    Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
+    Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
+    Long unreplicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
+    Long unreplicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
+    Long openKeyCountForKeyTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(OPEN_KEY_TABLE)));
+    Long openKeyCountForFileTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(OPEN_FILE_TABLE)));
 
-      // Calculate the total number of open keys
-      clusterSummary.put("totalOpenKeys",
-          openKeyCountForKeyTable + openKeyCountForFileTable);
-      // Calculate the total replicated and unreplicated sizes
-      clusterSummary.put("totalReplicatedDataSize",
-          replicatedSizeOpenKey + replicatedSizeOpenFile);
-      clusterSummary.put("totalUnreplicatedDataSize",
-          unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
-    } catch (NullPointerException e) {
-      // Handle the null pointer exception
-      LOG.error("Error while fetching the cluster summary", e);
-    }
+    // Calculate the total number of open keys
+    clusterSummary.put("totalOpenKeys",
+        openKeyCountForKeyTable + openKeyCountForFileTable);
+    // Calculate the total replicated and unreplicated sizes
+    clusterSummary.put("totalReplicatedDataSize",
+        replicatedSizeOpenKey + replicatedSizeOpenFile);
+    clusterSummary.put("totalUnreplicatedDataSize",
+        unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
+
   }
 
+  private Long getValueFromId(GlobalStats record) {
+    if (record != null) {
+      return record.getValue();
+    }
+    return 0L;
+  }
 
   private void getPendingForDeletionKeyInfo(
       int limit,
