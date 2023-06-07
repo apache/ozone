@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -285,7 +286,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
                 "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
-                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                snapInfo.getSnapshotId() + ". Processed " + deletionCount +
                 " keys and " + (keyLimitPerSnapshot - remainNum) +
                 " directories and files", ex);
           }
@@ -539,10 +540,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
     private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
         throws IOException {
+
       if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
-          snapInfo.getSnapshotID())) {
-        String previousPathSnapshot = chainManager.previousPathSnapshot(
-            snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
+          snapInfo.getSnapshotId())) {
+        UUID previousPathSnapshot = chainManager.previousPathSnapshot(
+            snapInfo.getSnapshotPath(),
+            snapInfo.getSnapshotId());
         String tableKey = chainManager.getTableKey(previousPathSnapshot);
         return omSnapshotManager.getSnapshotInfo(tableKey);
       }
