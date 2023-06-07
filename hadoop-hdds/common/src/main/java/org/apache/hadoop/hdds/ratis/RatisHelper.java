@@ -63,6 +63,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +89,10 @@ public final class RatisHelper {
       Collections.emptyList());
 
   private RatisHelper() {
+  }
+
+  public static JvmPauseMonitor newJvmPauseMonitor(String name) {
+    return new JvmPauseMonitor(name, extraSleep -> { });
   }
 
   private static String toRaftPeerIdString(DatanodeDetails id) {
@@ -320,8 +325,6 @@ public final class RatisHelper {
    * Set all client properties matching with regex
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
-   * @param ozoneConf
-   * @param raftProperties
    */
   public static void createRaftClientProperties(ConfigurationSource ozoneConf,
       RaftProperties raftProperties) {
@@ -360,8 +363,6 @@ public final class RatisHelper {
    * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
-   * @param ozoneConf
-   * @param raftProperties
    */
   public static void createRaftServerProperties(ConfigurationSource ozoneConf,
        RaftProperties raftProperties) {
@@ -447,7 +448,7 @@ public final class RatisHelper {
         }
       } catch (IOException e) {
         LOG.error("Can not get FirstNode from the pipeline: {} with " +
-            "exception: {}", pipeline.toString(), e.getLocalizedMessage());
+            "exception: {}", pipeline, e.getLocalizedMessage());
         return null;
       }
       raftPeers.add(raftPeerId);
@@ -498,7 +499,6 @@ public final class RatisHelper {
    *
    * @param raftGroup     the Raft group
    * @param targetPeerId  the target expected leader
-   * @throws IOException
    */
   public static void transferRatisLeadership(ConfigurationSource conf,
       RaftGroup raftGroup, RaftPeerId targetPeerId, GrpcTlsConfig tlsConfig)

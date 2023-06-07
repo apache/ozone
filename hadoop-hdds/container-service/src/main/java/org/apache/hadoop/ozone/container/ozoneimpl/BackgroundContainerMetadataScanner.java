@@ -50,7 +50,7 @@ public class BackgroundContainerMetadataScanner extends
 
   @Override
   public Iterator<Container<?>> getContainerIterator() {
-    return controller.getContainers();
+    return controller.getContainers().iterator();
   }
 
   @VisibleForTesting

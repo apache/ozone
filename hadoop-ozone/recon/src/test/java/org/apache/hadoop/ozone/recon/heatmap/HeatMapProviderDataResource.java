@@ -31,7 +31,10 @@ public class HeatMapProviderDataResource {
   private EntityMetaData[] metaDataList;
 
   public EntityMetaData[] getMetaDataList() {
-    return Arrays.copyOfRange(metaDataList, 0, metaDataList.length);
+    if (null != metaDataList) {
+      return Arrays.copyOfRange(metaDataList, 0, metaDataList.length);
+    }
+    return null;
   }
 
   public void setMetaDataList(EntityMetaData[] metaDataList) {

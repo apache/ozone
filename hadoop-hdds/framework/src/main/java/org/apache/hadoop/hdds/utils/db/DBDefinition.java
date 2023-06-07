@@ -24,9 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Simple interface to provide information to create a DBStore..
@@ -57,29 +58,65 @@ public interface DBDefinition {
   /**
    * @return The column families present in the DB.
    */
-  DBColumnFamilyDefinition[] getColumnFamilies();
+  Iterable<DBColumnFamilyDefinition<?, ?>> getColumnFamilies();
 
   /**
-   * Get the key type class for the given table.
-   * @param table table name
-   * @return the class of key type of the given table wrapped in an
-   * {@link Optional}
+   * @return The column families for the given name.
    */
-  default Optional<Class> getKeyType(String table) {
-    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
-        table)).map((Function<DBColumnFamilyDefinition, Class>)
-        DBColumnFamilyDefinition::getKeyType).findAny();
+  List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(String name);
+
+
+  /**
+   * @return The unique column family for the given name.
+   */
+  default DBColumnFamilyDefinition<?, ?> getColumnFamily(String name) {
+    final List<DBColumnFamilyDefinition<?, ?>> list = getColumnFamilies(name);
+    if (list == null || list.isEmpty()) {
+      return null;
+    }
+    if (list.size() > 1) {
+      throw new IllegalStateException("Multi-valued: The name " + name
+          + " maps to multiple values " + list + " in " + getName());
+    }
+    return list.get(0);
   }
 
   /**
-   * Get the value type class for the given table.
-   * @param table table name
-   * @return the class of value type of the given table wrapped in an
-   * {@link Optional}
+   * Define a {@link WithMapInterface#getMap()} method
+   * to implement {@link #getColumnFamily(String)}
+   * and {@link #getColumnFamilies()}.
    */
-  default Optional<Class> getValueType(String table) {
-    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
-        table)).map((Function<DBColumnFamilyDefinition, Class>)
-        DBColumnFamilyDefinition::getValueType).findAny();
+  interface WithMapInterface extends DBDefinition {
+    /** @return the underlying map. */
+    Map<String, DBColumnFamilyDefinition<?, ?>> getMap();
+
+    @Override
+    default Collection<DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+      return getMap().values();
+    }
+
+    @Override
+    default List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(
+        String name) {
+      final DBColumnFamilyDefinition<?, ?> d = getMap().get(name);
+      return d != null ? Collections.singletonList(d) : Collections.emptyList();
+    }
+  }
+
+  /**
+   * Provide constructors to initialize {@link #map}
+   * and use it to implement {@link #getMap()}.
+   */
+  abstract class WithMap implements WithMapInterface {
+    private final Map<String, DBColumnFamilyDefinition<?, ?>> map;
+
+    protected WithMap(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+      this.map = map;
+    }
+
+    @Override
+    public final Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
+      return map;
+    }
   }
 }

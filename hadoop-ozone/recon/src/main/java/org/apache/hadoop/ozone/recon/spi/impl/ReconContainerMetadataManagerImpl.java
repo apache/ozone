@@ -370,9 +370,9 @@ public class ReconContainerMetadataManagerImpl
       boolean skipPrevKey = false;
       if (StringUtils.isNotBlank(prevKeyPrefix)) {
         skipPrevKey = true;
-        seekKey = new ContainerKeyPrefix(containerId, prevKeyPrefix);
+        seekKey = ContainerKeyPrefix.get(containerId, prevKeyPrefix);
       } else {
-        seekKey = new ContainerKeyPrefix(containerId);
+        seekKey = ContainerKeyPrefix.get(containerId);
       }
       KeyValue<ContainerKeyPrefix, Integer> seekKeyValue =
           containerIterator.seek(seekKey);
@@ -403,10 +403,7 @@ public class ReconContainerMetadataManagerImpl
         // prefix.
         if (containerKeyPrefix.getContainerId() == containerId) {
           if (StringUtils.isNotEmpty(containerKeyPrefix.getKeyPrefix())) {
-            prefixes.put(new ContainerKeyPrefix(containerId,
-                    containerKeyPrefix.getKeyPrefix(),
-                    containerKeyPrefix.getKeyVersion()),
-                keyValue.getValue());
+            prefixes.put(containerKeyPrefix, keyValue.getValue());
           } else {
             LOG.warn("Null key prefix returned for containerId = {} ",
                 containerId);
@@ -443,7 +440,7 @@ public class ReconContainerMetadataManagerImpl
             containerIterator = containerKeyTable.iterator()) {
       ContainerKeyPrefix seekKey;
       if (prevContainer > 0L) {
-        seekKey = new ContainerKeyPrefix(prevContainer);
+        seekKey = ContainerKeyPrefix.get(prevContainer);
         KeyValue<ContainerKeyPrefix,
             Integer> seekKeyValue = containerIterator.seek(seekKey);
         // Check if RocksDB was able to correctly seek to the given
@@ -453,7 +450,7 @@ public class ReconContainerMetadataManagerImpl
           return containers;
         } else {
           // seek to the prevContainer+1 containerID to start scan
-          seekKey = new ContainerKeyPrefix(prevContainer + 1);
+          seekKey = ContainerKeyPrefix.get(prevContainer + 1);
           containerIterator.seek(seekKey);
         }
       }
@@ -598,9 +595,9 @@ public class ReconContainerMetadataManagerImpl
              keyContainerTable.iterator()) {
       KeyPrefixContainer seekKey;
       if (keyVersion != -1) {
-        seekKey = new KeyPrefixContainer(keyPrefix, keyVersion);
+        seekKey = KeyPrefixContainer.get(keyPrefix, keyVersion);
       } else {
-        seekKey = new KeyPrefixContainer(keyPrefix);
+        seekKey = KeyPrefixContainer.get(keyPrefix);
       }
       KeyValue<KeyPrefixContainer, Integer> seekKeyValue =
           keyIterator.seek(seekKey);
@@ -626,10 +623,7 @@ public class ReconContainerMetadataManagerImpl
           if (keyPrefixContainer.getContainerId() != -1 &&
               (keyVersion == -1 ||
                   keyPrefixContainer.getKeyVersion() == keyVersion)) {
-            containers.put(new KeyPrefixContainer(keyPrefix,
-                    keyPrefixContainer.getKeyVersion(),
-                    keyPrefixContainer.getContainerId()),
-                keyValue.getValue());
+            containers.put(keyPrefixContainer, keyValue.getValue());
           } else {
             LOG.warn("Null container returned for keyPrefix = {}," +
                 " keyVersion = {} ", keyPrefix, keyVersion);

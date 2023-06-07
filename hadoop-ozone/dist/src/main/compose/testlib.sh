@@ -39,12 +39,12 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
-## @description find all the test.sh scripts in the immediate child dirs
+## @description find all the test*.sh scripts in the immediate child dirs
 all_tests_in_immediate_child_dirs() {
-  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+  find . -mindepth 2 -maxdepth 2 -name 'test*.sh' | cut -c3- | sort
 }
 
-## @description Find all test.sh scripts in immediate child dirs,
+## @description Find all test*.sh scripts in immediate child dirs,
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
@@ -381,35 +381,44 @@ generate_report(){
 copy_results() {
   local test_dir="$1"
   local all_result_dir="$2"
+  local test_script="${3:-test.sh}"
 
   local result_dir="${test_dir}/result"
-  local test_dir_name=$(basename ${test_dir})
+  local test_dir_name="$(basename ${test_dir})"
+  local test_name="${test_dir_name}"
+  local target_dir="${all_result_dir}"/"${test_dir_name}"
+
+  if [[ -n "${test_script}" ]] && [[ "${test_script}" != "test.sh" ]]; then
+    local test_script_name=${test_script}
+    test_script_name=${test_script_name#test-}
+    test_script_name=${test_script_name#test_}
+    test_script_name=${test_script_name%.sh}
+    test_name="${test_name}-${test_script_name}"
+    target_dir="${target_dir}/${test_script_name}"
+  fi
+
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}"/*.xml
+    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml
     rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  mkdir -p "${all_result_dir}"/"${test_dir_name}"
-  mv -v "${result_dir}"/* "${all_result_dir}"/"${test_dir_name}"/
+  mkdir -p "${target_dir}"
+  mv -v "${result_dir}"/* "${target_dir}"/
 }
 
 run_test_script() {
   local d="$1"
-  local test_script="$2"
+  local test_script="${2:-test.sh}"
 
-  if [[ -z "$test_script" ]]; then
-    test_script=./test.sh
-  fi
-
-  echo "Executing test in ${d}"
+  echo "Executing test ${d}/${test_script}"
 
   #required to read the .env file from the right location
   cd "${d}" || return
 
   local ret=0
-  if ! "$test_script"; then
+  if ! ./"$test_script"; then
     ret=1
-    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+    echo "ERROR: Test execution of ${d}/${test_script} is FAILED!!!!"
   fi
 
   cd - > /dev/null
@@ -419,15 +428,17 @@ run_test_script() {
 
 run_test_scripts() {
   local ret=0
+  local d f t
 
   for t in "$@"; do
     d="$(dirname "${t}")"
+    f="$(basename "${t}")"
 
-    if ! run_test_script "${d}"; then
+    if ! run_test_script "${d}" "${f}"; then
       ret=1
     fi
 
-    copy_results "${d}" "${ALL_RESULT_DIR}"
+    copy_results "${d}" "${ALL_RESULT_DIR}" "${f}"
 
     if [[ "${ret}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
       break

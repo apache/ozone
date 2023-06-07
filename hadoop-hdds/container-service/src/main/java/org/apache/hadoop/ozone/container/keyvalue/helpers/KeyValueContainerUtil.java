@@ -182,7 +182,6 @@ public final class KeyValueContainerUtil {
   /**
    * Returns if there are no blocks in the container.
    * @param containerData Container to check
-   * @param conf configuration
    * @return true if the directory containing blocks is empty
    * @throws IOException
    */
@@ -369,8 +368,8 @@ public final class KeyValueContainerUtil {
         blockCount++;
         try {
           usedBytes += getBlockLength(blockIter.nextBlock());
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
+        } catch (Exception ex) {
+          LOG.error(errorMessage, ex);
         }
       }
     }

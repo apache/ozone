@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -303,7 +303,7 @@ public class TestLDBCli {
           if (schemaV3) {
             String dbKeyStr = DatanodeSchemaThreeDBDefinition
                 .getContainerKeyPrefix(cid) + blockId;
-            dbKey = FixedLengthStringUtils.string2Bytes(dbKeyStr);
+            dbKey = FixedLengthStringCodec.string2Bytes(dbKeyStr);
             // Schema V3 ldb scan output key is "containerId: blockId"
             mapKey = cid + keySeparatorSchemaV3 + blockId;
           } else {

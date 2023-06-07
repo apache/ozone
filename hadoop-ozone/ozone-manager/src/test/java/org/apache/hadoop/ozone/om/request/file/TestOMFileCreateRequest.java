@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -332,6 +335,31 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // to true
     testNonRecursivePath(key, true, false, false);
     testNonRecursivePath(key, false, false, true);
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
+    String[] invalidKeyNames = {
+        OM_SNAPSHOT_INDICATOR + "/" + keyName,
+        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName
+    };
+
+    for (String invalidKeyName : invalidKeyNames) {
+      OMRequest omRequest = createFileRequest(volumeName, bucketName,
+          invalidKeyName, HddsProtos.ReplicationFactor.ONE,
+          HddsProtos.ReplicationType.RATIS, false, false);
+
+      OMFileCreateRequest omFileCreateRequest =
+          getOMFileCreateRequest(omRequest);
+
+      OMException ex = Assert.assertThrows(OMException.class,
+          () -> omFileCreateRequest.preExecute(ozoneManager));
+
+      Assert.assertTrue(ex.getMessage().contains(
+          "Cannot create key under path reserved for snapshot: "
+              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+    }
   }
 
   protected void testNonRecursivePath(String key,
