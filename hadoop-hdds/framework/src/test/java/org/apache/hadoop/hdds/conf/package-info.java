@@ -16,6 +16,6 @@
  * limitations under the License.
  */
 /**
- * Contains configuration-related classes.
+ * Contains configuration-related tests.
  */
 package org.apache.hadoop.hdds.conf;

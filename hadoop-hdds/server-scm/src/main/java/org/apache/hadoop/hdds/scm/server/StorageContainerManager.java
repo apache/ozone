@@ -23,20 +23,18 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedSet;
 import com.google.protobuf.BlockingService;
 
 import java.time.Duration;
-import java.util.SortedSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -192,6 +190,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -252,6 +251,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private final EventQueue eventQueue;
   private final SCMServiceManager serviceManager;
+  private final ReconfigurationHandler reconfigurationHandler;
 
   /*
    * HTTP endpoint for JMX access.
@@ -303,12 +303,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
-
-  /** A list of property that are reconfigurable at runtime. */
-  private final SortedSet<String> reconfigurableProperties =
-      ImmutableSortedSet.of(
-          OZONE_ADMINISTRATORS
-      );
 
   private Clock systemClock;
 
@@ -403,10 +397,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
+    reconfigurationHandler =
+        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
+
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
-    clientProtocolServer = new SCMClientProtocolServer(conf, this);
+    clientProtocolServer = new SCMClientProtocolServer(conf, this,
+        reconfigurationHandler);
 
     initializeEventHandlers();
 
@@ -421,7 +420,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     registerMXBean();
     registerMetricsSource(this);
   }
-
 
   private void initializeEventHandlers() {
     long timeDuration = configuration.getTimeDuration(
@@ -1839,6 +1837,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  private void checkAdminAccess(String op) throws IOException {
+    checkAdminAccess(getRemoteUser());
+  }
+
   public void checkAdminAccess(UserGroupInformation remoteUser)
       throws IOException {
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
@@ -2085,28 +2087,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmAdmins.getAdminUsernames();
   }
 
-  // ReconfigurableBase get base configuration
-  @Override
-  public Configuration getConf() {
-    return getConfiguration();
-  }
-
-  @Override // ReconfigurableBase
-  public Collection<String> getReconfigurableProperties() {
-    return reconfigurableProperties;
-  }
-
-  @Override // ReconfigurableBase
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    if (property.equals(OZONE_ADMINISTRATORS)) {
-      return reconfOzoneAdmins(newVal);
-    } else {
-      throw new ReconfigurationException(property, newVal,
-          getConfiguration().get(property));
-    }
-  }
-
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
@@ -2163,5 +2143,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     SCMHAMetrics.unRegister();
 
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
+  }
+
+  @VisibleForTesting
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
   }
 }
