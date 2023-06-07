@@ -122,9 +122,10 @@ public class BackgroundContainerDataScanner extends
   }
 
   private synchronized void shutdown(String reason) {
-    String cancelerMessage = String.format(NAME_FORMAT, volume) + " is " +
+    String shutdownMessage = String.format(NAME_FORMAT, volume) + " is " +
         "shutting down. " + reason;
-    this.canceler.cancel(cancelerMessage);
+    LOG.info(shutdownMessage);
+    this.canceler.cancel(shutdownMessage);
     super.shutdown();
   }
 

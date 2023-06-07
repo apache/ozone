@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -130,5 +131,24 @@ public class TestBackgroundContainerDataScanner extends
     Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
+  }
+
+  @Test
+  public void testWithVolumeFailure() throws Exception {
+    Mockito.when(vol.isFailed()).thenReturn(true);
+    // Run the scanner thread in the background. It should be terminated on
+    // the first iteration because the volume is unhealthy.
+    scanner.start();
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
+
+    // No iterations should have been run.
+    assertEquals(0, metrics.getNumScanIterations());
+    // All containers were on the unhealthy volume, so they should not have
+    // been scanned.
+    Mockito.verify(healthy, never()).scanData(any(), any());
+    Mockito.verify(openContainer, never()).scanData(any(), any());
+    Mockito.verify(corruptData, never()).scanData(any(), any());
+    Mockito.verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 }
