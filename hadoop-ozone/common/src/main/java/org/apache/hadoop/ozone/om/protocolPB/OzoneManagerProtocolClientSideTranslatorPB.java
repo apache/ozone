@@ -1250,7 +1250,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setJobStatus(jobStatus)
             .setListAll(listAll);
 
-    final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJob)
+    final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
         .setListSnapshotDiffJobRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);

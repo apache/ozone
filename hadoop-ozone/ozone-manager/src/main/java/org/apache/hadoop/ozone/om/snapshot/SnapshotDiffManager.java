@@ -387,24 +387,34 @@ public class SnapshotDiffManager implements AutoCloseable {
              snapDiffJobTable.iterator()) {
       while (iterator.hasNext()) {
         SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
-        if (snapshotDiffJob.getVolume().equals(volumeName) &&
-            snapshotDiffJob.getBucket().equals(bucketName)) {
+        if (Objects.equals(snapshotDiffJob.getVolume(), volumeName) &&
+            Objects.equals(snapshotDiffJob.getBucket(), bucketName)) {
           if (listAll) {
             jobList.add(snapshotDiffJob);
             continue;
           }
 
-          // If provided job status is invalid,
-          // then all jobs on the table will be ignored.
-          // No need to check if getJobStatusFromString doesn't return null.
-          if (snapshotDiffJob.getStatus().equals(
-              JobStatus.getJobStatusFromString(jobStatus))) {
+          // First check if the provided JobStatus is valid,
+          // then check for matches with the provided JobStatus.
+          if (validateStringJobStatusExists(jobStatus) &&
+              Objects.equals(snapshotDiffJob.getStatus(),
+                  JobStatus.valueOf(jobStatus.toUpperCase()))) {
             jobList.add(snapshotDiffJob);
           }
         }
       }
     }
     return jobList;
+  }
+
+  private boolean validateStringJobStatusExists(String jobStatus) {
+    for (JobStatus status : JobStatus.values()) {
+      if (Objects.equals(status.name(),
+          jobStatus.toUpperCase())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(

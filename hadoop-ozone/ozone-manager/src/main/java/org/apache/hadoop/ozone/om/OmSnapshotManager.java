@@ -689,7 +689,21 @@ public final class OmSnapshotManager implements AutoCloseable {
   public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
                                                    final String bucketName,
                                                    final String jobStatus,
-                                                   final boolean listAll) {
+                                                   final boolean listAll)
+      throws IOException {
+    String volumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+    String bucketKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+
+    if (ozoneManager.getMetadataManager()
+            .getVolumeTable().getIfExist(volumeKey) == null ||
+        ozoneManager.getMetadataManager()
+            .getBucketTable().getIfExist(bucketKey) == null) {
+      throw new IOException("Provided volume name " + volumeName +
+          " or bucket name " + bucketName + " doesn't exist");
+    }
+
     return snapshotDiffManager.getSnapshotDiffJobList(
         volumeName, bucketName, jobStatus, listAll);
   }

@@ -4520,7 +4520,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
                                                     String bucket,
                                                     String jobStatus,
-                                                    boolean listAll) {
+                                                    boolean listAll)
+      throws IOException {
     return omSnapshotManager.getSnapshotDiffList(volume,
         bucket, jobStatus, listAll);
   }

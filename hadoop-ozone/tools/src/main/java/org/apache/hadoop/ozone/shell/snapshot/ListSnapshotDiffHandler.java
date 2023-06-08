@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -38,19 +37,16 @@ public class ListSnapshotDiffHandler extends Handler {
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-  @CommandLine.Option(names = {"-s, --status"},
+  @CommandLine.Option(names = {"-s", "--status"},
       description = "List jobs based on status.\n" +
       "Accepted values are: queued, in_progress, done, failed, rejected",
       defaultValue = "in_progress")
   private String jobStatus;
 
-  @CommandLine.Option(names = {"-a, --all"},
+  @CommandLine.Option(names = {"-a", "--all"},
       description = "List all jobs regardless of status.",
       defaultValue = "false")
   private boolean listAll;
-
-  private static final String[] STATUS_VALUES =
-      {"queued", "in_progress", "done", "failed", "rejected"};
 
   @Override
   protected OzoneAddress getAddress() {
@@ -64,21 +60,15 @@ public class ListSnapshotDiffHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    if (Arrays.asList(STATUS_VALUES)
-        .contains(jobStatus)) {
-      List<SnapshotDiffJob> jobList =
-          client.getObjectStore().listSnapshotDiffJobs(
-              volumeName, bucketName, jobStatus, listAll);
+    List<SnapshotDiffJob> jobList =
+        client.getObjectStore().listSnapshotDiffJobs(
+            volumeName, bucketName, jobStatus, listAll);
 
-      int counter = printAsJsonArray(jobList.iterator(),
-          jobList.size());
-      if (isVerbose()) {
-        System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s ",
-            counter, volumeName, bucketName);
-      }
-    } else {
-      System.out.println("Invalid job status, accepted values are: " +
-          Arrays.toString(STATUS_VALUES));
+    int counter = printAsJsonArray(jobList.iterator(),
+        jobList.size());
+    if (isVerbose()) {
+      System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s ",
+          counter, volumeName, bucketName);
     }
   }
 }

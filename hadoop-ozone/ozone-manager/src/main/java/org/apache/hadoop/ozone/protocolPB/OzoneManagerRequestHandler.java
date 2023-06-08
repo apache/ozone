@@ -305,7 +305,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getSnapshotDiffRequest());
         responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
         break;
-      case ListSnapshotDiffJob:
+      case ListSnapshotDiffJobs:
         ListSnapshotDiffJobResponse listSnapDiffResponse =
             listSnapshotDiffJobs(request.getListSnapshotDiffJobRequest());
         responseBuilder.setListSnapshotDiffJobResponse(listSnapDiffResponse);
@@ -1254,7 +1254,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
-      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest) {
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest)
+      throws IOException {
     List<SnapshotDiffJob> snapshotDiffJobs =
         impl.listSnapshotDiffJobs(
             listSnapshotDiffJobRequest.getVolumeName(),

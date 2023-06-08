@@ -135,7 +135,7 @@ enum Type {
   SnapshotPurge = 118;
   RecoverLease = 119;
   SetTimes = 120;
-  ListSnapshotDiffJob = 121;
+  ListSnapshotDiffJobs = 121;
 }
 
 message OMRequest {
@@ -1727,8 +1727,8 @@ message SnapshotDiffRequest {
 }
 
 message ListSnapshotDiffJobRequest {
-  optional string volumeName = 1;
-  optional string bucketName = 2;
+  required string volumeName = 1;
+  required string bucketName = 2;
   optional string jobStatus = 3;
   optional bool listAll = 4;
 }

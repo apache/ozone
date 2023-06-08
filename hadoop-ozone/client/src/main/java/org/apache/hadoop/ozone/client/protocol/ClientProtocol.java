@@ -1078,6 +1078,7 @@ public interface ClientProtocol {
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */

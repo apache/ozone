@@ -189,14 +189,11 @@ public class SnapshotDiffJob {
   public SnapshotDiffJobProto toProtoBuf() {
     return SnapshotDiffJobProto.newBuilder()
         .setCreationTime(creationTime)
-        .setJobId(jobId)
         .setStatus(status.toProtobuf())
         .setVolume(volume)
         .setBucket(bucket)
         .setFromSnapshot(fromSnapshot)
         .setToSnapshot(toSnapshot)
-        .setForceFullDiff(forceFullDiff)
-        .setTotalDiffEntries(totalDiffEntries)
         .build();
   }
 
