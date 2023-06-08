@@ -46,10 +46,8 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
 import java.sql.Timestamp;
@@ -74,8 +72,6 @@ import static org.mockito.Mockito.when;
  */
 public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
@@ -85,7 +81,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
-  private GlobalStatsDao globalStatsDao;
 
   @Before
   public void setUp() throws Exception {
@@ -119,7 +114,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     pipeline = getRandomPipeline();
     reconPipelineManager.addPipeline(pipeline);
     ozoneConfiguration = new OzoneConfiguration();
-    globalStatsDao = getDao(GlobalStatsDao.class);
     setUpOmData();
   }
 
