@@ -21,6 +21,9 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 import org.apache.hadoop.ipc.ExternalCall;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
@@ -29,26 +32,48 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class TestS3SecretRequestHelper {
-  private static final String TEST_ACCESS_ID = "access/server@realm";
-  private static final UserGroupInformation TEST_UGI =
-      createRemoteUser(TEST_ACCESS_ID, KERBEROS);
+  private static final String TEST_ACCESS_ID = "access/server@EXAMPLE.COM";
+  private UserGroupInformation testUgi;
+  private UserGroupInformation expectedUgi;
+
+  @BeforeEach
+  void setUp() {
+    KerberosName.setRules(
+            "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
+                    "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
+                    "DEFAULT");
+    testUgi = createRemoteUser(TEST_ACCESS_ID, KERBEROS);
+    expectedUgi = createRemoteUser(TEST_ACCESS_ID, KERBEROS);
+  }
+
+  @AfterEach
+  void tearDown() {
+    Server.getCurCall().set(null);
+  }
 
   @Test
   void testGettingUgiFromCall() {
-    Server.getCurCall().set(new StubCall(TEST_UGI));
-    assertEquals(createRemoteUser(TEST_ACCESS_ID, KERBEROS),
-                 S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
+    Server.getCurCall().set(new StubCall(testUgi));
+    compareUgi(expectedUgi,
+               S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
   }
 
   @Test
   void testGettingUgiFromAccessId() {
-    assertEquals(createRemoteUser(TEST_ACCESS_ID, KERBEROS),
-                 S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
+    compareUgi(expectedUgi,
+               S3SecretRequestHelper.getOrCreateUgi(TEST_ACCESS_ID));
   }
 
   @Test
   void testGettingUgiWithNoAccessId() {
     assertNull(S3SecretRequestHelper.getOrCreateUgi(null));
+  }
+
+  private static void compareUgi(UserGroupInformation expected,
+                                 UserGroupInformation actual) {
+    assertEquals(expected.getUserName(), actual.getUserName());
+    assertEquals(expected.getAuthenticationMethod(),
+                 actual.getAuthenticationMethod());
   }
 
   private static final class StubCall extends ExternalCall<String> {
