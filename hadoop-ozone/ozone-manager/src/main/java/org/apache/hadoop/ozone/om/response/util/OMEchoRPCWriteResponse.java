@@ -38,6 +38,9 @@ public class OMEchoRPCWriteResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
                               BatchOperation batchOperation)
       throws IOException {
+    // Overrides the addToDBBatch method to prevent a db/cache update.
+    // The purpose of this override is to facilitate isolated benchmarking of
+    // Ratis without extensive backend modifications.
     return;
   }
 }
