@@ -462,9 +462,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     String tokenString = hasMoreEntries ? String.valueOf(idx) : null;
 
-    if (!hasMoreEntries) {
-      checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
-    }
+    checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
 
     return new SnapshotDiffReportOzone(path.toString(), volumeName, bucketName,
         fromSnapshotName, toSnapshotName, diffReportList, tokenString);
