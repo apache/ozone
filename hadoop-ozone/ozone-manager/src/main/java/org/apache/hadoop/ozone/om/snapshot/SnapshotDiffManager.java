@@ -478,9 +478,9 @@ public class SnapshotDiffManager implements AutoCloseable {
                                      final int pageStartIdx,
                                      final int numberOfEntriesInPage)
       throws IOException {
-    if (pageStartIdx >= diffJob.getTotalDiffEntries() &&
-        numberOfEntriesInPage != 0 || pageStartIdx <
-        diffJob.getTotalDiffEntries() && numberOfEntriesInPage == 0) {
+    if ((pageStartIdx >= diffJob.getTotalDiffEntries() &&
+        numberOfEntriesInPage != 0) || (pageStartIdx <
+        diffJob.getTotalDiffEntries() && numberOfEntriesInPage == 0)) {
       LOG.error("Expected TotalDiffEntries: {} but found " +
               "TotalDiffEntries: {}",
           diffJob.getTotalDiffEntries(),
