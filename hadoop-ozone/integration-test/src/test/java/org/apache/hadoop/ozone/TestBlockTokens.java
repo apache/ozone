@@ -271,7 +271,6 @@ public final class TestBlockTokens {
     assertExceptionContains("Invalid token for user", ex);
   }
 
-
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
         keyInfo.getKeyLocationVersions().get(0).getLocationList().get(0);

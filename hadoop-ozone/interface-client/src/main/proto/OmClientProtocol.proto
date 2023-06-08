@@ -135,6 +135,7 @@ enum Type {
   SnapshotPurge = 118;
   RecoverLease = 119;
   SetTimes = 120;
+  RefetchSecretKey = 121;
 }
 
 message OMRequest {
@@ -254,6 +255,7 @@ message OMRequest {
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
 }
 
 message OMResponse {
@@ -365,6 +367,7 @@ message OMResponse {
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
 }
 
 enum Status {
@@ -591,6 +594,14 @@ message SetVolumePropertyRequest {
 
 message SetVolumePropertyResponse {
     optional bool response = 1;
+}
+
+message RefetchSecretKeyRequest {
+
+}
+
+message RefetchSecretKeyResponse {
+    optional hdds.UUID id = 1;
 }
 
 /**

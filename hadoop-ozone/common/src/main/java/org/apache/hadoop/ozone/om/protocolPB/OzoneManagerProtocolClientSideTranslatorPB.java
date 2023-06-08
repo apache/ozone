@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -155,6 +156,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
@@ -203,6 +206,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
@@ -1350,6 +1354,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final GetS3VolumeContextResponse resp =
         handleError(omResponse).getGetS3VolumeContextResponse();
     return S3VolumeContext.fromProtobuf(resp);
+  }
+
+  @Override
+  public UUID refetchSecretKey() throws IOException {
+    final RefetchSecretKeyRequest.Builder requestBuilder =
+        RefetchSecretKeyRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.RefetchSecretKey)
+        .setRefetchSecretKeyRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final RefetchSecretKeyResponse resp =
+        handleError(omResponse).getRefetchSecretKeyResponse();
+    return ProtobufUtils.fromProtobuf(resp.getId());
   }
 
   /**

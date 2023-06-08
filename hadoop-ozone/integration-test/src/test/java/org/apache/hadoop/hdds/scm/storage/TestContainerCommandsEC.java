@@ -366,8 +366,8 @@ public class TestContainerCommandsEC {
     }
 
     try (ECReconstructionCoordinator coordinator =
-        new ECReconstructionCoordinator(config, certClient, null,
-            ECReconstructionMetrics.create())) {
+        new ECReconstructionCoordinator(config, certClient, secretKeyClient,
+            null, ECReconstructionMetrics.create())) {
 
       // Attempt to reconstruct the container.
       coordinator.reconstructECContainerGroup(orphanContainerID,
