@@ -24,7 +24,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Add reference counter to an object instance.
- * TODO: Move this up a package level?
  */
 public class ReferenceCounted<T> implements AutoCloseable {
 
@@ -43,13 +42,14 @@ public class ReferenceCounted<T> implements AutoCloseable {
    */
   private final AtomicLong refCount;
 
-  public ReferenceCounted(T obj) {
-    this.obj = obj;
-    this.threadMap = new ConcurrentHashMap<>();
-    this.refCount = new AtomicLong(0L);
-  }
+  /**
+   * Parent SnapshotCache instance whose callback will be triggered upon this RC
+   * closure.
+   */
+  private SnapshotCache parentSnapshotCache;
 
-  public ReferenceCounted(T obj, boolean disableCounter) {
+  public ReferenceCounted(T obj, boolean disableCounter,
+      SnapshotCache parentSnapshotCache) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
@@ -88,6 +88,12 @@ public class ReferenceCounted<T> implements AutoCloseable {
       Preconditions.checkState(newValTotal > 0L,
           "Total reference count overflown");
 
+      if (refCount.get() == 1L) {
+        // ref count increased to one (from zero), remove from
+        // pendingEvictionList if added
+        parentSnapshotCache.callback(this);
+      }
+
       return newVal;
     });
 
@@ -115,6 +121,11 @@ public class ReferenceCounted<T> implements AutoCloseable {
       long newValTotal = refCount.decrementAndGet();
       Preconditions.checkState(newValTotal >= 0L,
           "Total reference count underflow");
+
+      if (refCount.get() == 0L) {
+        // ref count decreased to zero, add to pendingEvictionList
+        parentSnapshotCache.callback(this);
+      }
 
       // Remove entry by returning null here when thread ref count reaches zero
       return newValue != 0L ? newValue : null;

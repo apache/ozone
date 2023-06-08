@@ -159,7 +159,7 @@ public class SnapshotCache {
         dbMap.computeIfAbsent(key, k -> {
           LOG.info("Loading snapshot. Table key: {}", k);
           try {
-            return new ReferenceCounted<>(cacheLoader.load(k));
+            return new ReferenceCounted<>(cacheLoader.load(k), false, this);
           } catch (OMException omEx) {
             // Return null if the snapshot is no longer active
             if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
@@ -233,6 +233,23 @@ public class SnapshotCache {
   public void release(OmSnapshot omSnapshot) {
     final String key = omSnapshot.getSnapshotTableKey();
     release(key);
+  }
+
+  /**
+   * Callback method used to enqueue or dequeue ReferenceCounted from
+   * pendingEvictionList.
+   * @param referenceCounted ReferenceCounted object
+   */
+  public void callback(ReferenceCounted referenceCounted) {
+    if (referenceCounted.getTotalRefCount() == 0L) {
+      // Reference count reaches zero, add to pendingEvictionList
+      Preconditions.checkState(!pendingEvictionList.contains(referenceCounted),
+          "SnapshotCache is inconsistent. Entry should not be in the "
+              + "pendingEvictionList when ref count just reached zero.");
+      pendingEvictionList.add(referenceCounted);
+    } else if (referenceCounted.getTotalRefCount() == 1L) {
+      pendingEvictionList.remove(referenceCounted);
+    }
   }
 
   /**
