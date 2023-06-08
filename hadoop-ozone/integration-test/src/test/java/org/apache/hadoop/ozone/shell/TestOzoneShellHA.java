@@ -1467,8 +1467,8 @@ public class TestOzoneShellHA {
         .getName(), volume1);
 
     args =
-        new String[] {"volume",
-            "delete", volume1, "-r", "-id", omServiceId};
+        new String[] {"volume", "delete", volume1, "-r",
+            "-yes", "-id", omServiceId};
     // Try recursive delete without skipTrash, volume should not be deleted.
     execute(ozoneShell, args);
     out.reset();
@@ -1480,8 +1480,8 @@ public class TestOzoneShellHA {
     // Delete volume1(containing OBS, FSO and Legacy buckets)
     // recursively with skipTrash
     args =
-        new String[] {"volume",
-            "delete", volume1, "-r",  "-skipTrash", "-id", omServiceId};
+        new String[] {"volume", "delete", volume1, "-r",
+            "-skipTrash", "-yes",  "-id", omServiceId};
 
     execute(ozoneShell, args);
     out.reset();

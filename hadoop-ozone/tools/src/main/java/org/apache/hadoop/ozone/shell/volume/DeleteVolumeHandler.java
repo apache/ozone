@@ -33,15 +33,17 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -68,6 +70,15 @@ public class DeleteVolumeHandler extends VolumeHandler {
       description = "Ozone Manager Service ID"
   )
   private String omServiceId;
+  
+  @CommandLine.Option(names = {"-t", "--threads", "--thread"},
+      description = "Number of threads used to execute")
+  private int threadNo = 10;
+  
+  @CommandLine.Option(names = "-yes",
+      description = "Continue without interactive user confirmation")
+  private boolean yes;
+  
   private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
@@ -96,6 +107,19 @@ public class DeleteVolumeHandler extends VolumeHandler {
           return;
         }
         vol = client.getObjectStore().getVolume(volumeName);
+        if (!yes) {
+          // Ask for user confirmation
+          out().print("Enter 'yes' to confirm recursive volume delete '" +
+              volumeName + "': ");
+          out().flush();
+          Scanner scanner = new Scanner(new InputStreamReader(
+              System.in, StandardCharsets.UTF_8));
+          String confirmation = scanner.next().trim().toLowerCase();
+          if (!confirmation.equals("yes")) {
+            out().println("Operation cancelled.");
+            return;
+          }
+        }
         deleteVolumeRecursive();
       }
     } catch (InterruptedException e) {
@@ -172,7 +196,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
       final Path path = new Path(ofsPrefix);
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
-      clientConf.setInt(FS_TRASH_INTERVAL_KEY, 0);
       FileSystem fs = FileSystem.get(clientConf);
       if (!fs.delete(path, true)) {
         throw new IOException("Failed to delete bucket");
@@ -215,9 +238,8 @@ public class DeleteVolumeHandler extends VolumeHandler {
   }
 
   private void doCleanBuckets() throws InterruptedException {
-    int threadPoolSize = 10;
-    executor = Executors.newFixedThreadPool(threadPoolSize);
-    for (int i = 0; i < threadPoolSize; i++) {
+    executor = Executors.newFixedThreadPool(threadNo);
+    for (int i = 0; i < threadNo; i++) {
       executor.execute(new BucketCleaner());
     }
 
