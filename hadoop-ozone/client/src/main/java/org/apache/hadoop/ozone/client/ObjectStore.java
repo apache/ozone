@@ -612,7 +612,8 @@ public class ObjectStore {
      * @param prevSnapshot snapshots will be listed after this snapshot name
      */
     SnapshotIterator(String volumeName, String bucketName,
-                     String snapshotPrefix, String prevSnapshot) {
+                     String snapshotPrefix, String prevSnapshot)
+        throws IOException {
       this.volumeName = volumeName;
       this.bucketName = bucketName;
       this.snapshotPrefix = snapshotPrefix;
@@ -626,8 +627,12 @@ public class ObjectStore {
       // Removing this will break the listSnapshot call if we try to
       // list more than 1000 (ozone.client.list.cache ) snapshots.
       if (!currentIterator.hasNext() && currentValue != null) {
-        currentIterator = getNextListOfSnapshots(currentValue.getName())
-            .iterator();
+        try {
+          currentIterator = getNextListOfSnapshots(currentValue.getName())
+              .iterator();
+        } catch (IOException e) {
+          LOG.error("Error retrieving next batch of list results", e);
+        }
       }
       return currentIterator.hasNext();
     }
@@ -646,13 +651,10 @@ public class ObjectStore {
      * @param prevSnapshot previous snapshot, this will be excluded from result
      * @return {@code List<OzoneSnapshot>}
      */
-    private List<OzoneSnapshot> getNextListOfSnapshots(String prevSnapshot) {
-      try {
-        return proxy.listSnapshot(volumeName, bucketName, snapshotPrefix,
-            prevSnapshot, listCacheSize);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
+    private List<OzoneSnapshot> getNextListOfSnapshots(String prevSnapshot)
+        throws IOException {
+      return proxy.listSnapshot(volumeName, bucketName, snapshotPrefix,
+          prevSnapshot, listCacheSize);
     }
   }
 
