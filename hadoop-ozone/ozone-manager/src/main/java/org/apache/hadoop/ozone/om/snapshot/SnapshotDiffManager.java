@@ -463,7 +463,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     String tokenString = hasMoreEntries ? String.valueOf(idx) : null;
 
     if (!hasMoreEntries) {
-      checkReportsIntegrity(snapDiffJob, index, idx);
+      checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
     }
 
     return new SnapshotDiffReportOzone(path.toString(), volumeName, bucketName,
@@ -477,15 +477,16 @@ public class SnapshotDiffManager implements AutoCloseable {
    * service and throws the exception to client.
    */
   private void checkReportsIntegrity(final SnapshotDiffJob diffJob,
-                                     final int startIdx,
-                                     final int endIdx)
+                                     final int pageStartIdx,
+                                     final int numberOfEntriesInPage)
       throws IOException {
-    if (startIdx < diffJob.getTotalDiffEntries()
-        && diffJob.getTotalDiffEntries() != endIdx) {
+    if (pageStartIdx >= diffJob.getTotalDiffEntries() &&
+        numberOfEntriesInPage != 0 || pageStartIdx <
+        diffJob.getTotalDiffEntries() && numberOfEntriesInPage == 0) {
       LOG.error("Expected TotalDiffEntries: {} but found " +
               "TotalDiffEntries: {}",
           diffJob.getTotalDiffEntries(),
-          endIdx);
+          pageStartIdx + numberOfEntriesInPage);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
       throw new IOException("Report integrity check failed. Retry after: " +
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
