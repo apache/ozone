@@ -37,6 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
+
 /**
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
@@ -52,6 +55,8 @@ public final class CodecBuffer implements AutoCloseable {
   private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
       ? POOL.heapBuffer(c, c)   // allocate exact size
       : POOL.heapBuffer(-c);    // allocate a resizable buffer
+
+  private final StackTraceElement[] elements;
 
   /**
    * Allocate a buffer using the given allocator.
@@ -105,6 +110,7 @@ public final class CodecBuffer implements AutoCloseable {
 
   private CodecBuffer(ByteBuf buf) {
     this.buf = buf;
+    this.elements = getStackTrace(LOG);
     assertRefCnt(1);
   }
 
@@ -120,8 +126,11 @@ public final class CodecBuffer implements AutoCloseable {
       final int refCnt = buf.refCnt();
       if (refCnt > 0) {
         final int leak = LEAK_COUNT.incrementAndGet();
-        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}",
-            leak, this, refCnt, capacity);
+        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}{}",
+            leak, this, refCnt, capacity,
+            elements != null
+                ? " allocation:\n" + formatStackTrace(elements, 3)
+                : "");
         buf.release(refCnt);
       }
     }

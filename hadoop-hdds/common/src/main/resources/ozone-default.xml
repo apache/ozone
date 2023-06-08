@@ -3525,6 +3525,34 @@
       OM/S3GATEWAY OMRequest, OMResponse over grpc max message length (bytes).
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.grpc.read.thread.num</name>
+    <value>32</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM grpc server read thread pool core thread size.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.grpc.bossgroup.size</name>
+    <value>8</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM grpc server netty boss event group size.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.grpc.workergroup.size</name>
+    <value>32</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>
+      OM grpc server netty worker event group size.
+    </description>
+  </property>
+
   <property>
     <name>ozone.default.bucket.layout</name>
     <value/>
