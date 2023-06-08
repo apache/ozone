@@ -106,7 +106,7 @@ public class AsyncRFAAppender extends AsyncAppender {
     this.fileName = fileName;
   }
 
-  public String getConversionPattern() {
+  public synchronized String getConversionPattern() {
     return conversionPattern;
   }
 
