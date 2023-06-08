@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -28,14 +30,12 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
 
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
@@ -91,6 +91,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testReprocessForCount() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+    OmKeyInfo omKeyInfo =
+        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
     // Mock 5 rows in each table and test the count
     for (String tableName : omTableInsightTask.getTaskTables()) {
       TypedTable<String, Object> table = mock(TypedTable.class);
@@ -105,6 +107,10 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
           .thenReturn(true)
           .thenReturn(true)
           .thenReturn(false);
+      TypedTable.TypedKeyValue mockKeyValue =
+          mock(TypedTable.TypedKeyValue.class);
+      when(mockKeyValue.getValue()).thenReturn(omKeyInfo);
+      when(mockIter.next()).thenReturn(mockKeyValue);
     }
 
     Pair<String, Boolean> result =
@@ -269,5 +275,18 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private long getReplicatedSizeForTable(String tableName) {
     String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
     return globalStatsDao.findById(key).getValue();
+  }
+
+  private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
+                                 String keyName, boolean isFile) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(isFile)
+        .setReplicationConfig(StandaloneReplicationConfig
+            .getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(100L)
+        .build();
   }
 }

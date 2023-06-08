@@ -62,7 +62,6 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
-import static org.jooq.impl.DSL.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,9 +213,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testClusterSummaryAttribute() throws Exception {
+  public void testClusterSummaryAttribute() {
     Timestamp now = new Timestamp(System.currentTimeMillis());
-
+    GlobalStatsDao globalStatsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
     GlobalStats newRecord =
         new GlobalStats("openFileTableReplicatedDataSize", 30L, now);
@@ -233,7 +232,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     globalStatsDao.insert(newRecord);
     newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
     globalStatsDao.insert(newRecord);
-    omdbInsightEndpoint.setDao(globalStatsDao);
 
     // Call the API to get the response
     Response openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(-1, "");

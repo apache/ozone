@@ -33,6 +33,7 @@ import java.util.Map;
 public class KeyInsightInfoResponse {
 
   /** Cluster summary. Includes aggregated information about the cluster. */
+  @JsonProperty("clusterSummary")
   private Map<String, Object> clusterSummary;
 
   /** last key sent. */
@@ -41,11 +42,11 @@ public class KeyInsightInfoResponse {
 
   /** Amount of data mapped to all keys and files in
    * a cluster across all DNs. */
-  @JsonProperty("replicatedTotal")
+  @JsonProperty("replicatedDataSize")
   private long replicatedDataSize;
 
   /** Amount of data mapped to all keys and files on a single DN. */
-  @JsonProperty("unreplicatedTotal")
+  @JsonProperty("unreplicatedDataSize")
   private long unreplicatedDataSize;
 
   /** List of all non-fso keys. */

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -97,59 +98,60 @@ public class OMDBInsightEndpoint {
    * This method retrieves set of keys/files which are open.
    *
    * @return the http json response wrapped in below format:
+   *
    * {
-   *     "clusterSummary" :
+   *   "clusterSummary": {
+   *     "totalUnreplicatedDataSize": 2147483648,
+   *     "totalReplicatedDataSize": 2147483648,
+   *     "totalOpenKeys": 8
+   *   },
+   *   "lastKey": "/-4611686018427388160/-9223372036854775552/-922777620354",
+   *   "replicatedTotal": 2147483648,
+   *   "unreplicatedTotal": 2147483648,
+   *   "fso": [
    *     {
-   *        totalRecords : 1000,
-   *        totalUnReplicatedData : 303600,
-   *        totalReplicatedData : 101200
-   *     }.
-   *     replicatedDataSize: 13824,
-   *     unreplicatedDataSize: 4608,
-   *     entities: [
+   *       "key": "/-4611686018427388160/-9223372036/-922337203977722380527",
+   *       "path": "239",
+   *       "inStateSince": 1686156886632,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
+   *     },
    *     {
-   *         path: “/vol1/bucket1/key1”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 1024,
-   *         replicatedSize: 3072,
-   *         unreplicatedSize: 1024,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
-   *    {
-   *         path: “/vol1/bucket1/key2”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 512,
-   *         replicatedSize: 1536,
-   *         unreplicatedSize: 512,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
-   *     {
-   *         path: “/vol1/fso-bucket/dir1/file1”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 1024,
-   *         replicatedSize: 3072,
-   *         unreplicatedSize: 1024,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
-   *     {
-   *         path: “/vol1/fso-bucket/dir1/dir2/file2”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 2048,
-   *         replicatedSize: 6144,
-   *         unreplicatedSize: 2048,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
+   *       "key": "/-4611686018427388160/-9223372036854775552/0397777586240",
+   *       "path": "244",
+   *       "inStateSince": 1686156887186,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
    *     }
-   *   ]
+   *   ],
+   *   "nonFSO": [
+   *     {
+   *       "key": "/vol1/bucket1/object1",
+   *       "path": "239",
+   *       "inStateSince": 1686156886632,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
+   *     }
+   *   ],
+   *   "status": "OK"
    * }
    */
+
   @GET
   @Path("/open")
   public Response getOpenKeyInfo(
@@ -244,8 +246,15 @@ public class OMDBInsightEndpoint {
     return Response.ok(openKeyInsightInfo).build();
   }
 
+  /**
+   * Creates a cluster summary for open keys and updates the provided
+   * clusterSummary map. Calculates the total number of open keys, replicated
+   * data size, and unreplicated data size.
+   *
+   * @param clusterSummary A map to store the cluster summary information.
+   */
   private void createClusterSummaryForOpenKey(
-                Map<String, Object> clusterSummary) {
+      Map<String, Object> clusterSummary) {
     Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
     Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
@@ -271,10 +280,8 @@ public class OMDBInsightEndpoint {
   }
 
   private Long getValueFromId(GlobalStats record) {
-    if (record != null) {
-      return record.getValue();
-    }
-    return 0L;
+    // If the record is null, return 0
+    return record != null ? record.getValue() : 0L;
   }
 
   private void getPendingForDeletionKeyInfo(
@@ -542,9 +549,9 @@ public class OMDBInsightEndpoint {
     });
   }
 
-  @TestOnly
-  public void setDao(GlobalStatsDao globalStatsDao){
-    this.globalStatsDao = globalStatsDao;
+  @VisibleForTesting
+  public GlobalStatsDao getDao() {
+    return this.globalStatsDao;
   }
 
 }
