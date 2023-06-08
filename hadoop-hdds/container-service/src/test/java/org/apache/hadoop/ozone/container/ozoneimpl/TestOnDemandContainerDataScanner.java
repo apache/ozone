@@ -217,7 +217,6 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
-  @Test
   private void scanContainer(Container<ContainerData> container)
       throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
