@@ -80,14 +80,11 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
    * Read messages from the ReplicationManager under replicated queue and,
    * form commands to correct replication. The commands are added
    * to the event queue and the PendingReplicaOps are adjusted.
-   *
-   * Note: this is a temporary implementation of this feature. A future
-   * version will need to limit the amount of messages assigned to each
-   * datanode, so they are not assigned too much work.
    */
   public void processAll(ReplicationQueue queue) {
     int processed = 0;
     int failed = 0;
+    int overloaded = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
     List<HealthResult> failedOnes = new LinkedList<>();
@@ -115,11 +112,17 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         processContainer(healthResult);
         processed++;
         healthStateCntMap.compute(healthResult.getHealthState(),
-                (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+            (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("All targets overloaded when processing Health result of " +
+            "class: {} for container {}", healthResult.getClass(),
+            healthResult.getContainerInfo());
+        overloaded++;
+        failedOnes.add(healthResult);
       } catch (Exception e) {
         LOG.error("Error processing Health result of class: {} for " +
-                   "container {}", healthResult.getClass(),
-                healthResult.getContainerInfo(), e);
+                "container {}", healthResult.getClass(),
+            healthResult.getContainerInfo(), e);
         failed++;
         failedOnes.add(healthResult);
       }
@@ -127,9 +130,10 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
 
     failedOnes.forEach(result -> requeueHealthResult(queue, result));
 
-    if (processed > 0 || failed > 0) {
+    if (processed > 0 || failed > 0 || overloaded > 0) {
       LOG.info("Processed {} containers with health state counts {}, " +
-          "failed processing {}", processed, healthStateCntMap, failed);
+          "failed processing {}, deferred due to load {}",
+          processed, healthStateCntMap, failed, overloaded);
     }
   }
 

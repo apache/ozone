@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -187,9 +187,9 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             long endCId = Long.MIN_VALUE;
             for (LiveFileMetaData file: innerEntry.getValue()) {
               long firstCId = DatanodeSchemaThreeDBDefinition.getContainerId(
-                  FixedLengthStringUtils.bytes2String(file.smallestKey()));
+                  FixedLengthStringCodec.bytes2String(file.smallestKey()));
               long lastCId = DatanodeSchemaThreeDBDefinition.getContainerId(
-                  FixedLengthStringUtils.bytes2String(file.largestKey()));
+                  FixedLengthStringCodec.bytes2String(file.largestKey()));
               startCId = Math.min(firstCId, startCId);
               endCId = Math.max(lastCId, endCId);
             }

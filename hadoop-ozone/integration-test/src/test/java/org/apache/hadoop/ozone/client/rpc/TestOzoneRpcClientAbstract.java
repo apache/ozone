@@ -155,6 +155,7 @@ import static org.junit.Assert.fail;
 import static org.slf4j.event.Level.DEBUG;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -4073,6 +4074,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  @Disabled("HDDS-8752")
   public void testOverWriteKeyWithAndWithOutVersioning() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
