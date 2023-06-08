@@ -110,10 +110,8 @@ public class AsyncRFAAppender extends AsyncAppender {
     return conversionPattern;
   }
 
-  public void setConversionPattern(String conversionPattern) {
-    synchronized (conversionPatternLock) {
-      this.conversionPattern = conversionPattern;
-    }
+  public synchronized void setConversionPattern(String conversionPattern) {
+    this.conversionPattern = conversionPattern;
   }
 
   public boolean isBlocking() {
