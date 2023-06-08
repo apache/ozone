@@ -72,7 +72,7 @@ Storage space level quotas allow the use of units B, KB, MB, GB and TB. Represen
 
 #### Note:
 
-- You cannot set the quota of volumes and buckets in decimals. For example, 1.5 TB.
+- Decimals are not supported while setting quota for volume and bucket. For example, 1.5 TB.
 
 - Ensure that the minimum storage quota is default block size * replication factor. If you set the value lesser than the default block size * replication factor, while writing the data (key put) operation, an operation error is displayed.
 
