@@ -53,7 +53,11 @@ import org.junit.rules.TemporaryFolder;
 
 import javax.ws.rs.core.Response;
 import java.sql.Timestamp;
-import java.util.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
@@ -215,23 +219,23 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   @Test
   public void testClusterSummaryAttribute() {
     Timestamp now = new Timestamp(System.currentTimeMillis());
-    GlobalStatsDao globalStatsDao = omdbInsightEndpoint.getDao();
+    GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
     GlobalStats newRecord =
         new GlobalStats("openFileTableReplicatedDataSize", 30L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
     newRecord = new GlobalStats("openKeyTableReplicatedDataSize", 30L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
     newRecord = new GlobalStats("openFileTableUnReplicatedDataSize", 10L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
     newRecord = new GlobalStats("openKeyTableUnReplicatedDataSize", 10L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
 
     // Insert records for table counts
     newRecord = new GlobalStats("openKeyTableTableCount", 3L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
     newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
-    globalStatsDao.insert(newRecord);
+    statsDao.insert(newRecord);
 
     // Call the API to get the response
     Response openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(-1, "");

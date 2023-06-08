@@ -51,6 +51,7 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -91,8 +92,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testReprocessForCount() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    OmKeyInfo omKeyInfo =
-        getOmKeyInfo("sampleVol", "bucketOne", "key_one", true);
+
     // Mock 5 rows in each table and test the count
     for (String tableName : omTableInsightTask.getTaskTables()) {
       TypedTable<String, Object> table = mock(TypedTable.class);
@@ -109,7 +109,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
           .thenReturn(false);
       TypedTable.TypedKeyValue mockKeyValue =
           mock(TypedTable.TypedKeyValue.class);
-      when(mockKeyValue.getValue()).thenReturn(omKeyInfo);
+      when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
       when(mockIter.next()).thenReturn(mockKeyValue);
     }
 
@@ -240,12 +240,17 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       assertEquals(12000L, getReplicatedSizeForTable(tableName));
     }
 
-    // Verify count and size of non-size-related tables
+    // Null pointer exception should be thrown if table is not in database
     for (String tableName : omTableInsightTask.getTaskTables()) {
       if (!omTableInsightTask.getTablesToCalculateSize().contains(tableName)) {
-        assertEquals(5L, getCountForTable(tableName));
-        assertEquals(0L, getUnReplicatedSizeForTable(tableName));
-        assertEquals(0L, getReplicatedSizeForTable(tableName));
+        assertThrows(
+            NullPointerException.class,
+            () -> assertEquals(0L, getUnReplicatedSizeForTable(tableName))
+        );
+        assertThrows(
+            NullPointerException.class,
+            () -> assertEquals(0L, getReplicatedSizeForTable(tableName))
+        );
       }
     }
   }
