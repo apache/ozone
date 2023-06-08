@@ -965,11 +965,12 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
+
   long generateDiffReport(final String jobId,
                           final PersistentSet<byte[]> objectIDsToCheck,
                           final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-                          final PersistentMap<byte[], byte[]> newObjIdToKeyMap) {
-
+                          final PersistentMap<byte[], byte[]>
+                              newObjIdToKeyMap) {
     LOG.debug("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
