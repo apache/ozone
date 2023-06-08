@@ -158,23 +158,8 @@ public class HddsVolume extends StorageVolume {
       createDbStore(dbVolumeSet);
     }
 
-    createDeletedContainerDirIfNeeded();
+    createTmpSubdirIfNeeded(TMP_CONTAINER_DELETE_DIR_NAME);
     cleanDeletedContainerDir();
-  }
-
-  /**
-   * Create the directory where containers are moved before being deleted.
-   * This ensures container delete is atomic at the file system level.
-   */
-  private void createDeletedContainerDirIfNeeded() {
-    deletedContainerDir = new File(getTmpDir(), TMP_CONTAINER_DELETE_DIR_NAME);
-    if (!deletedContainerDir.exists()) {
-      try {
-        Files.createDirectories(deletedContainerDir.toPath());
-      } catch (IOException ex) {
-        LOG.error("Error creating {}", deletedContainerDir.toString(), ex);
-      }
-    }
   }
 
   public File getHddsRootDir() {

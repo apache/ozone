@@ -30,25 +30,20 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.io.SyncFailedException;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
 
@@ -234,7 +229,18 @@ public abstract class StorageVolume
     }
     this.workingDirName = workingDirName;
     this.tmpDir = new File(idDir, TMP_DIR_NAME);
-    this.tmpDiskCheckDir = new File(tmpDir, TMP_DISK_CHECK_DIR_NAME);
+    Files.createDirectories(tmpDir.toPath());
+    createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);
+    cleanTmpDiskCheckDir();
+  }
+
+  /**
+   * Create a subdirectory within this volume's tmp directory.
+   * This subdirectory can be used as a work space for temporary filesystem
+   * operations before they are moved to their final destination.
+   */
+  protected void createTmpSubdirIfNeeded(String name) throws IOException {
+    Files.createDirectories(new File(tmpDir, name).toPath());
   }
 
   private VolumeState analyzeVolumeState() {
@@ -513,6 +519,28 @@ public abstract class StorageVolume
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
     volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
+    cleanTmpDiskCheckDir();
+  }
+
+  /**
+   * Delete all temporary files in the directory used ot check disk health.
+   */
+  private void cleanTmpDiskCheckDir() {
+    try (Stream<Path> files = Files.list(tmpDiskCheckDir.toPath())) {
+          files.map(Path::toFile)
+          .filter(File::isFile)
+          .forEach(file -> {
+            try {
+              Files.delete(file.toPath());
+            } catch (IOException ex) {
+              LOG.warn("Failed to delete temporary volume health check file {}",
+                  file);
+            }
+          });
+    } catch (IOException ex) {
+      LOG.warn("Failed to list contents of volume health check directory {} " +
+          "for deleting.", tmpDiskCheckDir);
+    }
   }
 
   /**
