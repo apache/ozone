@@ -91,7 +91,8 @@ public final class OnDemandContainerDataScanner {
       return false;
     }
 
-    return !ContainerUtils.recentlyScanned(container, instance.minScanGap, LOG);
+    return !ContainerUtils.recentlyScanned(container, instance.minScanGap,
+        LOG) && container.shouldScanData();
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {
