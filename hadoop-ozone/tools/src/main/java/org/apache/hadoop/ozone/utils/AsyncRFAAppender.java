@@ -39,6 +39,8 @@ public class AsyncRFAAppender extends AsyncAppender {
 
   private String conversionPattern = null;
 
+  private final Object conversionPatternLock = new Object();
+
   private boolean blocking = true;
 
   private int bufferSize = DEFAULT_BUFFER_SIZE;
@@ -58,10 +60,12 @@ public class AsyncRFAAppender extends AsyncAppender {
   private synchronized void appendRFAToAsyncAppender() {
     if (!isRollingFileAppenderAssigned) {
       PatternLayout patternLayout;
-      if (conversionPattern != null) {
-        patternLayout = new PatternLayout(conversionPattern);
-      } else {
-        patternLayout = new PatternLayout();
+      synchronized (conversionPatternLock) {
+        if (conversionPattern != null) {
+          patternLayout = new PatternLayout(conversionPattern);
+        } else {
+          patternLayout = new PatternLayout();
+        }
       }
       try {
         rollingFileAppender =
@@ -107,7 +111,9 @@ public class AsyncRFAAppender extends AsyncAppender {
   }
 
   public void setConversionPattern(String conversionPattern) {
-    this.conversionPattern = conversionPattern;
+    synchronized (conversionPatternLock) {
+      this.conversionPattern = conversionPattern;
+    }
   }
 
   public boolean isBlocking() {
