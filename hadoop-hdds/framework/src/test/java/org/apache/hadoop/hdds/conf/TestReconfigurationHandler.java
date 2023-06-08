@@ -38,42 +38,67 @@ class TestReconfigurationHandler {
 
   private static final String PROP_A = "some.test.property";
   private static final String PROP_B = "other.property";
+  private static final String COMPRESSION_ENABLED =
+      "test.scm.client.compression.enabled";
+  private static final String WAIT = "test.scm.client.wait";
+
   private static final CheckedConsumer<String, IOException> ACCEPT = any -> { };
   private static final CheckedConsumer<String, IOException> DENY = any -> {
     throw new IOException("access denied");
   };
 
+  private final OzoneConfiguration config = new OzoneConfiguration();
+
   private final AtomicReference<String> refA =
       new AtomicReference<>("oldA");
   private final AtomicReference<String> refB =
       new AtomicReference<>("oldB");
+  private final SimpleConfiguration object =
+      config.getObject(SimpleConfiguration.class);
   private final AtomicReference<CheckedConsumer<String, IOException>> adminCheck
       = new AtomicReference<>(ACCEPT);
 
-  private final ReconfigurationHandler subject = new ReconfigurationHandler(
-      "test", new OzoneConfiguration(), op -> adminCheck.get().accept(op))
-              .register(PROP_A, refA::getAndSet)
-              .register(PROP_B, refB::getAndSet);
+  private final ReconfigurationHandler subject =
+      new ReconfigurationHandler(
+              "test", config, op -> adminCheck.get().accept(op))
+          .register(PROP_A, refA::getAndSet)
+          .register(PROP_B, refB::getAndSet)
+          .register(object);
+
+  private static Stream<String> expectedReconfigurableProperties() {
+    return Stream.of(PROP_A, PROP_B, COMPRESSION_ENABLED, WAIT);
+  }
 
   @Test
   void getProperties() {
-    assertEquals(Stream.of(PROP_A, PROP_B).collect(toSet()),
+    assertEquals(expectedReconfigurableProperties().collect(toSet()),
         subject.getReconfigurableProperties());
   }
 
   @Test
   void listProperties() throws IOException {
-    assertEquals(Stream.of(PROP_A, PROP_B).sorted().collect(toList()),
+    assertEquals(expectedReconfigurableProperties().sorted().collect(toList()),
         subject.listReconfigureProperties());
   }
 
   @Test
   void callsReconfigurationFunction() throws ReconfigurationException {
-    subject.reconfigurePropertyImpl(PROP_A, "newA");
-    assertEquals("newA", refA.get());
+    final String newA = "newA";
+    subject.reconfigurePropertyImpl(PROP_A, newA);
+    assertEquals(newA, refA.get());
 
-    subject.reconfigurePropertyImpl(PROP_B, "newB");
-    assertEquals("newB", refB.get());
+    final String newB = "newB";
+    subject.reconfigurePropertyImpl(PROP_B, newB);
+    assertEquals(newB, refB.get());
+
+    final boolean newCompressionEnabled = !object.isCompressionEnabled();
+    subject.reconfigurePropertyImpl(COMPRESSION_ENABLED,
+        Boolean.toString(newCompressionEnabled));
+    assertEquals(newCompressionEnabled, object.isCompressionEnabled());
+
+    long newWaitTime = object.getWaitTime() + 5;
+    subject.reconfigurePropertyImpl(WAIT, Long.toString(newWaitTime));
+    assertEquals(newWaitTime, object.getWaitTime());
   }
 
   @Test
