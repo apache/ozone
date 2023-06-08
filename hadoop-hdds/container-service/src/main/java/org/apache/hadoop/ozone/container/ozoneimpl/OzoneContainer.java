@@ -437,7 +437,7 @@ public class OzoneContainer {
 
   public void handleVolumeFailures() {
     if (containerSet != null) {
-      containerSet.handleVolumeFailures();
+      containerSet.handleVolumeFailures(context);
     }
   }
 

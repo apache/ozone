@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.container.common.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +43,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
@@ -179,21 +183,39 @@ public class ContainerSet implements Iterable<Container<?>> {
     return containerMap.size();
   }
 
-  public void handleVolumeFailures() {
+  /**
+   * Remove all containers belonging to failed volume.
+   * Send FCR which will not contain removed containers.
+   *
+   * @param  context StateContext
+   * @return
+   */
+  public void handleVolumeFailures(StateContext context) {
+    AtomicBoolean failedVolume = new AtomicBoolean(false);
+    AtomicInteger containerCount = new AtomicInteger(0);
     containerMap.values().forEach(c -> {
       if (c.getContainerData().getVolume().isFailed()) {
-        try {
-          c.markContainerUnhealthy();
-          LOG.info("Marking Container {} UNHEALTHY as the Volume {} " +
+        removeContainer(c.getContainerData().getContainerID());
+        LOG.debug("Removing Container {} as the Volume {} " +
               "has failed", c.getContainerData().getContainerID(),
-              c.getContainerData().getVolume());
-        } catch (StorageContainerException e) {
-          LOG.error("Failed to move container {} to UNHEALTHY state in "
-                  + "volume {}", c.getContainerData().getContainerID(),
-              c.getContainerData().getVolume(), e);
-        }
+            c.getContainerData().getVolume());
+        failedVolume.set(true);
+        containerCount.incrementAndGet();
       }
     });
+
+    if (failedVolume.get()) {
+      try {
+        LOG.info("Removed {} containers on failed volumes",
+            containerCount.get());
+        // There are some failed volume(container), send FCR to SCM
+        Message report = context.getFullContainerReportDiscardPendingICR();
+        context.refreshFullReport(report);
+        context.getParent().triggerHeartbeat();
+      } catch (Exception e) {
+        LOG.error("Failed to send FCR in Volume failure", e);
+      }
+    }
   }
 
   @Override

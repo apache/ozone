@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -41,7 +42,14 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 /**
  * Class defines the structure and types of the scm.db.
  */
-public class SCMDBDefinition implements DBDefinition {
+public class SCMDBDefinition extends DBDefinition.WithMap {
+  public SCMDBDefinition() {
+    this(COLUMN_FAMILIES);
+  }
+
+  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+    super(map);
+  }
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETED_BLOCKS =
@@ -176,6 +184,23 @@ public class SCMDBDefinition implements DBDefinition {
           ByteString.class,
           ByteStringCodec.getInstance());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINERS,
+          CRLS,
+          CRL_SEQUENCE_ID,
+          DELETED_BLOCKS,
+          META,
+          MOVE,
+          PIPELINES,
+          REVOKED_CERTS,
+          REVOKED_CERTS_V2,
+          SEQUENCE_ID,
+          STATEFUL_SERVICE_CONFIG,
+          TRANSACTIONINFO,
+          VALID_CERTS,
+          VALID_SCM_CERTS);
+
   @Override
   public String getName() {
     return "scm.db";
@@ -184,13 +209,5 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ScmConfigKeys.OZONE_SCM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META,
-        STATEFUL_SERVICE_CONFIG};
   }
 }

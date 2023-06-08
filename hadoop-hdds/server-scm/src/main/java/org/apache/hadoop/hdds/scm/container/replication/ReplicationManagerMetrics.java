@@ -147,7 +147,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   private MetricsRegistry registry;
 
-  private ReplicationManager replicationManager;
+  private final ReplicationManager replicationManager;
 
   //EC Metrics
   @Metric("Number of EC Replication commands sent.")

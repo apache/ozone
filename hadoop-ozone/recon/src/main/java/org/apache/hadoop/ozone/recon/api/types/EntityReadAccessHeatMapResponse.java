@@ -41,22 +41,31 @@ import java.util.Objects;
    *             {
    *               "label": "reg_path/hive_tpcds/store_sales/store_sales.dat",
    *               "size": 256,
+ *                 "path": "/hivevol1675429570/hivebuck1675429570/reg_path/
+ *                 hive_tpcds/store_sales/store_sales.dat",
    *               "accessCount": 129977,
    *               "color": 1
    *             }
  *            ],
  *           "size": 3072,
+ *           "path": "/hivevol1675429570/hivebuck1675429570",
  *           "minAccessCount": 3195,
  *           "maxAccessCount": 129977
  *         }
  *       ],
- *       "size": 6144
+ *       "size": 6144,
+ *       "path": "/hivevol1675429570"
  *     }
  */
 public class EntityReadAccessHeatMapResponse {
 
+  /** Name of volume or bucket or full key name. */
   @JsonProperty("label")
   private String label;
+
+  /** Path at each node level. */
+  @JsonProperty("path")
+  private String path;
 
   /**
    * This property is a list of each Entity's
@@ -95,6 +104,14 @@ public class EntityReadAccessHeatMapResponse {
 
   public void setLabel(String label) {
     this.label = label;
+  }
+
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
   }
 
   public long getSize() {
