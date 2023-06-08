@@ -1212,7 +1212,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
     return updateCertSerialId(signAndStoreCertificate(request,
-        getSecurityConfig().getCertificateLocation(getComponentName())));
+        securityConfig.getCertificateLocation(getComponentName())));
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
