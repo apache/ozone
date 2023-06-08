@@ -956,14 +956,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     long expiryTime = securityConfig.getBlockTokenExpiryDurationMs();
-    long certificateGracePeriod =
-        securityConfig.getRenewalGracePeriod().toMillis();
-    if (expiryTime > certificateGracePeriod) {
-      throw new IllegalArgumentException("Certificate grace period " +
-          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-          " should be greater than maximum block/container token lifetime " +
-          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
-    }
 
     // Means this is an upgraded cluster and it has no sub-ca,
     // so SCM Certificate client is not initialized. To make Tokens

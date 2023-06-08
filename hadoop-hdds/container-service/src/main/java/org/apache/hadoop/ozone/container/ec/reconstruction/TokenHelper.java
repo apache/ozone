@@ -63,14 +63,6 @@ class TokenHelper {
       user = UserGroupInformation.getCurrentUser().getShortUserName();
 
       long expiryTime = securityConfig.getBlockTokenExpiryDurationMs();
-      long certificateGracePeriod =
-          securityConfig.getRenewalGracePeriod().toMillis();
-      if (expiryTime > certificateGracePeriod) {
-        throw new IllegalArgumentException("Certificate grace period " +
-            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-            " should be greater than maximum block/container token lifetime " +
-            HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
-      }
 
       if (blockTokenEnabled) {
         blockTokenMgr = new OzoneBlockTokenSecretManager(expiryTime,

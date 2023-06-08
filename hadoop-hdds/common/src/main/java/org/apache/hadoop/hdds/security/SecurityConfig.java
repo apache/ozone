@@ -110,6 +110,7 @@ public class SecurityConfig {
   private final String x509SignatureAlgo;
   private final boolean blockTokenEnabled;
   private final long blockTokenExpiryDurationMs;
+  private final boolean tokenSanityChecksEnabled;
   private final boolean containerTokenEnabled;
   private final String certificateDir;
   private final String certificateFileName;
@@ -118,7 +119,7 @@ public class SecurityConfig {
   private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
   private final String crlName;
-  private boolean grpcTlsUseTestCert;
+  private final boolean grpcTlsUseTestCert;
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
@@ -169,6 +170,9 @@ public class SecurityConfig {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
+    tokenSanityChecksEnabled = configuration.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
 
     this.containerTokenEnabled = configuration.getBoolean(
         HDDS_CONTAINER_TOKEN_ENABLED,
@@ -180,6 +184,8 @@ public class SecurityConfig {
     if (grpcTlsEnabled) {
       this.grpcTlsUseTestCert = configuration.getBoolean(
           HDDS_GRPC_TLS_TEST_CERT, HDDS_GRPC_TLS_TEST_CERT_DEFAULT);
+    } else {
+      this.grpcTlsUseTestCert = false;
     }
 
     this.isSecurityEnabled = configuration.getBoolean(
@@ -285,6 +291,14 @@ public class SecurityConfig {
       throw new IllegalArgumentException("Property value of " +
           HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
           " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+    }
+
+    if (tokenSanityChecksEnabled
+        && blockTokenExpiryDurationMs > renewalGracePeriod.toMillis()) {
+      throw new IllegalArgumentException(" Certificate grace period " +
+          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+          " should be greater than maximum block/container token lifetime " +
+          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
     }
   }
 
@@ -512,14 +526,12 @@ public class SecurityConfig {
    * @param providerName - name of the provider.
    */
   private Provider initSecurityProvider(String providerName) {
-    switch (providerName) {
-    case "BC":
+    if ("BC".equals(providerName)) {
       Security.addProvider(new BouncyCastleProvider());
       return Security.getProvider(providerName);
-    default:
-      LOG.error("Security Provider:{} is unknown", provider);
-      throw new SecurityException("Unknown security provider:" + provider);
     }
+    LOG.error("Security Provider:{} is unknown", provider);
+    throw new SecurityException("Unknown security provider:" + provider);
   }
 
   public boolean isTokenEnabled() {
