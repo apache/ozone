@@ -131,7 +131,6 @@ public class TestSnapshotDiffManager {
   public static void initCodecRegistry() {
     // Integers are used for indexing persistent list.
     codecRegistry = CodecRegistry.newBuilder()
-        .addCodec(Integer.class, IntegerCodec.get())
         .addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
             SnapshotDiffReportOzone.getDiffReportEntryCodec())
         .addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec()).build();
