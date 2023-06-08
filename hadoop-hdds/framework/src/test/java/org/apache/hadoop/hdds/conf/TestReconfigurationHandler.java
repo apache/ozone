@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
 
@@ -67,7 +68,7 @@ class TestReconfigurationHandler {
   }
 
   @Test
-  void callsReconfigurationFunction() {
+  void callsReconfigurationFunction() throws ReconfigurationException {
     subject.reconfigurePropertyImpl(PROP_A, "newA");
     assertEquals("newA", refA.get());
 
