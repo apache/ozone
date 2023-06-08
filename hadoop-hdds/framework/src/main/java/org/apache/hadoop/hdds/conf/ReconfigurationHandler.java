@@ -50,9 +50,9 @@ public class ReconfigurationHandler extends ReconfigurableBase
 
   public ReconfigurationHandler(String name, OzoneConfiguration config,
       CheckedConsumer<String, IOException> requireAdminPrivilege) {
+    super(config);
     this.name = name;
     this.requireAdminPrivilege = requireAdminPrivilege;
-    setConf(config);
   }
 
   public ReconfigurationHandler register(
