@@ -352,7 +352,8 @@ public final class HASecurityUtils {
             RetryPolicies.retryUpToMaximumCountWithFixedSleep(120,
                 TimeDuration.valueOf(500, TimeUnit.MILLISECONDS)));
     try (RaftClient raftClient = builder.build()) {
-      CompletableFuture<RaftClientReply> future = raftClient.async().send(message);
+      CompletableFuture<RaftClientReply> future =
+          raftClient.async().send(message);
       RaftClientReply raftClientReply = future.get();
       return SCMRatisResponse.decode(raftClientReply);
     }
