@@ -28,7 +28,7 @@ import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class S3SecretRequestHelperTest {
+class TestS3SecretRequestHelper {
   private static final String TEST_ACCESS_ID = "access/server@realm";
   private static final UserGroupInformation TEST_UGI =
       createRemoteUser(TEST_ACCESS_ID, KERBEROS);
