@@ -17,18 +17,9 @@
 
 #suite:MR
 
-SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
-ALL_RESULT_DIR="$SCRIPT_DIR/result"
-mkdir -p "$ALL_RESULT_DIR"
-rm "$ALL_RESULT_DIR"/* || true
-source "$SCRIPT_DIR/../testlib.sh"
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
 
-tests=$(find_tests)
-cd "$SCRIPT_DIR"
+export HADOOP_VERSION=3.2.2
 
-RESULT=0
-run_test_scripts ${tests} || RESULT=$?
-
-generate_report "ozone-mr" "${ALL_RESULT_DIR}"
-
-exit ${RESULT}
+source ${COMPOSE_DIR}/hadoop-test.sh
