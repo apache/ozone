@@ -25,14 +25,13 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
 /**
  * Protocol for OmMetadataReader's.
  */
-public interface IOmMetadataReader extends Closeable {
+public interface IOmMetadataReader {
   /**
    * Look up for the container of an existing key.
    *

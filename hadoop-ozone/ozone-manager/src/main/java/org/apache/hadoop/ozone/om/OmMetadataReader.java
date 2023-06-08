@@ -589,8 +589,4 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return ResourceType.KEY;
   }
 
-  @Override
-  public void close() throws IOException {
-    
-  }
 }
