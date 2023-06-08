@@ -120,8 +120,18 @@ public interface CertificateClient extends Closeable {
    */
   X509Certificate getRootCACertificate();
 
+  /**
+   * Return the root ca certs saved in this client's file system
+   *
+   * @return all the Root CA certificates known to the client
+   */
   Set<X509Certificate> getAllRootCaCerts();
 
+  /**
+   * Return the subordinate ca certs saved in this client's file system
+   *
+   * @return all the subordinate CA certificates known to the client
+   */
   Set<X509Certificate> getAllCaCerts();
 
   /**
