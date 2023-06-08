@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -85,6 +86,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
@@ -664,6 +666,33 @@ public class TestOmSnapshot {
         bucketName, fromSnapName, toSnapName,
         null, 0, false, true);
     assertEquals(CANCELED, response.getJobStatus());
+
+    String fromSnapshotTableKey = SnapshotInfo
+        .getTableKey(volumeName, bucketName, fromSnapName);
+    String toSnapshotTableKey = SnapshotInfo
+        .getTableKey(volumeName, bucketName, toSnapName);
+
+    String fromSnapshotID = ozoneManager.getOmSnapshotManager()
+        .getSnapshotInfo(fromSnapshotTableKey).getSnapshotID();
+    String toSnapshotID = ozoneManager.getOmSnapshotManager()
+        .getSnapshotInfo(toSnapshotTableKey).getSnapshotID();
+
+    // Construct SnapshotDiffJob table key.
+    String snapDiffJobKey = fromSnapshotID + DELIMITER + toSnapshotID;
+
+    // Get the job from the SnapDiffJobTable, in order to get it's ID.
+    String jobID = ozoneManager.getOmSnapshotManager()
+        .getSnapshotDiffManager().getSnapDiffJobTable()
+        .get(snapDiffJobKey).getJobId();
+
+    SnapshotDiffCleanupService snapshotDiffCleanupService =
+        ozoneManager.getOmSnapshotManager().getSnapshotDiffCleanupService();
+
+    // Run SnapshotDiffCleanupService.
+    snapshotDiffCleanupService.run();
+    // Verify that after running the cleanup service,
+    // job exists in the purged job table.
+    assertNotNull(snapshotDiffCleanupService.getEntryFromPurgedJobTable(jobID));
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
