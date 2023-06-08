@@ -115,7 +115,7 @@ public class SnapshotTestUtils {
 
     @Override
     public void remove(K key) {
-      this.map.remove(getStringKey(key));
+      this.map.remove(key);
     }
 
     @Override

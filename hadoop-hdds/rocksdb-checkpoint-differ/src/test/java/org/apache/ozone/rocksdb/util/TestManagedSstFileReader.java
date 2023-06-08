@@ -58,6 +58,8 @@ public class TestManagedSstFileReader {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestManagedSstFileReader.class);
 
+  // Key prefix containing all characters, to check if all characters can be
+  // written & read from rocksdb through SSTDumptool
   private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
       .map(i -> String.format("%c", i))
       .collect(Collectors.joining(""));
