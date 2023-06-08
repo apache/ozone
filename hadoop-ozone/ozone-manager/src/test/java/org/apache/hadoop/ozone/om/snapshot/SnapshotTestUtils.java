@@ -84,8 +84,6 @@ public class SnapshotTestUtils {
 
   /**
    * Stubbed implementation Persistent Map for testing.
-   * @param <K>
-   * @param <V>
    */
   public static class StubbedPersistentMap<K, V> implements
       PersistentMap<K, V>  {
@@ -127,7 +125,6 @@ public class SnapshotTestUtils {
 
   /**
    * Stubbed implementation of Persistent Set for testing.
-   * @param <K>
    */
   public static class StubbedPersistentSet<K> implements PersistentSet<K> {
     private final Set<K> set;
@@ -155,17 +152,18 @@ public class SnapshotTestUtils {
 
   /**
    * Stubbed implementation of Persistent List for testing.
-   * @param <K>
    */
   public static class ArrayPersistentList<K> extends ArrayList<K>
       implements PersistentList<K> {
 
     @Override
     public boolean addAll(PersistentList<K> from) {
-      boolean[] ret = {true};
-      from.iterator().forEachRemaining(
-          val -> ret[0] = ret[0] && this.add(val));
-      return ret[0];
+      boolean ret = true;
+      Iterator<K> iterator = from.iterator();
+      while (iterator.hasNext()) {
+        ret = ret && this.add(iterator.next());
+      }
+      return ret;
     }
 
     @Override
