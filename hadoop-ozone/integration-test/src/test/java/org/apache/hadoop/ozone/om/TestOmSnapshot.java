@@ -225,7 +225,7 @@ public class TestOmSnapshot {
         store.createSnapshot(volumeName, bucketName,
             UUID.randomUUID().toString()));
     expectFailurePreFinalization(() ->
-        store.listSnapshot(volumeName, bucketName));
+        store.listSnapshot(volumeName, bucketName, null, null));
     expectFailurePreFinalization(() ->
         store.snapshotDiff(volumeName, bucketName,
             UUID.randomUUID().toString(),
