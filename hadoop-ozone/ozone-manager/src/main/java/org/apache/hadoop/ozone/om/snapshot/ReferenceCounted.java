@@ -46,7 +46,7 @@ public class ReferenceCounted<T> implements AutoCloseable {
    * Parent SnapshotCache instance whose callback will be triggered upon this RC
    * closure.
    */
-  private SnapshotCache parentSnapshotCache;
+  private final SnapshotCache parentSnapshotCache;
 
   public ReferenceCounted(T obj, boolean disableCounter,
       SnapshotCache parentSnapshotCache) {
@@ -60,6 +60,7 @@ public class ReferenceCounted<T> implements AutoCloseable {
       this.threadMap = new ConcurrentHashMap<>();
       this.refCount = new AtomicLong(0L);
     }
+    this.parentSnapshotCache = parentSnapshotCache;
   }
 
   /**
