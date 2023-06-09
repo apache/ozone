@@ -222,7 +222,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
-        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+        ContainerTestUtils.createDatanodeDetails(), conf);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
@@ -493,7 +493,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
-        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+        ContainerTestUtils.createDatanodeDetails(), conf);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
@@ -592,8 +592,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Build and start the datanode.
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
-    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd,
-        conf, null, null, null);
+    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(),
@@ -613,8 +612,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dsm.close();
 
     // Start new datanode with the same configuration.
-    dsm = new DatanodeStateMachine(dd,
-        conf, null, null, null);
+    dsm = new DatanodeStateMachine(dd, conf);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     if (exactMatch) {
       Assert.assertEquals(expectedMlv, mlv);

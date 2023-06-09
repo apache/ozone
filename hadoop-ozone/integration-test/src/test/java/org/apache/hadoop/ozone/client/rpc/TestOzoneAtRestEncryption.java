@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -154,6 +155,7 @@ public class TestOzoneAtRestEncryption {
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setCertificateClient(certificateClientTest)
+        .setSecretKeyClient(new SecretKeyTestClient())
         .build();
     cluster.getOzoneManager().startSecretManager();
     cluster.waitForClusterToBeReady();

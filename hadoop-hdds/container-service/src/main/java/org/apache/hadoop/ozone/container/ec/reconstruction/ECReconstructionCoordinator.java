@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -109,9 +110,9 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
 
-  public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient,
-      StateContext context,
+  public ECReconstructionCoordinator(
+      ConfigurationSource conf, CertificateClient certificateClient,
+      SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
@@ -127,7 +128,7 @@ public class ECReconstructionCoordinator implements Closeable {
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
-    tokenHelper = new TokenHelper(conf, certificateClient);
+    tokenHelper = new TokenHelper(conf, secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
   }
@@ -386,7 +387,6 @@ public class ECReconstructionCoordinator implements Closeable {
     if (containerOperationClient != null) {
       containerOperationClient.close();
     }
-    tokenHelper.stop();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
