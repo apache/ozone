@@ -148,9 +148,9 @@ public class HddsVolume extends StorageVolume {
   }
 
   @Override
-  public void createWorkingDirs(String workingDirName,
+  public void createWorkingDirs(String dirName,
       MutableVolumeSet dbVolumeSet) throws IOException {
-    super.createWorkingDirs(workingDirName, dbVolumeSet);
+    super.createWorkingDirs(dirName, dbVolumeSet);
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
@@ -295,10 +295,11 @@ public class HddsVolume extends StorageVolume {
             // Remove container from Rocks DB
             BlockUtils.removeContainerFromDB(keyValueContainerData, getConf());
           } catch (IOException ex) {
-            LOG.warn("Failed to remove container data from DB while deleting " +
-                    "container {}. Container cannot be removed from the delete " +
-                    "directory {}.",
-                keyValueContainerData.getContainerID(), deletedContainerDir, ex);
+            LOG.warn("Failed to remove container data from DB while" +
+                    "deleting container {}. Container cannot be removed from" +
+                    "the delete directory {}.",
+                keyValueContainerData.getContainerID(),
+                deletedContainerDir, ex);
             continue;
           }
         }

@@ -158,7 +158,8 @@ public class TestHddsDatanodeService {
             hddsVolume, clusterId, conf, schemaVersion);
     assertTrue(container.getContainerFile().exists());
     assertTrue(container.getContainerDBFile().exists());
-    File[] deletedContainersAfterShutdown = hddsVolume.getDeletedContainerDir().listFiles();
+    File[] deletedContainersAfterShutdown =
+        hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);
     assertEquals(1, deletedContainersAfterShutdown.length);
 
@@ -166,7 +167,8 @@ public class TestHddsDatanodeService {
     service.join();
     service.close();
 
-    deletedContainersAfterShutdown = hddsVolume.getDeletedContainerDir().listFiles();
+    deletedContainersAfterShutdown =
+        hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);
     assertEquals(0, deletedContainersAfterShutdown.length);
   }

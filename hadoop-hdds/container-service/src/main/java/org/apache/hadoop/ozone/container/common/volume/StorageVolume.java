@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -193,18 +192,18 @@ public abstract class StorageVolume
    * subdirectories, but they should call the parent method first to make
    * sure initial directories are constructed.
    *
-   * @param workingDirName scmID or clusterID according to SCM HA
+   * @param dirName scmID or clusterID according to SCM HA
    *    layout feature upgrade finalization status.
    * @throws IOException
    */
-  public void createWorkingDirs(String workingDirName,
-      MutableVolumeSet dbVolumeSet) throws IOException {
-    File idDir = new File(getStorageDir(), workingDirName);
+  public void createWorkingDirs(String dirName, MutableVolumeSet dbVolumeSet)
+      throws IOException {
+    File idDir = new File(getStorageDir(), dirName);
     if (!idDir.exists() && !idDir.mkdir()) {
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
-    this.workingDirName = workingDirName;
+    this.workingDirName = dirName;
     this.tmpDir = new File(idDir, TMP_DIR_NAME);
   }
 
