@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -1010,4 +1011,6 @@ public interface OzoneManagerProtocol
    */
   void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
       throws IOException;
+
+  UUID refetchSecretKey() throws IOException;
 }
