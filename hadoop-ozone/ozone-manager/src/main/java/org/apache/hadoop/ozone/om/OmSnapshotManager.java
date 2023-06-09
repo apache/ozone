@@ -703,6 +703,15 @@ public final class OmSnapshotManager implements AutoCloseable {
       throw new IOException("Provided volume name " + volumeName +
           " or bucket name " + bucketName + " doesn't exist");
     }
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
+      throw new IOException("There are no snapshots under path " +
+          snapshotPath);
+    }
 
     return snapshotDiffManager.getSnapshotDiffJobList(
         volumeName, bucketName, jobStatus, listAll);

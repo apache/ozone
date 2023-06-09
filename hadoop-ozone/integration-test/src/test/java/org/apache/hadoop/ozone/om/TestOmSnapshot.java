@@ -767,6 +767,29 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
+  @Test
+  public void testListSnapshotDiffWithInvalidParameters()
+      throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+
+    String errorMessage = "Provided volume name " + volume +
+        " or bucket name " + bucket + " doesn't exist";
+    // List SnapshotDiff jobs for non existent volume and bucket.
+    LambdaTestUtils.intercept(OMException.class,
+        errorMessage,
+        () -> store.listSnapshotDiffJobs(volume, bucket, "", true));
+
+    // Create the volume and the bucket.
+    store.createVolume(volume);
+    OzoneVolume ozVolume = store.getVolume(volume);
+    ozVolume.createBucket(bucket);
+
+    // List SnapshotDiff jobs using a path that has no snapshots.
+    LambdaTestUtils.intercept(OMException.class,
+        "There are no snapshots",
+        () -> store.listSnapshotDiffJobs(volume, bucket, "", true));
+  }
 
   /**
    * Tests snapdiff when there are multiple sst files in the from & to
