@@ -68,7 +68,7 @@ public abstract class StorageVolume
       LoggerFactory.getLogger(StorageVolume.class);
 
   // The name of the directory used for temporary files on the volume.
-  private static final String TMP_DIR_NAME = "tmp";
+  public static final String TMP_DIR_NAME = "tmp";
   // The name of the directory where temporary files used to check disk
   // health are written to. This will go inside the tmp directory.
   private static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
@@ -216,18 +216,18 @@ public abstract class StorageVolume
    * subdirectories, but they should call the parent method first to make
    * sure initial directories are constructed.
    *
-   * @param workingDirName scmID or clusterID according to SCM HA
+   * @param dirName scmID or clusterID according to SCM HA
    *    layout feature upgrade finalization status.
    * @throws IOException
    */
-  public void createWorkingDirs(String workingDirName,
-      MutableVolumeSet dbVolumeSet) throws IOException {
-    File idDir = new File(getStorageDir(), workingDirName);
+  public void createWorkingDirs(String dirName, MutableVolumeSet dbVolumeSet)
+      throws IOException {
+    File idDir = new File(getStorageDir(), dirName);
     if (!idDir.exists() && !idDir.mkdir()) {
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
-    this.workingDirName = workingDirName;
+    this.workingDirName = dirName;
     this.tmpDir = new File(idDir, TMP_DIR_NAME);
     Files.createDirectories(tmpDir.toPath());
     createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);

@@ -26,19 +26,16 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.ListIterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -89,7 +86,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
@@ -386,8 +382,9 @@ public class TestContainerPersistence {
     }
   }
 
-  private void assertContainerNotInSchema3DB(KeyValueContainerData containerData,
-      BlockID testBlock) throws IOException {
+  private void assertContainerNotInSchema3DB(
+      KeyValueContainerData containerData, BlockID testBlock)
+      throws IOException {
     // This test is only valid for schema v3. Earlier schemas will have their
     // own RocksDB that is deleted with the container.
     if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
@@ -407,7 +404,8 @@ public class TestContainerPersistence {
     }
   }
 
-  private BlockID addBlockToContainer(Container<KeyValueContainerData> container) throws IOException {
+  private BlockID addBlockToContainer(
+      Container<KeyValueContainerData> container) throws IOException {
     BlockID blockID = ContainerTestHelper.getTestBlockID(
             container.getContainerData().getContainerID());
     ChunkInfo info = writeChunkHelper(blockID);
