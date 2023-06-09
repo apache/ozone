@@ -282,8 +282,66 @@ class TestSnapshotCache {
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
   }
 
-  // TODO: [SNAPSHOT]
-  //  Ensure SnapshotCache behaves as expected when arbitrary combinations of
-  //  get()s and release()s are called.
+  @Test
+  @DisplayName("09. Cache eviction with try-with-resources")
+  void testEviction3WithClose() throws IOException {
+
+    final String dbKey1 = "dbKey1";
+    try (ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+        snapshotCache.get(dbKey1)) {
+      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(1, snapshotCache.size());
+      assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    }
+    // ref count should have been decreased because it would be close()d
+    // upon exiting try-with-resources.
+    assertEquals(0L, snapshotCache.getDbMap().get(dbKey1).getTotalRefCount());
+    assertEquals(1, snapshotCache.size());
+    assertEquals(1, snapshotCache.getPendingEvictionList().size());
+
+    final String dbKey2 = "dbKey2";
+    try (ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+        snapshotCache.get(dbKey2)) {
+      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(2, snapshotCache.size());
+      assertEquals(1, snapshotCache.getPendingEvictionList().size());
+      // Get dbKey2 entry a second time
+      try (ReferenceCounted<IOmMetadataReader> rcOmSnapshot2 =
+          snapshotCache.get(dbKey2)) {
+        assertEquals(2L, rcOmSnapshot.getTotalRefCount());
+        assertEquals(2L, rcOmSnapshot2.getTotalRefCount());
+        assertEquals(2, snapshotCache.size());
+        assertEquals(1, snapshotCache.getPendingEvictionList().size());
+      }
+      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+    }
+    assertEquals(0L, snapshotCache.getDbMap().get(dbKey2).getTotalRefCount());
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, snapshotCache.getPendingEvictionList().size());
+
+    final String dbKey3 = "dbKey3";
+    try (ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+        snapshotCache.get(dbKey3)) {
+      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(3, snapshotCache.size());
+      assertEquals(2, snapshotCache.getPendingEvictionList().size());
+    }
+    assertEquals(0L, snapshotCache.getDbMap().get(dbKey3).getTotalRefCount());
+    assertEquals(3, snapshotCache.size());
+    assertEquals(3, snapshotCache.getPendingEvictionList().size());
+
+    final String dbKey4 = "dbKey4";
+    try (ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+        snapshotCache.get(dbKey4)) {
+      assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertEquals(3, snapshotCache.size());
+      // An entry has been evicted at this point
+      assertEquals(2, snapshotCache.getPendingEvictionList().size());
+    }
+    assertEquals(0L, snapshotCache.getDbMap().get(dbKey4).getTotalRefCount());
+    // Reached cache size limit
+    assertEquals(3, snapshotCache.size());
+    assertEquals(3, snapshotCache.getPendingEvictionList().size());
+  }
 
 }
