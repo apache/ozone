@@ -1708,6 +1708,9 @@ message CreateSnapshotRequest {
 message ListSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
+  optional string prefix = 3;
+  optional string prevSnapshot = 4;
+  optional uint32 maxListResult = 5;
 }
 
 message SnapshotDiffRequest {

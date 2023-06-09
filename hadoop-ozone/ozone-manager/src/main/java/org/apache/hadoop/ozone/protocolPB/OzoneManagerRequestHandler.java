@@ -1284,7 +1284,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       OzoneManagerProtocolProtos.ListSnapshotRequest request)
       throws IOException {
     List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
-        request.getVolumeName(), request.getBucketName());
+        request.getVolumeName(), request.getBucketName(), request.getPrefix(),
+        request.getPrevSnapshot(), request.getMaxListResult());
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
         snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
             .collect(Collectors.toList());
