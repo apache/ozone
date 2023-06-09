@@ -65,7 +65,7 @@ public abstract class StorageVolume
       LoggerFactory.getLogger(StorageVolume.class);
 
   // The name of the directory used for temporary files on the volume.
-  private static final String TMP_DIR_NAME = "tmp";
+  public static final String TMP_DIR_NAME = "tmp";
 
   /**
    * Type for StorageVolume.

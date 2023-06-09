@@ -81,7 +81,7 @@ public class HddsVolume extends StorageVolume {
   private static final Logger LOG = LoggerFactory.getLogger(HddsVolume.class);
 
   public static final String HDDS_VOLUME_DIR = "hdds";
-  private static final String TMP_CONTAINER_DELETE_DIR_NAME =
+  public static final String TMP_CONTAINER_DELETE_DIR_NAME =
       "deleted-containers";
 
   private final VolumeIOStats volumeIOStats;
@@ -272,36 +272,40 @@ public class HddsVolume extends StorageVolume {
       // then remove the container from RocksDB.
       File containerFile = ContainerUtils.getContainerFile(containerDir);
 
-      KeyValueContainerData keyValueContainerData;
-      try {
-        ContainerData containerData =
-            ContainerDataYaml.readContainerFile(containerFile);
-        keyValueContainerData = (KeyValueContainerData) containerData;
-      } catch (IOException ex) {
-        LOG.warn("Failed to read container file {}. Container cannot be " +
-            "removed from the delete directory.", containerFile, ex);
-        continue;
-      }
-
-      if (keyValueContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
-        // Container file doesn't include the volume
-        // so we need to set it here in order to get the DB location.
-        keyValueContainerData.setVolume(this);
-        File dbFile = KeyValueContainerLocationUtil
-            .getContainerDBFile(keyValueContainerData);
-        keyValueContainerData.setDbFile(dbFile);
+      if (containerFile.exists()) {
+        KeyValueContainerData keyValueContainerData;
         try {
-          // Remove container from Rocks DB
-          BlockUtils.removeContainerFromDB(keyValueContainerData, getConf());
+          ContainerData containerData =
+              ContainerDataYaml.readContainerFile(containerFile);
+          keyValueContainerData = (KeyValueContainerData) containerData;
         } catch (IOException ex) {
-          LOG.warn("Failed to remove container data from DB while deleting " +
-              "container {}. Container cannot be removed from the delete " +
-              "directory {}.",
-              keyValueContainerData.getContainerID(), deletedContainerDir, ex);
+          LOG.warn("Failed to read container file {}. Container cannot be " +
+              "removed from the delete directory.", containerFile, ex);
           continue;
+        }
+
+        if (keyValueContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+          // Container file doesn't include the volume
+          // so we need to set it here in order to get the DB location.
+          keyValueContainerData.setVolume(this);
+          File dbFile = KeyValueContainerLocationUtil
+              .getContainerDBFile(keyValueContainerData);
+          keyValueContainerData.setDbFile(dbFile);
+          try {
+            // Remove container from Rocks DB
+            BlockUtils.removeContainerFromDB(keyValueContainerData, getConf());
+          } catch (IOException ex) {
+            LOG.warn("Failed to remove container data from DB while deleting " +
+                    "container {}. Container cannot be removed from the delete " +
+                    "directory {}.",
+                keyValueContainerData.getContainerID(), deletedContainerDir, ex);
+            continue;
+          }
         }
       }
 
+      // If the container file was already deleted, the RocksDB entries were
+      // cleared.
       try {
         if (containerDir.isDirectory()) {
           FileUtils.deleteDirectory(containerDir);
