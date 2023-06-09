@@ -45,6 +45,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
@@ -168,7 +169,8 @@ public class TestPermissionCheck {
   public void testListKey() throws IOException {
     Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
     Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listKeys(anyString());
+    doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
+        anyBoolean());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
 

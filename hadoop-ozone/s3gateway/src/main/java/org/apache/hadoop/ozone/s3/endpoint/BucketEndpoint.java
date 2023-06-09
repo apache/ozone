@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
@@ -133,18 +134,18 @@ public class BucketEndpoint extends EndpointBase {
         startAfter = marker;
       }
 
+      // If continuation token and start after both are provided, then we
+      // ignore start After
+      String prevKey = continueToken != null ? decodedToken.getLastKey()
+          : startAfter;
+
+      // If shallow is true, only list immediate children
+      // delimited by OZONE_URI_DELIMITER
+      boolean shallow = OZONE_URI_DELIMITER.equals(delimiter);
+
       OzoneBucket bucket = getBucket(bucketName);
-      if (startAfter != null && continueToken != null) {
-        // If continuation token and start after both are provided, then we
-        // ignore start After
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-      } else if (startAfter != null && continueToken == null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, startAfter);
-      } else if (startAfter == null && continueToken != null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-      } else {
-        ozoneKeyIterator = bucket.listKeys(prefix);
-      }
+      ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
+
     } catch (OMException ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
