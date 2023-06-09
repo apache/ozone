@@ -3791,6 +3791,17 @@
   </property>
 
   <property>
+    <name>ozone.recon.heatmap.enable</name>
+    <value>false</value>
+    <tag>OZONE, RECON</tag>
+    <description>
+      To enable/disable recon heatmap feature. Along with this config, user must also provide the implementation
+      of "org.apache.hadoop.ozone.recon.heatmap.IHeatMapProvider" interface and configure in
+      "ozone.recon.heatmap.provider" configuration.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.fs.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, DATANODE</tag>
