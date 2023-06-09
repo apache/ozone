@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -205,6 +206,18 @@ public abstract class StorageVolume
     }
     this.workingDirName = dirName;
     this.tmpDir = new File(idDir, TMP_DIR_NAME);
+    Files.createDirectories(tmpDir.toPath());
+  }
+
+  /**
+   * Create a subdirectory within this volume's tmp directory.
+   * This subdirectory can be used as a work space for temporary filesystem
+   * operations before they are moved to their final destination.
+   */
+  protected File createTmpSubdirIfNeeded(String name) throws IOException {
+    File newDir = new File(tmpDir, name);
+    Files.createDirectories(newDir.toPath());
+    return newDir;
   }
 
   private VolumeState analyzeVolumeState() {
