@@ -40,6 +40,8 @@ public class NativeLibraryLoader {
       LoggerFactory.getLogger(NativeLibraryLoader.class);
   public static final int LIBRARY_SHUTDOWN_HOOK_PRIORITY = 1;
   private static final String OS = System.getProperty("os.name").toLowerCase();
+
+  public static final String NATIVE_LIB_TMP_DIR = "native.lib.tmp.dir";
   private Map<String, Boolean> librariesLoaded;
   private static volatile NativeLibraryLoader instance;
 
@@ -136,7 +138,8 @@ public class NativeLibraryLoader {
 
       // create a temporary file to copy the library to
       final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
-          new File(""));
+          new File(Optional.ofNullable(System.getProperty(NATIVE_LIB_TMP_DIR))
+              .orElse("")));
       if (!temp.exists()) {
         return Optional.empty();
       } else {

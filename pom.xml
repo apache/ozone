@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <okhttp.version>2.7.5</okhttp.version>
     <okio.version>2.8.0</okio.version>
     <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
-    <mockito2.version>2.28.2</mockito2.version>
+    <mockito2.version>3.5.9</mockito2.version>
     <hamcrest.version>1.3</hamcrest.version>
     <powermock1.version>1.6.5</powermock1.version>
     <powermock2.version>2.0.4</powermock2.version>
@@ -253,7 +253,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
 
     <!-- Plugin versions and config -->
-    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dnative.lib.tmp.dir=${native.lib.tmp.dir}</maven-surefire-plugin.argLine>
     <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
@@ -306,6 +306,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <zstd.version>1.4.9</zstd.version>
 
     <vault.driver.version>5.1.0</vault.driver.version>
+    <native.lib.tmp.dir></native.lib.tmp.dir>
   </properties>
 
 
