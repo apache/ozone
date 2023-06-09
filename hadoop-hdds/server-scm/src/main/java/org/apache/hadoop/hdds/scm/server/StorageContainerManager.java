@@ -244,7 +244,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private HDDSLayoutVersionManager scmLayoutVersionManager;
   private LeaseManager<Object> leaseManager;
 
-  private SCMMetadataStore scmMetadataStore;
+  private final SCMMetadataStore scmMetadataStore;
   private CertificateStore certificateStore;
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
@@ -377,7 +377,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
-    initalizeMetadataStore(conf, configurator);
+    scmMetadataStore = getMetadataStore(conf, configurator);
 
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();
@@ -995,14 +995,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param configurator - configurator
    * @throws IOException - on Failure
    */
-  private void initalizeMetadataStore(OzoneConfiguration conf,
+  private SCMMetadataStore getMetadataStore(OzoneConfiguration conf,
                                       SCMConfigurator configurator)
       throws IOException {
-    if (configurator.getMetadataStore() != null) {
-      scmMetadataStore = configurator.getMetadataStore();
-    } else {
-      scmMetadataStore = new SCMMetadataStoreImpl(conf);
-    }
+    return configurator.getMetadataStore() != null
+        ? configurator.getMetadataStore()
+        : new SCMMetadataStoreImpl(conf);
   }
 
   /**
