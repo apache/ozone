@@ -254,6 +254,7 @@ jobs:
           - secure
           - unsecure
           - compat
+          - EC
           - HA-secure
           - HA-unsecure
           - MR

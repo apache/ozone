@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.Upgra
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -187,6 +188,7 @@ public class TestScmHAFinalization {
 
   @ParameterizedTest
   @MethodSource(METHOD_SOURCE)
+  @Flaky("HDDS-8714")
   public void testFinalizationWithRestart(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
     CountDownLatch terminateLatch = new CountDownLatch(1);

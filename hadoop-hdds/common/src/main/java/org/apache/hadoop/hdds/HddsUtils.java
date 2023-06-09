@@ -19,6 +19,9 @@
 package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -32,6 +35,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
@@ -85,6 +89,7 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.hadoop.ozone.conf.OzoneServiceConfig;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -823,5 +828,46 @@ public final class HddsUtils {
       sortedOzoneProps.put(entry.getKey(), value);
     }
     return sortedOzoneProps;
+  }
+
+  /**
+   * Execute some code and ensure thread name is not changed
+   * (workaround for HADOOP-18433).
+   */
+  public static <T, E extends IOException> T preserveThreadName(
+      CheckedSupplier<T, E> supplier) throws E {
+    final Thread thread = Thread.currentThread();
+    final String threadName = thread.getName();
+
+    try {
+      return supplier.get();
+    } finally {
+      if (!Objects.equals(threadName, thread.getName())) {
+        LOG.info("Restoring thread name: {}", threadName);
+        thread.setName(threadName);
+      }
+    }
+  }
+
+  /** Concatenate stack trace {@code elements} (one per line) starting at
+   * {@code startIndex}. */
+  public static @Nonnull String formatStackTrace(
+      @Nullable StackTraceElement[] elements, int startIndex) {
+    if (elements != null && elements.length > startIndex) {
+      final StringBuilder sb = new StringBuilder();
+      for (int line = startIndex; line < elements.length; line++) {
+        sb.append(elements[line]).append("\n");
+      }
+      return sb.toString();
+    }
+    return "";
+  }
+
+  /** @return current thread stack trace if {@code logger} has debug enabled */
+  public static @Nullable StackTraceElement[] getStackTrace(
+      @Nonnull Logger logger) {
+    return logger.isDebugEnabled()
+        ? Thread.currentThread().getStackTrace()
+        : null;
   }
 }

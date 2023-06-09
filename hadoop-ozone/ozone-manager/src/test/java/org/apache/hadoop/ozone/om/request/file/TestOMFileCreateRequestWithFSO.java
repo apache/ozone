@@ -34,6 +34,7 @@ import org.junit.Test;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 /**
  * Tests OMFileCreateRequest - prefix layout.
  */
@@ -154,6 +155,18 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     // overwrite is set to true
     testNonRecursivePath(key, true, false, false);
     testNonRecursivePath(key, false, false, true);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithSnapshotReservedWord()
+      throws Exception {
+    String[] validPaths = {
+        "a/b/" + OM_SNAPSHOT_INDICATOR + "c/d",
+        "a/b/c/" + OM_SNAPSHOT_INDICATOR + "/d"
+    };
+    for (String validPath : validPaths) {
+      testNonRecursivePath(validPath, false, true, false);
+    }
   }
 
   @Override

@@ -168,9 +168,6 @@ public class ContainerStateMap {
   /**
    * Returns the latest list of DataNodes where replica for given containerId
    * exist.
-   *
-   * @param containerID
-   * @return Set<DatanodeDetails>
    */
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) {
@@ -182,9 +179,6 @@ public class ContainerStateMap {
    * Adds given datanodes as nodes where replica for given containerId exist.
    * Logs a debug entry if a datanode is already added as replica for given
    * ContainerId.
-   *
-   * @param containerID
-   * @param replica
    */
   public void updateContainerReplica(final ContainerID containerID,
       final ContainerReplica replica) {
@@ -199,10 +193,6 @@ public class ContainerStateMap {
 
   /**
    * Remove a container Replica for given DataNode.
-   *
-   * @param containerID
-   * @param replica
-   * @return True of dataNode is removed successfully else false.
    */
   public void removeContainerReplica(final ContainerID containerID,
       final ContainerReplica replica) {
@@ -291,7 +281,7 @@ public class ContainerStateMap {
               "old state. Old = {}, Attempted state = {}", currentState,
           newState);
 
-      currentInfo.setState(currentState);
+      currentInfo.revertState();
 
       // if this line throws, the state map can be in an inconsistent
       // state, since we will have modified the attribute by the
@@ -444,16 +434,16 @@ public class ContainerStateMap {
    * Sorts a list of Sets based on Size. This is useful when we are
    * intersecting the sets.
    *
-   * @param sets - varagrs of sets
+   * @param sets - varargs of sets
    * @return Returns a sorted array of sets based on the size of the set.
    */
-  @SuppressWarnings("unchecked")
-  private NavigableSet<ContainerID>[] sortBySize(
+  @SafeVarargs
+  private final NavigableSet<ContainerID>[] sortBySize(
       final NavigableSet<ContainerID>... sets) {
     for (int x = 0; x < sets.length - 1; x++) {
       for (int y = 0; y < sets.length - x - 1; y++) {
         if (sets[y].size() > sets[y + 1].size()) {
-          final NavigableSet temp = sets[y];
+          final NavigableSet<ContainerID> temp = sets[y];
           sets[y] = sets[y + 1];
           sets[y + 1] = temp;
         }

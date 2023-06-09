@@ -29,6 +29,7 @@ enum RequestType {
     MOVE = 6;
     STATEFUL_SERVICE_CONFIG = 7;
     FINALIZE = 8;
+    SECRET_KEY = 9;
 }
 
 message Method {

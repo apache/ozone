@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -78,6 +79,7 @@ public class TestOmDBInsightEndPoint {
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private Pipeline pipeline;
   private Random random = new Random();
+  private OzoneConfiguration ozoneConfiguration;
 
   @Before
   public void setUp() throws Exception {
@@ -110,6 +112,7 @@ public class TestOmDBInsightEndPoint {
         ozoneStorageContainerManager.getPipelineManager();
     pipeline = getRandomPipeline();
     reconPipelineManager.addPipeline(pipeline);
+    ozoneConfiguration = new OzoneConfiguration();
     setUpOmData();
   }
 
@@ -182,7 +185,8 @@ public class TestOmDBInsightEndPoint {
     when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
         .thenReturn(tableMock);
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            ozoneConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
   }
 

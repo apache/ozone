@@ -187,7 +187,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           }
 
           //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
-          SnapshotInfo previousSnapshot = getPreviousSnapshot(snapInfo);
+          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(snapInfo);
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -537,14 +537,21 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID();
     }
 
-    private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
+    private SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo)
         throws IOException {
-      if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
-          snapInfo.getSnapshotID())) {
-        String previousPathSnapshot = chainManager.previousPathSnapshot(
-            snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-        String tableKey = chainManager.getTableKey(previousPathSnapshot);
-        return omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo currSnapInfo = snapInfo;
+      while (chainManager.hasPreviousPathSnapshot(
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID())) {
+
+        String prevPathSnapshot = chainManager.previousPathSnapshot(
+            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID());
+        String tableKey = chainManager.getTableKey(prevPathSnapshot);
+        SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+        if (prevSnapInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+          return prevSnapInfo;
+        }
+        currSnapInfo = prevSnapInfo;
       }
       return null;
     }
