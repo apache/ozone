@@ -33,12 +33,13 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -95,7 +96,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
-    SecretKeyProtocol {
+    SecretKeyProtocolScm {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
@@ -230,6 +231,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           "Secret key initialization is not finished yet.",
           SECRET_KEY_NOT_INITIALIZED);
     }
+  }
+
+  @Override
+  public boolean checkAndRotate(boolean force)
+      throws TimeoutException, SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.checkAndRotate(force);
   }
 
   /**

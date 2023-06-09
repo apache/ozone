@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.insight;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +69,8 @@ public abstract class BaseInsightPoint implements InsightPoint {
   /**
    * Create scm client.
    */
-  public ScmClient createScmClient(OzoneConfiguration ozoneConf) {
+  public ScmClient createScmClient(OzoneConfiguration ozoneConf)
+      throws IOException {
     if (!HddsUtils.getHostNameFromConfigKeys(ozoneConf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
 

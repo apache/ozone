@@ -18,6 +18,9 @@ package org.apache.hadoop.hdds.protocol;
 
 import org.apache.hadoop.security.KerberosInfo;
 
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 
 /**
@@ -28,4 +31,14 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
     clientPrincipal = HDDS_SCM_KERBEROS_PRINCIPAL_KEY
 )
 public interface SecretKeyProtocolScm extends SecretKeyProtocol {
+
+  /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return key rotation status
+   * @throws TimeoutException
+   * @throws IOException
+   */
+  boolean checkAndRotate(boolean force) throws TimeoutException, IOException;
 }

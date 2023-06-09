@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
@@ -42,6 +43,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -50,7 +52,7 @@ import java.util.stream.Collectors;
  * {@link SecretKeyProtocol} to the server proxy.
  */
 public class SecretKeyProtocolClientSideTranslatorPB implements
-    SecretKeyProtocol, ProtocolTranslator, Closeable {
+    SecretKeyProtocol, SecretKeyProtocolScm, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -127,6 +129,21 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
         submitRequest(Type.GetCurrentSecretKey, builder -> {
         }).getCurrentSecretKeyResponseProto().getSecretKey();
     return ManagedSecretKey.fromProtobuf(secretKeyProto);
+  }
+
+  @Override
+  public boolean checkAndRotate(boolean force)
+      throws TimeoutException, IOException {
+    SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest request =
+        SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest.newBuilder()
+            .setForce(force)
+            .build();
+    boolean checkAndRotateStatus =
+        submitRequest(Type.GetCheckAndRotate, builder ->
+            builder.setCheckAndRotateRequest(request))
+            .getCheckAndRotateResponseProto().getStatus();
+
+    return checkAndRotateStatus;
   }
 
   @Override

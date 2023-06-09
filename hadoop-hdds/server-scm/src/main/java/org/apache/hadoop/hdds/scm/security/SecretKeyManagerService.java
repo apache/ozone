@@ -127,7 +127,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     }
 
     try {
-      secretKeyManager.checkAndRotate();
+      secretKeyManager.checkAndRotate(false);
     } catch (TimeoutException e) {
       LOG.error("Error occurred when updating SecretKeys.", e);
     }

@@ -163,7 +163,7 @@ public class SecretKeyManagerTest {
     ManagedSecretKey initialCurrentKey = state.getCurrentKey();
     Mockito.reset(mockedKeyStore);
 
-    assertEquals(expectRotate, lifeCycleManager.checkAndRotate());
+    assertEquals(expectRotate, lifeCycleManager.checkAndRotate(false));
 
     if (expectRotate) {
       // Verify rotation behavior.
