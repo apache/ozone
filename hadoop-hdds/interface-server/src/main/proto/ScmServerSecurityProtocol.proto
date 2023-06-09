@@ -80,7 +80,6 @@ message SCMSecurityResponse {
     optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
 
     optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
-
 }
 
 enum Type {
