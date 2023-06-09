@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell.bucket;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -109,8 +110,12 @@ public class CreateBucketHandler extends BucketHandler {
       }
     }
 
-    replication.fromParams(getConf()).ifPresent(config ->
-        bb.setDefaultReplicationConfig(new DefaultReplicationConfig(config)));
+    ReplicationConfig replicationConfig =
+        replication.fromParamsOrConfig(getConf());
+    if (replicationConfig != null) {
+      bb.setDefaultReplicationConfig(
+          new DefaultReplicationConfig(replicationConfig));
+    }
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       bb.setQuotaInBytes(OzoneQuota.parseSpaceQuota(
