@@ -158,7 +158,8 @@ public class HddsVolume extends StorageVolume {
       createDbStore(dbVolumeSet);
     }
 
-    createTmpSubdirIfNeeded(TMP_CONTAINER_DELETE_DIR_NAME);
+    deletedContainerDir =
+        createTmpSubdirIfNeeded(TMP_CONTAINER_DELETE_DIR_NAME);
     cleanDeletedContainerDir();
   }
 

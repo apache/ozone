@@ -239,8 +239,10 @@ public abstract class StorageVolume
    * This subdirectory can be used as a work space for temporary filesystem
    * operations before they are moved to their final destination.
    */
-  protected void createTmpSubdirIfNeeded(String name) throws IOException {
-    Files.createDirectories(new File(tmpDir, name).toPath());
+  protected File createTmpSubdirIfNeeded(String name) throws IOException {
+    File newDir = new File(tmpDir, name);
+    Files.createDirectories(newDir.toPath());
+    return newDir;
   }
 
   private VolumeState analyzeVolumeState() {
