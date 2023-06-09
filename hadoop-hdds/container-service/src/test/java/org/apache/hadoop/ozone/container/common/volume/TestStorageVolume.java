@@ -93,7 +93,8 @@ public class TestStorageVolume {
     VolumeCheckResult result = volume.check(false);
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
-    final DiskCheckUtil.DiskChecks doesNotExist = new DiskCheckUtil.DiskChecks() {
+    final DiskCheckUtil.DiskChecks doesNotExist =
+        new DiskCheckUtil.DiskChecks() {
           @Override
           public boolean checkExistence(File storageDir) {
             return false;
@@ -113,12 +114,13 @@ public class TestStorageVolume {
     VolumeCheckResult result = volume.check(false);
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
-    final DiskCheckUtil.DiskChecks noPermissions = new DiskCheckUtil.DiskChecks() {
-      @Override
-      public boolean checkPermissions(File storageDir) {
-        return false;
-      }
-    };
+    final DiskCheckUtil.DiskChecks noPermissions =
+        new DiskCheckUtil.DiskChecks() {
+          @Override
+          public boolean checkPermissions(File storageDir) {
+            return false;
+          }
+        };
 
     DiskCheckUtil.setTestImpl(noPermissions);
     result = volume.check(false);
@@ -136,7 +138,7 @@ public class TestStorageVolume {
     final DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
       @Override
       public boolean checkReadWrite(File storageDir, File testFileDir,
-                                    int numBytesToWrite) {
+          int numBytesToWrite) {
         return false;
       }
     };

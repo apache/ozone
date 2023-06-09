@@ -553,16 +553,14 @@ public abstract class StorageVolume
     }
 
     try (Stream<Path> files = Files.list(diskCheckDir.toPath())) {
-          files.map(Path::toFile)
-          .filter(File::isFile)
-          .forEach(file -> {
-            try {
-              Files.delete(file.toPath());
-            } catch (IOException ex) {
-              LOG.warn("Failed to delete temporary volume health check file {}",
-                  file);
-            }
-          });
+      files.map(Path::toFile).filter(File::isFile).forEach(file -> {
+        try {
+          Files.delete(file.toPath());
+        } catch (IOException ex) {
+          LOG.warn("Failed to delete temporary volume health check file {}",
+              file);
+        }
+      });
     } catch (IOException ex) {
       LOG.warn("Failed to list contents of volume health check directory {} " +
           "for deleting.", diskCheckDir);

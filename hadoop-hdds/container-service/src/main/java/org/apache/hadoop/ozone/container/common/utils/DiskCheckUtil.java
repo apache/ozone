@@ -118,7 +118,8 @@ public final class DiskCheckUtil {
         permissionsCorrect = false;
       }
       if (!storageDir.canExecute()) {
-        logError(storageDir, "Datanode does not have execute permission on volume.");
+        logError(storageDir, "Datanode does not have execute" +
+            "permission on volume.");
         permissionsCorrect = false;
       }
 
