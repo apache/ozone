@@ -502,6 +502,7 @@ public class ReplicationManager implements SCMService {
       int commandCount = nodeManager.getTotalDatanodeCommandCount(datanode,
           Type.deleteContainerCommand);
       if (commandCount >= datanodeDeleteLimit) {
+        metrics.incrDeleteContainerCmdsDeferredTotal();
         throw new CommandTargetOverloadedException("Cannot schedule a delete " +
             "container command for container " + container.containerID() +
             " on datanode " + datanode + " as it has too many pending delete " +
@@ -533,6 +534,7 @@ public class ReplicationManager implements SCMService {
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
         getAvailableDatanodesForReplication(sources);
     if (sourceWithCmds.isEmpty()) {
+      metrics.incrReplicateContainerCmdsDeferredTotal();
       throw new CommandTargetOverloadedException("No sources with capacity " +
           "available for replication of container " + containerID + " to " +
           target);
@@ -553,6 +555,7 @@ public class ReplicationManager implements SCMService {
     List<Pair<Integer, DatanodeDetails>> targetWithCmds =
         getAvailableDatanodesForReplication(targets);
     if (targetWithCmds.isEmpty()) {
+      metrics.incrECReconstructionCmdsDeferredTotal();
       throw new CommandTargetOverloadedException("No target with capacity " +
           "available for reconstruction of " + containerInfo.getContainerID());
     }
