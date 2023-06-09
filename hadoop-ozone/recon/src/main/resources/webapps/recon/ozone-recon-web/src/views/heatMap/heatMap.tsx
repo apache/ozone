@@ -30,16 +30,15 @@ interface ITreeResponse {
   maxAccessCount: number;
   minAccessCount: number;
   size: number;
-  children: Ichildren[];
+  children: IChildren[];
 }
 
-interface Ichildren {
+interface IChildren {
   label: string;
   path: string;
   size: number;
   accessCount: number;
   color: number;
-  children: Ichildren[];
 }
 
 interface ITreeState {
@@ -68,7 +67,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
     };
   }
 
-  handleCalenderChange = (e: any) => {
+  handleCalendarChange = (e: any) => {
     if (e.key === '24H' || e.key === '7D' || e.key === '90D') {
       this.setState((prevState, newState) => ({
         date: e.key,
@@ -233,10 +232,10 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
 
   render() {
     const { treeResponse, isLoading, inputPath, date} = this.state;
-    const menuCalender = (
+    const menuCalendar = (
       <Menu
         defaultSelectedKeys={[date]}
-        onClick={e => this.handleCalenderChange(e)}>
+        onClick={e => this.handleCalendarChange(e)}>
         <Menu.Item key='24H'>
         24 Hour
         </Menu.Item>
@@ -283,7 +282,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
           { isLoading ? <span><Icon type='loading'/> Loading...</span> : (
             <div>
               {(Object.keys(treeResponse).length > 0 && (treeResponse.minAccessCount > 0 || treeResponse.maxAccessCount > 0)) ?
-                (treeResponse.size === 0)? <div style={{ height: 800 }} className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br/></div>
+                (treeResponse.size === 0)? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br/></div>
                   :
                   <div>
                     <Row>
@@ -302,7 +301,7 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
                               </Dropdown>
                             </div>
                             <div className='date-dropdown-button'>
-                              <Dropdown overlay={menuCalender} placement='bottomLeft'>
+                              <Dropdown overlay={menuCalendar} placement='bottomLeft'>
                               <Button>Last &nbsp;{date > 100 ?  new Date(date*1000).toLocaleString() : date }<DownOutlined/></Button>
                               </Dropdown>
                             </div>
@@ -322,12 +321,12 @@ export class HeatMap extends React.Component<Record<string, object>, ITreeState>
                               <span>Most Accessed</span>
                           </div>
                       </div>
-                      <div style={{ height:750}}>
+                      <div style={{ height:850}}>
                         <HeatMapConfiguration data={treeResponse} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                       </div>
                   </div>
                   :
-                  <div style={{ height: 800 }} className='heatmapinformation'><br />
+                  <div className='heatmapinformation'><br />
                     No Data Available.{' '}<br />
                   </div>
                 }

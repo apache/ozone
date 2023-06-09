@@ -18,6 +18,7 @@
 
 import React, { Component } from 'react';
 import { AgChartsReact } from 'ag-charts-react';
+import {byteToSize} from 'utils/common';
 
 export default class HeatMapConfiguration extends Component {
   constructor(props: {} | Readonly<{}>) {
@@ -107,21 +108,11 @@ export default class HeatMapConfiguration extends Component {
     }
   };
 
-  byteToSize = (bytes: number, decimals: number) => {
-      if (bytes === 0) {
-        return '0 Bytes';
-      }
-      const k = 1024;
-      const dm = decimals < 0 ? 0 : decimals;
-      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return  isNaN(i) ? `Not Defined`:`${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
-  };
     
   tooltipContent = (params:any) => {
     let tooltipContent = `<span>
       Size:
-      ${this.byteToSize(params.datum.size, 1)}
+      ${byteToSize(params.datum.size, 1)}
       `;
       if(params.datum.accessCount!==undefined ){
         tooltipContent += `<br/>
