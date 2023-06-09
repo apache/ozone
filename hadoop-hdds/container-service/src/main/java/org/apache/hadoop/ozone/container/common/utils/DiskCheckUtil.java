@@ -48,6 +48,11 @@ public final class DiskCheckUtil {
     impl = diskChecks;
   }
 
+  @VisibleForTesting
+  public static void clearTestImpl() {
+    impl = new DiskChecksImpl();
+  }
+
   public static boolean checkExistence(File storageDir) {
     return impl.checkExistence(storageDir);
   }
@@ -63,12 +68,20 @@ public final class DiskCheckUtil {
 
   /**
    * Defines operations that must be implemented by a class injecting
-   * failures into this class.
+   * failures into this class. Default implementations return true so that
+   * tests only need to override methods for the failures they want to test.
    */
   public interface DiskChecks {
-    boolean checkExistence(File storageDir);
-    boolean checkPermissions(File storageDir);
-    boolean checkReadWrite(File storageDir, File testFileDir, int numBytesToWrite);
+    default boolean checkExistence(File storageDir) {
+      return true;
+    }
+    default boolean checkPermissions(File storageDir) {
+      return true;
+    }
+    default boolean checkReadWrite(File storageDir, File testFileDir,
+                            int numBytesToWrite) {
+      return true;
+    }
   }
 
   /**

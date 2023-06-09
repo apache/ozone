@@ -68,23 +68,4 @@ public class TestDiskCheckUtil {
     Assert.assertNotNull(children);
     Assert.assertEquals(0, children.length);
   }
-
-  // TODO this needs to be moved ot HddsVolume tests.
-//  private class FailingDiskChecks implements DiskCheckUtil.DiskChecks {
-//
-//    @Override
-//    public boolean checkExistence(File storageDir) {
-//      return false;
-//    }
-//
-//    @Override
-//    public boolean checkPermissions(File storageDir) {
-//      return false;
-//    }
-//
-//    @Override
-//    public boolean checkReadWrite(File storageDir, File testFileDir, int numBytesToWrite) {
-//      return false;
-//    }
-//  }
 }

@@ -16,9 +16,12 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.Before;
 import org.junit.Rule;
@@ -54,6 +57,7 @@ public class TestStorageVolume {
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
     versionFile = StorageVolumeUtil.getVersionFile(rootDir);
+    DiskCheckUtil.clearTestImpl();
   }
 
   @Test
@@ -79,5 +83,84 @@ public class TestStorageVolume {
     assertEquals(volume.getDatanodeUuid(), datanodeUuid);
     assertEquals(volume.getCTime(), cTime);
     assertEquals(volume.getLayoutVersion(), layoutVersion);
+  }
+
+  @Test
+  public void testCheckExistence() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    VolumeCheckResult result = volume.check(false);
+    assertEquals(VolumeCheckResult.HEALTHY, result);
+
+    final DiskCheckUtil.DiskChecks doesNotExist = new DiskCheckUtil.DiskChecks() {
+          @Override
+          public boolean checkExistence(File storageDir) {
+            return false;
+          }
+        };
+
+    DiskCheckUtil.setTestImpl(doesNotExist);
+    result = volume.check(false);
+    assertEquals(VolumeCheckResult.FAILED, result);
+  }
+
+  @Test
+  public void testCheckPermissions() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    VolumeCheckResult result = volume.check(false);
+    assertEquals(VolumeCheckResult.HEALTHY, result);
+
+    final DiskCheckUtil.DiskChecks noPermissions = new DiskCheckUtil.DiskChecks() {
+      @Override
+      public boolean checkPermissions(File storageDir) {
+        return false;
+      }
+    };
+
+    DiskCheckUtil.setTestImpl(noPermissions);
+    result = volume.check(false);
+    assertEquals(VolumeCheckResult.FAILED, result);
+  }
+
+
+  @Test
+  public void testCheckIoFailure() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+    final DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+      @Override
+      public boolean checkReadWrite(File storageDir, File testFileDir,
+                                    int numBytesToWrite) {
+        return false;
+      }
+    };
+
+    // Volume should not fail until it crosses the specified failure threshold.
+    int numFailuresTolerated = CONF.getObject(DatanodeConfiguration.class)
+        .getConsecutiveVolumeIOFailuresTolerated();
+
+    // Trigger failures until just before the threshold.
+    DiskCheckUtil.setTestImpl(ioFailure);
+    for (int i = 0; i < numFailuresTolerated - 1; i++) {
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    }
+    // After a passing run, the failure count should reset.
+    DiskCheckUtil.clearTestImpl();
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+    // Trigger failures until just before the threshold.
+    DiskCheckUtil.setTestImpl(ioFailure);
+    for (int i = 0; i < numFailuresTolerated - 1; i++) {
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    }
+    // The last run should now fail.
+    assertEquals(VolumeCheckResult.FAILED, volume.check(false));
   }
 }
