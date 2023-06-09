@@ -118,26 +118,29 @@ public class TestHddsVolume {
     // All temp directories should have been created.
     assertTrue(volume.getTmpDir().exists());
     assertTrue(volume.getDeletedContainerDir().exists());
+    assertTrue(volume.getDiskCheckDir().exists());
 
     volume.shutdown();
     // tmp directories should still exist after shutdown. This is not
     // checking their contents.
     assertTrue(volume.getTmpDir().exists());
     assertTrue(volume.getDeletedContainerDir().exists());
+    assertTrue(volume.getDiskCheckDir().exists());
   }
 
   @Test
-  public void testClearVolumeTmpDirs() throws Exception {
+  public void testClearDeletedContainersDir() throws Exception {
     // Set up volume.
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
 
     File tmpDir = volume.getHddsRootDir().toPath()
         .resolve(Paths.get(CLUSTER_ID, StorageVolume.TMP_DIR_NAME)).toFile();
-    File tmpDeleteDir = new File(tmpDir,
-        HddsVolume.TMP_CONTAINER_DELETE_DIR_NAME);
+
     // Simulate a container that failed to delete fully from the deleted
     // containers directory.
+    File tmpDeleteDir = new File(tmpDir,
+        HddsVolume.TMP_CONTAINER_DELETE_DIR_NAME);
     File leftoverContainer = new File(tmpDeleteDir, "1");
     assertTrue(leftoverContainer.mkdirs());
 
@@ -158,6 +161,41 @@ public class TestHddsVolume {
     // It should be cleared again on shutdown.
     assertFalse(leftoverContainer.exists());
     assertTrue(tmpDeleteDir.exists());
+  }
+
+  @Test
+  public void testClearVolumeHealthCheckDir() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    File tmpDir = volume.getHddsRootDir().toPath()
+        .resolve(Paths.get(CLUSTER_ID, StorageVolume.TMP_DIR_NAME)).toFile();
+
+    // Simulate a leftover disk check file that failed to delete.
+    File tmpDiskCheckDir = new File(tmpDir,
+        StorageVolume.TMP_DISK_CHECK_DIR_NAME);
+    assertTrue(tmpDiskCheckDir.mkdirs());
+    File leftoverDiskCheckFile = new File(tmpDiskCheckDir, "diskcheck");
+    assertTrue(leftoverDiskCheckFile.createNewFile());
+
+    // Check that tmp dirs are created with expected names.
+    volume.createWorkingDirs(CLUSTER_ID, null);
+    assertEquals(tmpDir, volume.getTmpDir());
+    assertEquals(tmpDiskCheckDir, volume.getDiskCheckDir());
+
+    // Cleanup should have removed the leftover disk check file without
+    // removing the directory itself.
+    assertFalse(leftoverDiskCheckFile.exists());
+    assertTrue(tmpDiskCheckDir.exists());
+
+    // Re-create the disk check file
+    assertTrue(leftoverDiskCheckFile.createNewFile());
+
+    volume.shutdown();
+    // It should be cleared again on shutdown.
+    assertFalse(leftoverDiskCheckFile.exists());
+    assertTrue(tmpDiskCheckDir.exists());
   }
 
   @Test

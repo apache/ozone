@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -71,7 +72,7 @@ public abstract class StorageVolume
   public static final String TMP_DIR_NAME = "tmp";
   // The name of the directory where temporary files used to check disk
   // health are written to. This will go inside the tmp directory.
-  private static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
+  public static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
 
   /**
    * Type for StorageVolume.
@@ -117,7 +118,7 @@ public abstract class StorageVolume
   private final File storageDir;
   private String workingDirName;
   private File tmpDir;
-  private File tmpDiskCheckDir;
+  private File diskCheckDir;
 
   private final Optional<VolumeInfo> volumeInfo;
 
@@ -230,7 +231,7 @@ public abstract class StorageVolume
     this.workingDirName = dirName;
     this.tmpDir = new File(idDir, TMP_DIR_NAME);
     Files.createDirectories(tmpDir.toPath());
-    createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);
+    diskCheckDir = createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);
     cleanTmpDiskCheckDir();
   }
 
@@ -450,6 +451,11 @@ public abstract class StorageVolume
     return this.tmpDir;
   }
 
+  @VisibleForTesting
+  public File getDiskCheckDir() {
+    return this.diskCheckDir;
+  }
+
   public void refreshVolumeInfo() {
     volumeInfo.ifPresent(VolumeInfo::refreshNow);
   }
@@ -528,7 +534,25 @@ public abstract class StorageVolume
    * Delete all temporary files in the directory used ot check disk health.
    */
   private void cleanTmpDiskCheckDir() {
-    try (Stream<Path> files = Files.list(tmpDiskCheckDir.toPath())) {
+    // If the volume was shut down before initialization completed, skip
+    // emptying the directory.
+    if (diskCheckDir == null) {
+      return;
+    }
+
+    if (!diskCheckDir.exists()) {
+      LOG.warn("Unable to clear disk check files from {}. Directory does " +
+          "not exist.", diskCheckDir);
+      return;
+    }
+
+    if (!diskCheckDir.isDirectory()) {
+      LOG.warn("Unable to clear disk check files from {}. Location is not a" +
+          " directory", diskCheckDir);
+      return;
+    }
+
+    try (Stream<Path> files = Files.list(diskCheckDir.toPath())) {
           files.map(Path::toFile)
           .filter(File::isFile)
           .forEach(file -> {
@@ -541,7 +565,7 @@ public abstract class StorageVolume
           });
     } catch (IOException ex) {
       LOG.warn("Failed to list contents of volume health check directory {} " +
-          "for deleting.", tmpDiskCheckDir);
+          "for deleting.", diskCheckDir);
     }
   }
 
@@ -566,7 +590,7 @@ public abstract class StorageVolume
     // Since IO errors may be intermittent, volume remains healthy until the
     // threshold of consecutive failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(
-        LOG, storageDir, tmpDiskCheckDir, healthCheckFileSize);
+        LOG, storageDir, diskCheckDir, healthCheckFileSize);
     if (diskChecksPassed) {
       // Reset consecutive IO failure count when IO succeeds.
       // Volume remains healthy.
