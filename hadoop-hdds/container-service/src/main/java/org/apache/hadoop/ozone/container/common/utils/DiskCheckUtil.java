@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,105 +32,154 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.UUID;
 
-public class DiskCheckUtil {
-  private static void logError(Logger log, File storageDir, String message) {
-    log.error("Volume {} failed health check. {}", storageDir, message);
+/**
+ * Utility class that supports checking disk health when provided a directory
+ * where the disk is mounted.
+ */
+public final class DiskCheckUtil {
+  private DiskCheckUtil() { }
+
+  // For testing purposes, an alternate check implementation can be provided
+  // to inject failures.
+  private static DiskChecks impl = new DiskChecksImpl();
+
+  @VisibleForTesting
+  public static void setTestImpl(DiskChecks diskChecks) {
+    impl = diskChecks;
   }
 
-  private static void logError(Logger log, File storageDir, String message,
-                               Exception ex) {
-    log.error("Volume {} failed health check. {}", storageDir, message, ex);
+  public static boolean checkExistence(File storageDir) {
+    return impl.checkExistence(storageDir);
   }
 
-  public static boolean checkExistence(Logger log, File diskDir) {
-    if (!diskDir.exists()) {
-      logError(log, diskDir, "Directory does not exist.");
-      return false;
-    }
-    return true;
+  public static boolean checkPermissions(File storageDir) {
+    return impl.checkPermissions(storageDir);
   }
 
-  public static boolean checkPermissions(Logger log, File storageDir) {
-    // Check all permissions on the volume. If there are multiple permission
-    // errors, count it as one failure so the admin can fix them all at once.
-    boolean permissionsCorrect = true;
-    if (!storageDir.canRead()) {
-      logError(log, storageDir,
-          "Datanode does not have read permission on volume.");
-      permissionsCorrect = false;
-    }
-    if (!storageDir.canWrite()) {
-      logError(log, storageDir,
-          "Datanode does not have write permission on volume.");
-      permissionsCorrect = false;
-    }
-    if (!storageDir.canExecute()) {
-      logError(log, storageDir,
-          "Datanode does not have execute permission on volume.");
-      permissionsCorrect = false;
-    }
-
-    return permissionsCorrect;
+  public static boolean checkReadWrite(File storageDir, File testFileDir,
+      int numBytesToWrite) {
+    return impl.checkReadWrite(storageDir, testFileDir, numBytesToWrite);
   }
 
-  public static boolean checkReadWrite(Logger log, File storageDir,
-      File testFileDir, int numBytesToWrite) {
-    File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
-    byte[] writtenBytes = new byte[numBytesToWrite];
-    new Random().nextBytes(writtenBytes);
-    try (FileOutputStream fos = new FileOutputStream(testFile)) {
-      fos.write(writtenBytes);
-      fos.getFD().sync();
-    } catch (FileNotFoundException notFoundEx) {
-      logError(log, storageDir, String.format("Could not find file %s for " +
-              "volume check.", testFile), notFoundEx);
-      return false;
-    } catch (SyncFailedException syncEx) {
-      logError(log, storageDir, String.format("Could sync file %s to disk.",
-          testFile), syncEx);
-      return false;
-    } catch (IOException ioEx) {
-      logError(log, storageDir, String.format("Could not write file %s " +
-          "for volume check.", testFile), ioEx);
-      return false;
-    }
+  /**
+   * Defines operations that must be implemented by a class injecting
+   * failures into this class.
+   */
+  public interface DiskChecks {
+    boolean checkExistence(File storageDir);
+    boolean checkPermissions(File storageDir);
+    boolean checkReadWrite(File storageDir, File testFileDir, int numBytesToWrite);
+  }
 
-    // Read data back from the test file.
-    byte[] readBytes = new byte[numBytesToWrite];
-    try (FileInputStream fis = new FileInputStream(testFile)) {
-      int numBytesRead = fis.read(readBytes);
-      if (numBytesRead != numBytesToWrite) {
-        logError(log, storageDir, String.format("%d bytes written to file %s " +
-            "but %d bytes were read back.", numBytesToWrite, testFile,
-            numBytesRead));
+  /**
+   * The default implementation of DiskCheck that production code will use
+   * for disk checking.
+   */
+  private static class DiskChecksImpl implements DiskChecks {
+
+    private static final Logger LOG =
+        LoggerFactory.getLogger(DiskCheckUtil.class);
+
+    @Override
+    public boolean checkExistence(File diskDir) {
+      if (!diskDir.exists()) {
+        logError(diskDir, "Directory does not exist.");
         return false;
       }
-    } catch (FileNotFoundException notFoundEx) {
-      logError(log, storageDir, String.format("Could not find file %s " +
-          "for volume check.", testFile), notFoundEx);
-      return false;
-    } catch (IOException ioEx) {
-      logError(log, storageDir, String.format("Could not read file %s " +
-          "for volume check.", testFile), ioEx);
-      return false;
+      return true;
     }
 
-    // Check that test file has the expected content.
-    if (!Arrays.equals(writtenBytes, readBytes)) {
-      logError(log, storageDir, String.format("%d Bytes read from file " +
-          "%s do not match the %d bytes that were written.",
-          writtenBytes.length, testFile, readBytes.length));
-      return false;
+    @Override
+    public boolean checkPermissions(File storageDir) {
+      // Check all permissions on the volume. If there are multiple permission
+      // errors, count it as one failure so the admin can fix them all at once.
+      boolean permissionsCorrect = true;
+      if (!storageDir.canRead()) {
+        logError(storageDir,
+            "Datanode does not have read permission on volume.");
+        permissionsCorrect = false;
+      }
+      if (!storageDir.canWrite()) {
+        logError(storageDir,
+            "Datanode does not have write permission on volume.");
+        permissionsCorrect = false;
+      }
+      if (!storageDir.canExecute()) {
+        logError(storageDir, "Datanode does not have execute permission on volume.");
+        permissionsCorrect = false;
+      }
+
+      return permissionsCorrect;
     }
 
-    // Delete the file.
-    if (!testFile.delete()) {
-      logError(log, storageDir, String.format("Could not delete file %s " +
-          "for volume check.", testFile));
-      return false;
+    @Override
+    public boolean checkReadWrite(File storageDir,
+        File testFileDir, int numBytesToWrite) {
+      File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
+      byte[] writtenBytes = new byte[numBytesToWrite];
+      new Random().nextBytes(writtenBytes);
+      try (FileOutputStream fos = new FileOutputStream(testFile)) {
+        fos.write(writtenBytes);
+        fos.getFD().sync();
+      } catch (FileNotFoundException notFoundEx) {
+        logError(storageDir, String.format("Could not find file %s for " +
+            "volume check.", testFile), notFoundEx);
+        return false;
+      } catch (SyncFailedException syncEx) {
+        logError(storageDir, String.format("Could sync file %s to disk.",
+            testFile), syncEx);
+        return false;
+      } catch (IOException ioEx) {
+        logError(storageDir, String.format("Could not write file %s " +
+            "for volume check.", testFile), ioEx);
+        return false;
+      }
+
+      // Read data back from the test file.
+      byte[] readBytes = new byte[numBytesToWrite];
+      try (FileInputStream fis = new FileInputStream(testFile)) {
+        int numBytesRead = fis.read(readBytes);
+        if (numBytesRead != numBytesToWrite) {
+          logError(storageDir, String.format("%d bytes written to file %s " +
+                  "but %d bytes were read back.", numBytesToWrite, testFile,
+              numBytesRead));
+          return false;
+        }
+      } catch (FileNotFoundException notFoundEx) {
+        logError(storageDir, String.format("Could not find file %s " +
+            "for volume check.", testFile), notFoundEx);
+        return false;
+      } catch (IOException ioEx) {
+        logError(storageDir, String.format("Could not read file %s " +
+            "for volume check.", testFile), ioEx);
+        return false;
+      }
+
+      // Check that test file has the expected content.
+      if (!Arrays.equals(writtenBytes, readBytes)) {
+        logError(storageDir, String.format("%d Bytes read from file " +
+                "%s do not match the %d bytes that were written.",
+            writtenBytes.length, testFile, readBytes.length));
+        return false;
+      }
+
+      // Delete the file.
+      if (!testFile.delete()) {
+        logError(storageDir, String.format("Could not delete file %s " +
+            "for volume check.", testFile));
+        return false;
+      }
+
+      // If all checks passed, the volume is healthy.
+      return true;
     }
 
-    // If all checks passed, the volume is healthy.
-    return true;
+    private void logError(File storageDir, String message) {
+      LOG.error("Volume {} failed health check. {}", storageDir, message);
+    }
+
+    private void logError(File storageDir, String message, Exception ex) {
+      LOG.error("Volume {} failed health check. {}", storageDir, message, ex);
+    }
   }
 }

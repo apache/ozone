@@ -579,8 +579,8 @@ public abstract class StorageVolume
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
     boolean directoryChecksPassed =
-        DiskCheckUtil.checkExistence(LOG, storageDir) &&
-        DiskCheckUtil.checkPermissions(LOG, storageDir);
+        DiskCheckUtil.checkExistence(storageDir) &&
+        DiskCheckUtil.checkPermissions(storageDir);
     // If the directory is not present or has incorrect permissions, fail the
     // volume immediately. This is not an intermittent error.
     if (!directoryChecksPassed) {
@@ -589,15 +589,15 @@ public abstract class StorageVolume
 
     // Since IO errors may be intermittent, volume remains healthy until the
     // threshold of consecutive failures is crossed.
-    boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(
-        LOG, storageDir, diskCheckDir, healthCheckFileSize);
+    boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
+        diskCheckDir, healthCheckFileSize);
     if (diskChecksPassed) {
       // Reset consecutive IO failure count when IO succeeds.
       // Volume remains healthy.
       consecutiveIOFailureCount = 0;
     } else {
       consecutiveIOFailureCount++;
-      if (consecutiveIOFailureCount > consecutiveIOFailureTolerance) {
+      if (consecutiveIOFailureCount >= consecutiveIOFailureTolerance) {
         // After too many repeated IO failures, the volume should be failed.
         return VolumeCheckResult.FAILED;
       }
