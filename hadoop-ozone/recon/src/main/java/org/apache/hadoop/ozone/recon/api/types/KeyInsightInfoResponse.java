@@ -32,9 +32,9 @@ import java.util.Map;
  */
 public class KeyInsightInfoResponse {
 
-  /** Cluster summary. Includes aggregated information about the cluster. */
-  @JsonProperty("clusterSummary")
-  private Map<String, Object> clusterSummary;
+  /** Keys summary. Includes aggregated information about the keys. */
+  @JsonProperty("keysSummary")
+  private Map<String, Object> keysSummary;
 
   /** last key sent. */
   @JsonProperty("lastKey")
@@ -81,15 +81,15 @@ public class KeyInsightInfoResponse {
     fsoKeyInfoList = new ArrayList<>();
     repeatedOmKeyInfoList = new ArrayList<>();
     deletedDirInfoList = new ArrayList<>();
-    clusterSummary = new HashMap<>();
+    keysSummary = new HashMap<>();
   }
 
-  public Map<String, Object> getClusterSummary() {
-    return clusterSummary;
+  public Map<String, Object> getKeysSummary() {
+    return keysSummary;
   }
 
-  public void setClusterSummary(Map<String, Object> clusterSummary) {
-    this.clusterSummary = clusterSummary;
+  public void setKeysSummary(Map<String, Object> keysSummary) {
+    this.keysSummary = keysSummary;
   }
 
   public String getLastKey() {

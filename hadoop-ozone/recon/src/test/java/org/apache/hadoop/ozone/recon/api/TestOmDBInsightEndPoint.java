@@ -211,7 +211,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testClusterSummaryAttribute() {
+  public void testKeysSummaryAttribute() {
     Timestamp now = new Timestamp(System.currentTimeMillis());
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
@@ -236,7 +236,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
     Assertions.assertNotNull(keyInsightInfoResp);
-    Map<String, Object> summary = keyInsightInfoResp.getClusterSummary();
+    Map<String, Object> summary = keyInsightInfoResp.getKeysSummary();
     Assertions.assertEquals(60L, summary.get("totalReplicatedDataSize"));
     Assertions.assertEquals(20L, summary.get("totalUnreplicatedDataSize"));
     Assertions.assertEquals(6L, summary.get("totalOpenKeys"));

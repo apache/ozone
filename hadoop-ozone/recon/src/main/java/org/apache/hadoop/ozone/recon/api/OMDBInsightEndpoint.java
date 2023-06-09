@@ -81,7 +81,7 @@ public class OMDBInsightEndpoint {
   private final ReconContainerManager containerManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
-  private GlobalStatsDao globalStatsDao;
+  private final GlobalStatsDao globalStatsDao;
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
@@ -99,7 +99,7 @@ public class OMDBInsightEndpoint {
    * @return the http json response wrapped in below format:
    *
    * {
-   *   "clusterSummary": {
+   *   "keysSummary": {
    *     "totalUnreplicatedDataSize": 2147483648,
    *     "totalReplicatedDataSize": 2147483648,
    *     "totalOpenKeys": 8
@@ -162,8 +162,8 @@ public class OMDBInsightEndpoint {
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
 
-    // Create a HashMap for the clusterSummary
-    Map<String, Object> clusterSummary = new HashMap<>();
+    // Create a HashMap for the keysSummary
+    Map<String, Object> keysSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
@@ -236,24 +236,24 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
-    // Populate the clusterSummary map
-    createClusterSummaryForOpenKey(clusterSummary);
+    // Populate the keysSummary map
+    createKeysSummaryForOpenKey(keysSummary);
 
-    openKeyInsightInfo.setClusterSummary(clusterSummary);
+    openKeyInsightInfo.setKeysSummary(keysSummary);
 
     openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
   }
 
   /**
-   * Creates a cluster summary for open keys and updates the provided
-   * clusterSummary map. Calculates the total number of open keys, replicated
+   * Creates a keys summary for open keys and updates the provided
+   * keysSummary map. Calculates the total number of open keys, replicated
    * data size, and unreplicated data size.
    *
-   * @param clusterSummary A map to store the cluster summary information.
+   * @param keysSummary A map to store the keys summary information.
    */
-  private void createClusterSummaryForOpenKey(
-      Map<String, Object> clusterSummary) {
+  private void createKeysSummaryForOpenKey(
+      Map<String, Object> keysSummary) {
     Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
     Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
@@ -268,12 +268,12 @@ public class OMDBInsightEndpoint {
         OmTableInsightTask.getTableCountKeyFromTable(OPEN_FILE_TABLE)));
 
     // Calculate the total number of open keys
-    clusterSummary.put("totalOpenKeys",
+    keysSummary.put("totalOpenKeys",
         openKeyCountForKeyTable + openKeyCountForFileTable);
     // Calculate the total replicated and unreplicated sizes
-    clusterSummary.put("totalReplicatedDataSize",
+    keysSummary.put("totalReplicatedDataSize",
         replicatedSizeOpenKey + replicatedSizeOpenFile);
-    clusterSummary.put("totalUnreplicatedDataSize",
+    keysSummary.put("totalUnreplicatedDataSize",
         unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
 
   }
