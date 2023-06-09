@@ -1068,6 +1068,8 @@ public class TestReplicationManager {
 
     testReplicationCommand(cmdTarget, sourceNodes.keySet(), 0,
         MockDatanodeDetails.randomDatanodeDetails());
+    assertEquals(0, replicationManager.getMetrics()
+        .getReplicateContainerCmdsDeferredTotal());
   }
 
   @Test
@@ -1143,7 +1145,6 @@ public class TestReplicationManager {
             container, sourceNodes, destination, 0));
     assertEquals(overLoadedCount + 1, replicationManager.getMetrics()
         .getReplicateContainerCmdsDeferredTotal());
-
   }
 
   @Test
@@ -1168,6 +1169,8 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
     Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+    assertEquals(0, replicationManager.getMetrics()
+        .getEcReconstructionCmdsDeferredTotal());
   }
 
   @Test
@@ -1229,6 +1232,8 @@ public class TestReplicationManager {
         repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
     replicationManager.sendThrottledDeleteCommand(container, 1, target, true);
     assertEquals(commandsSent.size(), 1);
+    assertEquals(0, replicationManager.getMetrics()
+        .getDeleteContainerCmdsDeferredTotal());
   }
 
   @Test
