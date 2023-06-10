@@ -84,6 +84,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -181,9 +182,9 @@ public class TestSnapshotDiffManager {
     return snapshotDiffManager;
   }
 
-  private SnapshotInfo getMockedSnapshotInfo(String snapshot) {
+  private SnapshotInfo getMockedSnapshotInfo(UUID snapshotId) {
     SnapshotInfo snapshotInfo = Mockito.mock(SnapshotInfo.class);
-    Mockito.when(snapshotInfo.getSnapshotID()).thenReturn(snapshot);
+    Mockito.when(snapshotInfo.getSnapshotId()).thenReturn(snapshotId);
     return snapshotInfo;
   }
 
@@ -193,8 +194,8 @@ public class TestSnapshotDiffManager {
       throws ExecutionException, RocksDBException, IOException {
 
     SnapshotDiffManager snapshotDiffManager = getMockedSnapshotDiffManager(10);
-    String snap1 = "snap1";
-    String snap2 = "snap2";
+    UUID snap1 = UUID.randomUUID();
+    UUID snap2 = UUID.randomUUID();
 
     String diffDir = Files.createTempDirectory("snapdiff_dir").toString();
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
@@ -207,7 +208,8 @@ public class TestSnapshotDiffManager {
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
     Mockito.when(jobTableIterator.isValid()).thenReturn(false);
     Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-        snapshotCache.get(snap1), snapshotCache.get(snap2),
+        snapshotCache.get(snap1.toString()),
+        snapshotCache.get(snap2.toString()),
         Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
         Collections.EMPTY_MAP, diffDir);
     Assertions.assertEquals(randomStrings, deltaFiles);
@@ -248,8 +250,8 @@ public class TestSnapshotDiffManager {
           });
       SnapshotDiffManager snapshotDiffManager =
           getMockedSnapshotDiffManager(10);
-      String snap1 = "snap1";
-      String snap2 = "snap2";
+      UUID snap1 = UUID.randomUUID();
+      UUID snap2 = UUID.randomUUID();
       if (!useFullDiff) {
         Set<String> randomStrings = Collections.emptySet();
         Mockito.when(differ.getSSTDiffListWithFullPath(
@@ -262,7 +264,8 @@ public class TestSnapshotDiffManager {
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       Mockito.when(jobTableIterator.isValid()).thenReturn(false);
       Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-          snapshotCache.get(snap1), snapshotCache.get(snap2),
+          snapshotCache.get(snap1.toString()),
+          snapshotCache.get(snap2.toString()),
           Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
           Collections.EMPTY_MAP, Files.createTempDirectory("snapdiff_dir")
               .toAbsolutePath().toString());
