@@ -817,19 +817,24 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
-    List<OzoneSnapshot> snapshotList =
-        objectStore.listSnapshot(volumeName, bucketName);
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
+    List<FileStatusAdapter> res = new ArrayList<>();
 
-    return snapshotList.stream()
-        .map(ozoneSnapshot -> getFileStatusAdapterForBucketSnapshot(
-            ozoneBucket, ozoneSnapshot, uri, owner, group))
-        .collect(Collectors.toList());
+    Iterator<? extends OzoneSnapshot> snapshotIter =
+        objectStore.listSnapshot(volumeName, bucketName, null, null);
+
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot ozoneSnapshot = snapshotIter.next();
+      res.add(getFileStatusAdapterForBucketSnapshot(
+          ozoneBucket, ozoneSnapshot, uri, owner, group));
+    }
+
+    return res;
   }
 
   /**
@@ -1363,5 +1368,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OzoneBucket bucket = getBucket(ofsPath, false);
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
+  }
+
+  public void setTimes(String key, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    OFSPath ofsPath = new OFSPath(key, config);
+
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    bucket.setTimes(ofsPath.getKeyName(), mtime, atime);
   }
 }

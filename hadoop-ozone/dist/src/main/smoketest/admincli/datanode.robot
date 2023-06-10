@@ -21,12 +21,13 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 List datanodes
-    ${output} =         Execute          ozone admin datanode list
+                        Execute      ozone admin datanode list > datanode.list
+    ${output} =         Get File     datanode.list
                         Should contain   ${output}   Datanode:
                         Should contain   ${output}   Related pipelines:
 
 Filter list by UUID
-    ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
+    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
     ${output} =         Execute      ozone admin datanode list --id "${uuid}"
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
@@ -35,8 +36,8 @@ Filter list by UUID
     Should Be Equal As Integers    ${count}    1
 
 Filter list by NodeOperationalState
-    ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
-    ${expected} =       Execute      ozone admin datanode list | grep -c 'Operational State: IN_SERVICE'
+    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
+    ${expected} =       Execute      grep -c 'Operational State: IN_SERVICE' datanode.list
     ${output} =         Execute      ozone admin datanode list --operational-state IN_SERVICE
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
@@ -45,8 +46,8 @@ Filter list by NodeOperationalState
     Should Be Equal As Integers    ${count}    ${expected}
 
 Filter list by NodeState
-    ${uuid} =           Execute      ozone admin datanode list | grep '^Datanode:' | head -1 | awk '{ print \$2 }'
-    ${expected} =       Execute      ozone admin datanode list | grep -c 'Health State: HEALTHY'
+    ${uuid} =           Execute      grep '^Datanode:' datanode.list | head -1 | awk '{ print \$2 }'
+    ${expected} =       Execute      grep -c 'Health State: HEALTHY' datanode.list
     ${output} =         Execute      ozone admin datanode list --node-state HEALTHY
     Should contain      ${output}    Datanode: ${uuid}
     ${datanodes} =      Get Lines Containing String    ${output}    Datanode:
