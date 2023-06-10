@@ -23,9 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.UUID;
-import java.util.concurrent.ThreadPoolExecutor;
 
-import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -34,7 +32,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -52,8 +49,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -174,62 +169,6 @@ public class TestHddsDatanodeService {
     assertFalse(deleteLeftoverIt.hasNext());
 
     volumeSet.shutdown();
-  }
-
-  @Test
-  public void testReconfigBlockDeletingLimitPerInterval()
-      throws ReconfigurationException {
-    assertIsPropertyReconfigurable(
-        HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL);
-    service.start(conf);
-
-    service.reconfigurePropertyImpl(
-        HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, "1");
-    service.getDatanodeStateMachine().getContainer()
-        .getBlockDeletingService().getBlockLimitPerInterval();
-    assertEquals(1, service.getDatanodeStateMachine().getContainer()
-        .getBlockDeletingService().getBlockLimitPerInterval());
-
-    service.stop();
-    service.join();
-    service.close();
-  }
-
-  @Test
-  public void testReconfigBlockDeleteThreadMax()
-      throws ReconfigurationException {
-    assertIsPropertyReconfigurable(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX);
-    service.start(conf);
-
-   // Start the service and get the original pool size
-    ThreadPoolExecutor executor = ((DeleteBlocksCommandHandler)
-        service.getDatanodeStateMachine().getCommandDispatcher()
-            .getDeleteBlocksCommandHandler()).getExecutor();
-    int originPoolSize = executor.getMaximumPoolSize();
-
-    // Attempt to increase the pool size by 1 and verify if it's successful
-    service.reconfigurePropertyImpl(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-        String.valueOf(originPoolSize + 1));
-    assertEquals(originPoolSize + 1, executor.getMaximumPoolSize());
-    assertEquals(originPoolSize + 1, executor.getCorePoolSize());
-
-    // Attempt to decrease the pool size by 1 and verify if it's successful
-    service.reconfigurePropertyImpl(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-        String.valueOf(originPoolSize - 1));
-    assertEquals(originPoolSize - 1, executor.getMaximumPoolSize());
-    assertEquals(originPoolSize - 1,  executor.getCorePoolSize());
-
-    service.stop();
-    service.join();
-    service.close();
-  }
-
-  /**
-   * {@link org.apache.hadoop.conf.ReconfigurableBase#isPropertyReconfigurable}.
-   * @param config
-   */
-  private void assertIsPropertyReconfigurable(String config) {
-    assertTrue(service.getReconfigurableProperties().contains(config));
   }
 
   static class MockService implements ServicePlugin {

@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.reconfig;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
+import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -51,6 +53,21 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
         getCluster().getStorageContainerManager().getScmAdminUsernames());
+  }
+
+  @Test
+  public void blockDeletionPerIntervalMaxReconfigure() {
+    SCMBlockDeletingService blockDeletingService =
+        getCluster().getStorageContainerManager().getScmBlockManager()
+        .getSCMBlockDeletingService();
+    int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
+
+    getSubject().reconfigurePropertyImpl(
+        HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX,
+        String.valueOf(blockDeleteTXNum + 1));
+
+    assertEquals(blockDeleteTXNum + 1,
+        blockDeletingService.getBlockDeleteTXNum());
   }
 
 }

@@ -79,6 +79,7 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
@@ -338,7 +339,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               .register(HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL,
                   this::reconfigBlockDeletingLimitPerInterval)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-                  this::reconfigBlockDeleteThreadMax);
+                  this::reconfigBlockDeleteThreadMax)
+              .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+                  this::reconfigDeletingServiceWorkers);
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
@@ -717,6 +720,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         (DeleteBlocksCommandHandler) getDatanodeStateMachine()
             .getCommandDispatcher().getDeleteBlocksCommandHandler();
     handler.setPoolSize(Integer.parseInt(value));
+    return value;
+  }
+
+  private String reconfigDeletingServiceWorkers(String value) {
+    getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
+
+    getDatanodeStateMachine().getContainer().getBlockDeletingService()
+        .setPoolSize(Integer.parseInt(value));
     return value;
   }
 }
