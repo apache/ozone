@@ -27,9 +27,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1117,8 +1120,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             result.add(omBucketInfo);
             currentCount++;
           } else if (
-              StringUtils.isNotEmpty(
-                  snapshotChainManager.getLatestPathSnapshot(volumeName +
+              Objects.nonNull(
+                  snapshotChainManager.getLatestPathSnapshotId(volumeName +
                       OM_KEY_PREFIX + omBucketInfo.getBucketName()))) {
             // Snapshot filter on.
             // Add to result list only when the bucket has at least one snapshot
@@ -1618,37 +1621,46 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                             OmSnapshotManager snapshotManager)
       throws IOException {
 
+
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
-    String latestPathSnapshot = snapshotChainManager
-        .getLatestPathSnapshot(snapshotPath);
+    Optional<UUID> latestPathSnapshot = Optional.ofNullable(
+        snapshotChainManager.getLatestPathSnapshotId(snapshotPath));
 
-    SnapshotInfo snapInfo = null;
-    while (latestPathSnapshot != null) {
-      String snapTableKey = snapshotChainManager
-          .getTableKey(latestPathSnapshot);
-      snapInfo = getSnapshotInfoTable().get(snapTableKey);
+    Optional<SnapshotInfo> snapshotInfo = Optional.empty();
 
-      if (snapInfo != null && snapInfo.getSnapshotStatus() ==
+    while (latestPathSnapshot.isPresent()) {
+      Optional<String> snapTableKey = latestPathSnapshot
+          .map(uuid -> snapshotChainManager.getTableKey(uuid));
+
+      snapshotInfo = snapTableKey.isPresent() ?
+          Optional.ofNullable(getSnapshotInfoTable().get(snapTableKey.get())) :
+          Optional.empty();
+
+      if (snapshotInfo.isPresent() && snapshotInfo.get().getSnapshotStatus() ==
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         break;
       }
 
       // Update latestPathSnapshot if current snapshot is deleted.
-      if (snapshotChainManager.hasPreviousPathSnapshot(
-          snapshotPath, latestPathSnapshot)) {
-        latestPathSnapshot = snapshotChainManager
-            .previousPathSnapshot(snapshotPath, latestPathSnapshot);
+      if (snapshotChainManager.hasPreviousPathSnapshot(snapshotPath,
+          latestPathSnapshot.get())) {
+        latestPathSnapshot = Optional.ofNullable(snapshotChainManager
+            .previousPathSnapshot(snapshotPath, latestPathSnapshot.get()));
       } else {
-        latestPathSnapshot = null;
+        latestPathSnapshot = Optional.empty();
       }
     }
 
-    OmSnapshot omSnapshot = null;
-    if (snapInfo != null) {
-      omSnapshot = (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
-              bucketName, getSnapshotPrefix(snapInfo.getName()), true);
-    }
-    return omSnapshot;
+    Optional<OmSnapshot> omSnapshot = snapshotInfo.isPresent() ?
+        Optional.ofNullable(
+            (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
+                bucketName,
+                getSnapshotPrefix(snapshotInfo.get().getName()),
+                true)
+        ) :
+        Optional.empty();
+
+    return omSnapshot.orElse(null);
   }
 
   @Override

@@ -350,7 +350,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     final OMMetadataManager snapshotOMMM = omSnapshot.getMetadataManager();
     final String checkpointPath =
         snapshotOMMM.getStore().getDbLocation().getPath();
-    final String snapshotId = snapshotInfo.getSnapshotID();
+    final UUID snapshotId = snapshotInfo.getSnapshotId();
     final long dbTxSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
     return new DifferSnapshotInfo(
@@ -382,8 +382,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
         volumeName, bucketName, toSnapshotName);
 
-    String snapDiffJobKey = fsInfo.getSnapshotID() + DELIMITER +
-        tsInfo.getSnapshotID();
+    String snapDiffJobKey = fsInfo.getSnapshotId() + DELIMITER +
+        tsInfo.getSnapshotId();
 
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
