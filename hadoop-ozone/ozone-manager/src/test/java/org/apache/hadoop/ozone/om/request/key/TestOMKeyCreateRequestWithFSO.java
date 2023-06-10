@@ -27,16 +27,21 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.mockito.Mockito.when;
 /**
  * Tests OMCreateKeyRequestWithFSO class.
  */
@@ -45,6 +50,39 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   public TestOMKeyCreateRequestWithFSO(boolean setKeyPathLock,
                                        boolean setFileSystemPaths) {
     super(setKeyPathLock, setFileSystemPaths);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithKeyContainsSnapshotReservedWord()
+        throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(getKeyPathLockEnabled(),
+            getEnableFileSystemPaths()));
+
+    String[] validKeyNames = {
+        keyName,
+        OM_SNAPSHOT_INDICATOR + "a/" + keyName,
+        "a/" + OM_SNAPSHOT_INDICATOR + "/b/c/" + keyName
+    };
+    for (String validKeyName : validKeyNames) {
+      keyName = validKeyName;
+      OMRequest omRequest = createKeyRequest(false, 0);
+
+      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+          omMetadataManager, getBucketLayout());
+      OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+      OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+      omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+      OMClientResponse omKeyCreateResponse =
+          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+              ozoneManagerDoubleBufferHelper);
+      Assert.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
+      Assert.assertEquals("Incorrect keyName", keyName,
+          omKeyCreateResponse.getOMResponse()
+                .getCreateKeyResponse().getKeyInfo().getKeyName());
+    }
   }
 
   @Override

@@ -37,6 +37,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -66,6 +67,7 @@ public class TestContainerKeyMapperTask {
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
+  private OzoneConfiguration omConfiguration;
 
   private static final String FSO_KEY_NAME = "dir1/file7";
   private static final String BUCKET_NAME = "bucket1";
@@ -85,6 +87,7 @@ public class TestContainerKeyMapperTask {
     ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.newFolder());
+    omConfiguration = new OzoneConfiguration();
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder)
@@ -132,7 +135,8 @@ public class TestContainerKeyMapperTask {
         Collections.singletonList(omKeyLocationInfoGroup));
 
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            omConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer =
@@ -140,7 +144,7 @@ public class TestContainerKeyMapperTask {
     assertEquals(1, keyPrefixesForContainer.size());
     String omKey = omMetadataManager.getOzoneKey(VOLUME_NAME, BUCKET_NAME,
         FILE_NAME);
-    ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(1,
+    ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(1,
         omKey, 0);
     assertEquals(1,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -148,7 +152,7 @@ public class TestContainerKeyMapperTask {
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2);
     assertEquals(1, keyPrefixesForContainer.size());
-    containerKeyPrefix = new ContainerKeyPrefix(2, omKey,
+    containerKeyPrefix = ContainerKeyPrefix.get(2, omKey,
         0);
     assertEquals(1,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -204,7 +208,8 @@ public class TestContainerKeyMapperTask {
 
     // Reprocess container key mappings
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            omConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
     // Check the key prefixes for container 1
@@ -214,7 +219,7 @@ public class TestContainerKeyMapperTask {
         omMetadataManager.getOzonePathKey(VOL_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
             BUCKET_ONE_OBJECT_ID, FILE_NAME);
     ContainerKeyPrefix containerKeyPrefix =
-        new ContainerKeyPrefix(1L, omKey, 0L);
+        ContainerKeyPrefix.get(1L, omKey, 0L);
     assertEquals(1L, keyPrefixesForContainer.size());
     assertEquals(1L,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -222,7 +227,7 @@ public class TestContainerKeyMapperTask {
     // Check the key prefixes for container 2
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2L);
-    containerKeyPrefix = new ContainerKeyPrefix(2L, omKey, 0L);
+    containerKeyPrefix = ContainerKeyPrefix.get(2L, omKey, 0L);
     assertEquals(1L, keyPrefixesForContainer.size());
     assertEquals(1L,
         keyPrefixesForContainer.get(containerKeyPrefix).intValue());
@@ -311,7 +316,8 @@ public class TestContainerKeyMapperTask {
         }});
 
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            omConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
     keyPrefixesForContainer = reconContainerMetadataManager
@@ -380,7 +386,8 @@ public class TestContainerKeyMapperTask {
 
     // Reprocess container key mappings
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            omConfiguration);
 
     String bucket = BUCKET_NAME;
     String volume = VOLUME_NAME;

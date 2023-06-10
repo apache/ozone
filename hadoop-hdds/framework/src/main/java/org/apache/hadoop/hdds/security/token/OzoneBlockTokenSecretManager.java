@@ -21,11 +21,10 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,24 +39,19 @@ import java.util.Set;
 @InterfaceStability.Unstable
 public class OzoneBlockTokenSecretManager extends
     ShortLivedTokenSecretManager<OzoneBlockTokenIdentifier> {
-
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneBlockTokenSecretManager.class);
 
-  public OzoneBlockTokenSecretManager(SecurityConfig conf, long tokenLifetime) {
-    super(conf, tokenLifetime, LOG);
-  }
-
-  @Override
-  public OzoneBlockTokenIdentifier createIdentifier() {
-    throw new SecurityException("Ozone block token can't be created "
-        + "without owner and access mode information.");
+  public OzoneBlockTokenSecretManager(long tokenLifetime,
+                                      SecretKeySignerClient passwordManager) {
+    super(tokenLifetime, passwordManager);
   }
 
   public OzoneBlockTokenIdentifier createIdentifier(String owner,
       BlockID blockID, Set<AccessModeProto> modes, long maxLength) {
     return new OzoneBlockTokenIdentifier(owner, blockID, modes,
-        getTokenExpiryTime().toEpochMilli(), getCertSerialId(), maxLength);
+        getTokenExpiryTime().toEpochMilli(),
+        maxLength);
   }
 
   /**
@@ -73,8 +67,9 @@ public class OzoneBlockTokenSecretManager extends
       LOG.info("Issued delegation token -> expiryTime:{}, tokenId:{}",
           Instant.ofEpochMilli(expiryTime), tokenIdentifier);
     }
+    byte[] password = createPassword(tokenIdentifier);
     return new Token<>(tokenIdentifier.getBytes(),
-        createPassword(tokenIdentifier), tokenIdentifier.getKind(),
+        password, tokenIdentifier.getKind(),
         new Text(tokenIdentifier.getService()));
   }
 
@@ -88,49 +83,4 @@ public class OzoneBlockTokenSecretManager extends
     return generateToken(userID, blockId, modes, maxLength);
   }
 
-  @Override
-  public byte[] retrievePassword(OzoneBlockTokenIdentifier identifier)
-      throws InvalidToken {
-    validateToken(identifier);
-    return createPassword(identifier);
-  }
-
-  @Override
-  public long renewToken(Token<OzoneBlockTokenIdentifier> token,
-      String renewer) {
-    throw new UnsupportedOperationException("Renew token operation is not " +
-        "supported for ozone block tokens.");
-  }
-
-  @Override
-  public OzoneBlockTokenIdentifier cancelToken(Token<OzoneBlockTokenIdentifier>
-      token, String canceller) {
-    throw new UnsupportedOperationException("Cancel token operation is not " +
-        "supported for ozone block tokens.");
-  }
-
-  /**
-   * Find the OzoneBlockTokenInfo for the given token id, and verify that if the
-   * token is not expired.
-   */
-  @Override
-  public boolean validateToken(OzoneBlockTokenIdentifier identifier)
-      throws InvalidToken {
-    long now = Time.now();
-    if (identifier.getExpiryDate() < now) {
-      throw new InvalidToken("token " + formatTokenId(identifier) + " is " +
-          "expired, current time: " + Time.formatTime(now) +
-          " expiry time: " + identifier.getExpiryDate());
-    }
-    return true;
-  }
-
-  /**
-   * Validates if given hash is valid.
-   */
-  public boolean verifySignature(OzoneBlockTokenIdentifier identifier,
-      byte[] password) {
-    throw new UnsupportedOperationException("This operation is not " +
-        "supported for block tokens.");
-  }
 }

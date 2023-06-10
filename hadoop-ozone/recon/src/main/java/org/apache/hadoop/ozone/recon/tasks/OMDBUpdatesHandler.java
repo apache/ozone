@@ -27,13 +27,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
 
   private Map<Integer, String> tablesNames;
-  private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
   private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
@@ -57,7 +55,6 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
-    codecRegistry = metadataManager.getStore().getCodecRegistry();
     omdbDefinition = new OMDBDefinition();
   }
 
@@ -102,14 +99,14 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
     // When this table data will be needed, all events for this table will be
     // saved using Object as key and new task will also retrieve using Object
     // as key.
-    Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
-    Optional<Class> valueType = omdbDefinition.getValueType(tableName);
-    if (keyType.isPresent() && valueType.isPresent()) {
+    final DBColumnFamilyDefinition<?, ?> cf
+        = omdbDefinition.getColumnFamily(tableName);
+    if (cf != null) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-      Object key = codecRegistry.asObject(keyBytes, keyType.get());
+      final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
       // Put new
@@ -129,7 +126,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       }
 
       if (action == PUT) {
-        Object value = codecRegistry.asObject(valueBytes, valueType.get());
+        final Object value = cf.getValueCodec().fromPersistedFormat(valueBytes);
         builder.setValue(value);
         // If a PUT operation happens on an existing Key, it is tagged
         // as an "UPDATE" event.

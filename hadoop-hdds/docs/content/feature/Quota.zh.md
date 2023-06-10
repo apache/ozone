@@ -67,6 +67,11 @@ menu:
 ## 客户端用法
 ### Storage space级别配额
 Storage space级别配额允许使用 B, KB ，MB ，GB ，TB 等单位。表示将使用多少个存储空间。
+
+#### 注意:
+- Volume 和 Bucket 不支持设置带小数点的配额值，例如 1.5 TB.
+- 最小的有效空间配额，是一个数据块需要的存储空间，即默认块大小 * 副本数. 请确保设置的空间配额不小于这个数值，不然对象/文件写入操作，会失败。
+
 #### Volume Space quota用法
 ```shell
 bin/ozone sh volume create --space-quota 5MB /volume1

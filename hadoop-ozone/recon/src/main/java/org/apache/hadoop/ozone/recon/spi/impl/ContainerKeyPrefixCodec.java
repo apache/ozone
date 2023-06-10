@@ -94,7 +94,7 @@ public final class ContainerKeyPrefixCodec
         rawData.length - Long.BYTES,
         rawData.length);
     long version = ByteBuffer.wrap(versionBytes).getLong();
-    return new ContainerKeyPrefix(containerIdFromDB, keyPrefix, version);
+    return ContainerKeyPrefix.get(containerIdFromDB, keyPrefix, version);
   }
 
   @Override

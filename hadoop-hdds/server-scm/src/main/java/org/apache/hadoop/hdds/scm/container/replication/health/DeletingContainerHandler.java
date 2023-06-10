@@ -80,7 +80,7 @@ public class DeletingContainerHandler extends AbstractCheck {
 
     Set<DatanodeDetails> pendingDelete = request.getPendingOps().stream()
         .filter(o -> o.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)
-        .map(o -> o.getTarget()).collect(Collectors.toSet());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toSet());
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))

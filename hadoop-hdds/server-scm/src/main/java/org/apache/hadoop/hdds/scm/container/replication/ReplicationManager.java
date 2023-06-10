@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.annotations.VisibleForTesting;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.Config;
@@ -155,7 +156,7 @@ public class ReplicationManager implements SCMService {
    * Legacy RM will hopefully be removed after completing refactor
    * for now, it is used to process non-EC container.
    */
-  private LegacyReplicationManager legacyReplicationManager;
+  private final LegacyReplicationManager legacyReplicationManager;
 
   /**
    * Set of nodes which have been excluded for replication commands due to the
@@ -214,7 +215,6 @@ public class ReplicationManager implements SCMService {
    * @param clock Clock object used to get the current time
    * @param legacyReplicationManager The legacy ReplicationManager instance
    * @param replicaPendingOps The pendingOps instance
-   * @throws IOException
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ConfigurationSource conf,
@@ -279,7 +279,7 @@ public class ReplicationManager implements SCMService {
     // containers when they are checked by RM.
     containerCheckChain = new OpenContainerHandler(this);
     containerCheckChain
-        .addNext(new ClosingContainerHandler(this))
+        .addNext(new ClosingContainerHandler(this, clock))
         .addNext(new QuasiClosedContainerHandler(this))
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
@@ -503,6 +503,7 @@ public class ReplicationManager implements SCMService {
       int commandCount = nodeManager.getTotalDatanodeCommandCount(datanode,
           Type.deleteContainerCommand);
       if (commandCount >= datanodeDeleteLimit) {
+        metrics.incrDeleteContainerCmdsDeferredTotal();
         throw new CommandTargetOverloadedException("Cannot schedule a delete " +
             "container command for container " + container.containerID() +
             " on datanode " + datanode + " as it has too many pending delete " +
@@ -526,9 +527,6 @@ public class ReplicationManager implements SCMService {
    * @param sources The list of datanodes that can be used as sources
    * @param target The target datanode where the container should be replicated
    * @param replicaIndex The index of the container replica to be replicated
-   * @return A pair containing the datanode that the command was sent to, and
-   *         the command created.
-   * @throws CommandTargetOverloadedException
    */
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
@@ -537,6 +535,7 @@ public class ReplicationManager implements SCMService {
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
         getAvailableDatanodesForReplication(sources);
     if (sourceWithCmds.isEmpty()) {
+      metrics.incrReplicateContainerCmdsDeferredTotal();
       throw new CommandTargetOverloadedException("No sources with capacity " +
           "available for replication of container " + containerID + " to " +
           target);
@@ -557,6 +556,7 @@ public class ReplicationManager implements SCMService {
     List<Pair<Integer, DatanodeDetails>> targetWithCmds =
         getAvailableDatanodesForReplication(targets);
     if (targetWithCmds.isEmpty()) {
+      metrics.incrECReconstructionCmdsDeferredTotal();
       throw new CommandTargetOverloadedException("No target with capacity " +
           "available for reconstruction of " + containerInfo.getContainerID());
     }
@@ -638,7 +638,6 @@ public class ReplicationManager implements SCMService {
    * @param target The target to push container replica to
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendLowPriorityReplicateContainerCommand(
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
@@ -656,7 +655,6 @@ public class ReplicationManager implements SCMService {
    * @param command The command to send.
    * @param containerInfo The container the command is for.
    * @param target The datanode which will receive the command.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
@@ -673,7 +671,6 @@ public class ReplicationManager implements SCMService {
    * @param target The datanode which will receive the command.
    * @param scmDeadlineEpochMs The epoch time in ms, after which the command
    *                           will be discarded from the SCMPendingOps table.
-   * @throws NotLeaderException
    */
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target,
@@ -934,10 +931,11 @@ public class ReplicationManager implements SCMService {
    * interval and processes all the containers in the system.
    */
   private synchronized void run() {
+    final long interval = rmConf.getInterval().toMillis();
     try {
       while (running) {
         processAll();
-        wait(rmConf.getInterval());
+        wait(interval);
       }
     } catch (Throwable t) {
       if (t instanceof InterruptedException) {
@@ -956,7 +954,6 @@ public class ReplicationManager implements SCMService {
    * ContainerReplicaCount object for the container.
    * @param containerID The ID of the container
    * @return ContainerReplicaCount for the given container
-   * @throws ContainerNotFoundException
    */
   public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
       throws ContainerNotFoundException {
@@ -977,7 +974,6 @@ public class ReplicationManager implements SCMService {
    * replication health and return the health status.
    * @param containerInfo The container to check
    * @param replicas The set of replicas to use to check for the check
-   * @return
    */
   public ContainerHealthResult getContainerReplicationHealth(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
@@ -1305,8 +1301,8 @@ public class ReplicationManager implements SCMService {
       return maintenanceRemainingRedundancy;
     }
 
-    public long getInterval() {
-      return interval;
+    public Duration getInterval() {
+      return Duration.ofMillis(interval);
     }
 
     public long getUnderReplicatedInterval() {
@@ -1415,6 +1411,7 @@ public class ReplicationManager implements SCMService {
     return ReplicationManager.class.getSimpleName();
   }
 
+  @SuppressFBWarnings("IS2_INCONSISTENT_SYNC")
   public ReplicationManagerMetrics getMetrics() {
     return metrics;
   }

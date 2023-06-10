@@ -70,7 +70,8 @@ public abstract class TestMisReplicationHandler {
   private OzoneConfiguration conf;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
-  private AtomicBoolean throwThrottledException = new AtomicBoolean(false);
+  private final AtomicBoolean throwThrottledException =
+      new AtomicBoolean(false);
 
   protected void setup(ReplicationConfig repConfig)
       throws NodeNotFoundException, CommandTargetOverloadedException,

@@ -38,7 +38,7 @@ public class MismatchedReplicasHandler extends AbstractCheck {
   public static final Logger LOG =
       LoggerFactory.getLogger(MismatchedReplicasHandler.class);
 
-  private ReplicationManager replicationManager;
+  private final ReplicationManager replicationManager;
 
   public MismatchedReplicasHandler(
       ReplicationManager replicationManager) {

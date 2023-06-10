@@ -167,6 +167,27 @@ class RDBTable implements Table<byte[], byte[]> {
     return val;
   }
 
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    rdbMetrics.incNumDBKeyGetIfExistChecks();
+    final Supplier<Integer> value = db.keyMayExist(
+        family, key, outValue.duplicate());
+    if (value == null) {
+      return null; // definitely not exists
+    }
+    if (value.get() != null) {
+      // definitely exists, return value size.
+      return value.get();
+    }
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final Integer val = get(key, outValue);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
+  }
+
   @Override
   public void delete(byte[] key) throws IOException {
     db.delete(family, key);

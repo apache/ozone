@@ -28,14 +28,17 @@ import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 
+import java.util.Map;
+
 /**
  * RocksDB definition for the DB internal to Recon.
  */
-public class ReconDBDefinition implements DBDefinition {
+public class ReconDBDefinition extends DBDefinition.WithMap {
 
-  private String dbName;
+  private final String dbName;
 
   public ReconDBDefinition(String dbName) {
+    super(COLUMN_FAMILIES);
     this.dbName = dbName;
   }
 
@@ -93,6 +96,15 @@ public class ReconDBDefinition implements DBDefinition {
           ContainerReplicaHistoryList.class,
           ContainerReplicaHistoryList.getCodec());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINER_KEY,
+          CONTAINER_KEY_COUNT,
+          KEY_CONTAINER,
+          NAMESPACE_SUMMARY,
+          REPLICA_HISTORY,
+          REPLICA_HISTORY_V2);
+
   @Override
   public String getName() {
     return dbName;
@@ -101,12 +113,5 @@ public class ReconDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {
-        CONTAINER_KEY, KEY_CONTAINER, CONTAINER_KEY_COUNT, REPLICA_HISTORY,
-        NAMESPACE_SUMMARY, REPLICA_HISTORY_V2};
   }
 }
