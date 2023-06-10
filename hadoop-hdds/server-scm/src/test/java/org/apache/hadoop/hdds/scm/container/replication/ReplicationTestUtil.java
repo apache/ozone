@@ -29,10 +29,10 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -189,34 +189,31 @@ public final class ReplicationTestUtil {
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .build();
   }
 
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    builder.setNumberOfKeys(keyCount);
-    builder.setUsedBytes(bytesUsed);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setNumberOfKeys(keyCount)
+        .setUsedBytes(bytesUsed)
+        .build();
   }
 
   public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
       ReplicationConfig replicationConfig) {
-    return new ContainerInfo.Builder()
-        .setContainerID(1).setState(state)
-        .setReplicationConfig(replicationConfig).build();
+    return TestContainerInfo.newBuilderForTest()
+        .setState(state)
+        .setReplicationConfig(replicationConfig)
+        .build();
   }
 
   @SafeVarargs

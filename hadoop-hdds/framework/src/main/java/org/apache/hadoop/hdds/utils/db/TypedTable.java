@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -38,6 +39,8 @@ import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -311,30 +314,27 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  private VALUE getFromTableCodecBuffer(KEY key) throws IOException {
-    try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
-      for (; ;) {
-        final int allocated = bufferSize.get();
-        try (CodecBuffer outValue = CodecBuffer.allocateDirect(allocated)) {
-          final Integer required = outValue.putFromSource(
-              buffer -> rawTable.get(inKey.asReadOnlyByteBuffer(), buffer));
-          if (required == null) {
-            // key not found
-            return null;
-          } else if (required <= allocated) {
-            // buffer size is big enough
-            return valueCodec.fromCodecBuffer(outValue);
-          }
-          // buffer size too small, retry
-          increaseBufferSize(required);
-        }
-      }
-    }
+  /**
+   * Use {@link RDBTable#get(ByteBuffer, ByteBuffer)}
+   * to get a value mapped to the given key.
+   *
+   * @param key the buffer containing the key.
+   * @param outValue the buffer to write the output value.
+   *                 When the buffer capacity is smaller than the value size,
+   *                 partial value may be written.
+   * @return null if the key is not found;
+   *         otherwise, return the size of the value.
+   * @throws IOException in case is an error reading from the db.
+   */
+  private Integer getFromTable(CodecBuffer key, CodecBuffer outValue)
+      throws IOException {
+    return outValue.putFromSource(
+        buffer -> rawTable.get(key.asReadOnlyByteBuffer(), buffer));
   }
 
   private VALUE getFromTable(KEY key) throws IOException {
     if (supportCodecBuffer) {
-      return getFromTableCodecBuffer(key);
+      return getFromTable(key, this::getFromTable);
     } else {
       final byte[] keyBytes = encodeKey(key);
       byte[] valueBytes = rawTable.get(keyBytes);
@@ -342,35 +342,58 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  private Integer getFromTableIfExist(CodecBuffer key,
-      CodecBuffer outValue) throws IOException {
+  /**
+   * Similar to {@link #getFromTable(CodecBuffer, CodecBuffer)} except that
+   * this method use {@link RDBTable#getIfExist(ByteBuffer, ByteBuffer)}.
+   */
+  private Integer getFromTableIfExist(CodecBuffer key, CodecBuffer outValue)
+      throws IOException {
     return outValue.putFromSource(
         buffer -> rawTable.getIfExist(key.asReadOnlyByteBuffer(), buffer));
   }
 
-  private VALUE getFromTableIfExistCodecBuffer(KEY key) throws IOException {
+  private VALUE getFromTable(KEY key,
+      CheckedBiFunction<CodecBuffer, CodecBuffer, Integer, IOException> get)
+      throws IOException {
     try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
       for (; ;) {
-        final int allocated = bufferSize.get();
-        try (CodecBuffer outValue = CodecBuffer.allocateDirect(allocated)) {
-          final Integer required = getFromTableIfExist(inKey, outValue);
+        final Integer required;
+        final int initial = -bufferSize.get(); // allocate a resizable buffer
+        try (CodecBuffer outValue = CodecBuffer.allocateDirect(initial)) {
+          required = get.apply(inKey, outValue);
           if (required == null) {
             // key not found
             return null;
-          } else if (required >= 0 && required <= allocated) {
-            // buffer size is big enough
-            return valueCodec.fromCodecBuffer(outValue);
+          } else if (required < 0) {
+            throw new IllegalStateException("required = " + required + " < 0");
           }
-          // buffer size too small, retry
-          increaseBufferSize(required);
+
+          for (; ;) {
+            if (required == outValue.readableBytes()) {
+              // buffer size is big enough
+              return valueCodec.fromCodecBuffer(outValue);
+            }
+            // buffer size too small, try increasing the capacity.
+            if (!outValue.setCapacity(required)) {
+              break;
+            }
+
+            // retry with the new capacity
+            outValue.clear();
+            final int retried = get.apply(inKey, outValue);
+            Preconditions.assertSame(required.intValue(), retried, "required");
+          }
         }
+
+        // buffer size too small, reallocate a new buffer.
+        increaseBufferSize(required);
       }
     }
   }
 
   private VALUE getFromTableIfExist(KEY key) throws IOException {
     if (supportCodecBuffer) {
-      return getFromTableIfExistCodecBuffer(key);
+      return getFromTable(key, this::getFromTableIfExist);
     } else {
       final byte[] keyBytes = encodeKey(key);
       final byte[] valueBytes = rawTable.getIfExist(keyBytes);

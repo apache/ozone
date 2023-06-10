@@ -48,9 +48,9 @@ public class TestOMDBDefinition {
     OMDBDefinition dbDef = new OMDBDefinition();
 
     // Get list of tables from DB Definitions
-    DBColumnFamilyDefinition[] columnFamilyDefinitions =
-        dbDef.getColumnFamilies();
-    int countOmDefTables = columnFamilyDefinitions.length;
+    final Collection<DBColumnFamilyDefinition<?, ?>> columnFamilyDefinitions
+        = dbDef.getColumnFamilies();
+    final int countOmDefTables = columnFamilyDefinitions.size();
     ArrayList<String> missingDBDefTables = new ArrayList<>();
 
     // Get list of tables from the RocksDB Store

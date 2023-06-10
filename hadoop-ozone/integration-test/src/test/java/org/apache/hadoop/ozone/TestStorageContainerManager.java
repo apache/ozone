@@ -128,11 +128,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -197,8 +197,7 @@ public class TestStorageContainerManager {
       SCMClientProtocolServer mockClientServer = Mockito.spy(
           cluster.getStorageContainerManager().getClientProtocolServer());
 
-      when(mockClientServer.getRemoteUser()).thenReturn(
-          UserGroupInformation.createRemoteUser(fakeRemoteUsername));
+      mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
 
       try {
         mockClientServer.deleteContainer(

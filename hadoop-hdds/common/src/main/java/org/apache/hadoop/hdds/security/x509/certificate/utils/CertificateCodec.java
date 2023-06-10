@@ -35,7 +35,10 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -134,6 +137,32 @@ public class CertificateCodec {
   }
 
   /**
+   * Encode the given certificate in PEM
+   * and then write it out to the given {@link OutputStream}.
+   *
+   * @param <OUT> The output type.
+   */
+  public static <OUT extends OutputStream> OUT writePEMEncoded(
+      X509Certificate certificate, OUT out) throws IOException {
+    writePEMEncoded(certificate, new OutputStreamWriter(out, DEFAULT_CHARSET));
+    return out;
+  }
+
+  /**
+   * Encode the given certificate in PEM
+   * and then write it out to the given {@link Writer}.
+   *
+   * @param <W> The writer type.
+   */
+  public static <W extends Writer> W writePEMEncoded(
+      X509Certificate certificate, W writer) throws IOException {
+    try (JcaPEMWriter pemWriter = new JcaPEMWriter(writer)) {
+      pemWriter.writeObject(certificate);
+    }
+    return writer;
+  }
+
+  /**
    * Returns the Certificate as a PEM encoded String.
    *
    * @param certificate - X.509 Certificate.
@@ -143,11 +172,7 @@ public class CertificateCodec {
   public static String getPEMEncodedString(X509Certificate certificate)
       throws SCMSecurityException {
     try {
-      StringWriter stringWriter = new StringWriter();
-      try (JcaPEMWriter pemWriter = new JcaPEMWriter(stringWriter)) {
-        pemWriter.writeObject(certificate);
-      }
-      return stringWriter.toString();
+      return writePEMEncoded(certificate, new StringWriter()).toString();
     } catch (IOException e) {
       LOG.error("Error in encoding certificate." + certificate
           .getSubjectDN().toString(), e);
@@ -173,15 +198,26 @@ public class CertificateCodec {
   public static <E extends Exception> X509Certificate getX509Certificate(
       String pemEncoded, Function<CertificateException, E> convertor)
       throws E {
-    CertificateFactory fact = getCertFactory();
     // ByteArrayInputStream.close(), which is a noop, can be safely ignored.
     final ByteArrayInputStream input = new ByteArrayInputStream(
         pemEncoded.getBytes(DEFAULT_CHARSET));
+    return readX509Certificate(input, convertor);
+  }
+
+  private static <E extends Exception> X509Certificate readX509Certificate(
+      InputStream input, Function<CertificateException, E> convertor)
+      throws E {
+    final CertificateFactory fact = getCertFactory();
     try {
       return (X509Certificate) fact.engineGenerateCertificate(input);
     } catch (CertificateException e) {
       throw convertor.apply(e);
     }
+  }
+
+  public static X509Certificate readX509Certificate(InputStream input)
+      throws IOException {
+    return readX509Certificate(input, CertificateCodec::toIOException);
   }
 
   public static IOException toIOException(CertificateException e) {

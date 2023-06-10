@@ -22,6 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -127,6 +128,8 @@ public class TestContainerEndpoint {
   private boolean isSetupDone = false;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private OzoneConfiguration omConfiguration;
+
   private ContainerID containerID = ContainerID.valueOf(1L);
   private Pipeline pipeline;
   private PipelineID pipelineID;
@@ -208,6 +211,7 @@ public class TestContainerEndpoint {
       initializeInjector();
       isSetupDone = true;
     }
+    omConfiguration = new OzoneConfiguration();
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
     BlockID blockID1 = new BlockID(1, 101);
@@ -289,7 +293,8 @@ public class TestContainerEndpoint {
 
   private void reprocessContainerKeyMapper() {
     ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager);
+        new ContainerKeyMapperTask(reconContainerMetadataManager,
+            omConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
   }
 

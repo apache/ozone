@@ -19,6 +19,8 @@ package org.apache.ozone.rocksdb.util;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -28,12 +30,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,14 +46,15 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+
 /**
  * ManagedSstFileReader tests.
  */
 public class TestManagedSstFileReader {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestManagedSstFileReader.class);
-
+  // Key prefix containing all characters, to check if all characters can be
+  // written & read from rocksdb through SSTDumptool
   private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
       .map(i -> String.format("%c", i))
       .collect(Collectors.joining(""));
@@ -70,11 +70,11 @@ public class TestManagedSstFileReader {
              managedEnvOptions, managedOptions)) {
       sstFileWriter.open(file.getAbsolutePath());
       for (Map.Entry<String, Integer> entry : keys.entrySet()) {
+        byte[] keyByte = StringUtils.string2Bytes(entry.getKey());
         if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getBytes(StandardCharsets.UTF_8));
+          sstFileWriter.delete(keyByte);
         } else {
-          sstFileWriter.put(entry.getKey().getBytes(StandardCharsets.UTF_8),
-              entry.getKey().getBytes(StandardCharsets.UTF_8));
+          sstFileWriter.put(keyByte, keyByte);
         }
       }
       sstFileWriter.finish();
@@ -105,11 +105,10 @@ public class TestManagedSstFileReader {
     return Pair.of(keys, files);
   }
 
-
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
-      throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+      throws RocksDBException, IOException {
     Pair<Map<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
@@ -128,6 +127,8 @@ public class TestManagedSstFileReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
+    NativeLibraryLoader.getInstance()
+        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
     Pair<Map<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
@@ -144,7 +145,8 @@ public class TestManagedSstFileReader {
         .getKeyStreamWithTombstone(sstDumpTool)) {
       keyStream.forEach(keys::remove);
       Assertions.assertEquals(0, keys.size());
+    } finally {
+      executorService.shutdown();
     }
-    executorService.shutdown();
   }
 }

@@ -20,18 +20,35 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.TestDatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
@@ -44,10 +61,13 @@ import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
@@ -224,6 +244,114 @@ public class TestVolumeSetDiskChecks {
     dnConf.setFailedDbVolumesTolerated(numDirs * 2);
     ozoneConf.setFromObject(dnConf);
     return ozoneConf;
+  }
+
+  /**
+   * Verify that when volume fails, containers are removed from containerSet.
+   * And FCR report is being sent.
+   * @throws IOException
+   */
+  @Test
+  public void testVolumeFailure() throws IOException {
+    final int numVolumes = 5;
+
+    conf = getConfWithDataNodeDirs(numVolumes);
+    ContainerTestUtils.enableSchemaV3(conf);
+    UUID datanodeId = UUID.randomUUID();
+    StorageVolumeChecker dummyChecker =
+        new DummyChecker(conf, new Timer(), 0);
+
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ContainerSet conSet = new ContainerSet(20);
+    when(ozoneContainer.getContainerSet()).thenReturn(conSet);
+
+    String path = GenericTestUtils
+        .getTempPath(TestDatanodeStateMachine.class.getSimpleName());
+    File testRoot = new File(path);
+
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        new File(testRoot, "scm").getAbsolutePath());
+    path = new File(testRoot, "datanodeID").getAbsolutePath();
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
+
+    long containerID = ContainerTestHelper.getTestContainerID();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_CHUNK;
+    KeyValueContainerData data =
+        new KeyValueContainerData(containerID, layout,
+            ContainerTestHelper.CONTAINER_MAX_SIZE,
+            UUID.randomUUID().toString(), datanodeId.toString());
+    data.closeContainer();
+    data.setSchemaVersion(OzoneConsts.SCHEMA_V3);
+
+    long containerID1 = ContainerTestHelper.getTestContainerID();
+    KeyValueContainerData data1 =
+        new KeyValueContainerData(containerID1, layout,
+            ContainerTestHelper.CONTAINER_MAX_SIZE,
+            UUID.randomUUID().toString(), datanodeId.toString());
+    data1.closeContainer();
+    data1.setSchemaVersion(OzoneConsts.SCHEMA_V3);
+
+    final MutableVolumeSet volumeSet = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME,
+        dummyChecker);
+
+    final MutableVolumeSet volumeSet1 = new MutableVolumeSet(
+        UUID.randomUUID().toString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME,
+        dummyChecker);
+
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    container.create(volumeSet,
+        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+    conSet.addContainer(container);
+
+    KeyValueContainer container1 = new KeyValueContainer(data1, conf);
+    container1.create(volumeSet1,
+        new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+    conSet.addContainer(container1);
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+    StateContext stateContext = new StateContext(
+        new OzoneConfiguration(), DatanodeStateMachine
+        .DatanodeStates.getInitState(),
+        datanodeStateMachineMock);
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    stateContext.addEndpoint(scm1);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
+
+    Map<String, Integer> expectedReportCount = new HashMap<>();
+    checkReportCount(stateContext.getAllAvailableReports(scm1),
+        expectedReportCount);
+
+    // Fail one volume
+    volumeSet1.failVolume(volumeSet1.getVolumesList().get(0)
+        .getStorageDir().getPath());
+
+    conSet.handleVolumeFailures(stateContext);
+    // ContainerID1 should be removed belonging to failed volume
+    Assert.assertNull(conSet.getContainer(containerID1));
+    // ContainerID should exist belonging to normal volume
+    Assert.assertNotNull(conSet.getContainer(containerID));
+    expectedReportCount.put(
+        StorageContainerDatanodeProtocolProtos.ContainerReportsProto
+            .getDescriptor().getFullName(), 1);
+
+    // Check FCR report should be present
+    checkReportCount(stateContext.getAllAvailableReports(scm1),
+        expectedReportCount);
+    volumeSet.shutdown();
+  }
+
+  void checkReportCount(List<Message> reports,
+                        Map<String, Integer> expectedReportCount) {
+    Map<String, Integer> reportCount = new HashMap<>();
+    for (Message report : reports) {
+      final String reportName = report.getDescriptorForType().getFullName();
+      reportCount.put(reportName, reportCount.getOrDefault(reportName, 0) + 1);
+    }
+    // Verify
+    Assertions.assertEquals(expectedReportCount, reportCount);
   }
 
   /**

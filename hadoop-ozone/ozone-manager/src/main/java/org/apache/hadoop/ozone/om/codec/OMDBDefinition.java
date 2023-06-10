@@ -44,10 +44,12 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
+import java.util.Map;
+
 /**
  * Class defines the structure and types of the om.db.
  */
-public class OMDBDefinition implements DBDefinition {
+public class OMDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<String, RepeatedOmKeyInfo>
             DELETED_TABLE =
@@ -248,6 +250,34 @@ public class OMDBDefinition implements DBDefinition {
           String.class, // path to key in prev snapshot's key(file)/dir Table.
           StringCodec.get());
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          BUCKET_TABLE,
+          DELETED_DIR_TABLE,
+          DELETED_TABLE,
+          DIRECTORY_TABLE,
+          DTOKEN_TABLE,
+          FILE_TABLE,
+          KEY_TABLE,
+          META_TABLE,
+          MULTIPART_INFO_TABLE,
+          OPEN_FILE_TABLE,
+          OPEN_KEY_TABLE,
+          PREFIX_TABLE,
+          PRINCIPAL_TO_ACCESS_IDS_TABLE,
+          S3_SECRET_TABLE,
+          SNAPSHOT_INFO_TABLE,
+          SNAPSHOT_RENAMED_TABLE,
+          TENANT_ACCESS_ID_TABLE,
+          TENANT_STATE_TABLE,
+          TRANSACTION_INFO_TABLE,
+          USER_TABLE,
+          VOLUME_TABLE);
+
+  public OMDBDefinition() {
+    super(COLUMN_FAMILIES);
+  }
+
   @Override
   public String getName() {
     return OzoneConsts.OM_DB_NAME;
@@ -256,18 +286,6 @@ public class OMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return OMConfigKeys.OZONE_OM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
-        VOLUME_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
-        BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE, DIRECTORY_TABLE,
-        FILE_TABLE, OPEN_FILE_TABLE, DELETED_DIR_TABLE, META_TABLE,
-        TENANT_ACCESS_ID_TABLE,
-        PRINCIPAL_TO_ACCESS_IDS_TABLE, TENANT_STATE_TABLE,
-        SNAPSHOT_INFO_TABLE, SNAPSHOT_RENAMED_TABLE};
   }
 }
 
