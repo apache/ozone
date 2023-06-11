@@ -25,23 +25,26 @@ function get_rocks_native_git_sha() {
 }
 
 function init_native_maven_opts() {
+    local PROJECT_VERSION VERSION_NUMBER EXPECTED_ROCKS_NATIVE_VERSION
+
     get_rocks_native_git_sha
+
     PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
     # Parsing out version number from project version by getting the first occurance of '-'.
     # If project version is 1.4.0-SNAPSHOT, VERSION_NUMBER = 1.4.0
     VERSION_NUMBER=$(echo "${PROJECT_VERSION}" | cut -f1 -d'-')
     # Adding rocks native sha after the version number in the project version.
-    # EXPECTED_ROCK_NATIVE_VERSION = 1.4.0-<rocks native git sha>-SNAPSHOT
+    # EXPECTED_ROCKS_NATIVE_VERSION = 1.4.0-<rocks native git sha>-SNAPSHOT
     EXPECTED_ROCKS_NATIVE_VERSION=${VERSION_NUMBER}"-${ROCKS_NATIVE_GIT_SHA}"${PROJECT_VERSION:${#VERSION_NUMBER}}
-    echo "Checking Maven repo contains hdds-rocks-native of version ${EXPECTED_ROCKS_NATIVE_VERSION}"
+    echo "Checking if Maven repo contains hdds-rocks-native version ${EXPECTED_ROCKS_NATIVE_VERSION}"
     mvn --non-recursive dependency:get -Dartifact=org.apache.ozone:hdds-rocks-native:${EXPECTED_ROCKS_NATIVE_VERSION} -q
 
     MVN_GET_ROCKS_NATIVE_EXIT_CODE=$?
     if [[ "${MVN_GET_ROCKS_NATIVE_EXIT_CODE}" == "0" ]]; then
-      echo "Using existing hdds-rocks-native artifact version: ${EXPECTED_ROCKS_NATIVE_VERSION}"
+      echo "hdds-rocks-native version ${EXPECTED_ROCKS_NATIVE_VERSION} found in repo, using it"
       NATIVE_MAVEN_OPTIONS="-Dhdds.rocks.native.version=${EXPECTED_ROCKS_NATIVE_VERSION}"
     else
-      echo "Building hdds-rocks-native from scratch as version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found in the given Maven repos"
+      echo "hdds-rocks-native version ${EXPECTED_ROCKS_NATIVE_VERSION} was not found, not using native libs"
       NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
     fi
     readonly NATIVE_MAVEN_OPTIONS

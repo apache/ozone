@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -53,7 +54,8 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 /**
  * ManagedSstFileReader tests.
  */
-public class TestManagedSstFileReader {
+@Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
+class TestManagedSstFileReader {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestManagedSstFileReader.class);

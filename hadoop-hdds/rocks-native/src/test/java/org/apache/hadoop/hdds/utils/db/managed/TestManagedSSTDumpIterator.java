@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -48,11 +49,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+
 /**
  * Test for ManagedSSTDumpIterator.
  */
-@Native("Managed Rocks Tools")
-public class TestManagedSSTDumpIterator {
+@Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
+class TestManagedSSTDumpIterator {
 
   private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
