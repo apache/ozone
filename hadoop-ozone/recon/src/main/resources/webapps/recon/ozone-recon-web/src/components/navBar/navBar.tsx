@@ -21,7 +21,7 @@ import logo from '../../logo.png';
 import {Layout, Menu, Icon} from 'antd';
 import './navBar.less';
 import {withRouter, Link} from 'react-router-dom';
-import { RouteComponentProps } from 'react-router';
+import {RouteComponentProps} from 'react-router';
 import axios from 'axios';
 import {showDataFetchError} from 'utils/common';
 
@@ -123,10 +123,10 @@ class NavBar extends React.Component<INavBarProps> {
           </Menu.Item>
           {
             this.state.isHeatmapAvailable ?
-              <Menu.Item key='/HeatMap'>
+              <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
-                <Link to='/HeatMap' />
+                <Link to='/Heatmap' />
               </Menu.Item> : ""
           }
         </Menu>

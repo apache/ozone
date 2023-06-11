@@ -27,5 +27,5 @@ export const breadcrumbNameMap: IBreadcrumbNameMap = {
   '/MissingContainers': 'Missing Containers',
   '/Insights': 'Insights',
   '/DiskUsage': 'Disk Usage', 
-  '/HeatMap': 'HeatMap'
+  '/Heatmap': 'Heatmap'
 };

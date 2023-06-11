@@ -54,7 +54,7 @@ interface ITreeState {
 let minSize = Infinity;
 let maxSize = 0;
 
-export class HeatMap extends React.Component<Record<string, object>, ITreeState> {
+export class Heatmap extends React.Component<Record<string, object>, ITreeState> {
   constructor(props = {}) {
     super(props);
     this.state = {
