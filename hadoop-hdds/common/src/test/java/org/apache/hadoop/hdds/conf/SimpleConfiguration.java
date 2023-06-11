@@ -78,6 +78,10 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
     if (port < 0) {
       throw new NumberFormatException("Please use a positive port number");
     }
+    if (waitTime < 42) {
+      throw new IllegalArgumentException("Wait time less than 42 seconds: " +
+          waitTime);
+    }
   }
 
   public void setClientAddress(String clientAddress) {

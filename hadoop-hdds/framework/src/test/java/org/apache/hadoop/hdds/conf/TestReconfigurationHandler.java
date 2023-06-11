@@ -96,9 +96,17 @@ class TestReconfigurationHandler {
         Boolean.toString(newCompressionEnabled));
     assertEquals(newCompressionEnabled, object.isCompressionEnabled());
 
-    long newWaitTime = object.getWaitTime() + 5;
+    final long newWaitTime = object.getWaitTime() + 5;
     subject.reconfigurePropertyImpl(WAIT, Long.toString(newWaitTime));
     assertEquals(newWaitTime, object.getWaitTime());
+  }
+
+  @Test
+  void validatesNewConfiguration() {
+    final long oldWaitTime = object.getWaitTime();
+    assertThrows(ReconfigurationException.class,
+        () -> subject.reconfigurePropertyImpl(WAIT, "0"));
+    assertEquals(oldWaitTime, object.getWaitTime());
   }
 
   @Test
