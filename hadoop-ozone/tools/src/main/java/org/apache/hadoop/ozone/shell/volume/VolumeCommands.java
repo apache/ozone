@@ -49,7 +49,7 @@ import picocli.CommandLine.ParentCommand;
         SetAclVolumeHandler.class,
         GetAclVolumeHandler.class,
         SetQuotaHandler.class,
-        ClearQuotaHandler.class,
+        ClearQuotaHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
