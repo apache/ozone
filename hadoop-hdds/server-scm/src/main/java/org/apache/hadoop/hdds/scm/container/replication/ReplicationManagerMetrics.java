@@ -87,8 +87,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
             for (LifeCycleState s : LifeCycleState.values()) {
               String name = CaseFormat.UPPER_UNDERSCORE
                   .to(CaseFormat.UPPER_CAMEL, s.toString());
-              String metric = "Num" + name + "Containers";
-              String description = "Containers in " + name + " state";
+              String metric = name + "Containers";
+              String description = "Current count of Containers in " + name +
+                  " state";
               put(s, Interns.info(metric, description));
             }
           }});

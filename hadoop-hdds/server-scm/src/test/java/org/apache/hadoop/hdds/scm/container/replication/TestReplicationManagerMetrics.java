@@ -81,17 +81,17 @@ public class TestReplicationManagerMetrics {
   @Test
   public void testLifeCycleStateMetricsPresent() {
     Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
-        getGauge("NumOpenContainers"));
+        getGauge("OpenContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
-        getGauge("NumClosingContainers"));
+        getGauge("ClosingContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
-        getGauge("NumQuasiClosedContainers"));
+        getGauge("QuasiClosedContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
-        getGauge("NumClosedContainers"));
+        getGauge("ClosedContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
-        getGauge("NumDeletingContainers"));
+        getGauge("DeletingContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
-        getGauge("NumDeletedContainers"));
+        getGauge("DeletedContainers"));
   }
 
   @Test
