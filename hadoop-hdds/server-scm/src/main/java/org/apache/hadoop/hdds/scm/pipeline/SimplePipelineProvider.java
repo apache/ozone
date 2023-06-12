@@ -53,11 +53,13 @@ public class SimplePipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     List<DatanodeDetails> dns = pickNodesNotUsed(replicationConfig);
-    if (dns.size() < replicationConfig.getRequiredNodes()) {
-      String e = String
-          .format("Cannot create pipeline of factor %d using %d nodes.",
-              replicationConfig.getRequiredNodes(), dns.size());
-      throw new InsufficientDatanodesException(e);
+    int available = dns.size();
+    int required = replicationConfig.getRequiredNodes();
+    if (available < required) {
+      String msg = String.format(
+          "Cannot create pipeline of factor %d using %d nodes.",
+          required, available);
+      throw new InsufficientDatanodesException(required, available, msg);
     }
 
     Collections.shuffle(dns);

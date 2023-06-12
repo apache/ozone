@@ -21,12 +21,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +34,10 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests SnapshotChain that stores in chronological order
@@ -45,158 +48,144 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
  */
 public class TestSnapshotChain {
   private OMMetadataManager omMetadataManager;
-  private Map<String, SnapshotInfo> sinfos;
+  private Map<UUID, SnapshotInfo> snapshotIdToSnapshotInfoMap;
   private SnapshotChainManager chainManager;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private File folder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_DB_DIRS,
-        folder.getRoot().getAbsolutePath());
+    conf.set(OZONE_OM_DB_DIRS, folder.toString());
     omMetadataManager = new OmMetadataManagerImpl(conf);
-    sinfos = new HashMap<>();
+    snapshotIdToSnapshotInfoMap = new HashMap<>();
     chainManager = new SnapshotChainManager(omMetadataManager);
   }
 
-  private SnapshotInfo createSnapshotInfo(String volName,
-                                          String bucketName,
-                                          String snapshotName,
-                                          String snapshotID,
-                                          String pathPrevID,
-                                          String globalPrevID) {
+  private SnapshotInfo createSnapshotInfo(UUID snapshotID,
+                                          UUID pathPrevID,
+                                          UUID globalPrevID) {
     return new SnapshotInfo.Builder()
-        .setSnapshotID(snapshotID)
-        .setName(snapshotName)
-        .setVolumeName(volName)
-        .setBucketName(bucketName)
+        .setSnapshotId(snapshotID)
+        .setName("test")
+        .setVolumeName("vol1")
+        .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
         .setCreationTime(Time.now())
         .setDeletionTime(-1L)
-        .setPathPreviousSnapshotID(pathPrevID)
-        .setGlobalPreviousSnapshotID(globalPrevID)
-        .setSnapshotPath(String.join("/", volName, bucketName))
+        .setPathPreviousSnapshotId(pathPrevID)
+        .setGlobalPreviousSnapshotId(globalPrevID)
+        .setSnapshotPath(String.join("/", "vol1", "bucket1"))
         .setCheckpointDir("checkpoint.testdir")
         .build();
   }
 
-  private void deleteSnapshot(String snapshotID) throws IOException {
+  private void deleteSnapshot(UUID snapshotID) throws IOException {
     SnapshotInfo sinfo = null;
     final String snapshotPath = "vol1/bucket1";
     // reset the next snapshotInfo.globalPreviousSnapshotID
     // to the previous in the entry to be deleted.
     if (chainManager.hasNextGlobalSnapshot(snapshotID)) {
-      sinfo = sinfos
-              .get(chainManager.nextGlobalSnapshot(snapshotID));
+      sinfo = snapshotIdToSnapshotInfoMap.get(
+          chainManager.nextGlobalSnapshot(snapshotID));
       if (chainManager.hasPreviousGlobalSnapshot(snapshotID)) {
-        sinfo.setGlobalPreviousSnapshotID(chainManager
-                .previousGlobalSnapshot(snapshotID));
+        sinfo.setGlobalPreviousSnapshotId(
+            chainManager.previousGlobalSnapshot(snapshotID));
       } else {
-        sinfo.setGlobalPreviousSnapshotID(null);
+        sinfo.setGlobalPreviousSnapshotId(null);
       }
-      sinfos.put(sinfo.getSnapshotID(), sinfo);
+      snapshotIdToSnapshotInfoMap.put(sinfo.getSnapshotId(), sinfo);
     }
     // reset the next snapshotInfo.pathPreviousSnapshotID
     // to the previous in the entry to be deleted.
-    if (chainManager.hasNextPathSnapshot(snapshotPath,
-            snapshotID)) {
-      sinfo = sinfos.get(chainManager
-              .nextPathSnapshot(snapshotPath,
-                      snapshotID));
-      if (chainManager.hasPreviousPathSnapshot(snapshotPath,
-              snapshotID)) {
-        sinfo.setPathPreviousSnapshotID(chainManager
-                .previousPathSnapshot(snapshotPath,
-                        snapshotID));
+    if (chainManager.hasNextPathSnapshot(snapshotPath, snapshotID)) {
+      sinfo = snapshotIdToSnapshotInfoMap.get(
+          chainManager.nextPathSnapshot(snapshotPath, snapshotID));
+
+      if (chainManager.hasPreviousPathSnapshot(snapshotPath, snapshotID)) {
+        sinfo.setPathPreviousSnapshotId(
+            chainManager.previousPathSnapshot(snapshotPath, snapshotID));
       } else {
-        sinfo.setPathPreviousSnapshotID(null);
+        sinfo.setPathPreviousSnapshotId(null);
       }
-      sinfos.put(sinfo.getSnapshotID(), sinfo);
+      snapshotIdToSnapshotInfoMap.put(sinfo.getSnapshotId(), sinfo);
     }
+
+    UUID latestGlobalSnapshot = chainManager.getLatestGlobalSnapshotId();
     // append snapshot to the sinfos (the end).
-    if (chainManager.getLatestGlobalSnapshot() != null) {
-      sinfo = sinfos.get(snapshotID);
-      sinfo.setGlobalPreviousSnapshotID(chainManager
-              .getLatestGlobalSnapshot());
-      sinfo.setPathPreviousSnapshotID(chainManager
-              .getLatestPathSnapshot(String
-                      .join("/", "vol1", "bucket1")));
-      sinfos.put(snapshotID, sinfo);
+    if (latestGlobalSnapshot != null) {
+      sinfo = snapshotIdToSnapshotInfoMap.get(snapshotID);
+      sinfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
+      UUID latestPathSnapshot = chainManager.getLatestPathSnapshotId(
+          String.join("/", "vol1", "bucket1"));
+      if (latestPathSnapshot != null) {
+        sinfo.setPathPreviousSnapshotId(latestPathSnapshot);
+      }
+      snapshotIdToSnapshotInfoMap.put(snapshotID, sinfo);
     }
-    chainManager.deleteSnapshot(sinfos.get(snapshotID));
+    chainManager.deleteSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID));
   }
 
   @Test
   public void testAddSnapshot() throws Exception {
     final String snapshotPath = "vol1/bucket1";
     // add three snapshots
-    String snapshotID1 = UUID.randomUUID().toString();
-    String snapshotID2 = UUID.randomUUID().toString();
-    String snapshotID3 = UUID.randomUUID().toString();
+    UUID snapshotID1 = UUID.randomUUID();
+    UUID snapshotID2 = UUID.randomUUID();
+    UUID snapshotID3 = UUID.randomUUID();
 
-    ArrayList<String> snapshotIDs = new ArrayList<>();
+    ArrayList<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
     snapshotIDs.add(snapshotID3);
 
-    String prevSnapshotID = null;
+    UUID prevSnapshotID = null;
 
     // add 3 snapshots
-    for (String snapshotID : snapshotIDs) {
-      chainManager.addSnapshot(createSnapshotInfo("vol1",
-          "bucket1",
-          "test",
+    for (UUID snapshotID : snapshotIDs) {
+      chainManager.addSnapshot(createSnapshotInfo(
           snapshotID,
           prevSnapshotID,
           prevSnapshotID));
       prevSnapshotID = snapshotID;
     }
 
-    Assert.assertEquals(snapshotID3,
-        chainManager
-            .getLatestGlobalSnapshot());
-    Assert.assertEquals(snapshotID3,
-        chainManager
-            .getLatestPathSnapshot(String
-                .join("/", "vol1", "bucket1")));
+    assertEquals(snapshotID3, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID3, chainManager.getLatestPathSnapshotId(
+        String.join("/", "vol1", "bucket1")));
 
     int i = 0;
-    String curID = snapshotIDs.get(i);
+    UUID curID = snapshotIDs.get(i);
     while (chainManager.hasNextGlobalSnapshot(curID)) {
       i++;
-      Assert.assertEquals(snapshotIDs.get(i),
-              chainManager.nextGlobalSnapshot(curID));
+      assertEquals(snapshotIDs.get(i), chainManager.nextGlobalSnapshot(curID));
       curID = snapshotIDs.get(i);
     }
 
     curID = snapshotIDs.get(i);
     while (chainManager.hasPreviousGlobalSnapshot(curID)) {
       i--;
-      Assert.assertEquals(snapshotIDs.get(i),
-              chainManager.previousGlobalSnapshot(curID));
+      assertEquals(snapshotIDs.get(i),
+          chainManager.previousGlobalSnapshot(curID));
       curID = snapshotIDs.get(i);
     }
 
     i = 0;
     curID = snapshotIDs.get(i);
-    while (chainManager.hasNextPathSnapshot(snapshotPath,
-            curID)) {
+    while (chainManager.hasNextPathSnapshot(snapshotPath, curID)) {
       i++;
-      Assert.assertEquals(snapshotIDs.get(i),
-              chainManager.nextPathSnapshot(snapshotPath,
-                      curID));
+      assertEquals(snapshotIDs.get(i),
+          chainManager.nextPathSnapshot(snapshotPath, curID));
       curID = snapshotIDs.get(i);
     }
 
     curID = snapshotIDs.get(i);
     while (chainManager.hasPreviousPathSnapshot(snapshotPath,
-            curID)) {
+        curID)) {
       i--;
-      Assert.assertEquals(snapshotIDs.get(i),
-              chainManager.previousPathSnapshot(snapshotPath,
-                      curID));
+      assertEquals(snapshotIDs.get(i),
+          chainManager.previousPathSnapshot(snapshotPath, curID));
       curID = snapshotIDs.get(i);
     }
   }
@@ -204,29 +193,26 @@ public class TestSnapshotChain {
   @Test
   public void testDeleteSnapshot() throws Exception {
     // add three snapshots
-    String snapshotID1 = UUID.randomUUID().toString();
-    String snapshotID2 = UUID.randomUUID().toString();
-    String snapshotID3 = UUID.randomUUID().toString();
+    UUID snapshotID1 = UUID.randomUUID();
+    UUID snapshotID2 = UUID.randomUUID();
+    UUID snapshotID3 = UUID.randomUUID();
 
-    ArrayList<String> snapshotIDs = new ArrayList<>();
+    ArrayList<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
     snapshotIDs.add(snapshotID3);
 
-    String prevSnapshotID = null;
+    UUID prevSnapshotID = null;
 
     // add 3 snapshots
-    for (String snapshotID : snapshotIDs) {
-      sinfos.put(snapshotID,
-          createSnapshotInfo("vol1",
-              "bucket1",
-              "test",
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotIdToSnapshotInfoMap.put(snapshotID,
+          createSnapshotInfo(
               snapshotID,
               prevSnapshotID,
               prevSnapshotID));
 
-      chainManager
-          .addSnapshot(sinfos.get(snapshotID));
+      chainManager.addSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID));
       prevSnapshotID = snapshotID;
     }
 
@@ -235,31 +221,22 @@ public class TestSnapshotChain {
 
     deleteSnapshot(snapshotID2);
     // start with first snapshot in snapshot chain
-    Assert.assertEquals(false, chainManager
-            .hasPreviousGlobalSnapshot(snapshotID1));
-    Assert.assertEquals(true, chainManager
-            .hasNextGlobalSnapshot(snapshotID1));
-    Assert.assertEquals(snapshotID3, chainManager
-            .nextGlobalSnapshot(snapshotID1));
-    Assert.assertEquals(false, chainManager
-            .hasNextGlobalSnapshot(snapshotID3));
+    assertFalse(chainManager.hasPreviousGlobalSnapshot(snapshotID1));
+    assertTrue(chainManager.hasNextGlobalSnapshot(snapshotID1));
+    assertFalse(chainManager.hasNextGlobalSnapshot(snapshotID3));
+    assertEquals(snapshotID3,
+        chainManager.nextGlobalSnapshot(snapshotID1));
 
     // add snapshotID2 and delete snapshotID1
     // should have snapshotID3 and snapshotID2
     deleteSnapshot(snapshotID1);
-    chainManager
-        .addSnapshot(sinfos.get(snapshotID2));
+    chainManager.addSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID2));
 
-    Assert.assertEquals(false,
-            chainManager.hasPreviousGlobalSnapshot(snapshotID3));
-    Assert.assertEquals(true,
-            chainManager.hasNextGlobalSnapshot(snapshotID3));
-    Assert.assertEquals(snapshotID2,
-            chainManager.nextGlobalSnapshot(snapshotID3));
-    Assert.assertEquals(false,
-            chainManager.hasNextGlobalSnapshot(snapshotID2));
-    Assert.assertEquals(snapshotID3, chainManager
-            .previousGlobalSnapshot(snapshotID2));
+    assertFalse(chainManager.hasPreviousGlobalSnapshot(snapshotID3));
+    assertTrue(chainManager.hasNextGlobalSnapshot(snapshotID3));
+    assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID3));
+    assertFalse(chainManager.hasNextGlobalSnapshot(snapshotID2));
+    assertEquals(snapshotID3, chainManager.previousGlobalSnapshot(snapshotID2));
   }
 
   @Test
@@ -268,39 +245,32 @@ public class TestSnapshotChain {
             omMetadataManager.getSnapshotInfoTable();
 
     // add two snapshots to the snapshotInfo
-    String snapshotID1 = UUID.randomUUID().toString();
-    String snapshotID2 = UUID.randomUUID().toString();
+    UUID snapshotID1 = UUID.randomUUID();
+    UUID snapshotID2 = UUID.randomUUID();
 
-    ArrayList<String> snapshotIDs = new ArrayList<>();
+    ArrayList<UUID> snapshotIDs = new ArrayList<>();
     snapshotIDs.add(snapshotID1);
     snapshotIDs.add(snapshotID2);
 
-    String prevSnapshotID = "";
+    UUID prevSnapshotID = null;
 
     // add 3 snapshots
-    for (String snapshotID : snapshotIDs) {
-      snapshotInfo.put(snapshotID,
-              createSnapshotInfo("vol1",
-                      "bucket1",
-                      "test",
-                      snapshotID,
-                      prevSnapshotID,
-                      prevSnapshotID));
-
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotInfo.put(snapshotID.toString(),
+          createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID));
       prevSnapshotID = snapshotID;
     }
 
     chainManager.loadSnapshotInfo(omMetadataManager);
     // check if snapshots loaded correctly from snapshotInfoTable
-    Assert.assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshot());
-    Assert.assertEquals(snapshotID2, chainManager
-            .nextGlobalSnapshot(snapshotID1));
-    Assert.assertEquals(snapshotID1, chainManager.previousPathSnapshot(String
-            .join("/", "vol1", "bucket1"), snapshotID2));
-    Assert.assertThrows(NoSuchElementException.class,
-            () -> chainManager.nextGlobalSnapshot(snapshotID2));
-    Assert.assertThrows(NoSuchElementException.class,
-            () -> chainManager.previousPathSnapshot(String
-                    .join("/", "vol1", "bucket1"), snapshotID1));
+    assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID1));
+    assertEquals(snapshotID1, chainManager.previousPathSnapshot(String
+        .join("/", "vol1", "bucket1"), snapshotID2));
+    assertThrows(NoSuchElementException.class,
+        () -> chainManager.nextGlobalSnapshot(snapshotID2));
+    assertThrows(NoSuchElementException.class,
+        () -> chainManager.previousPathSnapshot(String
+            .join("/", "vol1", "bucket1"), snapshotID1));
   }
 }

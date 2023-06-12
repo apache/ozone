@@ -998,19 +998,24 @@ public class RpcClient implements ClientProtocol {
 
   /**
    * List snapshots in a volume/bucket.
-   * @param volumeName volume name
-   * @param bucketName bucket name
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
    * @return list of snapshots for volume/bucket snapshotpath.
    * @throws IOException
    */
   @Override
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
+  public List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
     Preconditions.checkArgument(Strings.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(Strings.isNotBlank(bucketName),
         "bucket can't be null or empty.");
-    return ozoneManagerClient.listSnapshot(volumeName, bucketName).stream()
+    return ozoneManagerClient.listSnapshot(volumeName, bucketName,
+            snapshotPrefix, prevSnapshot, maxListResult).stream()
         .map(snapshotInfo -> OzoneSnapshot.fromSnapshotInfo(snapshotInfo))
         .collect(Collectors.toList());
   }
@@ -2339,6 +2344,16 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setOwnerName(owner);
     return ozoneManagerClient.setBucketOwner(builder.build());
+  }
+
+  @Override
+  public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException {
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(obj.getVolumeName())
+        .setBucketName(obj.getBucketName())
+        .setKeyName(keyName);
+    ozoneManagerClient.setTimes(builder.build(), mtime, atime);
   }
 
   public ExecutorService getECReconstructExecutor() {

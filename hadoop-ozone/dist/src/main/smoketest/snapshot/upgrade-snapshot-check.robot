@@ -78,8 +78,9 @@ Delete snapshot
     [Tags]     finalized-snapshot-tests
     ${output} =         Execute           ozone sh snapshot delete /snapvolume-1/snapbucket-1 snapshot1
                         Should not contain      ${output}       Failed
-    ${output} =         Execute           ozone sh snapshot ls /snapvolume-1/snapbucket-1
-                        Should contain          ${output}       SNAPSHOT_DELETED
+
+    ${output} =         Execute            ozone sh snapshot ls /snapvolume-1/snapbucket-1 | jq '[.[] | select(.name == "snapshot1") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
+                        Should contain   ${output}   SNAPSHOT_DELETED
 
 Attempt to delete when snapshot feature is disabled
     [Tags]     pre-finalized-snapshot-tests

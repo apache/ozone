@@ -25,12 +25,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -294,7 +296,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final long omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();
-  private List<TableCacheMetrics> tableCacheMetrics = new LinkedList<>();
+  private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
+      new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
@@ -463,7 +466,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
     this.tableMap.put(name, table);
     if (addCacheMetrics) {
-      tableCacheMetrics.add(table.createCacheMetrics());
+      if (tableCacheMetricsMap.containsKey(name)) {
+        tableCacheMetricsMap.get(name).unregister();
+      }
+      tableCacheMetricsMap.put(name, table.createCacheMetrics());
     }
   }
 
@@ -713,9 +719,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       store.close();
       store = null;
     }
-    for (TableCacheMetrics metrics : tableCacheMetrics) {
-      metrics.unregister();
-    }
+    tableCacheMetricsMap.values().forEach(TableCacheMetrics::unregister);
     // OzoneManagerLock cleanup
     lock.cleanup();
   }
@@ -1116,8 +1120,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             result.add(omBucketInfo);
             currentCount++;
           } else if (
-              StringUtils.isNotEmpty(
-                  snapshotChainManager.getLatestPathSnapshot(volumeName +
+              Objects.nonNull(
+                  snapshotChainManager.getLatestPathSnapshotId(volumeName +
                       OM_KEY_PREFIX + omBucketInfo.getBucketName()))) {
             // Snapshot filter on.
             // Add to result list only when the bucket has at least one snapshot
@@ -1183,7 +1187,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     if (StringUtil.isNotBlank(keyPrefix)) {
       seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
     } else {
-      seekPrefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
+      seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
     int currentCount = 0;
 
@@ -1276,8 +1280,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
+  public List<SnapshotInfo> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
     if (Strings.isNullOrEmpty(volumeName)) {
       throw new OMException("Volume name is required.", VOLUME_NOT_FOUND);
     }
@@ -1292,39 +1297,69 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           BUCKET_NOT_FOUND);
     }
 
-    String prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
+    String prefix;
+    if (StringUtil.isNotBlank(snapshotPrefix)) {
+      prefix = getOzoneKey(volumeName, bucketName, snapshotPrefix);
+    } else {
+      prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
+    }
+
+    String seek;
+    if (StringUtil.isNotBlank(prevSnapshot)) {
+      // Seek to the specified snapshot.
+      seek = getOzoneKey(volumeName, bucketName, prevSnapshot);
+    } else {
+      // This allows us to seek directly to the first key with the right prefix.
+      seek = getOzoneKey(volumeName, bucketName,
+          StringUtil.isNotBlank(
+              snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
+    }
+
     TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
 
-    appendSnapshotFromCacheToMap(snapshotInfoMap, prefix);
-    appendSnapshotFromDBToMap(snapshotInfoMap, prefix);
+    int count = appendSnapshotFromCacheToMap(
+        snapshotInfoMap, prefix, seek, maxListResult);
+    appendSnapshotFromDBToMap(
+        snapshotInfoMap, prefix, seek, count, maxListResult);
 
     return new ArrayList<>(snapshotInfoMap.values());
   }
 
-  private void appendSnapshotFromCacheToMap(
-      TreeMap snapshotInfoMap, String prefix) {
+  private int appendSnapshotFromCacheToMap(
+      TreeMap snapshotInfoMap, String prefix,
+      String previous, int maxListResult) {
+    int count = 0;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
         snapshotInfoTable.cacheIterator();
-    while (iterator.hasNext()) {
+    while (iterator.hasNext() && count < maxListResult) {
       Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
           iterator.next();
       String snapshotKey = entry.getKey().getCacheKey();
       SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (snapshotInfo != null && snapshotKey.startsWith(prefix)) {
+      if (snapshotInfo != null && snapshotKey.startsWith(prefix) &&
+          snapshotKey.compareTo(previous) > 0) {
         snapshotInfoMap.put(snapshotKey, snapshotInfo);
+        count++;
       }
     }
+    return count;
   }
 
-  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap, String prefix)
+  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap,
+                                         String prefix, String previous,
+                                         int count, int maxListResult)
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
       KeyValue< String, SnapshotInfo> snapshotinfo;
-      snapshotIter.seek(prefix);
-      while (snapshotIter.hasNext()) {
+      snapshotIter.seek(previous);
+      while (snapshotIter.hasNext() && count < maxListResult) {
         snapshotinfo = snapshotIter.next();
-        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix)) {
+        if (snapshotinfo != null &&
+            snapshotinfo.getKey().compareTo(previous) == 0) {
+          continue;
+        }
+        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix))  {
           CacheValue<SnapshotInfo> cacheValue =
               snapshotInfoTable.getCacheValue(
                   new CacheKey<>(snapshotinfo.getKey()));
@@ -1333,6 +1368,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // in cache.
           if (cacheValue == null) {
             snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
+            count++;
           }
         } else {
           break;
@@ -1585,37 +1621,46 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                             OmSnapshotManager snapshotManager)
       throws IOException {
 
+
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
-    String latestPathSnapshot = snapshotChainManager
-        .getLatestPathSnapshot(snapshotPath);
+    Optional<UUID> latestPathSnapshot = Optional.ofNullable(
+        snapshotChainManager.getLatestPathSnapshotId(snapshotPath));
 
-    SnapshotInfo snapInfo = null;
-    while (latestPathSnapshot != null) {
-      String snapTableKey = snapshotChainManager
-          .getTableKey(latestPathSnapshot);
-      snapInfo = getSnapshotInfoTable().get(snapTableKey);
+    Optional<SnapshotInfo> snapshotInfo = Optional.empty();
 
-      if (snapInfo != null && snapInfo.getSnapshotStatus() ==
+    while (latestPathSnapshot.isPresent()) {
+      Optional<String> snapTableKey = latestPathSnapshot
+          .map(uuid -> snapshotChainManager.getTableKey(uuid));
+
+      snapshotInfo = snapTableKey.isPresent() ?
+          Optional.ofNullable(getSnapshotInfoTable().get(snapTableKey.get())) :
+          Optional.empty();
+
+      if (snapshotInfo.isPresent() && snapshotInfo.get().getSnapshotStatus() ==
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         break;
       }
 
       // Update latestPathSnapshot if current snapshot is deleted.
-      if (snapshotChainManager.hasPreviousPathSnapshot(
-          snapshotPath, latestPathSnapshot)) {
-        latestPathSnapshot = snapshotChainManager
-            .previousPathSnapshot(snapshotPath, latestPathSnapshot);
+      if (snapshotChainManager.hasPreviousPathSnapshot(snapshotPath,
+          latestPathSnapshot.get())) {
+        latestPathSnapshot = Optional.ofNullable(snapshotChainManager
+            .previousPathSnapshot(snapshotPath, latestPathSnapshot.get()));
       } else {
-        latestPathSnapshot = null;
+        latestPathSnapshot = Optional.empty();
       }
     }
 
-    OmSnapshot omSnapshot = null;
-    if (snapInfo != null) {
-      omSnapshot = (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
-              bucketName, getSnapshotPrefix(snapInfo.getName()), true);
-    }
-    return omSnapshot;
+    Optional<OmSnapshot> omSnapshot = snapshotInfo.isPresent() ?
+        Optional.ofNullable(
+            (OmSnapshot) snapshotManager.checkForSnapshot(volumeName,
+                bucketName,
+                getSnapshotPrefix(snapshotInfo.get().getName()),
+                true)
+        ) :
+        Optional.empty();
+
+    return omSnapshot.orElse(null);
   }
 
   @Override

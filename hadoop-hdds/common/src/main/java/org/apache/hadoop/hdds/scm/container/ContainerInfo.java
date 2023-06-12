@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 
@@ -28,13 +29,12 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.util.Time;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import static java.lang.Math.max;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Class wraps ozone container info.
@@ -53,9 +53,17 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   private HddsProtos.LifeCycleState state;
+  // The wall-clock ms since the epoch at which the current state enters.
+  private Instant stateEnterTime;
+  @JsonIgnore
+  private HddsProtos.LifeCycleState previousState;
+  @JsonIgnore
+  private Instant previousStateEnterTime;
   @JsonIgnore
   private final PipelineID pipelineID;
   private final ReplicationConfig replicationConfig;
+  @JsonIgnore
+  private final Clock clock;
   /*
   usedBytes is a volatile field. Writes and Reads of volatile long are atomic
   and each read of a volatile will see the last write to that volatile by any
@@ -65,8 +73,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private volatile long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
-  // The wall-clock ms since the epoch at which the current state enters.
-  private final Instant stateEnterTime;
   private String owner;
   // This is JsonIgnored as originally this class held a long in instead of
   // a containerID object. By emitting this in Json, it changes the JSON output.
@@ -85,7 +91,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private long sequenceId;
 
   @SuppressWarnings("parameternumber")
-  ContainerInfo(
+  private ContainerInfo(
       long containerID,
       HddsProtos.LifeCycleState state,
       PipelineID pipelineID,
@@ -95,18 +101,20 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationConfig repConfig) {
+      ReplicationConfig repConfig,
+      Clock clock) {
     this.containerID = ContainerID.valueOf(containerID);
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
     this.numberOfKeys = numberOfKeys;
-    this.lastUsed = Instant.ofEpochMilli(Time.now());
+    this.lastUsed = clock.instant();
     this.state = state;
     this.stateEnterTime = Instant.ofEpochMilli(stateEnterTime);
     this.owner = owner;
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
     this.replicationConfig = repConfig;
+    this.clock = clock;
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
@@ -146,7 +154,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   public void setState(HddsProtos.LifeCycleState state) {
+    previousState = this.state;
+    previousStateEnterTime = this.stateEnterTime;
+
     this.state = state;
+    this.stateEnterTime = clock.instant();
   }
 
   public Instant getStateEnterTime() {
@@ -240,7 +252,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   public void updateLastUsedTime() {
-    lastUsed = Instant.ofEpochMilli(Time.now());
+    lastUsed = clock.instant();
   }
 
   @JsonIgnore
@@ -286,8 +298,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     return "ContainerInfo{"
         + "id=" + containerID
         + ", state=" + state
-        + ", pipelineID=" + pipelineID
         + ", stateEnterTime=" + stateEnterTime
+        + ", pipelineID=" + pipelineID
         + ", owner=" + owner
         + '}';
   }
@@ -343,13 +355,28 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   /**
+   * Restore previous state.
+   */
+  public void revertState() {
+    if (previousState == null || previousStateEnterTime == null) {
+      throw new IllegalStateException("previous state unknown");
+    }
+
+    state = previousState;
+    stateEnterTime = previousStateEnterTime;
+    previousState = null;
+    previousStateEnterTime = null;
+  }
+
+  /**
    * Builder class for ContainerInfo.
    */
   public static class Builder {
     private HddsProtos.LifeCycleState state;
     private long used;
     private long keys;
-    private long stateEnterTime;
+    private Clock clock = Clock.systemUTC();
+    private long stateEnterTime = clock.millis();
     private String owner;
     private long containerID;
     private long deleteTransactionId;
@@ -368,7 +395,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     }
 
     public Builder setContainerID(long id) {
-      Preconditions.checkState(id >= 0);
+      Preconditions.assertTrue(id >= 0, () -> id + " < 0");
       this.containerID = id;
       return this;
     }
@@ -408,10 +435,19 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
+    /**
+     * Also resets {@code stateEnterTime}, so make sure to set clock first.
+     */
+    public Builder setClock(Clock clock) {
+      this.clock = clock;
+      this.stateEnterTime = clock.millis();
+      return this;
+    }
+
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationConfig);
+          sequenceId, replicationConfig, clock);
     }
   }
 

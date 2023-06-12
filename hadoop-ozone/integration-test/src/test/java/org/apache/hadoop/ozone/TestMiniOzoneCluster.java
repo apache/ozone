@@ -138,7 +138,7 @@ public class TestMiniOzoneCluster {
 
       for (int i = 0; i < 3; i++) {
         stateMachines.add(new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf, null, null, null));
+            randomDatanodeDetails(), ozoneConf));
       }
 
       //we need to start all the servers to get the fix ports
@@ -183,11 +183,11 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
     try (
         DatanodeStateMachine sm1 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
         DatanodeStateMachine sm2 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
     ) {
       HashSet<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));

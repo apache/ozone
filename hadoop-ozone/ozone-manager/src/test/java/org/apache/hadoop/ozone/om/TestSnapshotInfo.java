@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Before;
@@ -40,10 +40,8 @@ public class TestSnapshotInfo {
 
   private OMMetadataManager omMetadataManager;
   private static final String EXPECTED_SNAPSHOT_KEY = "snapshot1";
-  private static final String EXPECTED_SNAPSHOT_ID =
-      UUID.randomUUID().toString();
-  private static final String EXPECTED_PREVIOUS_SNAPSHOT_ID =
-      UUID.randomUUID().toString();
+  private static final UUID EXPECTED_SNAPSHOT_ID = UUID.randomUUID();
+  private static final UUID EXPECTED_PREVIOUS_SNAPSHOT_ID = UUID.randomUUID();
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -58,15 +56,15 @@ public class TestSnapshotInfo {
 
   private SnapshotInfo createSnapshotInfo() {
     return new SnapshotInfo.Builder()
-        .setSnapshotID(EXPECTED_SNAPSHOT_ID)
+        .setSnapshotId(EXPECTED_SNAPSHOT_ID)
         .setName("snapshot1")
         .setVolumeName("vol1")
         .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotStatus.SNAPSHOT_ACTIVE)
         .setCreationTime(Time.now())
         .setDeletionTime(-1L)
-        .setPathPreviousSnapshotID(EXPECTED_PREVIOUS_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(EXPECTED_PREVIOUS_SNAPSHOT_ID)
+        .setPathPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
+        .setGlobalPreviousSnapshotId(EXPECTED_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath("test/path")
         .setCheckpointDir("checkpoint.testdir")
         .build();
@@ -85,7 +83,7 @@ public class TestSnapshotInfo {
         omMetadataManager.getSnapshotInfoTable();
     snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, createSnapshotInfo());
     Assert.assertEquals(EXPECTED_SNAPSHOT_ID,
-        snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getSnapshotID());
+        snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).getSnapshotId());
   }
 
   @Test

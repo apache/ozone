@@ -18,9 +18,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Class represents one single column table with the required codecs and types.
@@ -29,6 +34,23 @@ import java.io.IOException;
  * @param <VALUE> they type of the value.
  */
 public class DBColumnFamilyDefinition<KEY, VALUE> {
+  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
+      DBColumnFamilyDefinition<?, ?>... families) {
+    return newUnmodifiableMap(Collections.emptyMap(), families);
+  }
+
+  public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
+      Map<String, DBColumnFamilyDefinition<?, ?>> existing,
+      DBColumnFamilyDefinition<?, ?>... families) {
+    return CollectionUtils.newUnmodifiableMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName, existing);
+  }
+
+  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>>
+      newUnmodifiableMultiMap(DBColumnFamilyDefinition<?, ?>... families) {
+    return CollectionUtils.newUnmodifiableMultiMap(Arrays.asList(families),
+        DBColumnFamilyDefinition::getName);
+  }
 
   private final String tableName;
 
@@ -61,10 +83,6 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
   }
 
   public String getName() {
-    return tableName;
-  }
-
-  public String getTableName() {
     return tableName;
   }
 

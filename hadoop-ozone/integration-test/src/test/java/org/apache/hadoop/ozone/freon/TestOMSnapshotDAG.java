@@ -150,7 +150,7 @@ public class TestOMSnapshotDAG {
 
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
-    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
+    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
         getTablePrefixes(omMetadataManager, volumeName, bucketName));
   }

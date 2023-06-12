@@ -225,12 +225,16 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   /**
    * List snapshots in a volume/bucket.
-   * @param volumeName volume name
-   * @param bucketName bucket name
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
    * @return list of snapshot
    */
-  List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
-      throws IOException;
+  List<SnapshotInfo> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException;
 
   /**
    * Recover trash allows the user to recover the keys

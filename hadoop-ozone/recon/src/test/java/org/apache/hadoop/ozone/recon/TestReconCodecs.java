@@ -34,7 +34,7 @@ public class TestReconCodecs {
 
   @Test
   public void testContainerKeyPrefixCodec() throws IOException {
-    ContainerKeyPrefix containerKeyPrefix = new ContainerKeyPrefix(
+    ContainerKeyPrefix containerKeyPrefix = ContainerKeyPrefix.get(
         System.currentTimeMillis(), "TestKeyPrefix", 0);
 
     Codec<ContainerKeyPrefix> codec = ContainerKeyPrefixCodec.get();

@@ -109,9 +109,9 @@ public class TestBucketLayoutAwareOMKeyFactory {
           LOG.info("Validated request class instantiation for cmdType " + k);
         });
 
-    Assert.assertEquals(12, omKeyReqsFSO.size());
-    Assert.assertEquals(13, omKeyReqsLegacy.size());
-    Assert.assertEquals(13, omKeyReqsOBS.size());
+    Assert.assertEquals(13, omKeyReqsFSO.size());
+    Assert.assertEquals(14, omKeyReqsLegacy.size());
+    Assert.assertEquals(14, omKeyReqsOBS.size());
     // Check if the number of instantiated OMKeyRequest classes is equal to
     // the number of keys in the mapping.
     Assert.assertEquals(
