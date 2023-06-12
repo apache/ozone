@@ -33,6 +33,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 
@@ -147,7 +148,9 @@ abstract class StringCodecBase implements Codec<String> {
       // and then wrap it as a buffer for encoding.
       final byte[] array = new byte[serializedSize];
       final Integer encoded = encoder.apply(ByteBuffer.wrap(array));
-      Preconditions.assertSame(serializedSize, encoded, "serializedSize");
+      Objects.requireNonNull(encoded, "encoded == null");
+      Preconditions.assertSame(serializedSize.intValue(), encoded.intValue(),
+          "serializedSize");
       return array;
     } else {
       // When the serialized size is unknown, allocate a larger buffer
@@ -155,8 +158,7 @@ abstract class StringCodecBase implements Codec<String> {
       try (CodecBuffer buffer = CodecBuffer.allocateHeap(upperBound)) {
         buffer.putFromSource(encoder);
 
-        // require a buffer copying
-        // unless upperBound equals to the serialized size.
+        // copy the buffer to an array in order to release the buffer.
         return buffer.getArray();
       }
     }

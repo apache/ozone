@@ -686,26 +686,64 @@ public class TestOmMetadataManager {
 
     OMRequestTestUtils.addVolumeToDB(vol1, omMetadataManager);
     addBucketsToCache(vol1, bucket1);
-    String snapshotName = "snapshot";
+    String prefixA = "snapshotA";
+    String prefixB = "snapshotB";
+    TreeSet<String> snapshotsASet = new TreeSet<>();
 
-    for (int i = 1; i <= 10; i++) {
+    for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {
+        snapshotsASet.add(prefixA + i);
         OMRequestTestUtils.addSnapshotToTable(vol1, bucket1,
-            snapshotName + i, omMetadataManager);
+            prefixA + i, omMetadataManager);
       } else {
         OMRequestTestUtils.addSnapshotToTableCache(vol1, bucket1,
-            snapshotName + i, omMetadataManager);
+            prefixB + i, omMetadataManager);
       }
     }
 
     //Test listing all snapshots.
     List<SnapshotInfo> snapshotInfos = omMetadataManager.listSnapshot(vol1,
-        bucket1);
-    assertEquals(10, snapshotInfos.size());
+        bucket1, null, null, 100);
+    assertEquals(100, snapshotInfos.size());
+
+    snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1, prefixA, null, 50);
+    assertEquals(50, snapshotInfos.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos) {
-      assertTrue(snapshotInfo.getName().startsWith(snapshotName));
+      assertTrue(snapshotInfo.getName().startsWith(prefixA));
     }
 
+    String startSnapshot = prefixA + 38;
+    snapshotInfos = omMetadataManager.listSnapshot(vol1,
+        bucket1, prefixA, startSnapshot, 50);
+    assertEquals(snapshotsASet.tailSet(startSnapshot).size() - 1,
+        snapshotInfos.size());
+    for (SnapshotInfo snapshotInfo : snapshotInfos) {
+      assertTrue(snapshotInfo.getName().startsWith(prefixA));
+      assertTrue(snapshotInfo.getName().compareTo(startSnapshot) > 0);
+    }
+
+    startSnapshot = null;
+    TreeSet<String> expectedSnapshot = new TreeSet<>();
+    for (int i = 1; i <= 5; i++) {
+      snapshotInfos = omMetadataManager.listSnapshot(
+          vol1, bucket1, prefixA, startSnapshot, 10);
+      assertEquals(10, snapshotInfos.size());
+
+      for (SnapshotInfo snapshotInfo : snapshotInfos) {
+        expectedSnapshot.add(snapshotInfo.getName());
+        assertTrue(snapshotInfo.getName().startsWith(prefixA));
+        startSnapshot = snapshotInfo.getName();
+      }
+    }
+    assertEquals(snapshotsASet, expectedSnapshot);
+
+    // As now we have iterated all 50 snapshots, calling next time should
+    // return empty list.
+    snapshotInfos = omMetadataManager.listSnapshot(vol1, bucket1,
+        startSnapshot, prefixA, 10);
+
+    assertEquals(snapshotInfos.size(), 0);
   }
 
   @ParameterizedTest
@@ -721,7 +759,7 @@ public class TestOmMetadataManager {
     addBucketsToCache(vol1, bucket1);
 
     OMException oe = assertThrows(OMException.class,
-        () -> omMetadataManager.listSnapshot(volume, bucket));
+        () -> omMetadataManager.listSnapshot(volume, bucket, null, null, 100));
     assertEquals(expectedResultCode, oe.getResult());
   }
 
@@ -758,14 +796,14 @@ public class TestOmMetadataManager {
 
     //Test listing snapshots only lists snapshots of specified bucket
     List<SnapshotInfo> snapshotInfos1 = omMetadataManager.listSnapshot(vol1,
-            bucket1);
+            bucket1, null, null, Integer.MAX_VALUE);
     assertEquals(2, snapshotInfos1.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos1) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName1));
     }
 
     List<SnapshotInfo> snapshotInfos2 = omMetadataManager.listSnapshot(vol1,
-            bucket2);
+            bucket2, null, null, Integer.MAX_VALUE);
     assertEquals(5, snapshotInfos2.size());
     for (SnapshotInfo snapshotInfo : snapshotInfos2) {
       assertTrue(snapshotInfo.getName().startsWith(snapshotName2));

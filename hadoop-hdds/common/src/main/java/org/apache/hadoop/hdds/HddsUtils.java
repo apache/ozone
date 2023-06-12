@@ -19,6 +19,9 @@
 package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +39,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -48,6 +52,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -844,5 +849,48 @@ public final class HddsUtils {
         thread.setName(threadName);
       }
     }
+  }
+
+  /**
+   * Transform a protobuf UUID to Java UUID.
+   */
+  public static UUID fromProtobuf(HddsProtos.UUID uuid) {
+    Objects.requireNonNull(uuid,
+        "HddsProtos.UUID can't be null to transform to java UUID.");
+    return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+  }
+
+  /**
+   * Transform a Java UUID to protobuf UUID.
+   */
+  public static HddsProtos.UUID toProtobuf(UUID uuid) {
+    Objects.requireNonNull(uuid,
+        "UUID can't be null to transform to protobuf UUID.");
+    return HddsProtos.UUID.newBuilder()
+        .setMostSigBits(uuid.getMostSignificantBits())
+        .setLeastSigBits(uuid.getLeastSignificantBits())
+        .build();
+  }
+
+  /** Concatenate stack trace {@code elements} (one per line) starting at
+   * {@code startIndex}. */
+  public static @Nonnull String formatStackTrace(
+      @Nullable StackTraceElement[] elements, int startIndex) {
+    if (elements != null && elements.length > startIndex) {
+      final StringBuilder sb = new StringBuilder();
+      for (int line = startIndex; line < elements.length; line++) {
+        sb.append(elements[line]).append("\n");
+      }
+      return sb.toString();
+    }
+    return "";
+  }
+
+  /** @return current thread stack trace if {@code logger} has debug enabled */
+  public static @Nullable StackTraceElement[] getStackTrace(
+      @Nonnull Logger logger) {
+    return logger.isDebugEnabled()
+        ? Thread.currentThread().getStackTrace()
+        : null;
   }
 }

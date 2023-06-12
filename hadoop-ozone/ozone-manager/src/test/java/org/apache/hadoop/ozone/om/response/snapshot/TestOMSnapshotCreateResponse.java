@@ -89,7 +89,7 @@ public class TestOMSnapshotCreateResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
+    UUID snapshotId = UUID.randomUUID();
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,

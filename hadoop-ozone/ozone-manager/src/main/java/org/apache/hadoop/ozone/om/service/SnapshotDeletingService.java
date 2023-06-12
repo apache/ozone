@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -187,7 +188,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           }
 
           //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
-          SnapshotInfo previousSnapshot = getPreviousSnapshot(snapInfo);
+          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(snapInfo);
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -285,7 +286,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
                 "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
-                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                snapInfo.getSnapshotId() + ". Processed " + deletionCount +
                 " keys and " + (keyLimitPerSnapshot - remainNum) +
                 " directories and files", ex);
           }
@@ -537,14 +538,21 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID();
     }
 
-    private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
+    private SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo)
         throws IOException {
-      if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
-          snapInfo.getSnapshotID())) {
-        String previousPathSnapshot = chainManager.previousPathSnapshot(
-            snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-        String tableKey = chainManager.getTableKey(previousPathSnapshot);
-        return omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo currSnapInfo = snapInfo;
+      while (chainManager.hasPreviousPathSnapshot(
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
+
+        UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
+        String tableKey = chainManager.getTableKey(prevPathSnapshot);
+        SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+        if (prevSnapInfo.getSnapshotStatus() ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+          return prevSnapInfo;
+        }
+        currSnapInfo = prevSnapInfo;
       }
       return null;
     }
@@ -639,4 +647,3 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     successRunCount.getAndSet(num);
   }
 }
-
