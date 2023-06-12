@@ -67,11 +67,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
@@ -498,9 +494,32 @@ public class ContainerEndpoint {
     return blockIds;
   }
 
+  /**
+   * Retrieves the container mismatch insights.
+   *
+   * This method returns a list of ContainerDiscrepancyInfo objects
+   * representing the containers that are present in the Object Manager (OM)
+   * but not in the Storage Container Manager (SCM), and the containers that
+   * are present in the SCM but not in the OM. The returned list is paginated
+   * based on the provided limit and prevKey parameters.
+   *
+   * @param limit The maximum number of container discrepancies to return.
+   * @param prevKey The container ID after which the results are returned.
+   * @return The HTTP response containing the list of ContainerDiscrepancyInfo
+   * objects representing the container discrepancies.
+   */
   @GET
   @Path("/mismatch")
-  public Response getContainerMisMatchInsights() {
+  public Response getContainerMisMatchInsights(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+          int limit,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
+    if (prevKey < 0 || limit < 0) {
+      // Send back an empty response
+      return Response.status(Response.Status.NOT_ACCEPTABLE).build();
+    }
+
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         new ArrayList<>();
     try {
@@ -508,18 +527,36 @@ public class ContainerEndpoint {
           reconContainerMetadataManager.getContainers(-1, -1);
       List<Long> scmNonDeletedContainers =
           containerManager.getContainers().stream()
-              .filter(containerInfo -> !(containerInfo.getState() ==
-                  HddsProtos.LifeCycleState.DELETED))
-              .map(containerInfo -> containerInfo.getContainerID()).collect(
-                  Collectors.toList());
+              .filter(containerInfo -> containerInfo.getState() !=
+                  HddsProtos.LifeCycleState.DELETED)
+              .map(containerInfo -> containerInfo.getContainerID())
+              .collect(Collectors.toList());
 
-      // Filter list of container Ids which are present in OM but not in SCM.
+      // Filter list of container IDs which are present in OM but not in SCM.
       List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
-          omContainers.entrySet().stream().filter(containerMetadataEntry ->
-                  !(scmNonDeletedContainers.contains(
-                      containerMetadataEntry.getKey())))
-              .collect(
-                  Collectors.toList());
+          omContainers.entrySet().stream()
+              .filter(
+                  containerMetadataEntry -> !scmNonDeletedContainers.contains(
+                      containerMetadataEntry.getKey()))
+              .collect(Collectors.toList());
+
+      // Filter containers based on pagination parameters
+      if (prevKey > 0) {
+        int index = 0;
+        while (index < notSCMContainers.size() &&
+            notSCMContainers.get(index).getKey() <= prevKey) {
+          index++;
+        }
+        if (index < notSCMContainers.size()) {
+          notSCMContainers = notSCMContainers.subList(index,
+              Math.min(index + limit, notSCMContainers.size()));
+        } else {
+          notSCMContainers = Collections.emptyList();
+        }
+      } else {
+        notSCMContainers = notSCMContainers.subList(0,
+            Math.min(limit, notSCMContainers.size()));
+      }
 
       notSCMContainers.forEach(nonSCMContainer -> {
         ContainerDiscrepancyInfo containerDiscrepancyInfo =
@@ -527,16 +564,34 @@ public class ContainerEndpoint {
         containerDiscrepancyInfo.setContainerID(nonSCMContainer.getKey());
         containerDiscrepancyInfo.setNumberOfKeys(
             nonSCMContainer.getValue().getNumberOfKeys());
-        containerDiscrepancyInfo.setPipelines(nonSCMContainer.getValue()
-            .getPipelines());
+        containerDiscrepancyInfo.setPipelines(
+            nonSCMContainer.getValue().getPipelines());
         containerDiscrepancyInfo.setExistsAt("OM");
         containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
       });
 
-      // Filter list of container Ids which are present in SCM but not in OM.
+      // Filter list of container IDs which are present in SCM but not in OM.
       List<Long> nonOMContainers = scmNonDeletedContainers.stream()
           .filter(containerId -> !omContainers.containsKey(containerId))
           .collect(Collectors.toList());
+
+      // Filter containers based on pagination parameters
+      if (prevKey > 0) {
+        int index = 0;
+        while (index < nonOMContainers.size() &&
+            nonOMContainers.get(index) <= prevKey) {
+          index++;
+        }
+        if (index < nonOMContainers.size()) {
+          nonOMContainers = nonOMContainers.subList(index,
+              Math.min(index + limit, nonOMContainers.size()));
+        } else {
+          nonOMContainers = Collections.emptyList();
+        }
+      } else {
+        nonOMContainers =
+            nonOMContainers.subList(0, Math.min(limit, nonOMContainers.size()));
+      }
 
       List<Pipeline> pipelines = new ArrayList<>();
       nonOMContainers.forEach(nonOMContainerId -> {
@@ -547,10 +602,8 @@ public class ContainerEndpoint {
         PipelineID pipelineID = null;
         try {
           pipelineID = containerManager.getContainer(
-                  ContainerID.valueOf(nonOMContainerId))
-              .getPipelineID();
-
-          if (null != pipelineID) {
+              ContainerID.valueOf(nonOMContainerId)).getPipelineID();
+          if (pipelineID != null) {
             pipelines.add(pipelineManager.getPipeline(pipelineID));
           }
         } catch (ContainerNotFoundException e) {
@@ -563,7 +616,6 @@ public class ContainerEndpoint {
         containerDiscrepancyInfo.setExistsAt("SCM");
         containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
       });
-
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
@@ -575,6 +627,7 @@ public class ContainerEndpoint {
     }
     return Response.ok(containerDiscrepancyInfoList).build();
   }
+
 
   /** This API retrieves set of deleted containers in SCM which are present
    * in OM to find out list of keys mapped to such DELETED state containers.

@@ -100,11 +100,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -1268,7 +1264,7 @@ public class TestContainerEndpoint {
     // delete container Id 1 from SCM
     reconContainerManager.deleteContainer(ContainerID.valueOf(1));
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights();
+        containerEndpoint.getContainerMisMatchInsights(10, 0);
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
@@ -1277,6 +1273,55 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
   }
+
+  @Test
+  public void testGetContainerInsightsNonSCMContainersWithPrevKey()
+      throws IOException, TimeoutException {
+
+    // Add 3 more containers to OM making total container in OM to 5
+    String[] keys = {"key_three", "key_four", "key_five"};
+    String bucket = "bucketOne";
+    String volume = "sampleVol";
+    BlockID[] blockIDs =
+        {new BlockID(3, 103), new BlockID(4, 105), new BlockID(5, 107)};
+
+    for (int i = 0; i < keys.length; i++) {
+      List<OmKeyLocationInfoGroup> infoGroups = new ArrayList<>();
+      OmKeyLocationInfo omKeyLocationInfo =
+          getOmKeyLocationInfo(blockIDs[i], pipeline);
+      List<OmKeyLocationInfo> omKeyLocationInfoList =
+          Collections.singletonList(omKeyLocationInfo);
+      infoGroups.add(new OmKeyLocationInfoGroup(0, omKeyLocationInfoList));
+      writeDataToOm(reconOMMetadataManager, keys[i], bucket, volume,
+          infoGroups);
+    }
+
+    reprocessContainerKeyMapper();
+
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    List<ContainerInfo> scmContainers = reconContainerManager.getContainers();
+    // There are 5 containers in OM and 0 in SCM
+    assertNotEquals(omContainers.size(), scmContainers.size());
+
+    // Set prevKey and limit
+    long prevKey = 2;
+    int limit = 10;
+
+    Response containerInsights =
+        containerEndpoint.getContainerMisMatchInsights(limit, prevKey);
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+
+    // Check the first ContainerDiscrepancyInfo object in the response
+    assertEquals(3, containerDiscrepancyInfoList.size());
+
+    ContainerDiscrepancyInfo containerDiscrepancyInfo =
+        containerDiscrepancyInfoList.get(0);
+    assertEquals(3, containerDiscrepancyInfo.getContainerID());
+    assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
+  }
+
 
   @Test
   public void testGetContainerInsightsNonOMContainers()
@@ -1296,7 +1341,7 @@ public class TestContainerEndpoint {
       }
     });
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights();
+        containerEndpoint.getContainerMisMatchInsights(10, 0);
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
@@ -1305,6 +1350,47 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals("SCM", containerDiscrepancyInfo.getExistsAt());
   }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainersWithPrevKey()
+      throws IOException, TimeoutException {
+    putContainerInfos(5);
+    List<ContainerKeyPrefix> deletedContainerKeyList =
+        reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
+            .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
+    deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
+      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+        reconContainerMetadataManager.batchDeleteContainerMapping(
+            rdbBatchOperation, key);
+        reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
+      } catch (IOException e) {
+        LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
+      }
+    });
+
+    // Set prevKey and limit
+    long prevKey = 2;
+    int limit = 3;
+
+    Response containerInsights =
+        containerEndpoint.getContainerMisMatchInsights(limit, prevKey);
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+
+    // Check the first two ContainerDiscrepancyInfo objects in the response
+    assertEquals(3, containerDiscrepancyInfoList.size());
+
+    ContainerDiscrepancyInfo containerDiscrepancyInfo1 =
+        containerDiscrepancyInfoList.get(0);
+    assertEquals(3, containerDiscrepancyInfo1.getContainerID());
+    assertEquals("SCM", containerDiscrepancyInfo1.getExistsAt());
+
+    ContainerDiscrepancyInfo containerDiscrepancyInfo2 =
+        containerDiscrepancyInfoList.get(1);
+    assertEquals(4, containerDiscrepancyInfo2.getContainerID());
+    assertEquals("SCM", containerDiscrepancyInfo2.getExistsAt());
+  }
+
 
   @Test
   public void testGetOmContainersDeletedInSCM() throws Exception {
