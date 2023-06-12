@@ -506,7 +506,7 @@ public class ContainerEndpoint {
    * Retrieves the container mismatch insights.
    *
    * This method returns a list of ContainerDiscrepancyInfo objects representing
-   * the containers that are missing in either the Object Manager (OM) or the
+   * the containers that are missing in either the Ozone Manager (OM) or the
    * Storage Container Manager (SCM), based on the provided filter parameter.
    * The returned list is paginated based on the provided limit and prevKey
    * parameters.
