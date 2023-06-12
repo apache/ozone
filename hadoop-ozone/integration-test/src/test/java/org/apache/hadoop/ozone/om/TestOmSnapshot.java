@@ -1239,9 +1239,9 @@ public class TestOmSnapshot {
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
-                                               String bucket,
-                                               String fromSnapshot,
-                                               String toSnapshot)
+                                                    String bucket,
+                                                    String fromSnapshot,
+                                                    String toSnapshot)
       throws InterruptedException, IOException {
     SnapshotDiffResponse response;
     do {

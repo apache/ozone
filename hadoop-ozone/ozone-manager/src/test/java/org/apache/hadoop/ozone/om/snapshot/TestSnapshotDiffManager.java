@@ -497,7 +497,7 @@ public class TestSnapshotDiffManager {
           objectIdsToCheck, oldObjectIdKeyMap, newObjectIdKeyMap);
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           SnapshotDiffResponse.JobStatus.DONE, "vol", "buck", "fs", "ts",
-          true, diffMap.size());
+          true, false, diffMap.size());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
           "buck", "fs", "ts",
@@ -578,10 +578,10 @@ public class TestSnapshotDiffManager {
       });
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
           SnapshotDiffResponse.JobStatus.DONE, "vol", "buck", "fs", "ts",
-          true, totalNumberOfRecords);
+          true, false, totalNumberOfRecords);
       SnapshotDiffJob snapshotDiffJob2 = new SnapshotDiffJob(0, testJobId2,
           SnapshotDiffResponse.JobStatus.DONE, "vol", "buck", "fs", "ts",
-          true, totalNumberOfRecords);
+          true, false, totalNumberOfRecords);
       cfHandleRocksDbPersistentMap.get(snapdiffJobCFH)
           .put(codecRegistry.asRawData(testJobId), snapshotDiffJob);
       cfHandleRocksDbPersistentMap.get(snapdiffJobCFH)
