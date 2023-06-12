@@ -230,6 +230,7 @@ function get_count_compose_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/k8s"
+        "\.md$"
     )
     filter_changed_files true
     COUNT_COMPOSE_CHANGED_FILES=${match_count}
@@ -285,6 +286,7 @@ function get_count_kubernetes_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/compose"
+        "\.md$"
     )
     filter_changed_files true
     COUNT_KUBERNETES_CHANGED_FILES=${match_count}

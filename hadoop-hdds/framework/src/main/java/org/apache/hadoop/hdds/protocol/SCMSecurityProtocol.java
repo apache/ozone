@@ -170,4 +170,5 @@ public interface SCMSecurityProtocol {
    */
   String getCertificate(NodeDetailsProto nodeDetails,
       String certSignReq) throws IOException;
+
 }
