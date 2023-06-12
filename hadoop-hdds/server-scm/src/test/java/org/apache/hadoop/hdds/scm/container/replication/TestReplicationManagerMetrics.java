@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
@@ -57,8 +59,12 @@ public class TestReplicationManagerMetrics {
         LegacyReplicationManager.class);
     Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
         .thenReturn(0);
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager replicationManager =
         Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
     Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);

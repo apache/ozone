@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -53,7 +55,12 @@ public class TestContainerReplicaPendingOps {
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
     pendingOps = new ContainerReplicaPendingOps(clock);
+
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager rm = Mockito.mock(ReplicationManager.class);
+    Mockito.when(rm.getConfig()).thenReturn(rmConf);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -281,8 +288,8 @@ public class TestContainerReplicaPendingOps {
     // Two Delete and Replication command should be timeout
     Assertions.assertEquals(metrics.getEcReplicaCreateTimeoutTotal(), 2);
     Assertions.assertEquals(metrics.getEcReplicaDeleteTimeoutTotal(), 2);
-    Assertions.assertEquals(metrics.getNumReplicationCmdsTimeout(), 1);
-    Assertions.assertEquals(metrics.getNumDeletionCmdsTimeout(), 1);
+    Assertions.assertEquals(metrics.getReplicationCmdsTimeoutTotal(), 1);
+    Assertions.assertEquals(metrics.getDeletionCmdsTimeoutTotal(), 1);
 
     expiry = clock.millis() + 1000;
     pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2, expiry);
@@ -306,8 +313,8 @@ public class TestContainerReplicaPendingOps {
 
     Assertions.assertEquals(metrics.getEcReplicasCreatedTotal(), 2);
     Assertions.assertEquals(metrics.getEcReplicasDeletedTotal(), 2);
-    Assertions.assertEquals(metrics.getNumReplicationCmdsCompleted(), 1);
-    Assertions.assertEquals(metrics.getNumDeletionCmdsCompleted(), 1);
+    Assertions.assertEquals(metrics.getReplicationCmdsCompletedTotal(), 1);
+    Assertions.assertEquals(metrics.getDeletionCmdsCompletedTotal(), 1);
 
     pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.completeAddReplica(new ContainerID(2), dn1, 3);
