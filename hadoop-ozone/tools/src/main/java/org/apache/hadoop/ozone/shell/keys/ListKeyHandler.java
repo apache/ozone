@@ -39,7 +39,7 @@ import picocli.CommandLine.Command;
  */
 @Command(name = "list",
     aliases = "ls",
-    description = "list all keys in a given bucket or snapshot")
+    description = "list all keys in a given volume or bucket or snapshot")
 public class ListKeyHandler extends BucketSnapshotHandler {
 
   @CommandLine.Mixin
@@ -49,6 +49,15 @@ public class ListKeyHandler extends BucketSnapshotHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
+    if (!Strings.isNullOrEmpty(address.getBucketName())) {
+      listKeysInsideBucket(client, address);
+      return;
+    }
+    listKeysInsideVolume(client, address);
+  }
+
+  private void listKeysInsideBucket(OzoneClient client, OzoneAddress address)
+      throws IOException {
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     String snapshotNameWithIndicator = address.getSnapshotNameWithIndicator();
@@ -94,4 +103,34 @@ public class ListKeyHandler extends BucketSnapshotHandler {
     }
   }
 
+  private void listKeysInsideVolume(OzoneClient client, OzoneAddress address)
+      throws IOException {
+    String volumeName = address.getVolumeName();
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+
+    Iterator<? extends OzoneBucket> bucketIterator =
+        vol.listBuckets(null);
+    int maxKeyLimit = listOptions.getLimit();
+    int totalKeys = 0;
+    while (bucketIterator.hasNext()) {
+      OzoneBucket bucket = bucketIterator.next();
+      Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(null);
+
+      int counter = printAsJsonArray(keyIterator, maxKeyLimit);
+      totalKeys += counter;
+      maxKeyLimit -= counter;
+
+      // More keys were returned notify about max length
+      if (keyIterator.hasNext() || (bucketIterator.hasNext()
+          && maxKeyLimit <= 0)) {
+        out().println("Listing first " + totalKeys + " entries of the " +
+            "result. Use --length (-l) to override max returned keys.");
+        return;
+      }
+    }
+    if (isVerbose()) {
+      out().printf("Found : %d keys in volume : %s %n",
+          totalKeys, volumeName);
+    }
+  }
 }

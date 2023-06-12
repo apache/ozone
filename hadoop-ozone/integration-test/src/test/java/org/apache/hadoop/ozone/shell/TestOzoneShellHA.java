@@ -1447,7 +1447,7 @@ public class TestOzoneShellHA {
     }
     out.reset();
     args =
-        new String[]{"volume", "listkeys", "-l", "200", volume1};
+        new String[]{"key", "list", "-l", "200", volume1};
     execute(ozoneShell, args);
     // Total keys should be 100+5+5=110
     Assert.assertEquals(110, getNumOfKeys());
@@ -1456,7 +1456,7 @@ public class TestOzoneShellHA {
     // Try listkeys on non-existing volume
     String volume2 = "voly";
     final String[] args1 =
-        new String[]{"volume", "listkeys", volume2};
+        new String[]{"key", "list", volume2};
     execute(ozoneShell, args);
     LambdaTestUtils.intercept(ExecutionException.class,
         "VOLUME_NOT_FOUND", () -> execute(ozoneShell, args1));
