@@ -1651,7 +1651,7 @@ public class TestOmSnapshot {
             }
 
             if (snapshotInfo != null) {
-              snapshotIds.add(snapshotInfo.getSnapshotID());
+              snapshotIds.add(snapshotInfo.getSnapshotId().toString());
             }
             return snapshotInfo != null;
           },
