@@ -638,7 +638,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     for (int idx = 0; idx < deletedLocationList.size(); idx++) {
       OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
       OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
-      if (!deletedLocationInfo.equalsForSDS(prevLocationInfo)) {
+      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
         return false;
       }
     }

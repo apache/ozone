@@ -34,7 +34,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -1470,8 +1469,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return a list of {@link BlockGroup} represent keys and blocks.
    * @throws IOException
    */
-  public Pair<List<BlockGroup>, HashMap<String, RepeatedOmKeyInfo>>
-      getPendingDeletionKeys(final int keyCount,
+  public PendingKeysDeletion getPendingDeletionKeys(final int keyCount,
                              OmSnapshotManager omSnapshotManager)
       throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
@@ -1580,7 +1578,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         }
       }
     }
-    return Pair.of(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(keyBlocksList, keysToModify);
   }
 
   private boolean versionExistsInPreviousSnapshot(OmKeyInfo omKeyInfo,

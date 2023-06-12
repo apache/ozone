@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -34,7 +33,6 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -123,18 +121,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
-   * Returns a Pair. First is a list of pending deletion key info that ups to
-   * the given count.Each entry is a {@link BlockGroup}, which contains
-   * the info about the key name and all its associated block IDs. Second is a
-   * Mapping of Key-Value pair which is updated in the deletedTable.
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
    *
    * @param count max number of keys to return.
    * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
    * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  Pair<List<BlockGroup>, HashMap<String, RepeatedOmKeyInfo>>
-      getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is

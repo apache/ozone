@@ -176,7 +176,7 @@ public class BlockLocationInfo {
         + '}';
   }
 
-  public boolean equalsForSDS(Object o) {
+  public boolean hasSameBlockAs(Object o) {
     if (this == o) {
       return true;
     }

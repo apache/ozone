@@ -17,12 +17,10 @@
 package org.apache.hadoop.ozone.om.service;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -39,7 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,14 +135,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
 
-          Pair<List<BlockGroup>, HashMap<String, RepeatedOmKeyInfo>>
-              blockListAndKeyMap = manager
+          PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(keyLimitPerTask);
-          List<BlockGroup> keyBlocksList = blockListAndKeyMap.getLeft();
+          List<BlockGroup> keyBlocksList = pendingKeysDeletion
+              .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             int delCount = processKeyDeletes(keyBlocksList,
                 getOzoneManager().getKeyManager(),
-                blockListAndKeyMap.getRight(), null);
+                pendingKeysDeletion.getKeysToModify(), null);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {
