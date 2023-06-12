@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -258,10 +259,21 @@ public class TestContainerReplicaPendingOps {
     pendingOps.scheduleAddReplica(new ContainerID(1), dn1, 2, expiry);
     pendingOps.scheduleDeleteReplica(new ContainerID(2), dn2, 1, expiry);
     pendingOps.scheduleAddReplica(new ContainerID(2), dn3, 1, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(3), dn3, 0, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(4), dn3, 0, expiry);
 
     // InFlight Replication and Deletion
-    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
-    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+    Assertions.assertEquals(3, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(3, pendingOps.getPendingOpCount(DELETE));
+    Assertions.assertEquals(1,
+        pendingOps.getPendingOpCount(ADD, ReplicationType.RATIS));
+    Assertions.assertEquals(1,
+        pendingOps.getPendingOpCount(DELETE, ReplicationType.RATIS));
+    Assertions.assertEquals(2,
+        pendingOps.getPendingOpCount(ADD, ReplicationType.EC));
+    Assertions.assertEquals(2,
+        pendingOps.getPendingOpCount(DELETE, ReplicationType.EC));
+
     clock.fastForward(1500);
 
     pendingOps.removeExpiredEntries();
@@ -269,25 +281,33 @@ public class TestContainerReplicaPendingOps {
     // Two Delete and Replication command should be timeout
     Assertions.assertEquals(metrics.getEcReplicaCreateTimeoutTotal(), 2);
     Assertions.assertEquals(metrics.getEcReplicaDeleteTimeoutTotal(), 2);
+    Assertions.assertEquals(metrics.getNumReplicationCmdsTimeout(), 1);
+    Assertions.assertEquals(metrics.getNumDeletionCmdsTimeout(), 1);
 
     expiry = clock.millis() + 1000;
     pendingOps.scheduleDeleteReplica(new ContainerID(3), dn1, 2, expiry);
     pendingOps.scheduleAddReplica(new ContainerID(3), dn1, 3, expiry);
     pendingOps.scheduleDeleteReplica(new ContainerID(4), dn2, 2, expiry);
     pendingOps.scheduleAddReplica(new ContainerID(4), dn3, 4, expiry);
+    pendingOps.scheduleAddReplica(new ContainerID(5), dn3, 0, expiry);
+    pendingOps.scheduleDeleteReplica(new ContainerID(6), dn3, 0, expiry);
 
     // InFlight Replication and Deletion. Previous Inflight should be
     // removed as they were timed out.
-    Assertions.assertEquals(2, pendingOps.getPendingOpCount(ADD));
-    Assertions.assertEquals(2, pendingOps.getPendingOpCount(DELETE));
+    Assertions.assertEquals(3, pendingOps.getPendingOpCount(ADD));
+    Assertions.assertEquals(3, pendingOps.getPendingOpCount(DELETE));
 
     pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.completeAddReplica(new ContainerID(3), dn1, 3);
     pendingOps.completeDeleteReplica(new ContainerID(4), dn2, 2);
     pendingOps.completeAddReplica(new ContainerID(4), dn3, 4);
+    pendingOps.completeDeleteReplica(new ContainerID(6), dn3, 0);
+    pendingOps.completeAddReplica(new ContainerID(5), dn3, 0);
 
     Assertions.assertEquals(metrics.getEcReplicasCreatedTotal(), 2);
     Assertions.assertEquals(metrics.getEcReplicasDeletedTotal(), 2);
+    Assertions.assertEquals(metrics.getNumReplicationCmdsCompleted(), 1);
+    Assertions.assertEquals(metrics.getNumDeletionCmdsCompleted(), 1);
 
     pendingOps.completeDeleteReplica(new ContainerID(3), dn1, 2);
     pendingOps.completeAddReplica(new ContainerID(2), dn1, 3);
