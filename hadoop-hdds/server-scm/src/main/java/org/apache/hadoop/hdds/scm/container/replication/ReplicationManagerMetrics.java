@@ -80,6 +80,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightEcDeletion",
       "Tracked inflight EC container deletion requests.");
 
+  private static final MetricsInfo UNDER_REPLICATED_QUEUE = Interns.info(
+      "UnderReplicatedQueueSize",
+      "Number of containers currently in the under replicated queue");
+
+  private static final MetricsInfo OVER_REPLICATED_QUEUE = Interns.info(
+      "OverReplicatedQueueSize",
+      "Number of containers currently in the over replicated queue");
+
   // Setup metric names and descriptions for Container Lifecycle states
   private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
       = Collections.unmodifiableMap(
@@ -220,8 +228,13 @@ public final class ReplicationManagerMetrics implements MetricsSource {
           // and therefore we don't need IN_FLIGHT_MOVE here.
           .addGauge(INFLIGHT_MOVE, getInflightMove());
     }
-    // Add under / over queue size
-    // Add partial reconstruction due to load or node availability if possible
+    if (!legacyReplicationManager) {
+      builder
+          .addGauge(UNDER_REPLICATED_QUEUE,
+              replicationManager.getQueue().underReplicatedQueueSize())
+          .addGauge(OVER_REPLICATED_QUEUE,
+              replicationManager.getQueue().overReplicatedQueueSize());
+    }
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
