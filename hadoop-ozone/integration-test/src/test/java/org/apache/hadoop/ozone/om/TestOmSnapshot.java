@@ -1246,7 +1246,8 @@ public class TestOmSnapshot {
     SnapshotDiffResponse response;
     do {
       response = store.snapshotDiff(volume, bucket, fromSnapshot,
-          toSnapshot, null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff);
+          toSnapshot, null, 0,
+          forceFullSnapshotDiff, forceNonNativeSnapshotDiff);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
 
@@ -1633,12 +1634,12 @@ public class TestOmSnapshot {
         .getOzoneManagersList();
     List<String> snapshotIds = new ArrayList<>();
 
-    for (OzoneManager ozoneManager : ozoneManagers) {
+    for (OzoneManager om : ozoneManagers) {
       GenericTestUtils.waitFor(
           () -> {
             SnapshotInfo snapshotInfo;
             try {
-              snapshotInfo = ozoneManager.getMetadataManager()
+              snapshotInfo = om.getMetadataManager()
                   .getSnapshotInfoTable()
                   .get(
                       SnapshotInfo.getTableKey(volumeName,
