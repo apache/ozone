@@ -337,6 +337,25 @@ public class TestDefaultCertificateClient {
   }
 
   @Test
+  public void testStoreMultipleRootCACertificate() throws Exception {
+    KeyPair keyPair = keyGenerator.generateKey();
+    X509Certificate cert1 = generateX509Cert(keyPair);
+    X509Certificate cert2 = generateX509Cert(keyPair);
+    X509Certificate cert3 = generateX509Cert(keyPair);
+
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.ROOT);
+
+    assertEquals(cert1, dnCertClient.getCertificate(cert1.getSerialNumber()
+        .toString()));
+    assertEquals(cert2, dnCertClient.getCertificate(cert2.getSerialNumber()
+        .toString()));
+    assertEquals(cert3, dnCertClient.getCertificate(cert3.getSerialNumber()
+        .toString()));
+  }
+
+  @Test
   public void testInitCertAndKeypairValidationFailures() throws Exception {
     GenericTestUtils.LogCapturer dnClientLog = GenericTestUtils.LogCapturer
         .captureLogs(dnCertClient.getLogger());

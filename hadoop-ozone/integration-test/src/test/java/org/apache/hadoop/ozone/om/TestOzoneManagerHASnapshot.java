@@ -164,7 +164,7 @@ public class TestOzoneManagerHASnapshot {
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
-    List<String> snapshotIds = new ArrayList<>();
+    List<UUID> snapshotIds = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
       await().atMost(Duration.ofSeconds(120))
@@ -181,7 +181,7 @@ public class TestOzoneManagerHASnapshot {
             }
 
             if (snapshotInfo != null) {
-              snapshotIds.add(snapshotInfo.getSnapshotID());
+              snapshotIds.add(snapshotInfo.getSnapshotId());
             }
             return snapshotInfo != null;
           });
