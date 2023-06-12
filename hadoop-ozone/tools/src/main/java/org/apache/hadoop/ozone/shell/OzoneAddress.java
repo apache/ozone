@@ -361,14 +361,6 @@ public class OzoneAddress {
    */
   public void ensureSnapshotAddress()
       throws OzoneClientException {
-    if (volumeName.length() == 0) {
-      throw new OzoneClientException(
-          "Volume name is missing.");
-    } else if (bucketName.length() == 0) {
-      // Operation is on the volume and not on the bucket.
-      // No need to check for the keys and update snapshotIndicator
-      return;
-    }
     if (keyName.length() > 0) {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         snapshotNameWithIndicator = keyName;
@@ -378,6 +370,12 @@ public class OzoneAddress {
                 "a bucket name. Only a snapshot name with " +
                 "a snapshot indicator is accepted");
       }
+    } else if (volumeName.length() == 0) {
+      throw new OzoneClientException(
+          "Volume name is missing.");
+    } else if (bucketName.length() == 0) {
+      throw new OzoneClientException(
+          "Bucket name is missing.");
     }
   }
 
@@ -435,6 +433,21 @@ public class OzoneAddress {
     }
     if (!keyName.isEmpty()) {
       out.printf("Key Name : %s%n", keyName);
+    }
+  }
+
+  public void ensureVolumeOrBucketAddress() throws OzoneClientException {
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        // If snapshot, ensure snapshot URI
+        ensureSnapshotAddress();
+      }
+    } else if (volumeName.length() == 0) {
+      // Volume must be present
+      // Bucket may or may not be present
+      // Depending on operation is on volume or bucket
+      throw new OzoneClientException(
+            "Volume name is missing.");
     }
   }
 }
