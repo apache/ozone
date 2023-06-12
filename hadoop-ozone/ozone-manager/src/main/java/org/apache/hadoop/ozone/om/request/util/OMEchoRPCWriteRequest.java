@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.request.util;
 
 import com.google.protobuf.ByteString;
-import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -35,9 +35,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public class OMEchoRPCWriteRequest extends OMClientRequest {
 
-  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
-  private static final int MAX_SIZE_KB = 2097151;
-
   public OMEchoRPCWriteRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -48,13 +45,8 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
 
     EchoRPCRequest echoRPCRequest = getOmRequest().getEchoRPCRequest();
 
-    byte[] payloadBytes = new byte[0];
-    int payloadRespSize = Math.min(
-        echoRPCRequest.getPayloadSizeResp() * RPC_PAYLOAD_MULTIPLICATION_FACTOR,
-        MAX_SIZE_KB);
-    if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
-    }
+    byte[] payloadBytes =
+        PayloadUtils.generatePayloadBytes(echoRPCRequest.getPayloadSizeResp());
 
     EchoRPCResponse echoRPCResponse = EchoRPCResponse.newBuilder()
         .setPayload(ByteString.copyFrom(payloadBytes))
