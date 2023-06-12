@@ -57,6 +57,8 @@ import org.slf4j.LoggerFactory;
  */
 public class DBCheckpointServlet extends HttpServlet {
 
+  private static final String FIELD_NAME =
+      OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]";
   private static final Logger LOG =
       LoggerFactory.getLogger(DBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
@@ -225,7 +227,6 @@ public class DBCheckpointServlet extends HttpServlet {
    * @return array of parsed sst form data parameters for exclusion
    */
   private static String[] parseFormDataParameters(HttpServletRequest request) {
-    String fieldName = OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]";
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 
@@ -233,11 +234,7 @@ public class DBCheckpointServlet extends HttpServlet {
       FileItemIterator iter = upload.getItemIterator(request);
       while (iter.hasNext()) {
         FileItemStream item = iter.next();
-        if (!item.isFormField()) {
-          continue;
-        }
-
-        if (!item.getFieldName().equals(fieldName)) {
+        if (!item.isFormField() || !FIELD_NAME.equals(item.getFieldName())) {
           continue;
         }
 
