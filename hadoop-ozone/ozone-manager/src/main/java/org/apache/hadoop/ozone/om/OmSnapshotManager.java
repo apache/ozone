@@ -696,10 +696,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     String bucketKey = ozoneManager.getMetadataManager()
         .getBucketKey(volumeName, bucketName);
 
-    if (ozoneManager.getMetadataManager()
-            .getVolumeTable().getIfExist(volumeKey) == null ||
-        ozoneManager.getMetadataManager()
-            .getBucketTable().getIfExist(bucketKey) == null) {
+    if (!ozoneManager.getMetadataManager()
+            .getVolumeTable().isExist(volumeKey) ||
+        !ozoneManager.getMetadataManager()
+            .getBucketTable().isExist(bucketKey)) {
       throw new IOException("Provided volume name " + volumeName +
           " or bucket name " + bucketName + " doesn't exist");
     }
@@ -709,8 +709,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         omMetadataManager.getSnapshotChainManager();
     String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
     if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
-      throw new IOException("There are no snapshots under path " +
-          snapshotPath);
+      // Return an empty ArrayList here to avoid
+      // unnecessarily iterating the SnapshotDiffJob table.
+      return new ArrayList<>();
     }
 
     return snapshotDiffManager.getSnapshotDiffJobList(

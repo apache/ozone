@@ -380,7 +380,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   public List<SnapshotDiffJob> getSnapshotDiffJobList(
       String volumeName, String bucketName,
-      String jobStatus, boolean listAll) {
+      String jobStatus, boolean listAll) throws IOException {
     List<SnapshotDiffJob> jobList = new ArrayList<>();
 
     try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
@@ -394,11 +394,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             continue;
           }
 
-          // First check if the provided JobStatus is valid,
-          // then check for matches with the provided JobStatus.
-          if (validateStringJobStatusExists(jobStatus) &&
-              Objects.equals(snapshotDiffJob.getStatus(),
-                  JobStatus.valueOf(jobStatus.toUpperCase()))) {
+          if (Objects.equals(snapshotDiffJob.getStatus(),
+              getJobStatus(jobStatus))) {
             jobList.add(snapshotDiffJob);
           }
         }
@@ -407,14 +404,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     return jobList;
   }
 
-  private boolean validateStringJobStatusExists(String jobStatus) {
-    for (JobStatus status : JobStatus.values()) {
-      if (Objects.equals(status.name(),
-          jobStatus.toUpperCase())) {
-        return true;
-      }
+  private JobStatus getJobStatus(String jobStatus)
+      throws IOException {
+    try {
+      return JobStatus.valueOf(jobStatus.toUpperCase());
+    } catch (IllegalArgumentException ex) {
+      LOG.info(ex.toString());
+      throw new IOException("Invalid job status: " + jobStatus);
     }
-    return false;
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(

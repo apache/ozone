@@ -773,22 +773,50 @@ public class TestOmSnapshot {
     String volume = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
 
-    String errorMessage = "Provided volume name " + volume +
+    String volBucketErrorMessage = "Provided volume name " + volume +
         " or bucket name " + bucket + " doesn't exist";
-    // List SnapshotDiff jobs for non existent volume and bucket.
-    LambdaTestUtils.intercept(OMException.class,
-        errorMessage,
-        () -> store.listSnapshotDiffJobs(volume, bucket, "", true));
+
+    Exception volBucketEx = Assertions.assertThrows(OMException.class,
+        () -> store.listSnapshotDiffJobs(volume, bucket,
+            "", true));
+    Assertions.assertEquals(volBucketErrorMessage,
+        volBucketEx.getMessage());
 
     // Create the volume and the bucket.
     store.createVolume(volume);
     OzoneVolume ozVolume = store.getVolume(volume);
     ozVolume.createBucket(bucket);
 
-    // List SnapshotDiff jobs using a path that has no snapshots.
-    LambdaTestUtils.intercept(OMException.class,
-        "There are no snapshots",
-        () -> store.listSnapshotDiffJobs(volume, bucket, "", true));
+    Assertions.assertDoesNotThrow(() ->
+        store.listSnapshotDiffJobs(volume, bucket, "", true));
+
+    // There are no snapshots, response should be empty.
+    Assertions.assertTrue(store
+        .listSnapshotDiffJobs(volume, bucket,
+            "", true).isEmpty());
+
+    OzoneBucket ozBucket = ozVolume.getBucket(bucket);
+    // Create keys and take snapshots.
+    String key1 = "key-1-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozBucket, key1);
+    String snap1 = "snap-1-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    String key2 = "key-2-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozBucket, key2);
+    String snap2 = "snap-2-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap2);
+
+    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0, true);
+
+    String invalidStatus = "invalid";
+    String statusErrorMessage = "Invalid job status: " + invalidStatus;
+
+    Exception statusEx = Assertions.assertThrows(OMException.class,
+        () -> store.listSnapshotDiffJobs(volume, bucket,
+            invalidStatus, false));
+    Assertions.assertEquals(statusErrorMessage,
+        statusEx.getMessage());
   }
 
   /**

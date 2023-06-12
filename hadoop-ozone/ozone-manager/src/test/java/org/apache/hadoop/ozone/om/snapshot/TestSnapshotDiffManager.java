@@ -43,17 +43,19 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.rocksdb.RocksDBException;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
@@ -112,9 +114,24 @@ public class TestSnapshotDiffManager {
     }
   }
 
+  private static Stream<Arguments> listSnapshotDiffJobsScenarios() {
+    return Stream.of(
+        Arguments.of("queued", false, false),
+        Arguments.of("done", false, false),
+        Arguments.of("in_progress", false, true),
+        Arguments.of("queued", true, true),
+        Arguments.of("done", true, true),
+        Arguments.of("in_progress", true, true),
+        Arguments.of("invalid", true, true),
+        Arguments.of("", true, true)
+    );
+  }
+
   @ParameterizedTest
-  @ValueSource(strings = {"queued", "done", "in_progress", ""})
-  public void testListSnapshotDiffJobs(String jobStatus)
+  @MethodSource("listSnapshotDiffJobsScenarios")
+  public void testListSnapshotDiffJobs(String jobStatus,
+                                       boolean listAll,
+                                       boolean containsJob)
       throws IOException {
     String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
     String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
@@ -131,73 +148,52 @@ public class TestSnapshotDiffManager {
     // There are no jobs in the table, therefore
     // the response list should be empty.
     List<SnapshotDiffJob> jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, false);
+        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, listAll);
     Assertions.assertTrue(jobList.isEmpty());
 
-    // Submit a job.
     SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(VOLUME, BUCKET,
             fromSnapshotName, toSnapshotName,
             0, 0, false);
 
-    // Response should be IN_PROGRESS.
     Assertions.assertEquals(JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
 
-    // Check snapDiffJobTable.
     diffJob = snapDiffJobTable.get(diffJobKey);
     Assertions.assertNotNull(diffJob);
-    // Status stored in the table should be IN_PROGRESS.
     Assertions.assertEquals(JobStatus.IN_PROGRESS,
         diffJob.getStatus());
 
-    // If the job is IN_PROGRESS, there should be a response.
-    // Otherwise, response list should be empty.
     jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, false);
+        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, listAll);
 
-    if (Objects.equals(jobStatus, "in_progress")) {
+    // When listAll is true, jobStatus is ignored.
+    // If the job is IN_PROGRESS or listAll is used,
+    // there should be a response.
+    // Otherwise, response list should be empty.
+    if (containsJob) {
       Assertions.assertTrue(jobList.contains(diffJob));
     } else {
       Assertions.assertTrue(jobList.isEmpty());
     }
+  }
 
-    // If listAll is true, jobStatus is ignored.
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, true);
-    Assertions.assertTrue(jobList.contains(diffJob));
+  @Test
+  public void testListSnapDiffWithInvalidStatus() throws IOException {
+    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String fromSnapshotId = UUID.randomUUID().toString();
+    String toSnapshotId = UUID.randomUUID().toString();
 
-    // Providing an invalid jobStatus results in an empty list.
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid", false);
-    Assertions.assertTrue(jobList.isEmpty());
+    setUpKeysAndSnapshots(fromSnapshotName, toSnapshotName,
+        fromSnapshotId, toSnapshotId);
 
-    // If listAll is true, jobStatus will be ignored even if it's invalid.
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid", true);
-    Assertions.assertTrue(jobList.size() > 0);
-
-    // Set up new snapshots to submit a second snapshot diff job.
-    String fromSnapshotName2 = "snap-" + RandomStringUtils.randomNumeric(5);
-    String toSnapshotName2 = "snap-" + RandomStringUtils.randomNumeric(5);
-    String fromSnapshotId2 = UUID.randomUUID().toString();
-    String toSnapshotId2 = UUID.randomUUID().toString();
-    String diffJobKey2 = fromSnapshotId2 + DELIMITER + toSnapshotId2;
-
-    setUpKeysAndSnapshots(fromSnapshotName2, toSnapshotName2,
-        fromSnapshotId2, toSnapshotId2);
-
-    // Submit a second job.
     snapshotDiffManager.getSnapshotDiffReport(VOLUME, BUCKET,
-        fromSnapshotName2, toSnapshotName2, 0, 0, false);
-    SnapshotDiffJob diffJob2 = snapDiffJobTable.get(diffJobKey2);
+        fromSnapshotName, toSnapshotName, 0, 0, false);
 
-    jobList = snapshotDiffManager
-        .getSnapshotDiffJobList(VOLUME, BUCKET, jobStatus, true);
-
-    Assertions.assertTrue(jobList.contains(diffJob));
-    Assertions.assertTrue(jobList.contains(diffJob2));
-    Assertions.assertEquals(2, jobList.size());
+    // Invalid status, without listAll true, results in an exception.
+    Assertions.assertThrows(IOException.class, () -> snapshotDiffManager
+        .getSnapshotDiffJobList(VOLUME, BUCKET, "invalid", false));
   }
 
   private void setUpKeysAndSnapshots(String fromSnapshotName,
