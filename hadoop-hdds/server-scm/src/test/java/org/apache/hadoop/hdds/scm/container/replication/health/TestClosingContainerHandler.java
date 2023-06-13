@@ -21,15 +21,18 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,31 +41,42 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.mockito.Mockito.never;
 
 /**
  * Tests for {@link ClosingContainerHandler}.
  */
 public class TestClosingContainerHandler {
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf =
+      new OzoneConfiguration()
+          .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+
   private ReplicationManager replicationManager;
-  private ClosingContainerHandler closingContainerHandler;
+  private ClosingContainerHandler subject;
   private static final ECReplicationConfig EC_REPLICATION_CONFIG =
       new ECReplicationConfig(3, 2);
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
 
+  private final TestClock clock = TestClock.newInstance();
+
   @BeforeEach
   public void setup() {
     replicationManager = Mockito.mock(ReplicationManager.class);
-    closingContainerHandler = new ClosingContainerHandler(replicationManager);
+    Mockito.when(replicationManager.getConfig())
+        .thenReturn(rmConf);
+    subject = new ClosingContainerHandler(replicationManager, clock);
   }
 
   private static Stream<ReplicationConfig> replicationConfigs() {
@@ -210,6 +224,44 @@ public class TestClosingContainerHandler {
     });
   }
 
+  @Test
+  public void testEmptyContainerInClosingState() throws InterruptedException {
+
+    /*
+     * Empty Container in CLOSING state should be CLOSED after
+     * a timeout (ReplicationManager Interval * 5)
+     */
+    Duration replicationInterval = Duration.ofSeconds(1);
+    rmConf.setInterval(replicationInterval);
+
+    ContainerInfo containerInfo = TestContainerInfo.newBuilderForTest()
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setContainerID(1)
+        .setState(CLOSING)
+        .setClock(clock)
+        .build();
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(new HashSet<>())
+        .build();
+
+    // not enough time has elapsed
+    Duration notEnoughTime = replicationInterval.multipliedBy(3).plusMillis(1);
+    clock.fastForward(notEnoughTime);
+    assertAndVerify(request, true, 0);
+    Mockito.verify(replicationManager, never())
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+
+    // wait time has elapsed (3x + 2x + a bit)
+    Duration moreTime = replicationInterval.multipliedBy(2);
+    clock.fastForward(moreTime);
+    assertAndVerify(request, true, 0);
+    Mockito.verify(replicationManager, Mockito.times(1))
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+  }
+
   /**
    * Close commands should be sent for Open or Closing replicas.
    */
@@ -254,7 +306,7 @@ public class TestClosingContainerHandler {
 
     ArgumentCaptor<Boolean> forceCaptor =
         ArgumentCaptor.forClass(Boolean.class);
-    Assertions.assertTrue(closingContainerHandler.handle(request));
+    Assertions.assertTrue(subject.handle(request));
     Mockito.verify(replicationManager, Mockito.times(replicas))
         .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
             Mockito.any(DatanodeDetails.class), forceCaptor.capture());
@@ -264,7 +316,7 @@ public class TestClosingContainerHandler {
 
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times) {
-    Assertions.assertEquals(assertion, closingContainerHandler.handle(request));
+    Assertions.assertEquals(assertion, subject.handle(request));
     Mockito.verify(replicationManager, Mockito.times(times))
         .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
             Mockito.any(DatanodeDetails.class), Mockito.anyBoolean());

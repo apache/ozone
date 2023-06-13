@@ -1045,13 +1045,17 @@ public interface ClientProtocol {
 
   /**
    * List snapshots in a volume/bucket.
-   * @param volumeName volume name
-   * @param bucketName bucket name
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
    * @return list of snapshots for volume/bucket snapshotpath.
    * @throws IOException
    */
-  List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException;
+  List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException;
 
 
   /**

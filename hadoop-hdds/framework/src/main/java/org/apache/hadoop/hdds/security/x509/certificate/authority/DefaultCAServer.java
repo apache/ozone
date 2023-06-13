@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -33,7 +32,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -69,7 +67,6 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -577,22 +574,7 @@ public class DefaultCAServer implements CertificateServer {
         .setConfiguration(securityConfig.getConfiguration())
         .setKey(key);
 
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if (validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new org.apache.hadoop.hdds.security.x509
-          .exception.CertificateException(
-          "Error while adding ip to CA self signed certificate", e,
-          CSR_ERROR);
-    }
+    builder.addInetAddresses();
     X509CertificateHolder selfSignedCertificate = builder.build();
 
     CertificateCodec certCodec =

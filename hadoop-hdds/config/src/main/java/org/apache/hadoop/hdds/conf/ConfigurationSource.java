@@ -175,13 +175,23 @@ public interface ConfigurationSource {
 
     ConfigurationReflectionUtil
         .injectConfiguration(this, configurationClass, configObject,
-            prefix);
+            prefix, false);
 
     ConfigurationReflectionUtil
         .callPostConstruct(configurationClass, configObject);
 
     return configObject;
 
+  }
+
+  /**
+   * Update {@code object}'s reconfigurable properties from this configuration.
+   */
+  default <T> void reconfigure(Class<T> configClass, T object) {
+    ConfigGroup configGroup = configClass.getAnnotation(ConfigGroup.class);
+    String prefix = configGroup.prefix();
+    ConfigurationReflectionUtil.injectConfiguration(
+        this, configClass, object, prefix, true);
   }
 
   /**

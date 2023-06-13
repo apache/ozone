@@ -147,6 +147,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public String toString() {
-    return getClass().getSimpleName() + ":limit=" + buffer.limit();
+    return getClass().getSimpleName() + ":limit=" + buffer.limit()
+        + "@" + Integer.toHexString(hashCode());
   }
 }

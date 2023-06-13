@@ -94,11 +94,12 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
-    int minimumPipelines = getMinimumPipelines(repConfig);
+    int maximumPipelines = getMaximumPipelines(repConfig);
+    int openPipelineCount = 0;
     synchronized (this) {
-      int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
+      openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < minimumPipelines) {
+      if (openPipelineCount < maximumPipelines) {
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
@@ -131,6 +132,7 @@ public class WritableECContainerProvider
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
             pipelineManager.closePipeline(pipeline, true);
+            openPipelineCount--;
           } else {
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
@@ -143,6 +145,7 @@ public class WritableECContainerProvider
               + "container", e);
           existingPipelines.remove(pipelineIndex);
           pipelineManager.closePipeline(pipeline, true);
+          openPipelineCount--;
         }
       }
     }
@@ -150,7 +153,12 @@ public class WritableECContainerProvider
     // allocate a new one.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, size, owner, excludeList);
+        if (openPipelineCount < maximumPipelines) {
+          return allocateContainer(repConfig, size, owner, excludeList);
+        }
+        throw new IOException("Unable to allocate a pipeline for "
+            + repConfig + " after trying all existing pipelines as the max "
+            + "limit has been reached and no pipelines where closed");
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
@@ -159,7 +167,7 @@ public class WritableECContainerProvider
     }
   }
 
-  private int getMinimumPipelines(ECReplicationConfig repConfig) {
+  private int getMaximumPipelines(ECReplicationConfig repConfig) {
     final double factor = providerConfig.getPipelinePerVolumeFactor();
     int volumeBasedCount = 0;
     if (factor > 0) {

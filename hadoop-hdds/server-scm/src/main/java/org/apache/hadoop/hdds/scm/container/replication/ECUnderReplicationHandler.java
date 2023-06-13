@@ -137,96 +137,90 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
     final ContainerID id = container.containerID();
     int commandsSent = 0;
+    final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        deletionInFlight.add(op.getTarget());
+      }
+    }
+
+    Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
+        filterSources(replicas, deletionInFlight);
+    List<DatanodeDetails> availableSourceNodes =
+        sources.values().stream().map(Pair::getLeft)
+            .map(ContainerReplica::getDatanodeDetails)
+            .filter(datanodeDetails ->
+                datanodeDetails.getPersistedOpState() ==
+                    HddsProtos.NodeOperationalState.IN_SERVICE)
+            .collect(Collectors.toList());
+
     try {
-      final List<DatanodeDetails> deletionInFlight = new ArrayList<>();
-      for (ContainerReplicaOp op : pendingOps) {
-        if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-          deletionInFlight.add(op.getTarget());
-        }
+      IOException firstException = null;
+      try {
+        commandsSent += processMissingIndexes(replicaCount, sources,
+            availableSourceNodes, excludedNodes, usedNodes);
+      } catch (InsufficientDatanodesException
+          | CommandTargetOverloadedException  e) {
+        firstException = e;
       }
 
-      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources =
-          filterSources(replicas, deletionInFlight);
-      List<DatanodeDetails> availableSourceNodes =
-          sources.values().stream().map(Pair::getLeft)
-              .map(ContainerReplica::getDatanodeDetails)
-              .filter(datanodeDetails ->
-                  datanodeDetails.getPersistedOpState() ==
-                      HddsProtos.NodeOperationalState.IN_SERVICE)
-              .collect(Collectors.toList());
-
+      excludedNodes.addAll(replicationManager.getExcludedNodes());
       try {
-        IOException firstException = null;
-        try {
-          commandsSent += processMissingIndexes(replicaCount, sources,
-              availableSourceNodes, excludedNodes, usedNodes);
-        } catch (InsufficientDatanodesException
-            | CommandTargetOverloadedException  e) {
+        commandsSent += processDecommissioningIndexes(replicaCount, sources,
+            availableSourceNodes, excludedNodes, usedNodes);
+      } catch (InsufficientDatanodesException
+          | CommandTargetOverloadedException e) {
+        if (firstException == null) {
           firstException = e;
         }
-
-        excludedNodes.addAll(replicationManager.getExcludedNodes());
-        try {
-          commandsSent += processDecommissioningIndexes(replicaCount, sources,
-              availableSourceNodes, excludedNodes, usedNodes);
-        } catch (InsufficientDatanodesException
-            | CommandTargetOverloadedException e) {
-          if (firstException == null) {
-            firstException = e;
-          }
+      }
+      try {
+        commandsSent += processMaintenanceOnlyIndexes(replicaCount, sources,
+            excludedNodes, usedNodes);
+      } catch (InsufficientDatanodesException
+          | CommandTargetOverloadedException e) {
+        if (firstException == null) {
+          firstException = e;
         }
-        try {
-          commandsSent += processMaintenanceOnlyIndexes(replicaCount, sources,
-              excludedNodes, usedNodes);
-        } catch (InsufficientDatanodesException
-            | CommandTargetOverloadedException e) {
-          if (firstException == null) {
-            firstException = e;
-          }
-        }
-        if (firstException != null) {
-          // We had partial success through some of the steps, so just throw the
-          // first exception we got. This will cause the container to be
-          // re-queued and try again later.
-          throw firstException;
-        }
-      } catch (SCMException e) {
-        SCMException.ResultCodes code = e.getResult();
-        if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
-          throw e;
-        }
-        // If we get here, we got an exception indicating the placement policy
-        // was not able to find ANY nodes to satisfy the replication at one of
-        // the processing stages (missing index, decom or maint). It is
-        // possible that some commands were sent to partially fix the
-        // replication, but a further run will be needed to fix the rest.
-        // On a small cluster, it is possible that over replication could stop
-        // nodes getting selected, so to check if that is the case, we run
-        // the over rep handler, which may free some nodes for the next run.
-        if (replicaCount.isOverReplicated()) {
-          LOG.debug("Container {} is both under and over replicated. Cannot " +
-              "find enough target nodes, so handing off to the " +
-              "OverReplication handler", container);
-          replicationManager.processOverReplicatedContainer(result);
-        }
-
-        /* If we get here, the scenario is:
-        1. Under replicated.
-        2. Not over replicated.
-        3. Placement Policy not able to find enough targets.
-        Check if there are some UNHEALTHY replicas. In a small cluster, these
-        UNHEALTHY replicas could block DNs that could otherwise be targets
-        for new EC replicas. Deleting an UNHEALTHY replica can make its host DN
-        available as a target.
-        */
-        checkAndRemoveUnhealthyReplica(replicaCount, deletionInFlight);
-        // As we want to re-queue and try again later, we just re-throw
+      }
+      if (firstException != null) {
+        // We had partial success through some of the steps, so just throw the
+        // first exception we got. This will cause the container to be
+        // re-queued and try again later.
+        throw firstException;
+      }
+    } catch (SCMException e) {
+      SCMException.ResultCodes code = e.getResult();
+      if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
         throw e;
       }
-    } catch (IOException | IllegalStateException ex) {
-      LOG.warn("Exception while creating the replication or" +
-          " reconstruction commands for container {}.", id, ex);
-      throw ex;
+      // If we get here, we got an exception indicating the placement policy
+      // was not able to find ANY nodes to satisfy the replication at one of
+      // the processing stages (missing index, decom or maint). It is
+      // possible that some commands were sent to partially fix the
+      // replication, but a further run will be needed to fix the rest.
+      // On a small cluster, it is possible that over replication could stop
+      // nodes getting selected, so to check if that is the case, we run
+      // the over rep handler, which may free some nodes for the next run.
+      if (replicaCount.isOverReplicated()) {
+        LOG.debug("Container {} is both under and over replicated. Cannot " +
+            "find enough target nodes, so handing off to the " +
+            "OverReplication handler", container);
+        replicationManager.processOverReplicatedContainer(result);
+      }
+
+      /* If we get here, the scenario is:
+      1. Under replicated.
+      2. Not over replicated.
+      3. Placement Policy not able to find enough targets.
+      Check if there are some UNHEALTHY replicas. In a small cluster, these
+      UNHEALTHY replicas could block DNs that could otherwise be targets
+      for new EC replicas. Deleting an UNHEALTHY replica can make its host DN
+      available as a target.
+      */
+      checkAndRemoveUnhealthyReplica(replicaCount, deletionInFlight);
+      // As we want to re-queue and try again later, we just re-throw
+      throw e;
     }
     if (commandsSent == 0) {
       LOG.warn("Container {} is under replicated, but no commands were " +

@@ -205,6 +205,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
     ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 

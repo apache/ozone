@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.rocksdb.RocksObject;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+
 /**
  * General template for a managed RocksObject.
  * @param <T>
@@ -31,11 +33,7 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   ManagedObject(T original) {
     this.original = original;
-    if (ManagedRocksObjectUtils.LOG.isDebugEnabled()) {
-      this.elements = Thread.currentThread().getStackTrace();
-    } else {
-      this.elements = null;
-    }
+    this.elements = ManagedRocksObjectUtils.getStackTrace();
   }
 
   public T get() {
@@ -54,15 +52,7 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
   }
 
   public String getStackTrace() {
-    if (elements != null && elements.length > 0) {
-      StringBuilder sb = new StringBuilder();
-      for (int line = 1; line < elements.length; line++) {
-        sb.append(elements[line]);
-        sb.append("\n");
-      }
-      return sb.toString();
-    }
-    return "";
+    return formatStackTrace(elements);
   }
 
 }

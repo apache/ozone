@@ -178,7 +178,7 @@ public class TestOzoneContainer {
     // loaded into the containerSet.
     // Also expected to initialize committed space for each volume.
     OzoneContainer ozoneContainer = new
-        OzoneContainer(datanodeDetails, conf, context, null);
+        OzoneContainer(datanodeDetails, conf, context);
 
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
@@ -213,7 +213,7 @@ public class TestOzoneContainer {
     // loaded into the containerSet.
     // Also expected to initialize committed space for each volume.
     OzoneContainer ozoneContainer = new
-            OzoneContainer(datanodeDetails, conf, context, null);
+            OzoneContainer(datanodeDetails, conf, context);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(3,
@@ -234,7 +234,7 @@ public class TestOzoneContainer {
     // loaded into the containerSet.
     // Also expected to initialize committed space for each volume.
     OzoneContainer ozoneContainer = new
-            OzoneContainer(datanodeDetails, conf, context, null);
+            OzoneContainer(datanodeDetails, conf, context);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
             ozoneContainer.getNodeReport().getStorageReportList().size());
     Assert.assertEquals(1,

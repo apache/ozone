@@ -135,6 +135,7 @@ enum Type {
   SnapshotPurge = 118;
   RecoverLease = 119;
   SetTimes = 120;
+  RefetchSecretKey = 121;
 }
 
 message OMRequest {
@@ -254,6 +255,7 @@ message OMRequest {
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
 }
 
 message OMResponse {
@@ -365,6 +367,7 @@ message OMResponse {
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
 }
 
 enum Status {
@@ -593,6 +596,14 @@ message SetVolumePropertyResponse {
     optional bool response = 1;
 }
 
+message RefetchSecretKeyRequest {
+
+}
+
+message RefetchSecretKeyResponse {
+    optional hdds.UUID id = 1;
+}
+
 /**
  * Checks if the user has specified permissions for the volume
  */
@@ -775,15 +786,15 @@ enum SnapshotStatusProto {
  * SnapshotInfo table entry for Bucket/Volume snapshot metadata
  */
 message SnapshotInfo {
-  optional string snapshotID = 1;
+  optional hadoop.hdds.UUID snapshotID = 1;
   optional string name = 2;
   optional string volumeName = 3;
   optional string bucketName = 4;
   optional SnapshotStatusProto snapshotStatus = 5;
   optional uint64 creationTime = 6;
   optional uint64 deletionTime = 7;
-  optional string pathPreviousSnapshotID = 8;
-  optional string globalPreviousSnapshotID = 9;
+  optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
+  optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
@@ -1690,13 +1701,16 @@ message CreateSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string snapshotName = 3;
-  optional string snapshotId = 4;
+  optional hadoop.hdds.UUID snapshotId = 4;
   optional uint64 creationTime = 5;
 }
 
 message ListSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
+  optional string prefix = 3;
+  optional string prevSnapshot = 4;
+  optional uint32 maxListResult = 5;
 }
 
 message SnapshotDiffRequest {
