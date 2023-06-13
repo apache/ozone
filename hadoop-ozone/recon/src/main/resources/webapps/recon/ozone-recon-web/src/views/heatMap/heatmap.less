@@ -16,16 +16,45 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
+.heatmap-container {
+
+  .go-back-button {
+    display: inline-block;
+    margin-left: 20px;
+  }
+
+  .entity-dropdown-button {
+    display: inline-block;
+    margin-left: 30px;
+  }
+
+  .date-dropdown-button {
+    display: inline-block;
+    margin-left: 45px;
+  }
+
+  .input-bar {
+    display: inline-block;
+    margin-left: 25px;
+  }
+
+  .input {
+    padding-left: 5px;
+    margin-right: 10px;
+    display: inline-block;
+    width: 350px;
+  }
+
+  .heatmapinformation {
+    font-size: 14px;
+    fill: rgba(0, 0, 0, 0.65) !important;
+    line-height: 1.5;
+    font-feature-settings: 'tnum', "tnum";
+    height: 800;
+  }
+
 }
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines',
-  '/MissingContainers': 'Missing Containers',
-  '/Insights': 'Insights',
-  '/DiskUsage': 'Disk Usage', 
-  '/Heatmap': 'Heatmap'
-};
+.ant-drawer-open .ant-drawer-mask {
+  opacity: 0 !important;
+}
