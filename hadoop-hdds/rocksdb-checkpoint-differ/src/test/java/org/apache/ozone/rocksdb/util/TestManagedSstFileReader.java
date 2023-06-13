@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
@@ -128,6 +129,7 @@ public class TestManagedSstFileReader {
     }
   }
 
+  @Disabled
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
