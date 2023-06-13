@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -285,7 +286,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
                 "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
-                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                snapInfo.getSnapshotId() + ". Processed " + deletionCount +
                 " keys and " + (keyLimitPerSnapshot - remainNum) +
                 " directories and files", ex);
           }
@@ -541,14 +542,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         throws IOException {
       SnapshotInfo currSnapInfo = snapInfo;
       while (chainManager.hasPreviousPathSnapshot(
-          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID())) {
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
 
-        String prevPathSnapshot = chainManager.previousPathSnapshot(
-            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID());
+        UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
         String tableKey = chainManager.getTableKey(prevPathSnapshot);
         SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
-        if (prevSnapInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+        if (prevSnapInfo.getSnapshotStatus() ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
           return prevSnapInfo;
         }
         currSnapInfo = prevSnapInfo;
@@ -646,4 +647,3 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     successRunCount.getAndSet(num);
   }
 }
-

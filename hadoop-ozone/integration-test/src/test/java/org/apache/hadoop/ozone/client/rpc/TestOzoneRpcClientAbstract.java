@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -4159,4 +4160,85 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(expectedBucketCount, bucketCount);
   }
 
+  @Test
+  public void testListSnapshot() throws IOException {
+    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
+    String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketB = "buc-b-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    store.createVolume(volumeB);
+    OzoneVolume volA = store.getVolume(volumeA);
+    OzoneVolume volB = store.getVolume(volumeB);
+    volA.createBucket(bucketA);
+    volA.createBucket(bucketB);
+    volB.createBucket(bucketA);
+    volB.createBucket(bucketB);
+    String snapshotPrefixA = "snapshot-a-";
+    String snapshotPrefixB = "snapshot-b-";
+    for (int i = 0; i < 10; i++) {
+      store.createSnapshot(volumeA, bucketA,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketB,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketA,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketB,
+          snapshotPrefixA + i + "-" + RandomStringUtils.randomNumeric(5));
+    }
+    for (int i = 0; i < 10; i++) {
+      store.createSnapshot(volumeA, bucketA,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeA, bucketB,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketA,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+      store.createSnapshot(volumeB, bucketB,
+          snapshotPrefixB + i + "-" + RandomStringUtils.randomNumeric(5));
+    }
+
+    Iterator<? extends OzoneSnapshot> snapshotIter =
+        store.listSnapshot(volumeA, bucketA, null, null);
+    int volABucketASnapshotCount = 0;
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot snapshot = snapshotIter.next();
+      volABucketASnapshotCount++;
+    }
+    Assert.assertEquals(20, volABucketASnapshotCount);
+
+    snapshotIter = store.listSnapshot(volumeA, bucketB, null, null);
+    int volABucketBSnapshotCount = 0;
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot snapshot = snapshotIter.next();
+      volABucketBSnapshotCount++;
+    }
+    Assert.assertEquals(20, volABucketASnapshotCount);
+
+    snapshotIter = store.listSnapshot(volumeB, bucketA, null, null);
+    int volBBucketASnapshotCount = 0;
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot snapshot = snapshotIter.next();
+      volBBucketASnapshotCount++;
+    }
+    Assert.assertEquals(20, volABucketASnapshotCount);
+
+    snapshotIter = store.listSnapshot(volumeB, bucketB, null, null);
+    int volBBucketBSnapshotCount = 0;
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot snapshot = snapshotIter.next();
+      volBBucketBSnapshotCount++;
+    }
+    Assert.assertEquals(20, volABucketASnapshotCount);
+
+    int volABucketASnapshotACount = 0;
+    snapshotIter = store.listSnapshot(volumeA, bucketA, snapshotPrefixA, null);
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot snapshot = snapshotIter.next();
+      Assert.assertTrue(snapshot.getName().startsWith(snapshotPrefixA));
+      volABucketASnapshotACount++;
+    }
+    Assert.assertEquals(10, volABucketASnapshotACount);
+    Assert.assertFalse(snapshotIter.hasNext());
+
+  }
 }
