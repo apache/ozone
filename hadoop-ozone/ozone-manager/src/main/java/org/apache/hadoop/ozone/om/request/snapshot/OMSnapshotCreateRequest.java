@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -54,6 +53,8 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
@@ -70,7 +71,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   private final String volumeName;
   private final String bucketName;
   private final String snapshotName;
-  private final String snapshotId;
   private final SnapshotInfo snapshotInfo;
 
   public OMSnapshotCreateRequest(OMRequest omRequest) {
@@ -79,7 +79,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         .getCreateSnapshotRequest();
     volumeName = createSnapshotRequest.getVolumeName();
     bucketName = createSnapshotRequest.getBucketName();
-    snapshotId = createSnapshotRequest.getSnapshotId();
+    UUID snapshotId = createSnapshotRequest.hasSnapshotId() ?
+        fromProtobuf(createSnapshotRequest.getSnapshotId()) : null;
 
     String possibleName = createSnapshotRequest.getSnapshotName();
     snapshotInfo = SnapshotInfo.newInstance(volumeName,
@@ -111,7 +112,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     return omRequest.toBuilder().setCreateSnapshotRequest(
         omRequest.getCreateSnapshotRequest().toBuilder()
-            .setSnapshotId(UUID.randomUUID().toString())
+            .setSnapshotId(toProtobuf(UUID.randomUUID()))
             .setCreationTime(Time.now())
             .build()).build();
   }
@@ -163,22 +164,13 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
 
       // Set previous path and global snapshot
-      String latestPathSnapshot =
-          snapshotChainManager.getLatestPathSnapshot(snapshotPath);
-      String latestGlobalSnapshot =
-          snapshotChainManager.getLatestGlobalSnapshot();
+      UUID latestPathSnapshot =
+          snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
+      UUID latestGlobalSnapshot =
+          snapshotChainManager.getLatestGlobalSnapshotId();
 
-      if (StringUtils.isEmpty(latestPathSnapshot)) {
-        snapshotInfo.setPathPreviousSnapshotID(null);
-      } else {
-        snapshotInfo.setPathPreviousSnapshotID(latestPathSnapshot);
-      }
-
-      if (StringUtils.isEmpty(latestGlobalSnapshot)) {
-        snapshotInfo.setGlobalPreviousSnapshotID(null);
-      } else {
-        snapshotInfo.setGlobalPreviousSnapshotID(latestGlobalSnapshot);
-      }
+      snapshotInfo.setPathPreviousSnapshotId(latestPathSnapshot);
+      snapshotInfo.setGlobalPreviousSnapshotId(latestGlobalSnapshot);
 
       snapshotChainManager.addSnapshot(snapshotInfo);
 
@@ -202,8 +194,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // SnapshotChainManager#loadFromSnapshotInfoTable because it could not
       // find the previous snapshot which doesn't exist because it was never
       // added to the SnapshotInfo table.
-      if (Objects.equals(snapshotInfo.getSnapshotID(),
-          snapshotChainManager.getLatestGlobalSnapshot())) {
+      if (Objects.equals(snapshotInfo.getSnapshotId(),
+          snapshotChainManager.getLatestGlobalSnapshotId())) {
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
       }

@@ -47,6 +47,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -126,6 +127,7 @@ public class SstFilteringService extends BackgroundService
           Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
+          UUID snapshotId = snapshotInfo.getSnapshotId();
 
           File omMetadataDir =
               OMStorage.getOmDbDir(ozoneManager.getConfiguration());
@@ -137,7 +139,8 @@ public class SstFilteringService extends BackgroundService
           // it has already undergone filtering.
           if (Files.exists(filePath)) {
             List<String> processedSnapshotIds = Files.readAllLines(filePath);
-            if (processedSnapshotIds.contains(snapshotInfo.getSnapshotID())) {
+            if (snapshotId != null &&
+                processedSnapshotIds.contains(snapshotId.toString())) {
               continue;
             }
           }
@@ -164,7 +167,7 @@ public class SstFilteringService extends BackgroundService
           }
 
           // mark the snapshot as filtered by writing to the file
-          String content = snapshotInfo.getSnapshotID() + "\n";
+          String content = snapshotInfo.getSnapshotId() + "\n";
           Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
               StandardOpenOption.CREATE, StandardOpenOption.APPEND);
           snapshotLimit--;

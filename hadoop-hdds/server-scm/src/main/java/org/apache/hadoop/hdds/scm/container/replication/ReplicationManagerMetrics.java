@@ -171,6 +171,19 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of EC replicas scheduled for delete which timed out.")
   private MutableCounterLong ecReplicaDeleteTimeoutTotal;
 
+  @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
+      + "due to the pending commands on the target datanode")
+  private MutableCounterLong ecReconstructionCmdsDeferredTotal;
+
+  @Metric("Number of delete container commands that could not be sent due "
+      + "to the pending commands on the target datanode")
+  private MutableCounterLong deleteContainerCmdsDeferredTotal;
+
+  @Metric("Number of replicate container commands that could not be sent due "
+      + "to the pending commands on all source datanodes")
+  private MutableCounterLong replicateContainerCmdsDeferredTotal;
+
+
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
@@ -223,6 +236,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecReconstructionCmdsSentTotal.snapshot(builder, all);
     ecReplicaCreateTimeoutTotal.snapshot(builder, all);
     ecReplicasDeletedTotal.snapshot(builder, all);
+    ecReconstructionCmdsDeferredTotal.snapshot(builder, all);
+    deleteContainerCmdsDeferredTotal.snapshot(builder, all);
+    replicateContainerCmdsDeferredTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -372,6 +388,18 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.ecReconstructionCmdsSentTotal.incr();
   }
 
+  public void incrECReconstructionCmdsDeferredTotal() {
+    this.ecReconstructionCmdsDeferredTotal.incr();
+  }
+
+  public void incrDeleteContainerCmdsDeferredTotal() {
+    this.deleteContainerCmdsDeferredTotal.incr();
+  }
+
+  public void incrReplicateContainerCmdsDeferredTotal() {
+    this.replicateContainerCmdsDeferredTotal.incr();
+  }
+
   public long getEcReplication() {
     return replicationManager.getContainerReplicaPendingOps()
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
@@ -417,4 +445,17 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public long getEcReplicasDeletedTotal() {
     return ecReplicasDeletedTotal.value();
   }
+
+  public long getEcReconstructionCmdsDeferredTotal() {
+    return ecReconstructionCmdsDeferredTotal.value();
+  }
+
+  public long getDeleteContainerCmdsDeferredTotal() {
+    return deleteContainerCmdsDeferredTotal.value();
+  }
+
+  public long getReplicateContainerCmdsDeferredTotal() {
+    return replicateContainerCmdsDeferredTotal.value();
+  }
+
 }
