@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
@@ -482,6 +484,22 @@ public class TestHddsVolume {
       // Shutdown the volume.
       volume.shutdown();
     }
+  }
+
+  @Test
+  public void testDBDirFailureDetected() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDirs(CLUSTER_ID, null);
+
+    VolumeCheckResult result = volume.check(false);
+    assertEquals(VolumeCheckResult.HEALTHY, result);
+
+    File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
+    FileUtils.deleteDirectory(dbFile);
+
+    result = volume.check(false);
+    assertEquals(VolumeCheckResult.FAILED, result);
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {
