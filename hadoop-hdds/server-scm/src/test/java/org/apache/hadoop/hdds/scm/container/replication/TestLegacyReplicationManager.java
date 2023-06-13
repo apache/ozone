@@ -460,7 +460,7 @@ public class TestLegacyReplicationManager {
       clock.fastForward(timeout + 1000);
       assertReplicaScheduled(1);
       Assertions.assertEquals(1, replicationManager.getMetrics()
-              .getReplicationCmdsTimeoutTotal());
+              .getReplicaCreateTimeoutTotal());
     }
 
     @Test
@@ -483,7 +483,7 @@ public class TestLegacyReplicationManager {
       clock.fastForward(timeout + 1000);
       assertDeleteScheduled(1);
       Assertions.assertEquals(1, replicationManager.getMetrics()
-              .getDeletionCmdsTimeoutTotal());
+              .getReplicaDeleteTimeoutTotal());
     }
 
     /**
@@ -1121,7 +1121,7 @@ public class TestLegacyReplicationManager {
       }
 
       final long currentDeleteCommandCompleted = replicationManager.getMetrics()
-          .getDeletionCmdsCompletedTotal();
+          .getReplicasDeletedTotal();
       final long deleteBytesCompleted =
           replicationManager.getMetrics().getDeletionBytesCompletedTotal();
 
@@ -1131,7 +1131,7 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0, replicationManager.getMetrics()
           .getInflightDeletion());
       Assertions.assertEquals(currentDeleteCommandCompleted + 1,
-          replicationManager.getMetrics().getDeletionCmdsCompletedTotal());
+          replicationManager.getMetrics().getReplicasDeletedTotal());
       Assertions.assertEquals(deleteBytesCompleted + 101,
           replicationManager.getMetrics().getDeletionBytesCompletedTotal());
 
@@ -1260,7 +1260,7 @@ public class TestLegacyReplicationManager {
           ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
       final long currentDeleteCommandCompleted = replicationManager.getMetrics()
-          .getDeletionCmdsCompletedTotal();
+          .getReplicasDeletedTotal();
       // Now we remove the replica to simulate deletion complete
       containerStateManager.removeContainerReplica(id, unhealthyReplica);
 
@@ -1270,7 +1270,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
 
       Assertions.assertEquals(currentDeleteCommandCompleted + 1,
-          replicationManager.getMetrics().getDeletionCmdsCompletedTotal());
+          replicationManager.getMetrics().getReplicasDeletedTotal());
       Assertions.assertEquals(0, getInflightCount(InflightType.DELETION));
       Assertions.assertEquals(0, replicationManager.getMetrics()
           .getInflightDeletion());
@@ -1331,7 +1331,7 @@ public class TestLegacyReplicationManager {
           ReplicationManagerReport.HealthState.UNDER_REPLICATED));
 
       final long currentReplicateCommandCompleted = replicationManager
-          .getMetrics().getReplicationCmdsCompletedTotal();
+          .getMetrics().getReplicasCreatedTotal();
       final long currentReplicateBytesCompleted = replicationManager
           .getMetrics().getReplicationBytesCompletedTotal();
 
@@ -1349,7 +1349,7 @@ public class TestLegacyReplicationManager {
       eventQueue.processAll(1000);
 
       Assertions.assertEquals(currentReplicateCommandCompleted + 1,
-          replicationManager.getMetrics().getReplicationCmdsCompletedTotal());
+          replicationManager.getMetrics().getReplicasCreatedTotal());
       Assertions.assertEquals(currentReplicateBytesCompleted + 100,
           replicationManager.getMetrics().getReplicationBytesCompletedTotal());
       Assertions.assertEquals(0, getInflightCount(InflightType.REPLICATION));

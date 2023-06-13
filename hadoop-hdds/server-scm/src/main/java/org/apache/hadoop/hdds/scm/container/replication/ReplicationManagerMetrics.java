@@ -114,20 +114,20 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of replication commands sent.")
   private MutableCounterLong replicationCmdsSentTotal;
 
-  @Metric("Number of replication commands completed.")
-  private MutableCounterLong replicationCmdsCompletedTotal;
+  @Metric("Number of container replicas created successfully.")
+  private MutableCounterLong replicasCreatedTotal;
 
-  @Metric("Number of replication commands timeout.")
-  private MutableCounterLong replicationCmdsTimeoutTotal;
+  @Metric("Number of container replicas which timed out before being created.")
+  private MutableCounterLong replicaCreateTimeoutTotal;
 
   @Metric("Number of deletion commands sent.")
   private MutableCounterLong deletionCmdsSentTotal;
 
-  @Metric("Number of deletion commands completed.")
-  private MutableCounterLong deletionCmdsCompletedTotal;
+  @Metric("Number of container replicas deleted successfully.")
+  private MutableCounterLong replicasDeletedTotal;
 
-  @Metric("Number of deletion commands timeout.")
-  private MutableCounterLong deletionCmdsTimeoutTotal;
+  @Metric("Number of container replicas which timed out before being deleted.")
+  private MutableCounterLong replicaDeleteTimeoutTotal;
 
   @Metric("Number of replication bytes total.")
   private MutableCounterLong replicationBytesTotal;
@@ -247,11 +247,11 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     }
 
     replicationCmdsSentTotal.snapshot(builder, all);
-    replicationCmdsCompletedTotal.snapshot(builder, all);
-    replicationCmdsTimeoutTotal.snapshot(builder, all);
+    replicasCreatedTotal.snapshot(builder, all);
+    replicaCreateTimeoutTotal.snapshot(builder, all);
     deletionCmdsSentTotal.snapshot(builder, all);
-    deletionCmdsCompletedTotal.snapshot(builder, all);
-    deletionCmdsTimeoutTotal.snapshot(builder, all);
+    replicasDeletedTotal.snapshot(builder, all);
+    replicaDeleteTimeoutTotal.snapshot(builder, all);
     if (legacyReplicationManager) {
       // As things stand, the new RM does not track bytes sent / completed
       replicationBytesTotal.snapshot(builder, all);
@@ -282,24 +282,24 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.replicationCmdsSentTotal.incr();
   }
 
-  public void incrReplicationCmdsCompletedTotal() {
-    this.replicationCmdsCompletedTotal.incr();
+  public void incrReplicasCreatedTotal() {
+    this.replicasCreatedTotal.incr();
   }
 
-  public void incrReplicationCmdsTimeoutTotal() {
-    this.replicationCmdsTimeoutTotal.incr();
+  public void incrReplicaCreateTimeoutTotal() {
+    this.replicaCreateTimeoutTotal.incr();
   }
 
   public void incrDeletionCmdsSentTotal() {
     this.deletionCmdsSentTotal.incr();
   }
 
-  public void incrDeletionCmdsCompletedTotal() {
-    this.deletionCmdsCompletedTotal.incr();
+  public void incrReplicasDeletedTotal() {
+    this.replicasDeletedTotal.incr();
   }
 
-  public void incrDeletionCmdsTimeoutTotal() {
-    this.deletionCmdsTimeoutTotal.incr();
+  public void incrReplicaDeleteTimeoutTotal() {
+    this.replicaDeleteTimeoutTotal.incr();
   }
 
   public void incrReplicationBytesTotal(long bytes) {
@@ -377,24 +377,24 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     return this.replicationCmdsSentTotal.value();
   }
 
-  public long getReplicationCmdsCompletedTotal() {
-    return this.replicationCmdsCompletedTotal.value();
+  public long getReplicasCreatedTotal() {
+    return this.replicasCreatedTotal.value();
   }
 
-  public long getReplicationCmdsTimeoutTotal() {
-    return this.replicationCmdsTimeoutTotal.value();
+  public long getReplicaCreateTimeoutTotal() {
+    return this.replicaCreateTimeoutTotal.value();
   }
 
   public long getDeletionCmdsSentTotal() {
     return this.deletionCmdsSentTotal.value();
   }
 
-  public long getDeletionCmdsCompletedTotal() {
-    return this.deletionCmdsCompletedTotal.value();
+  public long getReplicasDeletedTotal() {
+    return this.replicasDeletedTotal.value();
   }
 
-  public long getDeletionCmdsTimeoutTotal() {
-    return this.deletionCmdsTimeoutTotal.value();
+  public long getReplicaDeleteTimeoutTotal() {
+    return this.replicaDeleteTimeoutTotal.value();
   }
 
   public long getDeletionBytesTotal() {

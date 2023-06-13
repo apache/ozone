@@ -155,7 +155,7 @@ public class ContainerReplicaPendingOps {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasCreatedTotal();
       } else {
-        replicationMetrics.incrReplicationCmdsCompletedTotal();
+        replicationMetrics.incrReplicasCreatedTotal();
       }
     }
     return completed;
@@ -177,7 +177,7 @@ public class ContainerReplicaPendingOps {
       if (isEC(replicaIndex)) {
         replicationMetrics.incrEcReplicasDeletedTotal();
       } else {
-        replicationMetrics.incrDeletionCmdsCompletedTotal();
+        replicationMetrics.incrReplicasDeletedTotal();
       }
     }
     return completed;
@@ -246,13 +246,13 @@ public class ContainerReplicaPendingOps {
       if (isEC(op.getReplicaIndex())) {
         replicationMetrics.incrEcReplicaCreateTimeoutTotal();
       } else {
-        replicationMetrics.incrReplicationCmdsTimeoutTotal();
+        replicationMetrics.incrReplicaCreateTimeoutTotal();
       }
     } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
       if (isEC(op.getReplicaIndex())) {
         replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
       } else {
-        replicationMetrics.incrDeletionCmdsTimeoutTotal();
+        replicationMetrics.incrReplicaDeleteTimeoutTotal();
       }
     }
   }

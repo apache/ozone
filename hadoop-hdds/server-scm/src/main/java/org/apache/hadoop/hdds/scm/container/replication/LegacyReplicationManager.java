@@ -433,13 +433,13 @@ public class LegacyReplicationManager {
         updateInflightAction(container, inflightReplication,
             action -> replicas.stream().anyMatch(
                 r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrReplicationCmdsTimeoutTotal(),
+            () -> metrics.incrReplicaCreateTimeoutTotal(),
             action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream().noneMatch(
                 r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrDeletionCmdsTimeoutTotal(),
+            () -> metrics.incrReplicaDeleteTimeoutTotal(),
             action -> updateCompletedDeletionMetrics(container, action));
 
         /*
@@ -544,14 +544,14 @@ public class LegacyReplicationManager {
 
   private void updateCompletedReplicationMetrics(ContainerInfo container,
       InflightAction action) {
-    metrics.incrReplicationCmdsCompletedTotal();
+    metrics.incrReplicasCreatedTotal();
     metrics.incrReplicationBytesCompletedTotal(container.getUsedBytes());
     metrics.addReplicationTime(clock.millis() - action.getTime());
   }
 
   private void updateCompletedDeletionMetrics(ContainerInfo container,
       InflightAction action) {
-    metrics.incrDeletionCmdsCompletedTotal();
+    metrics.incrReplicasDeletedTotal();
     metrics.incrDeletionBytesCompletedTotal(container.getUsedBytes());
     metrics.addDeletionTime(clock.millis() - action.getTime());
   }
