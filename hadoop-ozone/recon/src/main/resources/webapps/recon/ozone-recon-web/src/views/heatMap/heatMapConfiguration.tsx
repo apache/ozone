@@ -16,39 +16,63 @@
  * limitations under the License.
  */
 
-import React, { Component } from 'react';
+import React from 'react';
 import { AgChartsReact } from 'ag-charts-react';
 import {byteToSize} from 'utils/common';
 
-export default class HeatMapConfiguration extends Component {
-  constructor(props: {} | Readonly<{}>) {
+interface ITreeResponse {
+  label: string;
+  children: IChildren[];
+  size: number;
+  path: string;
+  minAccessCount: number;
+  maxAccessCount: number;
+}
+
+interface IChildren {
+  label: string;
+  size: number;
+  accessCount: number;
+  color: number;
+}
+
+interface IHeatmapConfigurationProps {
+  data: ITreeResponse[];
+  onClick: Function;
+}
+
+const colourScheme = {
+  "pastel_greens": [
+    '#CCFFD9',  //light green start (least accessed)
+    '#B9FBD5',
+    '#A7F7D1',
+    '#94F2CD',
+    '#82EEC9',
+    '#6FEAC5',
+    '#5DE6C2',
+    '#4AE2BE',
+    '#38DEBA',
+    '#25D9B6',
+    '#13D5B2',
+    '#00D1AE',  //dark green ends (light to moderate accces)
+    '#FFD28F',  //light orange (moderate access)
+    '#FFC58A',
+    '#FFB984',
+    '#FEAC7F',
+    '#FE9F7A',
+    '#FE9274',
+    '#FE866F',
+    '#FD7969',
+    '#FD6C64',  //red (most accessed)
+  ]
+};
+
+export default class HeatMapConfiguration extends React.Component<IHeatmapConfigurationProps> {
+  constructor(props: IHeatmapConfigurationProps) {
     super(props);
     const { data } = this.props;
-
-    const colorRange1 = [
-      '#ffff99',  //yellow start 80%
-      '#ffff80',  //75%
-      '#ffff66',  //70%
-      '#ffff4d',  //yellow 65%
-      '#ffd24d',  //dark Mustered yellow start 65%
-      '#ffbf00',   //dark Mustard yellow end 50%
-      '#b38600',  //Dark Mustard yellow 35%
-      '#ffb366',  //orange start 70%
-      '#ff9933',  //orange 60%
-      '#ff8c1a',  //55%
-      '#e67300',  //45%
-      '#994d00',  //orange end 30%
-      '#ff6633',  //Red start 60%
-      '#ff4000',   // Red 50%
-      '#cc3300',   //40%
-      '#992600',   //30%
-      '#802000',   //25%
-      '#661a00',   //20%
-      '#4d1300',   // 15%
-      '#330000',    //dark Maroon
-      '#330d00',   //10 % Last Red
-    ];
-
+    console.log("Data: ")
+    console.log(data)
     this.state = {
       // Tree Map Options Start
       options: {
@@ -58,10 +82,9 @@ export default class HeatMapConfiguration extends Component {
           type: 'treemap',
           labelKey: 'label',// the name of the key to fetch the label value from
           sizeKey: 'normalizedSize',// the name of the key to fetch the value that will determine tile size
-          colorkey: 'color',
-          fontSize: 35,
-          title: { color: 'white', fontSize: 18, fontFamily:'Courier New' },
-          subtitle: { color: 'white', fontSize: 15, fontFamily:'Courier New' },
+          colorKey: 'color',
+          title: { color: '#424242', fontSize: 16, fontFamily:'Roboto', fontWeight: '600'},
+          subtitle: { color: '#424242', fontSize: 12, fontFamily:'Roboto', fontWeight: '400' },
           tooltip: {
             renderer: (params) => {
               return {
@@ -69,8 +92,8 @@ export default class HeatMapConfiguration extends Component {
               };
             }
           },
-          formatter: ({ highlighted}) => {
-            const stroke = highlighted ? 'yellow' : 'white';
+          formatter: ({highlighted}) => {
+            const stroke = highlighted ? '#CED4D9' : '#FFFFFF';
             return { stroke };
           },
           labels: {
@@ -79,15 +102,17 @@ export default class HeatMapConfiguration extends Component {
             fontSize: 12
           },
           tileStroke: 'white',
-          tileStrokeWidth: 1,
+          tileStrokeWidth: 1.5,
           colorDomain: [0.000, 0.050, 0.100, 0.150, 0.200, 0.250, 0.300, 0.350, 0.400, 0.450, 0.500, 0.550, 0.600, 0.650, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000],
-          colorRange: [...colorRange1],
-          groupFill: 'black',
-          nodePadding: 1, //Disatnce between two nodes
+          colorRange: [...colourScheme["pastel_greens"]],
+          groupFill: '#E6E6E6',
+          groupStroke: "#E1E2E6",
+          nodePadding: 3.5,
           labelShadow: { enabled: false }, //labels shadow
+          gradient: false,
           highlightStyle: {
             text: {
-              color: 'yellow',
+              color: '#424242',
             },
             item:{
               fill: undefined,
@@ -122,7 +147,7 @@ export default class HeatMapConfiguration extends Component {
     if (params.datum.label !== "") {
         tooltipContent += `<br/>
           File Name:
-          ${params.datum.label ? params.datum.label.split("/").slice(-1) : "no"}
+          ${params.datum.label ? params.datum.label.split("/").slice(-1) : "None"}
         `;
       }
     tooltipContent += '</span>';

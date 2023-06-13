@@ -18,43 +18,70 @@
 
 .heatmap-container {
 
-  .go-back-button {
-    display: inline-block;
-    margin-left: 20px;
+  .heatmap-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    margin: 10px 15px 20px 15px;
+
+    .go-back-button {
+      display: inline-block;
+    }
+
+    .path-input-container {
+      display: inline-flex;
+      margin-left: 15px;
+    }
+
+    .entity-dropdown-button {
+      display: inline-block;
+      margin-left: 15px;
+    }
+  
+    .date-dropdown-button {
+      display: inline-block;
+      margin-left: 15px;
+    }
+  
+    .input {
+      padding-left: 5px;
+      margin-right: 10px;
+      display: inline-block;
+      width: 350px;
+    }
+
+    .heatmap-legend-container {
+      display: flex !important;
+
+      .heatmap-legend-item{
+        display: flex;
+        align-items: center;
+        margin-left: 20px;
+      }
+    }
   }
 
-  .entity-dropdown-button {
-    display: inline-block;
-    margin-left: 30px;
+  #heatmap-chart-container{
+    height: 850px;
+    width: 85vw;
+    margin-left: -10px;
   }
 
-  .date-dropdown-button {
-    display: inline-block;
-    margin-left: 45px;
-  }
-
-  .input-bar {
-    display: inline-block;
-    margin-left: 25px;
-  }
-
-  .input {
-    padding-left: 5px;
-    margin-right: 10px;
-    display: inline-block;
-    width: 350px;
-  }
-
-  .heatmapinformation {
+  .heatmap-no-data-text {
     font-size: 14px;
     fill: rgba(0, 0, 0, 0.65) !important;
     line-height: 1.5;
     font-feature-settings: 'tnum', "tnum";
     height: 800;
   }
-
 }
 
 .ant-drawer-open .ant-drawer-mask {
   opacity: 0 !important;
+}
+
+.ant-calendar-picker-container {
+  left: 60vw !important;
+  top: 15vh !important;
+  backdrop-filter: blur(100vh) !important;
 }

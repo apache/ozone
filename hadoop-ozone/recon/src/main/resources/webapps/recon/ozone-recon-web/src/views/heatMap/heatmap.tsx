@@ -19,23 +19,23 @@
 import React from 'react';
 import axios from 'axios';
 import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker } from 'antd';
-import {DownOutlined} from '@ant-design/icons';
+import { DownOutlined } from '@ant-design/icons';
 import moment from 'moment';
-import {showDataFetchError} from 'utils/common';
+import { showDataFetchError } from 'utils/common';
 import './heatmap.less';
 import HeatMapConfiguration from './heatMapConfiguration';
 
 interface ITreeResponse {
   label: string;
-  maxAccessCount: number;
-  minAccessCount: number;
-  size: number;
   children: IChildren[];
+  size: number;
+  path: string;
+  minAccessCount: number;
+  maxAccessCount: number;
 }
 
 interface IChildren {
   label: string;
-  path: string;
   size: number;
   accessCount: number;
   color: number;
@@ -43,12 +43,12 @@ interface IChildren {
 
 interface ITreeState {
   isLoading: boolean;
-  treeResponse: ITreeResponse[];
+  treeResponse: ITreeResponse[]
   showPanel: boolean;
-  inputRadio: number;
   inputPath: string;
   entityType: string;
   date: string;
+  inputRadio?: number;
 }
 
 let minSize = Infinity;
@@ -80,16 +80,15 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   handleMenuChange = (e: any) => {
-    if (e.key === 'volume' || e.key === 'bucket' || e.key === 'key')
-    {
-      minSize=Infinity;
+    if (e.key === 'volume' || e.key === 'bucket' || e.key === 'key') {
+      minSize = Infinity;
       maxSize = 0;
       this.setState((prevState, newState) => ({
         entityType: e.key,
         date: prevState.date,
-        inputPath : prevState.inputPath
+        inputPath: prevState.inputPath
       }), () => {
-        this.updateTreeMap(this.state.inputPath, this.state.entityType,this.state.date)
+        this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
       });
     }
   };
@@ -101,12 +100,12 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     const regex = /^[a-zA-Z0-9_/]*$/;
     if (regex.test(value)) {
       validExpression = value;
-     }
+    }
     else {
       alert("Please Enter Valid Input Path.");
       validExpression = '/';
     }
-    this.setState({ 
+    this.setState({
       inputPath: validExpression
     })
   };
@@ -116,7 +115,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date);
   };
 
-  updateTreeMap = (path: string, entityType:string, date:string) => {
+  updateTreeMap = (path: string, entityType: string, date: string) => {
     this.setState({
       isLoading: true
     });
@@ -136,7 +135,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         isLoading: false,
         inputPath: '',
         entityType: '',
-        date:''
+        date: ''
       });
       showDataFetchError(error.toString());
     });
@@ -146,8 +145,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     this.setState({
       isLoading: true,
       inputPath: path
-    },() => {
-      this.updateTreeMap(this.state.inputPath, this.state.entityType,this.state.date)
+    }, () => {
+      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
     });
   };
 
@@ -156,7 +155,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       isLoading: true
     });
     // By default render treemap for default path entity type and date
-    this.updateTreeMap('/',this.state.entityType,this.state.date);
+    this.updateTreeMap('/', this.state.entityType, this.state.date);
   }
 
   onChange = (date: any[]) => {
@@ -164,9 +163,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     this.setState(prevState => ({
       date: moment(date).unix(),
       entityType: prevState.entityType,
-      inputPath : prevState.inputPath
+      inputPath: prevState.inputPath
     }), () => {
-      this.updateTreeMap(this.state.inputPath, this.state.entityType,this.state.date)
+      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
     });
   }
 
@@ -174,7 +173,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     return current > moment() || current < moment().subtract(90, 'day');
   }
 
-  resetInputpath = (e:any, path:string) => {
+  resetInputpath = (e: any, path: string) => {
     if (!path || path === '/') {
       return;
     }
@@ -185,8 +184,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     }
   };
 
-  minmax=(obj :any) =>
-  {
+  minmax = (obj: any) => {
     if (obj.hasOwnProperty('children')) {
       obj.children.forEach((child: any) => this.minmax(child))
     };
@@ -196,9 +194,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     }
     return [minSize, maxSize];
   };
-    
+
   updateSize = (obj: any) => {
-      //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
+    //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
     if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
       let newSize = this.normalize(minSize, maxSize, obj.size);
       obj['normalizedSize'] = newSize;
@@ -212,64 +210,64 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   normalize = (min: number, max: number, size: number) => {
     //Normaized Size using Deviation and mid Point
     var mean = (max + min) / 2;
-    var highMean = (max+mean)/2;
-    var lowMean1 = (min+mean)/2;
+    var highMean = (max + mean) / 2;
+    var lowMean1 = (min + mean) / 2;
     var lowMean2 = (lowMean1 + min) / 2;
-      
-    if(size>highMean){
-    var newsize= highMean+(size*0.1);
-    return(newsize);
+
+    if (size > highMean) {
+      var newsize = highMean + (size * 0.1);
+      return (newsize);
     }
     // lowmean2= 100 value=10, diff=
     // min= 10 ,max=100, mean=55, lowmean1=32.5,lowmean2=22, value= 15, diff=7, diff/2=3.5, newsize= 22-3.5=18.5
-    if(size<lowMean2){
-    var diff = (lowMean2-size)/2;
-    var newSize= lowMean2-diff;
-    return(newSize);
+    if (size < lowMean2) {
+      var diff = (lowMean2 - size) / 2;
+      var newSize = lowMean2 - diff;
+      return (newSize);
     }
     return size;
   }
 
   render() {
-    const { treeResponse, isLoading, inputPath, date} = this.state;
+    const { treeResponse, isLoading, inputPath, date } = this.state;
     const menuCalendar = (
       <Menu
         defaultSelectedKeys={[date]}
         onClick={e => this.handleCalendarChange(e)}>
         <Menu.Item key='24H'>
-        24 Hour
+          24 Hour
         </Menu.Item>
         <Menu.Item key='7D'>
-        7 Days
+          7 Days
         </Menu.Item>
         <Menu.Item key='90D'>
-        90 Days
+          90 Days
         </Menu.Item>
-        <Menu.SubMenu  title="Custom Select Last 90 Days">
-            <Menu.Item> 
-              <DatePicker
-                format="YYYY-MM-DD"
-                onChange={this.onChange}
-                disabledDate={this.disabledDate}
-              />
+        <Menu.SubMenu title="Custom Select Last 90 Days">
+          <Menu.Item>
+            <DatePicker
+              format="YYYY-MM-DD"
+              onChange={this.onChange}
+              disabledDate={this.disabledDate}
+            />
           </Menu.Item>
         </Menu.SubMenu>
       </Menu>
     );
-    
+
     const entityTypeMenu = (
       <Menu
         defaultSelectedKeys={[this.state.entityType]}
         onClick={e => this.handleMenuChange(e)}>
-          <Menu.Item key='volume'>
-            Volume
-          </Menu.Item>
-          <Menu.Item key='bucket'>
-            Bucket
-          </Menu.Item>
-          <Menu.Item key='key'>
-            Key
-          </Menu.Item>
+        <Menu.Item key='volume'>
+          Volume
+        </Menu.Item>
+        <Menu.Item key='bucket'>
+          Bucket
+        </Menu.Item>
+        <Menu.Item key='key'>
+          Key
+        </Menu.Item>
       </Menu>
     );
 
@@ -279,60 +277,61 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
           Tree Map for Entities
         </div>
         <div className='content-div'>
-          { isLoading ? <span><Icon type='loading'/> Loading...</span> : (
+          {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
             <div>
               {(Object.keys(treeResponse).length > 0 && (treeResponse.minAccessCount > 0 || treeResponse.maxAccessCount > 0)) ?
-                (treeResponse.size === 0)? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br/></div>
+                (treeResponse.size === 0) ? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br /></div>
                   :
                   <div>
-                    <Row>
-                            <div className='go-back-button'>
-                              <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo'/></Button>
-                            </div>
-                            <div className='input-bar'>
-                              <h4>Path</h4>
-                              <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
-                                <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
-                              </form>
-                            </div>
-                            <div className='entity-dropdown-button'>
-                              <Dropdown  overlay={entityTypeMenu} placement='bottomCenter'>
-                                <Button>Entity Type:&nbsp;{this.state.entityType }<DownOutlined/></Button>
-                              </Dropdown>
-                            </div>
-                            <div className='date-dropdown-button'>
-                              <Dropdown overlay={menuCalendar} placement='bottomLeft'>
-                              <Button>Last &nbsp;{date > 100 ?  new Date(date*1000).toLocaleString() : date }<DownOutlined/></Button>
-                              </Dropdown>
-                            </div>
-                    </Row>
-                    <br/><br/><br/><br/><br/>
-                      <div style={{display:"flex", alignItems: "right"}}>
-                          <div style={{ display: "flex", alignItems: "center",marginLeft:"30px"}}>
-                              <div style={{ width: "13px", height: "13px", backgroundColor: "yellow", marginRight: "5px" }}> </div>
-                              <span>Less Accessed</span>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center",marginLeft:"50px" }}>
-                              <div style={{ width: "13px", height: "13px", backgroundColor: "orange", marginRight: "5px" }}> </div>
-                              <span>Moderate Accessed</span>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center",marginLeft:"50px" }}>
-                              <div style={{ width: "13px", height: "13px", backgroundColor: "maroon", marginRight: "5px" }}> </div>
-                              <span>Most Accessed</span>
-                          </div>
+                    <div className='heatmap-header-container'>
+                      <Row>
+                        <div className='go-back-button'>
+                          <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
+                        </div>
+                        <div className='path-input-container'>
+                          <h4 style={{ margin: "auto" }}>Path</h4>
+                          <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
+                            <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
+                          </form>
+                        </div>
+                        <div className='entity-dropdown-button'>
+                          <Dropdown overlay={entityTypeMenu} placement='bottomCenter'>
+                            <Button>Entity Type:&nbsp;{this.state.entityType}<DownOutlined /></Button>
+                          </Dropdown>
+                        </div>
+                        <div className='date-dropdown-button'>
+                          <Dropdown overlay={menuCalendar} placement='bottomLeft'>
+                            <Button>Last &nbsp;{date > 100 ? new Date(date * 1000).toLocaleString() : date}<DownOutlined /></Button>
+                          </Dropdown>
+                        </div>
+                      </Row>
+                      <div className='heatmap-legend-container'>
+                        <div className='heatmap-legend-item'>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: "#CCFFD9", marginRight: "5px" }}> </div>
+                          <span>Less Accessed</span>
+                        </div>
+                        <div className='heatmap-legend-item'>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: "#FFD28F", marginRight: "5px" }}> </div>
+                          <span>Moderate Accessed</span>
+                        </div>
+                        <div className='heatmap-legend-item'>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: "#FD6C64", marginRight: "5px" }}> </div>
+                          <span>Most Accessed</span>
+                        </div>
                       </div>
-                      <div style={{ height:850}}>
-                        <HeatMapConfiguration data={treeResponse} onClick={this.updateTreemapParent}></HeatMapConfiguration>
-                      </div>
+                    </div>
+                    <div id="heatmap-chart-container">
+                      <HeatMapConfiguration data={treeResponse} onClick={this.updateTreemapParent}></HeatMapConfiguration>
+                    </div>
                   </div>
-                  :
-                  <div className='heatmapinformation'><br />
-                    No Data Available.{' '}<br />
-                  </div>
-                }
-              
+                :
+                <div className='heatmap-no-data-text'><br />
+                  No Data Available.{' '}<br />
+                </div>
+              }
+
             </div>
-            )
+          )
           }
         </div>
       </div>
