@@ -816,13 +816,13 @@ public class TestSnapshotDiffManager {
     keyTableMap.put(BucketLayout.LEGACY,
         OmMetadataManagerImpl.KEY_TABLE);
 
-    for (BucketLayout layout : keyTableMap.keySet()) {
+    for (Map.Entry<BucketLayout, String> entry : keyTableMap.entrySet()) {
       Mockito.when(ozoneManager.getMetadataManager()
-              .getKeyTable(layout))
+              .getKeyTable(entry.getKey()))
           .thenReturn(Mockito.mock(Table.class));
       Mockito.when(ozoneManager.getMetadataManager()
-              .getKeyTable(layout).getName())
-          .thenReturn(keyTableMap.get(layout));
+              .getKeyTable(entry.getKey()).getName())
+          .thenReturn(entry.getValue());
     }
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
