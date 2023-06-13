@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,7 +66,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.assertj.core.util.Lists;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -117,6 +118,7 @@ public class TestOmMetrics {
   /**
    * Shutdown MiniDFSCluster.
    */
+
   @After
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -421,7 +423,6 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotCreates", 1L, omMetrics);
     assertCounter("NumSnapshotListFails", 0L, omMetrics);
     assertCounter("NumSnapshotLists", 0L, omMetrics);
-
     assertCounter("NumSnapshotActive", 1L, omMetrics);
     assertCounter("NumSnapshotDeleted", 0L, omMetrics);
     assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
@@ -443,6 +444,14 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotActive", 2L, omMetrics);
     assertCounter("NumSnapshotCreates", 2L, omMetrics);
     assertCounter("NumSnapshotLists", 1L, omMetrics);
+    assertCounter("NumSnapshotListFails", 0L, omMetrics);
+
+    // List snapshot: invalid bucket case.
+    assertThrows(OMException.class, () -> writeClient.listSnapshot(volumeName,
+        "invalidBucket", null, null, Integer.MAX_VALUE));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotLists", 2L, omMetrics);
+    assertCounter("NumSnapshotListFails", 1L, omMetrics);
 
     // restart OM
     cluster.restartOzoneManager();
@@ -562,18 +571,18 @@ public class TestOmMetrics {
         new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
             IAccessAuthorizer.ACLType.ALL, ACCESS));
 
-    Assert.assertEquals(initialValue + 1, metrics.getNumAddAcl());
+    assertEquals(initialValue + 1, metrics.getNumAddAcl());
 
     // Test setAcl
     initialValue = metrics.getNumSetAcl();
 
     objectStore.setAcl(volObj, acls);
-    Assert.assertEquals(initialValue + 1, metrics.getNumSetAcl());
+    assertEquals(initialValue + 1, metrics.getNumSetAcl());
 
     // Test removeAcl
     initialValue = metrics.getNumRemoveAcl();
     objectStore.removeAcl(volObj, acls.get(0));
-    Assert.assertEquals(initialValue + 1, metrics.getNumRemoveAcl());
+    assertEquals(initialValue + 1, metrics.getNumRemoveAcl());
   }
 
   /**
