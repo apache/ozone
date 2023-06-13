@@ -71,8 +71,6 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
   constructor(props: IHeatmapConfigurationProps) {
     super(props);
     const { data } = this.props;
-    console.log("Data: ")
-    console.log(data)
     this.state = {
       // Tree Map Options Start
       options: {
