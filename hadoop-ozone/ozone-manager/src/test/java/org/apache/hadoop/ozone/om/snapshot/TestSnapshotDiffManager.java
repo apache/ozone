@@ -81,6 +81,7 @@ import org.rocksdb.RocksIterator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -157,8 +158,8 @@ public class TestSnapshotDiffManager {
     return omSnapshot;
   }
 
-  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize) {
-
+  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize)
+      throws IOException {
     Mockito.when(snapdiffDB.get()).thenReturn(rocksDB);
     Mockito.when(rocksDB.newIterator(snapdiffJobCFH))
         .thenReturn(jobTableIterator);
@@ -177,6 +178,9 @@ public class TestSnapshotDiffManager {
     OMMetadataManager mockedMetadataManager =
         Mockito.mock(OMMetadataManager.class);
     RDBStore mockedRDBStore = Mockito.mock(RDBStore.class);
+    Path diffDir = Files.createTempDirectory("snapdiff_dir");
+    Mockito.when(mockedRDBStore.getSnapshotMetadataDir())
+        .thenReturn(diffDir.toString());
     Mockito.when(mockedMetadataManager.getStore()).thenReturn(mockedRDBStore);
     Mockito.when(ozoneManager.getMetadataManager())
         .thenReturn(mockedMetadataManager);
@@ -795,13 +799,13 @@ public class TestSnapshotDiffManager {
     keyTableMap.put(BucketLayout.LEGACY,
         OmMetadataManagerImpl.KEY_TABLE);
 
-    for (BucketLayout layout : keyTableMap.keySet()) {
+    for (Map.Entry<BucketLayout, String> entry : keyTableMap.entrySet()) {
       Mockito.when(ozoneManager.getMetadataManager()
-              .getKeyTable(layout))
+              .getKeyTable(entry.getKey()))
           .thenReturn(Mockito.mock(Table.class));
       Mockito.when(ozoneManager.getMetadataManager()
-              .getKeyTable(layout).getName())
-          .thenReturn(keyTableMap.get(layout));
+              .getKeyTable(entry.getKey()).getName())
+          .thenReturn(entry.getValue());
     }
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
