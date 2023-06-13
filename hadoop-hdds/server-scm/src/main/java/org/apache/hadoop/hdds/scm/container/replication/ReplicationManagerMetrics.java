@@ -155,6 +155,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       " due to the configured limit.")
   private MutableCounterLong inflightDeletionSkippedTotal;
 
+  @Metric("Number of times under replication processing has paused due to" +
+      " reaching the cluster inflight replication limit.")
+  private MutableCounterLong pendingReplicationLimitReachedTotal;
+
   private MetricsRegistry registry;
 
   private final ReplicationManager replicationManager;
@@ -272,6 +276,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecReconstructionCmdsDeferredTotal.snapshot(builder, all);
     deleteContainerCmdsDeferredTotal.snapshot(builder, all);
     replicateContainerCmdsDeferredTotal.snapshot(builder, all);
+    pendingReplicationLimitReachedTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -503,6 +508,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getReplicateContainerCmdsDeferredTotal() {
     return replicateContainerCmdsDeferredTotal.value();
+  }
+
+  public void incrPendingReplicationLimitReachedTotal() {
+    this.pendingReplicationLimitReachedTotal.incr();
+  }
+
+  public long getPendingReplicationLimitReachedTotal() {
+    return pendingReplicationLimitReachedTotal.value();
   }
 
 }
