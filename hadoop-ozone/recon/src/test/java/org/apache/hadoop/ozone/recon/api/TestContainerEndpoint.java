@@ -1273,10 +1273,10 @@ public class TestContainerEndpoint {
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
     long prevKey = (long) response.get("prevKey");
-    assertEquals(0, prevKey);
+    assertEquals(1, prevKey);
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) response.get(
-            "missingContainerList");
+            "containerDiscrepancyInfo");
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(1, containerDiscrepancyInfo.getContainerID());
@@ -1325,7 +1325,7 @@ public class TestContainerEndpoint {
         (Map<String, Object>) containerInsights.getEntity();
     long responsePrevKey = (long) response.get("prevKey");
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
+        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
 
     // Check the first ContainerDiscrepancyInfo object in the response
     assertEquals(3, containerDiscrepancyInfoList.size());
@@ -1334,7 +1334,7 @@ public class TestContainerEndpoint {
         containerDiscrepancyInfoList.get(0);
     assertEquals(3, containerDiscrepancyInfo.getContainerID());
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
-    assertEquals(prevKey, responsePrevKey);
+    assertEquals(5, responsePrevKey);
   }
 
   @Test
@@ -1359,7 +1359,7 @@ public class TestContainerEndpoint {
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
+        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(2, containerDiscrepancyInfo.getContainerID());
@@ -1393,7 +1393,7 @@ public class TestContainerEndpoint {
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
+        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
 
     // Check the first two ContainerDiscrepancyInfo objects in the response
     assertEquals(3, containerDiscrepancyInfoList.size());
@@ -1432,7 +1432,7 @@ public class TestContainerEndpoint {
         (Map<String, Object>) responseOM.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoListOM =
         (List<ContainerDiscrepancyInfo>)
-            responseMapOM.get("missingContainerList");
+            responseMapOM.get("containerDiscrepancyInfo");
     assertEquals(3, containerDiscrepancyInfoListOM.size());
 
     // Set the filter to "SCM" to get missing containers in SCM
@@ -1442,7 +1442,7 @@ public class TestContainerEndpoint {
         (Map<String, Object>) responseSCM.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoListSCM =
         (List<ContainerDiscrepancyInfo>)
-            responseMapSCM.get("missingContainerList");
+            responseMapSCM.get("containerDiscrepancyInfo");
     assertEquals(2, containerDiscrepancyInfoListSCM.size());
 
     List<Long> missingContainerIdsOM = containerDiscrepancyInfoListOM.stream()

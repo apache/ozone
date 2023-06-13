@@ -49,7 +49,7 @@ public final class ReconConstants {
   public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =
       "0";
   // Only include containers that are missing in OM by default
-  public static final String DEFAULT_FILTER_FOR_MISSING_CONTAINERS = "OM";
+  public static final String DEFAULT_FILTER_FOR_MISSING_CONTAINERS = "SCM";
   public static final String RECON_QUERY_LIMIT = "limit";
   public static final String RECON_QUERY_VOLUME = "volume";
   public static final String RECON_QUERY_BUCKET = "bucket";
