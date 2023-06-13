@@ -180,7 +180,7 @@ load bats-assert/load.bash
 @test "native test in other module" {
   run dev-support/ci/selective_ci_checks.sh 7d01cc14a6
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native","unit"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
