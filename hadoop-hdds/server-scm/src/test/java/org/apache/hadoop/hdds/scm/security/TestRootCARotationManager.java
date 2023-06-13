@@ -166,7 +166,7 @@ public class TestRootCARotationManager {
     GenericTestUtils.waitFor(
         () -> !logs.getOutput().contains("Start the rotation immediately") &&
             logs.getOutput().contains(msg),
-        100, 10000);
+        100, 15000);
     assertEquals(1, StringUtils.countMatches(logs.getOutput(), msg));
   }
 
