@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
+import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
@@ -72,6 +73,7 @@ import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmHAUnfinalizedStateValidationAction;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
@@ -129,7 +131,6 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolic
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
@@ -165,7 +166,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 
 import javax.management.ObjectName;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -189,6 +189,7 @@ import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -303,6 +304,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   // container replicas.
   private ContainerReplicaPendingOps containerReplicaPendingOps;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final SecretKeyManagerService secretKeyManagerService;
 
   private Clock systemClock;
 
@@ -381,6 +383,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
 
     initializeSystemManagers(conf, configurator);
+
+    if (isSecretKeyEnable(securityConfig)) {
+      secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
+              scmHAManager.getRatisServer());
+      serviceManager.register(secretKeyManagerService);
+    } else {
+      secretKeyManagerService = null;
+    }
 
     // Authenticate SCM if security is enabled, this initialization can only
     // be done after the metadata store is initialized.
@@ -616,7 +626,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
-      scmHAManager = new SCMHAManagerImpl(conf, this);
+      scmHAManager = new SCMHAManagerImpl(conf, securityConfig, this);
     }
 
     if (configurator.getLeaseManager() != null) {
@@ -863,6 +873,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               certificateStore, scmStorageConfig, new DefaultProfile());
     }
 
+    SecretKeyManager secretKeyManager = secretKeyManagerService != null ?
+        secretKeyManagerService.getSecretKeyManager() : null;
+
     // We need to pass getCACertificate as rootCA certificate,
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
@@ -870,7 +883,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmCertificateClient == null ? null :
             scmCertificateClient.getRootCACertificate() != null ?
             scmCertificateClient.getRootCACertificate() :
-            scmCertificateClient.getCACertificate(), this);
+            scmCertificateClient.getCACertificate(), this, secretKeyManager);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
@@ -972,8 +985,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmCertificateClient = new SCMCertificateClient(securityConfig,
           certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
     }
-    return new ContainerTokenSecretManager(securityConfig,
-        expiryTime);
+    return new ContainerTokenSecretManager(expiryTime,
+        secretKeyManagerService.getSecretKeyManager());
   }
 
   /**
@@ -1469,7 +1482,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmHAManager.start();
-    startSecretManagerIfNecessary();
 
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
@@ -1616,8 +1628,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       LOG.error("SCM block manager service stop failed.", ex);
     }
-
-    stopSecretManager();
 
     if (metrics != null) {
       metrics.unRegister();
@@ -1796,6 +1806,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public SCMSafeModeManager getScmSafeModeManager() {
     return scmSafeModeManager;
+  }
+
+  @VisibleForTesting
+  public SecretKeyManager getSecretKeyManager() {
+    return secretKeyManagerService != null ?
+        secretKeyManagerService.getSecretKeyManager() : null;
   }
 
   @Override
@@ -1994,46 +2010,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public SCMHAMetrics getScmHAMetrics() {
     return scmHAMetrics;
-  }
-
-  private void startSecretManagerIfNecessary() {
-    boolean shouldRun = securityConfig.isSecurityEnabled()
-        && securityConfig.isContainerTokenEnabled()
-        && containerTokenMgr != null;
-    if (shouldRun) {
-      boolean running = containerTokenMgr.isRunning();
-      if (!running) {
-        startSecretManager();
-      }
-    }
-  }
-
-  private void startSecretManager() {
-    try {
-      scmCertificateClient.assertValidKeysAndCertificate();
-    } catch (OzoneSecurityException e) {
-      LOG.error("Unable to read key pair.", e);
-      throw new UncheckedIOException(e);
-    }
-    try {
-      LOG.info("Starting token manager");
-      containerTokenMgr.start(scmCertificateClient);
-    } catch (IOException e) {
-      // Unable to start secret manager.
-      LOG.error("Error starting block token secret manager.", e);
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  private void stopSecretManager() {
-    if (containerTokenMgr != null) {
-      LOG.info("Stopping block token manager.");
-      try {
-        containerTokenMgr.stop();
-      } catch (IOException e) {
-        LOG.error("Failed to stop block token manager", e);
-      }
-    }
   }
 
   public ContainerTokenGenerator getContainerTokenGenerator() {

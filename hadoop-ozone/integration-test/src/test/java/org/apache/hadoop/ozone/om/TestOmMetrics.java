@@ -436,7 +436,8 @@ public class TestOmMetrics {
     writeClient.createSnapshot(volumeName, bucketName, snapshot2);
 
     // List snapshots
-    writeClient.listSnapshot(volumeName, bucketName);
+    writeClient.listSnapshot(
+        volumeName, bucketName, null, null, Integer.MAX_VALUE);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumSnapshotActive", 2L, omMetrics);

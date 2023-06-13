@@ -26,7 +26,7 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
 fi
 
-if [[ "${CANCEL_NATIVE_VERSION_CHECK}" != "true" ]]; then
+if [[ "${SKIP_NATIVE_VERSION_CHECK}" != "true" ]]; then
   NATIVE_MAVEN_OPTIONS="-Drocks_tools_native"
   . "$DIR/native_check.sh"
   init_native_maven_opts

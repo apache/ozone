@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -37,19 +38,29 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.protocol.SecretKeyProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.hadoop.hdds.scm.update.server.SCMCRLStore;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.SCMSecurityProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -68,6 +79,10 @@ import org.bouncycastle.asn1.x509.CRLReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
+import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_INITIALIZED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
@@ -79,7 +94,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 @KerberosInfo(
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
-public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
+public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
+    SecretKeyProtocol {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
@@ -90,17 +106,24 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
+  private final ProtocolMessageMetrics secretKeyMetrics;
   private final StorageContainerManager storageContainerManager;
+
+  // SecretKey may not be enabled when neither block token nor container
+  // token is enabled.
+  private final SecretKeyManager secretKeyManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      X509Certificate rootCACert, StorageContainerManager scm)
+      X509Certificate rootCACert, StorageContainerManager scm,
+      @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
     this.rootCACertificate = rootCACert;
+    this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -112,11 +135,20 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     metrics = new ProtocolMessageMetrics("ScmSecurityProtocol",
         "SCM Security protocol metrics",
         SCMSecurityProtocolProtos.Type.values());
+    secretKeyMetrics = new ProtocolMessageMetrics("ScmSecretKeyProtocol",
+        "SCM SecretKey protocol metrics",
+        SCMSecretKeyProtocolProtos.Type.values());
     BlockingService secureProtoPbService =
         SCMSecurityProtocolProtos.SCMSecurityProtocolService
             .newReflectiveBlockingService(
                 new SCMSecurityProtocolServerSideTranslatorPB(this,
                     scm, metrics));
+    BlockingService secretKeyService =
+        SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService
+            .newReflectiveBlockingService(
+                new SecretKeyProtocolServerSideTranslatorPB(
+                    this, scm, secretKeyMetrics)
+        );
     this.rpcServer =
         StorageContainerManager.startRpcServer(
             conf,
@@ -124,6 +156,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
             SCMSecurityProtocolPB.class,
             secureProtoPbService,
             handlerCount);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolDatanodePB.class,
+        secretKeyService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolOmPB.class,
+        secretKeyService, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, SecretKeyProtocolScmPB.class,
+        secretKeyService, rpcServer);
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       rpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
@@ -160,6 +198,38 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
     return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
+  }
+
+  @Override
+  public ManagedSecretKey getCurrentSecretKey() throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getCurrentSecretKey();
+  }
+
+  @Override
+  public ManagedSecretKey getSecretKey(UUID id) throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getSecretKey(id);
+  }
+
+  @Override
+  public List<ManagedSecretKey> getAllSecretKeys()
+      throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    return secretKeyManager.getSortedKeys();
+  }
+
+  private void validateSecretKeyStatus() throws SCMSecretKeyException {
+    if (secretKeyManager == null) {
+      throw new SCMSecretKeyException("Secret keys are not enabled.",
+          SECRET_KEY_NOT_ENABLED);
+    }
+
+    if (!secretKeyManager.isInitialized()) {
+      throw new SCMSecretKeyException(
+          "Secret key initialization is not finished yet.",
+          SECRET_KEY_NOT_INITIALIZED);
+    }
   }
 
   /**
@@ -368,7 +438,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
     } catch (InterruptedException | ExecutionException e) {
       Thread.currentThread().interrupt();
       throw new SCMException("Fail to revoke certs",
-          SCMException.ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
+          ResultCodes.FAILED_TO_REVOKE_CERTIFICATES);
     }
   }
 
