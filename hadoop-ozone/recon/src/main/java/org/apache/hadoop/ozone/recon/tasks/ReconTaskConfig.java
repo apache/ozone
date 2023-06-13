@@ -102,4 +102,22 @@ public class ReconTaskConfig {
     this.containerSizeCountTaskInterval = interval.toMillis();
   }
 
+  @Config(key = "scmtablecounttask.interval",
+      type = ConfigType.TIME,
+      defaultValue = "60s",
+      tags = { ConfigTag.RECON, ConfigTag.OZONE },
+      description = "The time interval to wait between each runs of " +
+          "SCM table count task."
+  )
+  private long scmTableCountTaskInterval =
+      Duration.ofMinutes(1).toMillis();
+
+  public Duration getScmTableCountTaskInterval() {
+    return Duration.ofMillis(scmTableCountTaskInterval);
+  }
+
+  public void setScmTableCountTaskInterval(Duration interval) {
+    this.scmTableCountTaskInterval = interval.toMillis();
+  }
+
 }

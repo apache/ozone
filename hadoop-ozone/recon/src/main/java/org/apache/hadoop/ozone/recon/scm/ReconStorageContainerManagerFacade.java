@@ -113,10 +113,12 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 
+import org.apache.hadoop.ozone.recon.tasks.ScmTableCountTask;
 import org.apache.ratis.util.ExitUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.hadoop.ozone.recon.schema.tables.daos.ScmTableCountDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,6 +158,8 @@ public class ReconStorageContainerManagerFacade
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
+  private ScmTableCountTask scmTableCountTask;
+  private ScmTableCountDao scmTableCountDao;
   private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
@@ -247,6 +251,13 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao,
         reconTaskConfig,
         containerCountBySizeDao,
+        utilizationSchemaDefinition);
+
+    this.scmTableCountTask = new ScmTableCountTask(
+        this,
+        reconTaskStatusDao,
+        reconTaskConfig,
+        scmTableCountDao,
         utilizationSchemaDefinition);
 
     StaleNodeHandler staleNodeHandler =

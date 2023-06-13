@@ -53,6 +53,8 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
       "FILE_COUNT_BY_SIZE";
   public static final String CONTAINER_COUNT_BY_SIZE_TABLE_NAME =
       "CONTAINER_COUNT_BY_SIZE";
+  public static final String SCM_TABLE_COUNT =
+      "SCM_TABLE_COUNT";
 
   @Inject
   UtilizationSchemaDefinition(DataSource dataSource) {
@@ -73,6 +75,18 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
     if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_COUNT_BY_SIZE_TABLE_NAME)) {
       createContainerSizeCountTable();
     }
+    if (!TABLE_EXISTS_CHECK.test(conn, SCM_TABLE_COUNT)) {
+      createScmTableCountTable();
+    }
+  }
+
+  private void createScmTableCountTable() {
+    dslContext.createTableIfNotExists(SCM_TABLE_COUNT)
+        .column("table_name", SQLDataType.VARCHAR(1024).nullable(false))
+        .column("count", SQLDataType.BIGINT)
+        .constraint(DSL.constraint("pk_table_name")
+            .primaryKey("table_name"))
+        .execute();
   }
 
   private void createClusterGrowthTable() {
