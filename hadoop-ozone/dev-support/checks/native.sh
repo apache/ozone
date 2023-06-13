@@ -17,7 +17,4 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=native
 
-. "$DIR/native_check.sh"
-init_native_maven_opts
-
-source "${DIR}/junit.sh" -Pnative "$NATIVE_MAVEN_OPTIONS" "$@"
+source "${DIR}/junit.sh" -Pnative -Drocks_tools_native "$@"
