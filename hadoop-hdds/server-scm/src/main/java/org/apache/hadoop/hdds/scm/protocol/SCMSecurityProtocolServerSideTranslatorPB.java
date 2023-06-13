@@ -148,8 +148,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .build();
       case GetCert:
         return scmSecurityResponse.setGetCertResponseProto(
-            getCertificate(request.getGetCertRequest()))
+                getCertificate(request.getGetCertRequest()))
             .build();
+
+      case GetAllRootCaCertificates:
+        return scmSecurityResponse.setGetCertResponseProto(
+            getAllRootCa()).build();
 
       default:
         throw new IllegalArgumentException(
@@ -395,6 +399,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   private SCMSecurityException createNotHAException() {
     return new SCMSecurityException("SCM is not Ratis enabled. Enable ozone" +
         ".scm.ratis.enable config");
+  }
+
+  public SCMGetCertResponseProto getAllRootCa() throws IOException {
+    return SCMGetCertResponseProto.newBuilder()
+        .setX509Certificate(impl.getAllRootCaCertificates())
+        .build();
   }
 
   private void setRootCAIfNeeded(SCMGetCertResponseProto.Builder builder)

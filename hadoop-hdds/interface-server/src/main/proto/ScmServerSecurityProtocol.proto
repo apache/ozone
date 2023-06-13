@@ -56,6 +56,8 @@ message SCMSecurityRequest {
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
     optional SCMGetCertRequestProto getCertRequest = 13;
+    optional SCMGetAllRootCaCertificatesRequestProto
+        getAllRootCaCertificatesRequestProto = 14;
 }
 
 message SCMSecurityResponse {
@@ -95,6 +97,7 @@ enum Type {
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
     GetCert = 12;
+    GetAllRootCaCertificates = 13;
 }
 
 enum Status {
@@ -239,6 +242,9 @@ message SCMRevokeCertificatesRequestProto {
     repeated string certIds = 1;
     optional Reason reason = 2 [default = unspecified];
     optional uint64 revokeTime = 3;
+}
+
+message SCMGetAllRootCaCertificatesRequestProto {
 }
 
 message SCMRevokeCertificatesResponseProto {

@@ -61,6 +61,8 @@ import org.apache.hadoop.ipc.RPC;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.*;
+
 /**
  * This class is the client-side translator that forwards requests for
  * {@link SCMSecurityProtocol} to the {@link SCMSecurityProtocolPB} proxy.
@@ -87,7 +89,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * Helper method to wrap the request and send the message.
    */
   private SCMSecurityResponse submitRequest(
-      SCMSecurityProtocolProtos.Type type,
+      Type type,
       Consumer<Builder> builderConsumer) throws IOException {
     final SCMSecurityResponse response;
     try {
@@ -116,7 +118,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   private SCMSecurityResponse handleError(SCMSecurityResponse resp)
       throws SCMSecurityException {
-    if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
+    if (resp.getStatus() != Status.OK) {
       throw new SCMSecurityException(resp.getMessage(),
           SCMSecurityException.ErrorCode.values()[resp.getStatus().ordinal()]);
     }
@@ -408,5 +410,14 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
+  }
+
+  @Override
+  public String getAllRootCaCertificates() throws IOException {
+    SCMGetAllRootCaCertificatesRequestProto protoIns =
+        SCMGetAllRootCaCertificatesRequestProto.getDefaultInstance();
+    return submitRequest(Type.GetAllRootCaCertificates,
+        builder -> builder.setGetAllRootCaCertificatesRequestProto(protoIns)).
+        getGetCertResponseProto().getX509Certificate();
   }
 }

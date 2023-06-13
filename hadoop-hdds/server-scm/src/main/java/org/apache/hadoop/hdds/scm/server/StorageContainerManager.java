@@ -886,7 +886,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmCertificateClient.getCACertificate();
     //TODO change this functionality once the SCMs can generate the root ca
     // certs
-    HashSet<X509Certificate> rootCaList = new HashSet<>();
+    ArrayList<X509Certificate> rootCaList = new ArrayList<>();
     rootCaList.add(rootCaCert);
     // We need to pass getCACertificate as rootCA certificate,
     // as for SCM CA is root-CA.
