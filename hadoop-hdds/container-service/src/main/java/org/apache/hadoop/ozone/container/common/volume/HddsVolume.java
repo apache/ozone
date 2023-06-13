@@ -306,7 +306,8 @@ public class HddsVolume extends StorageVolume {
   }
 
   @Override
-  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused)
+      throws Exception {
     VolumeCheckResult result = super.check(unused);
 
     DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);

@@ -130,7 +130,7 @@ public abstract class StorageVolume
   during a volume check. If this number crosses a configured threshold,
   the volume will be failed. A passing check will reset this counter.
    */
-  private int consecutiveIOFailureCount;
+  private volatile int consecutiveIOFailureCount;
   private int consecutiveIOFailureTolerance;
   private int healthCheckFileSize;
 
@@ -575,7 +575,7 @@ public abstract class StorageVolume
    *            the volume check.
    */
   @Override
-  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
     boolean directoryChecksPassed =
         DiskCheckUtil.checkExistence(storageDir) &&
         DiskCheckUtil.checkPermissions(storageDir);
