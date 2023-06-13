@@ -83,6 +83,7 @@ import org.rocksdb.RocksIterator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -161,8 +162,8 @@ public class TestSnapshotDiffManager {
     return omSnapshot;
   }
 
-  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize) {
-
+  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize)
+      throws IOException {
     Mockito.when(snapdiffDB.get()).thenReturn(rocksDB);
     Mockito.when(rocksDB.newIterator(snapdiffJobCFH))
         .thenReturn(jobTableIterator);
@@ -181,7 +182,11 @@ public class TestSnapshotDiffManager {
     OMMetadataManager mockedMetadataManager =
         Mockito.mock(OMMetadataManager.class);
     RDBStore mockedRDBStore = Mockito.mock(RDBStore.class);
+    Path diffDir = Files.createTempDirectory("snapdiff_dir");
+    Mockito.when(mockedRDBStore.getSnapshotMetadataDir())
+        .thenReturn(diffDir.toString());
     Mockito.when(mockedMetadataManager.getStore()).thenReturn(mockedRDBStore);
+
     Mockito.when(ozoneManager.getMetadataManager())
         .thenReturn(mockedMetadataManager);
     SnapshotDiffManager snapshotDiffManager = Mockito.spy(
