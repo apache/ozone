@@ -187,6 +187,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         this.certPath = allCertificates;
       }
       certificateMap.putIfAbsent(readCertSerialId, allCertificates);
+      addCertsToSubCaMapIfNeeded(fileName, allCertificates);
+      addCertToRootCaMapIfNeeded(fileName, allCertificates);
 
       updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
       updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
@@ -226,6 +228,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (caCertId == null
         || Long.parseLong(s) > Long.parseLong(caCertId)) {
       caCertId = s;
+    }
+  }
+
+  private void addCertsToSubCaMapIfNeeded(String fileName, CertPath certs) {
+    if (fileName.startsWith(CAType.SUBORDINATE.getFileNamePrefix())) {
+      caCertificates.addAll(
+          certs.getCertificates().stream()
+              .map(x -> (X509Certificate) x)
+              .collect(Collectors.toSet()));
+    }
+  }
+
+  private void addCertToRootCaMapIfNeeded(String fileName, CertPath certs) {
+    if (fileName.startsWith(CAType.ROOT.getFileNamePrefix())) {
+      rootCaCertificates.add(firstCertificateFrom(certs));
     }
   }
 
@@ -378,7 +395,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return Optional.empty();
   }
 
-  @Override
   public synchronized CertPath getCACertPath() {
     if (caCertId != null) {
       return certificateMap.get(caCertId);
