@@ -176,8 +176,6 @@ public class TestHddsVolume {
     assertEquals(initialUsedSpace, savedUsedSpace.get());
     assertEquals(expectedUsedSpace, volume.getUsedSpace());
 
-    // Create a directory to simulate a failed container delete from
-
     // Shutdown the volume.
     volume.shutdown();
 
