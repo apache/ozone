@@ -108,6 +108,8 @@ public class ContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
+  private static final String SCM_FILTER = "SCM";
+  private static final String OM_FILTER = "OM";
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
@@ -542,8 +544,8 @@ public class ContainerEndpoint {
               .map(containerInfo -> containerInfo.getContainerID())
               .collect(Collectors.toList());
 
-      // Filter list of container IDs which are missing in SCM
-      if ("SCM".equalsIgnoreCase(missingIn)) {
+      switch (missingIn.toUpperCase()) {
+      case SCM_FILTER:
         List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
             omContainers.entrySet().stream()
                 .filter(
@@ -551,7 +553,6 @@ public class ContainerEndpoint {
                         containerMetadataEntry.getKey()))
                 .collect(Collectors.toList());
 
-        // Filter containers based on pagination parameters
         if (prevKey > 0) {
           int index = 0;
           while (index < notSCMContainers.size() &&
@@ -580,13 +581,13 @@ public class ContainerEndpoint {
           containerDiscrepancyInfo.setExistsAt("OM");
           containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
         });
-      } else if ("OM".equalsIgnoreCase(missingIn)) {
-        // Filter list of container IDs which are missing in OM
+        break;
+
+      case OM_FILTER:
         List<Long> nonOMContainers = scmNonDeletedContainers.stream()
             .filter(containerId -> !omContainers.containsKey(containerId))
             .collect(Collectors.toList());
 
-        // Filter containers based on pagination parameters
         if (prevKey > 0) {
           int index = 0;
           while (index < nonOMContainers.size() &&
@@ -627,7 +628,9 @@ public class ContainerEndpoint {
           containerDiscrepancyInfo.setExistsAt("SCM");
           containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
         });
-      } else {
+        break;
+
+      default:
         // Invalid filter parameter value
         return Response.status(Response.Status.BAD_REQUEST).build();
       }

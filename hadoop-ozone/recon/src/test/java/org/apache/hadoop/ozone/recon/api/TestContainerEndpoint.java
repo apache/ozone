@@ -1316,25 +1316,36 @@ public class TestContainerEndpoint {
     assertNotEquals(omContainers.size(), scmContainers.size());
 
     // Set prevKey and limit
-    long prevKey = 2;
-    int limit = 10;
+    long prevKey = 0;
+    int limit = 3;
+    List<ContainerDiscrepancyInfo> allContainerDiscrepancyInfoList =
+        new ArrayList<>();
 
-    Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights(limit, prevKey, "SCM");
-    Map<String, Object> response =
-        (Map<String, Object>) containerInsights.getEntity();
-    long responsePrevKey = (long) response.get("prevKey");
-    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
+    // Check to see if pagination works as expected by reusing the prevKey
+    // from the previous response
+    do {
+      Response containerInsights =
+          containerEndpoint.getContainerMisMatchInsights(limit, prevKey, "SCM");
+      Map<String, Object> response =
+          (Map<String, Object>) containerInsights.getEntity();
+      long responsePrevKey = (long) response.get("prevKey");
+      List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
+          (List<ContainerDiscrepancyInfo>) response.get(
+              "containerDiscrepancyInfo");
 
-    // Check the first ContainerDiscrepancyInfo object in the response
-    assertEquals(3, containerDiscrepancyInfoList.size());
+      // Check the ContainerDiscrepancyInfo objects in the response
+      allContainerDiscrepancyInfoList.addAll(containerDiscrepancyInfoList);
+      boolean allExistAtOM = containerDiscrepancyInfoList.stream()
+          .allMatch(info -> "OM".equals(info.getExistsAt()));
 
-    ContainerDiscrepancyInfo containerDiscrepancyInfo =
-        containerDiscrepancyInfoList.get(0);
-    assertEquals(3, containerDiscrepancyInfo.getContainerID());
-    assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
-    assertEquals(5, responsePrevKey);
+      assertTrue(allExistAtOM);
+
+      // Update prevKey for the next iteration
+      prevKey = responsePrevKey;
+    } while (allContainerDiscrepancyInfoList.size() < omContainers.size());
+
+    // Ensure all containers in OM are included in the response
+    assertEquals(omContainers.size(), allContainerDiscrepancyInfoList.size());
   }
 
   @Test
@@ -1359,7 +1370,8 @@ public class TestContainerEndpoint {
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
+        (List<ContainerDiscrepancyInfo>) response.get(
+            "containerDiscrepancyInfo");
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(2, containerDiscrepancyInfo.getContainerID());
@@ -1393,7 +1405,8 @@ public class TestContainerEndpoint {
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) response.get("containerDiscrepancyInfo");
+        (List<ContainerDiscrepancyInfo>) response.get(
+            "containerDiscrepancyInfo");
 
     // Check the first two ContainerDiscrepancyInfo objects in the response
     assertEquals(3, containerDiscrepancyInfoList.size());
