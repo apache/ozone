@@ -399,8 +399,7 @@ public class TestSnapshotDeletingService {
           RepeatedOmKeyInfo activeDBDeleted = next.getValue();
           OMMetadataManager metadataManager =
               cluster.getOzoneManager().getMetadataManager();
-          GenericTestUtils.waitFor(() -> activeDBDeleted.getOmKeyInfoList()
-              .size() == 1, 100, 2000);
+          assertEquals(activeDBDeleted.getOmKeyInfoList().size(), 1);
           OmKeyInfo activeDbDeletedKeyInfo =
               activeDBDeleted.getOmKeyInfoList().get(0);
           long volumeId = metadataManager

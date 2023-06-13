@@ -617,6 +617,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
                                                 OmKeyInfo deletedKeyInfo) {
+    if (prevKeyInfo.getKeyLocationVersions().size() !=
+        deletedKeyInfo.getKeyLocationVersions().size()) {
+      return false;
+    }
+
     OmKeyLocationInfoGroup deletedOmKeyLocation =
         deletedKeyInfo.getLatestVersionLocations();
     OmKeyLocationInfoGroup prevOmKeyLocation =

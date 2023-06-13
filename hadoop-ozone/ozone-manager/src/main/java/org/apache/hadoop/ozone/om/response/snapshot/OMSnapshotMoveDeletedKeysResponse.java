@@ -214,6 +214,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private boolean isSameAsLatestOmKeyInfo(OmKeyInfo omKeyInfo,
                                           RepeatedOmKeyInfo result) {
     int size = result.getOmKeyInfoList().size();
+    assert size > 0;
     OmKeyInfo keyInfoFromRepeated = result.getOmKeyInfoList().get(size - 1);
     return omKeyInfo.equals(keyInfoFromRepeated);
   }
