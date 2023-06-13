@@ -102,30 +102,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   /**
-   * Acquire lock on resource.
-   *
-   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
-   * thread acquiring lock again is allowed.
-   *
-   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
-   * acquiring lock again is not allowed.
-   *
-   * Special Note for USER_LOCK: Single thread can acquire single user lock/
-   * multi user lock. But not both at the same time.
-   * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
-  @Override
-  @Deprecated
-  public boolean acquireLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
-  }
-
-  /**
    * Acquire read lock on resource.
    *
    * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
@@ -145,11 +121,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   public boolean acquireReadLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
-    return lock(resource, resourceName, manager::readLock, READ_LOCK);
-  }
-
-  @Override
-  public boolean acquireReadHashedLock(Resource resource, String resourceName) {
     return lock(resource, resourceName, manager::readLock, READ_LOCK);
   }
 
@@ -173,12 +144,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   public boolean acquireWriteLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
-    return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
-  }
-
-  @Override
-  public boolean acquireWriteHashedLock(Resource resource,
-                                        String resourceName) {
     return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
   }
 
@@ -255,8 +220,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * @param resource
    * @param resources
    */
-  @Override
-  public String generateResourceName(Resource resource, String... resources) {
+  private String generateResourceName(Resource resource, String... resources) {
     if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
       return OzoneManagerLockUtil.generateResourceLockName(resource,
           resources[0]);
@@ -408,11 +372,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
 
-  @Override
-  public void releaseWriteHashedLock(Resource resource, String resourceName) {
-    unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
-  }
-
   /**
    * Release read lock on resource.
    * @param resource - Type of the resource.
@@ -425,26 +384,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   public void releaseReadLock(Resource resource, String... resources) {
     String resourceName = generateResourceName(resource, resources);
     unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
-  }
-
-  @Override
-  public void releaseReadHashedLock(Resource resource, String resourceName) {
-    unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
-  }
-
-  /**
-   * Release write lock on resource.
-   * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
-   * For Resource type BUCKET_LOCK, first param should be volume, second param
-   * should be bucket name. For remaining all resource only one param should
-   * be passed.
-   */
-  @Override
-  @Deprecated
-  public void releaseLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
   }
 
   private void unlock(Resource resource, String resourceName,
@@ -514,59 +453,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public int getReadHoldCount(String resourceName) {
+  public int getReadHoldCount(Resource resource, String... resources) {
+    String resourceName = generateResourceName(resource, resources);
     return manager.getReadHoldCount(resourceName);
   }
 
-  /**
-   * Returns a string representation of the object. Provides information on the
-   * total number of samples, minimum value, maximum value, arithmetic mean,
-   * standard deviation of all the samples added.
-   *
-   * @return String representation of object
-   */
-  @Override
-  @VisibleForTesting
-  public String getReadLockWaitingTimeMsStat() {
-    return omLockMetrics.getReadLockWaitingTimeMsStat();
-  }
-
-  /**
-   * Returns the longest time (ms) a read lock was waiting since the last
-   * measurement.
-   *
-   * @return longest read lock waiting time (ms)
-   */
-  @Override
-  @VisibleForTesting
-  public long getLongestReadLockWaitingTimeMs() {
-    return omLockMetrics.getLongestReadLockWaitingTimeMs();
-  }
-
-  /**
-   * Returns a string representation of the object. Provides information on the
-   * total number of samples, minimum value, maximum value, arithmetic mean,
-   * standard deviation of all the samples added.
-   *
-   * @return String representation of object
-   */
-  @Override
-  @VisibleForTesting
-  public String getReadLockHeldTimeMsStat() {
-    return omLockMetrics.getReadLockHeldTimeMsStat();
-  }
-
-  /**
-   * Returns the longest time (ms) a read lock was held since the last
-   * measurement.
-   *
-   * @return longest read lock held time (ms)
-   */
-  @Override
-  @VisibleForTesting
-  public long getLongestReadLockHeldTimeMs() {
-    return omLockMetrics.getLongestReadLockHeldTimeMs();
-  }
 
   /**
    * Returns writeHoldCount for a given resource lock name.
@@ -576,7 +467,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public int getWriteHoldCount(String resourceName) {
+  public int getWriteHoldCount(Resource resource, String... resources) {
+    String resourceName = generateResourceName(resource, resources);
     return manager.getWriteHoldCount(resourceName);
   }
 
@@ -590,58 +482,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   @VisibleForTesting
-  public boolean isWriteLockedByCurrentThread(String resourceName) {
+  public boolean isWriteLockedByCurrentThread(Resource resource,
+      String... resources) {
+    String resourceName = generateResourceName(resource, resources);
     return manager.isWriteLockedByCurrentThread(resourceName);
-  }
-
-  /**
-   * Returns a string representation of the object. Provides information on the
-   * total number of samples, minimum value, maximum value, arithmetic mean,
-   * standard deviation of all the samples added.
-   *
-   * @return String representation of object
-   */
-  @Override
-  @VisibleForTesting
-  public String getWriteLockWaitingTimeMsStat() {
-    return omLockMetrics.getWriteLockWaitingTimeMsStat();
-  }
-
-  /**
-   * Returns the longest time (ms) a write lock was waiting since the last
-   * measurement.
-   *
-   * @return longest write lock waiting time (ms)
-   */
-  @Override
-  @VisibleForTesting
-  public long getLongestWriteLockWaitingTimeMs() {
-    return omLockMetrics.getLongestWriteLockWaitingTimeMs();
-  }
-
-  /**
-   * Returns a string representation of the object. Provides information on the
-   * total number of samples, minimum value, maximum value, arithmetic mean,
-   * standard deviation of all the samples added.
-   *
-   * @return String representation of object
-   */
-  @Override
-  @VisibleForTesting
-  public String getWriteLockHeldTimeMsStat() {
-    return omLockMetrics.getWriteLockHeldTimeMsStat();
-  }
-
-  /**
-   * Returns the longest time (ms) a write lock was held since the last
-   * measurement.
-   *
-   * @return longest write lock held time (ms)
-   */
-  @Override
-  @VisibleForTesting
-  public long getLongestWriteLockHeldTimeMs() {
-    return omLockMetrics.getLongestWriteLockHeldTimeMs();
   }
 
   /**
