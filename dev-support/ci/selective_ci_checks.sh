@@ -439,6 +439,8 @@ function check_needs_native() {
     local pattern_array=(
         "^hadoop-ozone/dev-support/checks/native.sh"
         "^hadoop-hdds/rocks-native"
+        # include tests tagged as @Native in any module
+        $(grep -Flr 'org.apache.ozone.test.tag.Native' hadoop-*/*/src/test/java)
     )
     filter_changed_files true
 
@@ -462,6 +464,7 @@ function check_needs_unit_test() {
         "^hadoop-ozone/dist"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "^hadoop-ozone/integration-test"
+        $(grep -Flr 'org.apache.ozone.test.tag.Native' hadoop-*/*/src/test/java)
     )
     filter_changed_files true
 
