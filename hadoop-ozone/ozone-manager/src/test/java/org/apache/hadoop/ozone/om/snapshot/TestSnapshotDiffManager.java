@@ -186,7 +186,6 @@ public class TestSnapshotDiffManager {
     Mockito.when(mockedRDBStore.getSnapshotMetadataDir())
         .thenReturn(diffDir.toString());
     Mockito.when(mockedMetadataManager.getStore()).thenReturn(mockedRDBStore);
-
     Mockito.when(ozoneManager.getMetadataManager())
         .thenReturn(mockedMetadataManager);
     SnapshotDiffManager snapshotDiffManager = Mockito.spy(
