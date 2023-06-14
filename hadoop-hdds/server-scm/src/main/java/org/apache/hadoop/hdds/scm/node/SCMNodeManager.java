@@ -1355,6 +1355,10 @@ public class SCMNodeManager implements NodeManager {
 
   @Override
   public DatanodeDetails getNodeByUuid(UUID uuid) {
+    if (uuid == null) {
+      return null;
+    }
+
     try {
       return nodeStateManager.getNode(
           DatanodeDetails.newBuilder().setUuid(uuid).build());
