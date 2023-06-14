@@ -279,8 +279,8 @@ public class TestSCMInstallSnapshotWithHA {
         s == LifeCycle.State.NEW || s.isPausingOrPaused());
 
     // Verify correct reloading
-    followerSM.setInstallingDBCheckpoint(
-        new RocksDBCheckpoint(checkpointBackup.toPath()));
+    followerSM.setInstallingSnapshotData(
+        new RocksDBCheckpoint(checkpointBackup.toPath()), null);
     followerSM.reinitialize();
     Assert.assertEquals(followerSM.getLastAppliedTermIndex(),
         leaderCheckpointTrxnInfo.getTermIndex());

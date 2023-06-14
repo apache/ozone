@@ -70,6 +70,12 @@ f. If the cluster is upgraded from old version less than 1.1.0, use of quota on 
 ### Storage Space level quota
 Storage space level quotas allow the use of units B, KB, MB, GB and TB. Represents how much storage Spaces will be used.
 
+#### Note:
+
+- Decimals are not supported while setting quota for volume and bucket. For example, 1.5 TB.
+
+- Ensure that the minimum storage quota is default block size * replication factor. If you set the value lesser than the default block size * replication factor, while writing the data (key put) operation, an operation error is displayed.
+
 #### Volume Storage Space level quota
 ```shell
 bin/ozone sh volume create --space-quota 5MB /volume1

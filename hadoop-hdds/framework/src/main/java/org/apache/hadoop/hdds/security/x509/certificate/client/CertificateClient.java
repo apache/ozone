@@ -99,14 +99,6 @@ public interface CertificateClient extends Closeable {
   X509Certificate getCACertificate();
 
   /**
-   * Returns the full certificate path for the CA certificate known to the
-   * client.
-   *
-   * @return latest ca certificate path known to the client
-   */
-  CertPath getCACertPath();
-
-  /**
    * Return all certificates in this component's trust chain,
    * the last one is the root CA certificate.
    */

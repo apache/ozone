@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
-import org.apache.hadoop.hdds.scm.ha.CheckedConsumer;
 import org.apache.hadoop.hdds.scm.ha.ExecutionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -58,6 +57,7 @@ import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,8 +85,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
  */
 public final class ContainerStateManagerImpl
     implements ContainerStateManager {
-
-  private ConfigurationSource confSrc;
 
   private final LockManager<ContainerID> lockManager;
 
@@ -157,7 +155,7 @@ public final class ContainerStateManagerImpl
       final Table<ContainerID, ContainerInfo> containerStore,
       final DBTransactionBuffer buffer,
       final ContainerReplicaPendingOps pendingOps) throws IOException {
-    this.confSrc = OzoneConfiguration.of(conf);
+    ConfigurationSource confSrc = OzoneConfiguration.of(conf);
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
@@ -385,8 +383,8 @@ public final class ContainerStateManagerImpl
             transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
           }).execute();
-          containerStateChangeActions.getOrDefault(event, info -> {
-          }).execute(oldInfo);
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
         }
       }
     } finally {
@@ -485,8 +483,8 @@ public final class ContainerStateManagerImpl
       // space in the headset, we need to pass true to deal with the
       // situation that we have a lone container that has space. That is we
       // ignored the last used container under the assumption we can find
-      // other containers with space, but if have a single container that is
-      // not true. Hence we need to include the last used container as the
+      // other containers with space, but if we have a single container that is
+      // not true. Hence, we need to include the last used container as the
       // last element in the sorted set.
 
       resultSet = containerIDs.headSet(lastID, true);

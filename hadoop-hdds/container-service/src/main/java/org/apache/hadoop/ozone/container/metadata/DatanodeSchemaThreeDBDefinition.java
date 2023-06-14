@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.FixedLengthStringUtils;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -42,7 +41,7 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  * version 3, where the block data, metadata, and transactions which are to be
  * deleted are put in their own separate column families and with containerID
  * as key prefix.
- *
+ * <p>
  * Some key format illustrations for the column families:
  * - block_data:     containerID | blockID
  * - metadata:       containerID | #BLOCKCOUNT
@@ -50,7 +49,7 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PRO
  *                   ...
  * - deleted_blocks: containerID | blockID
  * - delete_txns:    containerID | TransactionID
- *
+ * <p>
  * The keys would be encoded in a fix-length encoding style in order to
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
@@ -153,19 +152,19 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   public static int getContainerKeyPrefixLength() {
-    return FixedLengthStringUtils.string2Bytes(
+    return FixedLengthStringCodec.string2Bytes(
         getContainerKeyPrefix(0L)).length;
   }
 
   public static String getContainerKeyPrefix(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.bytes2String(Longs.toByteArray(containerID))
+    return FixedLengthStringCodec.bytes2String(Longs.toByteArray(containerID))
         + separator;
   }
 
   public static byte[] getContainerKeyPrefixBytes(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
-    return FixedLengthStringUtils.string2Bytes(
+    return FixedLengthStringCodec.string2Bytes(
         getContainerKeyPrefix(containerID));
   }
 
@@ -180,7 +179,7 @@ public class DatanodeSchemaThreeDBDefinition
   public static long getContainerId(String key) {
     int index = getContainerKeyPrefixLength();
     String cid = key.substring(0, index);
-    return Longs.fromByteArray(FixedLengthStringUtils.string2Bytes(cid));
+    return Longs.fromByteArray(FixedLengthStringCodec.string2Bytes(cid));
   }
 
   private void setSeparator(String keySeparator) {

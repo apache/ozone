@@ -516,9 +516,7 @@ public class TestDatanodeUpgradeToScmHA {
 
     // Build and start the datanode.
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
-    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd,
-        conf, null, null,
-        null);
+    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
         actualMlv);
@@ -534,9 +532,7 @@ public class TestDatanodeUpgradeToScmHA {
     dsm.close();
 
     // Start new datanode with the same configuration.
-    dsm = new DatanodeStateMachine(dd,
-        conf, null, null,
-        null);
+    dsm = new DatanodeStateMachine(dd, conf);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     if (exactMatch) {
       Assert.assertEquals(expectedMlv, mlv);

@@ -191,9 +191,10 @@ public final class OzoneQuota {
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-          " that the Quota format is legal(supported values are B," +
-          " KB, MB, GB and TB). And the quota value cannot be greater than " +
-          "Long.MAX_VALUE BYTES");
+              " that the Quota format is legal(supported values are B," +
+              " KB, MB, GB and TB with positive long values)." +
+              " And the quota value cannot be greater than " +
+              "Long.MAX_VALUE BYTES");
     }
 
     if (nSize <= 0) {

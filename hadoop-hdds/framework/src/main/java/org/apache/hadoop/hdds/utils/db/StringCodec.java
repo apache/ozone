@@ -18,15 +18,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.function.IntFunction;
-import javax.annotation.Nonnull;
-
-import org.apache.hadoop.hdds.StringUtils;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Codec to serialize/deserialize {@link String}.
+ * A {@link Codec} to serialize/deserialize {@link String}
+ * using {@link StandardCharsets#UTF_8},
+ * a variable-length character encoding.
  */
-public final class StringCodec implements Codec<String> {
+public final class StringCodec extends StringCodecBase {
   private static final StringCodec CODEC = new StringCodec();
 
   public static StringCodec get() {
@@ -35,45 +34,6 @@ public final class StringCodec implements Codec<String> {
 
   private StringCodec() {
     // singleton
-  }
-
-  @Override
-  public boolean supportCodecBuffer() {
-    return true;
-  }
-
-  @Override
-  public CodecBuffer toCodecBuffer(@Nonnull String object,
-      IntFunction<CodecBuffer> allocator) {
-    final byte[] array = toPersistedFormat(object);
-    return allocator.apply(array.length).put(array);
-  }
-
-  @Override
-  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
-    return StringUtils.bytes2String(buffer.asReadOnlyByteBuffer());
-  }
-
-  @Override
-  public byte[] toPersistedFormat(String object) {
-    if (object != null) {
-      return StringUtils.string2Bytes(object);
-    } else {
-      return null;
-    }
-  }
-
-  @Override
-  public String fromPersistedFormat(byte[] rawData) {
-    if (rawData != null) {
-      return StringUtils.bytes2String(rawData);
-    } else {
-      return null;
-    }
-  }
-
-  @Override
-  public String copyObject(String object) {
-    return object;
+    super(StandardCharsets.UTF_8);
   }
 }

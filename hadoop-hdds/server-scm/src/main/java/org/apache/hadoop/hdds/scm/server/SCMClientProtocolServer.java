@@ -24,17 +24,15 @@ package org.apache.hadoop.hdds.scm.server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
@@ -120,12 +118,13 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 /**
  * The RPC server that listens to requests from clients.
  */
 public class SCMClientProtocolServer implements
-    StorageContainerLocationProtocol, ReconfigureProtocol, Auditor {
+    StorageContainerLocationProtocol, Auditor {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMClientProtocolServer.class);
   private static final AuditLogger AUDIT =
@@ -135,8 +134,11 @@ public class SCMClientProtocolServer implements
   private final StorageContainerManager scm;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
 
-  public SCMClientProtocolServer(OzoneConfiguration conf,
-      StorageContainerManager scm) throws IOException {
+  public SCMClientProtocolServer(
+      OzoneConfiguration conf,
+      StorageContainerManager scm,
+      ReconfigurationHandler reconfigurationHandler
+  ) throws IOException {
     this.scm = scm;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
@@ -168,7 +170,7 @@ public class SCMClientProtocolServer implements
 
     // Add reconfigureProtocolService.
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
-        = new ReconfigureProtocolServerSideTranslatorPB(this);
+        = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
     BlockingService reconfigureService =
         ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
@@ -218,9 +220,6 @@ public class SCMClientProtocolServer implements
     getClientRpcServer().join();
   }
 
-  public UserGroupInformation getRemoteUser() {
-    return Server.getRemoteUser();
-  }
   @Override
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
@@ -1297,29 +1296,6 @@ public class SCMClientProtocolServer implements
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
-  }
-
-  @Override
-  public String getServerName() throws IOException {
-    return "SCM";
-  }
-
-  @Override
-  public void startReconfigure() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    getScm().startReconfigurationTask();
-  }
-
-  @Override
-  public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    return getScm().getReconfigurationTaskStatus();
-  }
-
-  @Override
-  public List<String> listReconfigureProperties() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    return Lists.newArrayList(getScm().getReconfigurableProperties());
   }
 
   @Override

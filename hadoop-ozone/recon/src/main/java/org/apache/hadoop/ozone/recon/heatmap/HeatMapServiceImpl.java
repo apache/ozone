@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -70,12 +69,10 @@ public class HeatMapServiceImpl extends HeatMapService {
   }
 
   private void initializeProvider() {
-    String heatMapProviderCls = ozoneConfiguration.get(
-        OZONE_RECON_HEATMAP_PROVIDER_KEY, OZONE_RECON_HEATMAP_PROVIDER_DEFAULT);
+    String heatMapProviderCls =
+        ozoneConfiguration.get(OZONE_RECON_HEATMAP_PROVIDER_KEY);
     LOG.info("HeatMapProvider: {}", heatMapProviderCls);
-    if (StringUtils.isEmpty(heatMapProviderCls)) {
-      heatMapProvider = new HeatMapProviderImpl();
-    } else {
+    if (!StringUtils.isEmpty(heatMapProviderCls)) {
       try {
         heatMapProvider = loadHeatMapProvider(heatMapProviderCls);
       } catch (Exception e) {
