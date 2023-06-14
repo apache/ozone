@@ -5,8 +5,11 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Class to resolve paths of Objects.
+ */
 public interface ObjectPathResolver {
 
-  public Map<Long, Path> getAbsolutePathForObjectIDs(Set<Long> objIds)
+  Map<Long, Path> getAbsolutePathForObjectIDs(Set<Long> objIds)
       throws IOException;
 }

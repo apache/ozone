@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.List;
@@ -210,6 +209,9 @@ public class SnapshotDiffReportOzone
     this.getDiffList().addAll(diffReport.getDiffList());
   }
 
+  /**
+   * DiffReportEntry for ozone.
+   */
   public static class DiffReportEntryOzone extends DiffReportEntry {
 
     public DiffReportEntryOzone(DiffType type, byte[] sourcePath) {

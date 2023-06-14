@@ -31,8 +31,9 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
+/**
+ * Class to resolve absolute paths for FSO DirectoryInfo Objects.
+ */
 public class FSODirectoryPathResolver implements ObjectPathResolver {
 
   private String prefix;
@@ -63,7 +64,8 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
   @Override
   public Map<Long, Path> getAbsolutePathForObjectIDs(Set<Long> dirObjIds)
       throws IOException {
-    // Root of a bucket would always have the key as /volumeId/bucketId/bucketId/
+    // Root of a bucket would always have the
+    // key as /volumeId/bucketId/bucketId/
     if (dirObjIds.isEmpty()) {
       return Collections.emptyMap();
     }
@@ -76,7 +78,8 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
 
     while (!objectIdPathVals.isEmpty() && dirObjIds.size() > 0) {
       ObjectIDPathVal parent = objectIdPathVals.poll();
-      try(TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+      try (TableIterator<String,
+              ? extends Table.KeyValue<String, OmDirectoryInfo>>
               subDirIter = dirInfoTable.iterator(
                   prefix + parent.getObjectId())) {
         while (dirObjIds.size() > 0 && subDirIter.hasNext()) {
@@ -99,7 +102,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
     private long objectId;
     private Path path;
 
-    public ObjectIDPathVal(long objectId, Path path) {
+    ObjectIDPathVal(long objectId, Path path) {
       this.objectId = objectId;
       this.path = path;
     }
