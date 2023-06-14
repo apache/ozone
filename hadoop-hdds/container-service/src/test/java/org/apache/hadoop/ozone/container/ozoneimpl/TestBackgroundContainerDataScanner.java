@@ -19,7 +19,9 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -130,5 +132,35 @@ public class TestBackgroundContainerDataScanner extends
     Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
+  }
+
+  /**
+   * A datanode will have one background data scanner per volume. When the
+   * volume fails, the scanner thread should be terminated.
+   */
+  @Test
+  @Override
+  // Override findbugs warning about Mockito.verify
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+  public void testWithVolumeFailure() throws Exception {
+    Mockito.when(vol.isFailed()).thenReturn(true);
+    // Run the scanner thread in the background. It should be terminated on
+    // the first iteration because the volume is unhealthy.
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    scanner.start();
+    GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
+
+    // Volume health should have been checked.
+    Mockito.verify(vol, atLeastOnce()).isFailed();
+    // No iterations should have been run.
+    assertEquals(0, metrics.getNumScanIterations());
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+    // All containers were on the unhealthy volume, so they should not have
+    // been scanned.
+    Mockito.verify(healthy, never()).scanData(any(), any());
+    Mockito.verify(openContainer, never()).scanData(any(), any());
+    Mockito.verify(corruptData, never()).scanData(any(), any());
+    Mockito.verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 }
