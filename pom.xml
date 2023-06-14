@@ -2182,7 +2182,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.client.**</include>
               </includes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2199,7 +2199,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.om.**</include>
               </includes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2216,7 +2216,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.ozone.scm.**</include>
               </includes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2233,7 +2233,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.fs.ozone.**</include>
               </includes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2250,7 +2250,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2272,7 +2272,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
                 <exclude>org.apache.hadoop.ozone.scm.**</exclude>
               </excludes>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2286,7 +2286,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <excludedGroups>flaky | slow | native</excludedGroups>
+              <excludedGroups>flaky | slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
@@ -2301,7 +2301,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <groups>flaky</groups>
-              <excludedGroups>slow | native</excludedGroups>
+              <excludedGroups>slow</excludedGroups>
             </configuration>
           </plugin>
         </plugins>
