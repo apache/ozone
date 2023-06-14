@@ -101,7 +101,7 @@ public class OmTableInsightTask implements ReconOmTask {
           TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
               = table.iterator()) {
         if (getTablesToCalculateSize().contains(tableName)) {
-          Triple<Long, Long, Long> details = getTableSizeAndCount(table);
+          Triple<Long, Long, Long> details = getTableSizeAndCount(iterator);
           objectCountMap.put(getTableCountKeyFromTable(tableName),
               details.getLeft());
           unReplicatedSizeCountMap.put(
@@ -133,25 +133,24 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   /**
-   * Returns a pair with the total count of records (left), total unReplicated
-   * size (middle), and total replicated size (right) in the given table.
+   * Returns a triple with the total count of records (left), total unreplicated
+   * size (middle), and total replicated size (right) in the given iterator.
    * Increments count for each record and adds the dataSize if a record's value
-   * is an instance of OmKeyInfo. If the table is null, returns (0, 0, 0).
+   * is an instance of OmKeyInfo. If the iterator is null, returns (0, 0, 0).
    *
-   * @param table The table from which to get the count and data size.
-   * @return Three Long values representing the count, unReplicated size,
-   *         and replicated size.
-   * @throws IOException If an I/O error occurs during the table iteration.
+   * @param iterator The iterator over the table to be iterated.
+   * @return A Triple with three Long values representing the count,
+   *         unreplicated size and replicated size.
+   * @throws IOException If an I/O error occurs during the iterator traversal.
    */
-  private Triple<Long, Long, Long> getTableSizeAndCount(Table table)
+  private Triple<Long, Long, Long> getTableSizeAndCount(
+      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
       throws IOException {
     long count = 0;
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator =
-            table.iterator()) {
+    if (iterator != null) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, ?> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
