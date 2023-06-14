@@ -1078,21 +1078,32 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void markContainerUnhealthy(Container container)
-      throws IOException {
+      throws StorageContainerException {
     container.writeLock();
     try {
-      if (container.getContainerState() != State.UNHEALTHY) {
-        try {
-          container.markContainerUnhealthy();
-        } catch (IOException ex) {
-          // explicitly catch IOException here since this operation
-          // will fail if the Rocksdb metadata is corrupted.
-          long id = container.getContainerData().getContainerID();
-          LOG.warn("Unexpected error while marking container " + id
-              + " as unhealthy", ex);
-        } finally {
-          sendICR(container);
-        }
+      long containerID = container.getContainerData().getContainerID();
+      if (container.getContainerState() == State.UNHEALTHY) {
+        LOG.debug("Call to mark already unhealthy container {} as unhealthy",
+            containerID);
+        return;
+      }
+      // If the volume is unhealthy, no action is needed. The container has
+      // already been discarded and SCM notified. Once a volume is failed, it
+      // cannot be restored without a restart.
+      HddsVolume containerVolume = container.getContainerData().getVolume();
+      if (containerVolume.isFailed()) {
+        LOG.debug("Ignoring unhealthy container {} detected on an " +
+            "already failed volume {}", containerID, containerVolume);
+        return;
+      }
+
+      try {
+        container.markContainerUnhealthy();
+      } catch (StorageContainerException ex) {
+        LOG.warn("Unexpected error while marking container {} unhealthy",
+            containerID, ex);
+      } finally {
+        sendICR(container);
       }
     } finally {
       container.writeUnlock();
