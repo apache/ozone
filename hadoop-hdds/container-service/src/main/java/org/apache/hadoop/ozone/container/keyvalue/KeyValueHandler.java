@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -1300,7 +1301,15 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (container.hasBlocks()) {
+        boolean containerHasBlocks = false;
+        try {
+          containerHasBlocks = container.hasBlocks();
+        } catch (IOException ioe){
+          LOG.error("Failed to check if container has blocks", ioe);
+          triggerVolumeScanAndThrowException(container,
+              "Failed to read chunks directory");
+        }
+        if (containerHasBlocks) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty with blockCount {}",
@@ -1328,10 +1337,10 @@ public class KeyValueHandler extends Handler {
             .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
 
         if (!success) {
-          LOG.error("Failed to move container under " +
-              hddsVolume.getDeleteServiceDirPath());
-          throw new StorageContainerException("Moving container failed",
-              CONTAINER_INTERNAL_ERROR);
+          LOG.error("Failed to move container under " + hddsVolume
+              .getDeleteServiceDirPath());
+          triggerVolumeScanAndThrowException(container,
+              "Failed to move container");
         }
 
         if (LOG.isDebugEnabled()) {
@@ -1362,5 +1371,13 @@ public class KeyValueHandler extends Handler {
     container.delete();
     container.getContainerData().setState(State.DELETED);
     sendICR(container);
+  }
+
+  private void triggerVolumeScanAndThrowException(Container container,
+      String msg) throws StorageContainerException {
+    // Trigger a volume scan as exception occurred.
+    StorageVolumeUtil.onFailure(container.getContainerData().getVolume());
+    throw new StorageContainerException(msg,
+        CONTAINER_INTERNAL_ERROR);
   }
 }

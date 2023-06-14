@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
@@ -380,6 +381,11 @@ public class HddsVolume extends StorageVolume {
       LOG.error(errMsg, ex);
       throw new IOException(errMsg, ex);
     }
+  }
+
+  @VisibleForTesting
+  public void setTmpDirPath(Path tmpDirPath) {
+    this.tmpDirPath = tmpDirPath;
   }
 
   private Path createTmpPath() throws IOException {

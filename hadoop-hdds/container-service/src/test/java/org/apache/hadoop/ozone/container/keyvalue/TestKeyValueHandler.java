@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Collections;
 import java.util.HashMap;
@@ -357,15 +358,17 @@ public class TestKeyValueHandler {
         TestKeyValueHandler.class.getSimpleName() +
             "-" + UUID.randomUUID().toString());
     try {
+      // Case 1 : Regular container delete
       final long containerID = 1L;
       final String clusterId = UUID.randomUUID().toString();
       final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
       final ContainerSet containerSet = new ContainerSet(1000);
-      final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
+      final MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
 
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
           .clusterID(clusterId).datanodeUuid(datanodeId)
+          .volumeSet(volumeSet)
           .build();
       hddsVolume.format(clusterId);
       hddsVolume.createWorkingDir(clusterId, null);
@@ -388,16 +391,7 @@ public class TestKeyValueHandler {
       kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
-          ContainerCommandRequestProto.newBuilder()
-              .setCmdType(ContainerProtos.Type.CreateContainer)
-              .setDatanodeUuid(datanodeId)
-              .setCreateContainer(
-                  ContainerProtos.CreateContainerRequestProto.newBuilder()
-                      .setContainerType(ContainerType.KeyValueContainer)
-                      .build())
-              .setContainerID(containerID)
-              .setPipelineID(UUID.randomUUID().toString())
-              .build();
+          createContainerRequest(datanodeId, containerID);
 
       kvHandler.handleCreateContainer(createContainer, null);
       Assert.assertEquals(1, icrReceived.get());
@@ -409,8 +403,42 @@ public class TestKeyValueHandler {
 
       assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
           .getDeleteLeftovers(hddsVolume).hasNext());
+
+      // Case 2 : failed move of container dir to tmp location should trigger
+      // a volume scan
+
+      final long container2ID = 2L;
+
+      final ContainerCommandRequestProto createContainer2 =
+          createContainerRequest(datanodeId, container2ID);
+
+      kvHandler.handleCreateContainer(createContainer2, null);
+
+      Assert.assertEquals(3, icrReceived.get());
+      Assert.assertNotNull(containerSet.getContainer(container2ID));
+      // to simulate failed move
+      hddsVolume.setTmpDirPath(Paths.get("/dummy/dir/doesnt/exist"));
+      try {
+        kvHandler.deleteContainer(containerSet.getContainer(container2ID),
+            true);
+      } catch (StorageContainerException sce) {
+        Assert.assertTrue(sce.getMessage().contains("Moving container failed"));
+      }
+      Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
+
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
+  }
+
+  private static ContainerCommandRequestProto createContainerRequest(
+      String datanodeId, long containerID) {
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.CreateContainer)
+        .setDatanodeUuid(datanodeId).setCreateContainer(
+            ContainerProtos.CreateContainerRequestProto.newBuilder()
+                .setContainerType(ContainerType.KeyValueContainer).build())
+        .setContainerID(containerID).setPipelineID(UUID.randomUUID().toString())
+        .build();
   }
 }
