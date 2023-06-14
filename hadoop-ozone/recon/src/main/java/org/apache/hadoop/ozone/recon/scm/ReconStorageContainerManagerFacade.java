@@ -171,6 +171,7 @@ public class ReconStorageContainerManagerFacade
       StorageContainerServiceProvider scmServiceProvider,
       ReconTaskStatusDao reconTaskStatusDao,
       ContainerCountBySizeDao containerCountBySizeDao,
+      ScmTableCountDao scmTableCountDao,
       UtilizationSchemaDefinition utilizationSchemaDefinition,
       ContainerHealthSchemaManager containerHealthSchemaManager,
       ReconContainerMetadataManager reconContainerMetadataManager,
@@ -222,6 +223,7 @@ public class ReconStorageContainerManagerFacade
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
     this.containerCountBySizeDao = containerCountBySizeDao;
+    this.scmTableCountDao = scmTableCountDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
 
@@ -334,6 +336,7 @@ public class ReconStorageContainerManagerFacade
     reconScmTasks.add(pipelineSyncTask);
     reconScmTasks.add(containerHealthTask);
     reconScmTasks.add(containerSizeCountTask);
+    reconScmTasks.add(scmTableCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);

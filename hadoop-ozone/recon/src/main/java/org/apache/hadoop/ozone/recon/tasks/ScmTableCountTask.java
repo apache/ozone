@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.SCM_TABLE_COUNT;
+import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.SCM_TABLE_COUNT_TABLE_NAME;
 
 
 /**
@@ -79,12 +79,12 @@ public class ScmTableCountTask extends ReconScmTask {
         long startTime, endTime, duration, durationMilliseconds;
           try {
             int execute =
-                dslContext.truncate(SCM_TABLE_COUNT).execute();
+                dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
             LOG.info("Deleted {} records from {}", execute,
-                SCM_TABLE_COUNT);
+                SCM_TABLE_COUNT_TABLE_NAME);
           } catch (Exception e) {
             LOG.error("An error occurred while truncating the table {}: {}",
-                SCM_TABLE_COUNT, e.getMessage(), e);
+                SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
             return;
           }
         startTime = System.nanoTime();
