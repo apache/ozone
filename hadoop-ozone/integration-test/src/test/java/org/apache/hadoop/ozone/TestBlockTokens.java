@@ -240,7 +240,10 @@ public final class TestBlockTokens {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
         OzoneBlockTokenIdentifier tokenId = token.decodeIdentifier();
         tokenId.setSecretKeyId(UUID.randomUUID());
-        token.setID(tokenId.getBytes());
+        Token<OzoneBlockTokenIdentifier> override = new Token<>(
+            tokenId.getBytes(), token.getPassword(),
+            token.getKind(), token.getService());
+        l.setToken(override);
       }
     }
 
@@ -259,7 +262,11 @@ public final class TestBlockTokens {
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo l : v.getLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
-        token.setPassword(RandomUtils.nextBytes(100));
+        byte[] randomPassword = RandomUtils.nextBytes(100);
+        Token<OzoneBlockTokenIdentifier> override = new Token<>(
+            token.getIdentifier(), randomPassword,
+            token.getKind(), token.getService());
+        l.setToken(override);
       }
     }
 

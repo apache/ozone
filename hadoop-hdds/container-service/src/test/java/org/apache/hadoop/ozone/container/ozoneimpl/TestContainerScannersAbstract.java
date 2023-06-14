@@ -97,6 +97,9 @@ public abstract class TestContainerScannersAbstract {
   @Test
   public abstract void testScannerMetricsUnregisters() throws Exception;
 
+  @Test
+  public abstract void testWithVolumeFailure() throws Exception;
+
   // HELPER METHODS
 
   protected void setScannedTimestampOld(Container<ContainerData> container) {
@@ -129,20 +132,20 @@ public abstract class TestContainerScannersAbstract {
   private ContainerController mockContainerController() {
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
-        true, true, true, CONTAINER_SEQ_ID);
+        true, true, true, CONTAINER_SEQ_ID, vol);
 
     // Open container (only metadata can be scanned)
     ContainerTestUtils.setupMockContainer(openContainer,
-        false, true, false, CONTAINER_SEQ_ID);
+        false, true, false, CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt data)
     ContainerTestUtils.setupMockContainer(corruptData,
-        true, true, false, CONTAINER_SEQ_ID);
+        true, true, false, CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt metadata). To simulate container still
     // being open while metadata is corrupted, shouldScanData will return false.
     ContainerTestUtils.setupMockContainer(openCorruptMetadata,
-        false, false, false, CONTAINER_SEQ_ID);
+        false, false, false, CONTAINER_SEQ_ID, vol);
 
     Collection<Container<?>> containers = Arrays.asList(
         healthy, corruptData, openCorruptMetadata);

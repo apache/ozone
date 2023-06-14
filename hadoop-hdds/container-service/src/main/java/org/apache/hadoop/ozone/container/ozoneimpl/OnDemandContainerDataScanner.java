@@ -23,6 +23,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,13 +77,22 @@ public final class OnDemandContainerDataScanner {
   }
 
   private static boolean shouldScan(Container<?> container) {
+    long containerID = container.getContainerData().getContainerID();
     if (instance == null) {
       LOG.debug("Skipping on demand scan for container {} since scanner was " +
-          "not initialized.", container.getContainerData().getContainerID());
+          "not initialized.", containerID);
+      return false;
     }
-    return instance != null &&
-        container.shouldScanData() &&
-        !ContainerUtils.recentlyScanned(container, instance.minScanGap, LOG);
+
+    HddsVolume containerVolume = container.getContainerData().getVolume();
+    if (containerVolume.isFailed()) {
+      LOG.debug("Skipping on demand scan for container {} since its volume {}" +
+          " has failed.", containerID, containerVolume);
+      return false;
+    }
+
+    return !ContainerUtils.recentlyScanned(container, instance.minScanGap,
+        LOG) && container.shouldScanData();
   }
 
   public static Optional<Future<?>> scanContainer(Container<?> container) {
@@ -173,8 +183,9 @@ public final class OnDemandContainerDataScanner {
   private synchronized void shutdownScanner() {
     instance = null;
     metrics.unregister();
-    this.canceler.cancel("On-demand container" +
-        " scanner is shutting down.");
+    String shutdownMessage = "On-demand container scanner is shutting down.";
+    LOG.info(shutdownMessage);
+    this.canceler.cancel(shutdownMessage);
     if (!scanExecutor.isShutdown()) {
       scanExecutor.shutdown();
     }
