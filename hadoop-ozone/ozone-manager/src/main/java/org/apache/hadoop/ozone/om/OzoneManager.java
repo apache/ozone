@@ -4515,8 +4515,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            boolean forceFullDiff,
                                            boolean cancel)
       throws IOException {
-    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, cancel);
+    if (cancel) {
+      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+          fromSnapshot, toSnapshot);
+    } else {
+      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+    }
   }
 
   private String reconfOzoneAdmins(String newVal) {

@@ -1802,9 +1802,20 @@ message SnapshotDiffResponse {
     FAILED = 5;
     CANCELED = 6;
   }
+
+  enum CancelStatusProto {
+    JOB_NOT_CANCELED = 1;
+    NEW_JOB = 2;
+    JOB_DONE = 3;
+    INVALID_STATUS_TRANSITION = 4;
+    JOB_ALREADY_CANCELED = 5;
+    CANCEL_SUCCESS = 6;
+  }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
+  optional CancelStatusProto cancelStatus = 4;
 }
 
 message DeleteSnapshotResponse {

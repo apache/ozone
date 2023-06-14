@@ -661,15 +661,22 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
-  @SuppressWarnings("parameternumber")
+  public SnapshotDiffResponse cancelSnapshotDiff(final String volume,
+                                                 final String bucket,
+                                                 final String fromSnapshot,
+                                                 final String toSnapshot)
+      throws IOException {
+    return snapshotDiffManager.cancelSnapshotDiff(volume,
+        bucket, fromSnapshot, toSnapshot);
+  }
+
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
                                                     final String toSnapshot,
                                                     final String token,
                                                     int pageSize,
-                                                    boolean forceFullDiff,
-                                                    boolean cancel)
+                                                    boolean forceFullDiff)
       throws IOException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
@@ -681,7 +688,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SnapshotDiffResponse snapshotDiffReport =
         snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
-            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff, cancel);
+            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff);
 
     // Check again to make sure that from and to snapshots are still active and
     // were not deleted in between response generation.

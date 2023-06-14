@@ -93,8 +93,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus.CANCEL_SUCCESS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus.JOB_ALREADY_CANCELED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus.JOB_NOT_CANCELED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus.NEW_JOB;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.awaitility.Awaitility.with;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.awaitility.Awaitility.await;
@@ -650,10 +655,8 @@ public class TestOmSnapshot {
 
     SnapshotDiffResponse response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, false, false);
 
-    // Cancel here is ignored, job gets saved in the snapDiffJobTable
-    // as QUEUED and then transitions IN_PROGRESS.
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
     response = store.snapshotDiff(volumeName,
@@ -663,13 +666,16 @@ public class TestOmSnapshot {
     // Job status should be updated to CANCELED.
     assertEquals(CANCELED, response.getJobStatus());
 
-    // Executing the command again should return CANCELED,
+    // Executing the command again should return the
+    // CancelStatus that the job is JOB_ALREADY_CANCELED,
+    // but the job status should still be CANCELED
     // until the job is picked up by the SnapshotDiffCleanupService
     // and removed from the snapDiffJobTable.
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
         null, 0, false, true);
     assertEquals(CANCELED, response.getJobStatus());
+    assertEquals(JOB_ALREADY_CANCELED, response.getCancelStatus());
 
     String fromSnapshotTableKey = SnapshotInfo
         .getTableKey(volumeName, bucketName, fromSnapName);
@@ -684,7 +690,7 @@ public class TestOmSnapshot {
     // Construct SnapshotDiffJob table key.
     String snapDiffJobKey = fromSnapshotID + DELIMITER + toSnapshotID;
 
-    // Get the job from the SnapDiffJobTable, in order to get it's ID.
+    // Get the job from the SnapDiffJobTable, in order to get its ID.
     String jobID = ozoneManager.getOmSnapshotManager()
         .getSnapshotDiffManager().getSnapDiffJobTable()
         .get(snapDiffJobKey).getJobId();
@@ -697,6 +703,61 @@ public class TestOmSnapshot {
     // Verify that after running the cleanup service,
     // job exists in the purged job table.
     assertNotNull(snapshotDiffCleanupService.getEntryFromPurgedJobTable(jobID));
+  }
+
+  @Test
+  public void testSnapDiffCancelFailureResponses() throws Exception {
+    // Create key1 and take snapshot.
+    String key1 = "key-1-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozoneBucket, key1);
+    String fromSnapName = "snap-1-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volumeName, bucketName, fromSnapName);
+
+    // Create key2 and take snapshot.
+    String key2 = "key-2-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozoneBucket, key2);
+    String toSnapName = "snap-2-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volumeName, bucketName, toSnapName);
+
+    // New job that doesn't exist, cancel fails.
+    SnapshotDiffResponse response = store.snapshotDiff(
+        volumeName, bucketName, fromSnapName, toSnapName,
+        null, 0, false, true);
+
+    Assert.assertEquals(NEW_JOB, response.getCancelStatus());
+    Assert.assertTrue(response.toString()
+        .contains(NEW_JOB.getDescription()));
+    Assert.assertEquals(QUEUED, response.getJobStatus());
+
+    // Submit new job.
+    response = store.snapshotDiff(volumeName,
+        bucketName, fromSnapName, toSnapName,
+        null, 0, false, false);
+
+    Assert.assertEquals(JOB_NOT_CANCELED, response.getCancelStatus());
+    Assert.assertEquals(IN_PROGRESS, response.getJobStatus());
+    Assert.assertTrue(response.toString()
+        .contains("Snapshot diff job is " + IN_PROGRESS));
+
+    // Cancel success.
+    response = store.snapshotDiff(volumeName,
+        bucketName, fromSnapName, toSnapName,
+        null, 0, false, true);
+
+    Assert.assertEquals(CANCEL_SUCCESS, response.getCancelStatus());
+    Assert.assertEquals(CANCELED, response.getJobStatus());
+    Assert.assertTrue(response.toString()
+        .contains("Snapshot diff job is " + CANCELED));
+
+    // Job already canceled.
+    response = store.snapshotDiff(volumeName,
+        bucketName, fromSnapName, toSnapName,
+        null, 0, false, true);
+
+    Assert.assertEquals(JOB_ALREADY_CANCELED, response.getCancelStatus());
+    Assert.assertEquals(CANCELED, response.getJobStatus());
+    Assert.assertTrue(response.toString()
+        .contains(JOB_ALREADY_CANCELED.getDescription()));
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
