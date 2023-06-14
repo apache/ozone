@@ -166,7 +166,7 @@ public class SnapshotDiffReportOzone
       return null;
     }
     DiffType type = fromProtobufDiffType(entry.getDiffType());
-    return type == null ? null : new DiffReportEntry(type,
+    return type == null ? null : new DiffReportEntryOzone(type,
         entry.getSourcePath().getBytes(StandardCharsets.UTF_8),
         entry.hasTargetPath() ?
             entry.getTargetPath().getBytes(StandardCharsets.UTF_8) : null);
@@ -194,7 +194,7 @@ public class SnapshotDiffReportOzone
 
   public static DiffReportEntry getDiffReportEntry(final DiffType type,
       final String sourcePath, final String targetPath) {
-    return new DiffReportEntry(type,
+    return new DiffReportEntryOzone(type,
         sourcePath.getBytes(StandardCharsets.UTF_8),
         targetPath != null ? targetPath.getBytes(StandardCharsets.UTF_8) :
             null);
