@@ -170,12 +170,12 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
-        if: matrix.check != 'bats' && matrix.check != 'native'
+        if: matrix.check != 'bats'
       - name: Checkout project with history
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-        if: matrix.check == 'bats' || matrix.check == 'native'
+        if: matrix.check == 'bats'
       - name: Cache for maven dependencies
         uses: actions/cache@v3
         with:
