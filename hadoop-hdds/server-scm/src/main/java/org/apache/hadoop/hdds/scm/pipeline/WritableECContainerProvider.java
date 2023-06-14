@@ -129,8 +129,6 @@ public class WritableECContainerProvider
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
-          Optional.ofNullable(containerInfo)
-              .ifPresent(ContainerInfo::updateLastUsedTime);
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
@@ -140,6 +138,8 @@ public class WritableECContainerProvider
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
+              Optional.ofNullable(containerInfo)
+                  .ifPresent(ContainerInfo::updateLastUsedTime);
               return containerInfo;
             }
           }
