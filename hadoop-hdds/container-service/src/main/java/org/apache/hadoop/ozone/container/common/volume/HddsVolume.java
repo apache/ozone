@@ -381,7 +381,7 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  private Path createTmpPath() throws IOException {
+  public Path getTmpPath() throws IOException {
 
     // HddsVolume root directory path
     String hddsRoot = getHddsRootDir().toString();
@@ -396,7 +396,7 @@ public class HddsVolume extends StorageVolume {
   }
 
   private void createTmpDir() throws IOException {
-    tmpDirPath = createTmpPath();
+    tmpDirPath = getTmpPath();
 
     if (Files.notExists(tmpDirPath)) {
       try {
