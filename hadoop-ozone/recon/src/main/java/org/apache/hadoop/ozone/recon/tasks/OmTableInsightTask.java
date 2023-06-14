@@ -97,18 +97,20 @@ public class OmTableInsightTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
 
-      try {
+      try (
+          TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
+              = table.iterator()) {
         if (getTablesToCalculateSize().contains(tableName)) {
           Triple<Long, Long, Long> details = getTableSizeAndCount(table);
-          objectCountMap.put(
-              getTableCountKeyFromTable(tableName), details.getLeft());
+          objectCountMap.put(getTableCountKeyFromTable(tableName),
+              details.getLeft());
           unReplicatedSizeCountMap.put(
               getUnReplicatedSizeKeyFromTable(tableName), details.getMiddle());
-          replicatedSizeCountMap.put(
-              getReplicatedSizeKeyFromTable(tableName), details.getRight());
+          replicatedSizeCountMap.put(getReplicatedSizeKeyFromTable(tableName),
+              details.getRight());
         } else {
-          objectCountMap.put(getTableCountKeyFromTable(tableName),
-              Long.valueOf(Iterators.size(table.iterator())));
+          long count = Iterators.size(iterator);
+          objectCountMap.put(getTableCountKeyFromTable(tableName), count);
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to populate Table Count in Recon DB.", ioEx);
@@ -147,19 +149,22 @@ public class OmTableInsightTask implements ReconOmTask {
     long unReplicatedSize = 0;
     long replicatedSize = 0;
 
-    TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator =
-        table.iterator();
-    while (iterator.hasNext()) {
-      Table.KeyValue<String, ?> kv = iterator.next();
-      if (kv != null && kv.getValue() != null) {
-        if (kv.getValue() instanceof OmKeyInfo) {
-          OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
-          unReplicatedSize += omKeyInfo.getDataSize();
-          replicatedSize += omKeyInfo.getReplicatedSize();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator =
+            table.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, ?> kv = iterator.next();
+        if (kv != null && kv.getValue() != null) {
+          if (kv.getValue() instanceof OmKeyInfo) {
+            OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
+            unReplicatedSize += omKeyInfo.getDataSize();
+            replicatedSize += omKeyInfo.getReplicatedSize();
+          }
+          count++;  // Increment count for each row
         }
-        count++;  // Increment count for each row
       }
     }
+
     return Triple.of(count, unReplicatedSize, replicatedSize);
   }
 
