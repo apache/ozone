@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -54,7 +56,6 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 /**
  * Test for ManagedSSTDumpIterator.
  */
-@Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
 class TestManagedSSTDumpIterator {
 
   private File createSSTFileWithKeys(
@@ -169,11 +170,15 @@ class TestManagedSSTDumpIterator {
     );
   }
 
+  @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
                                                String valueFormat)
       throws Exception {
+    Assumptions.assumeTrue(NativeLibraryLoader.getInstance()
+        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
+
     TreeMap<Pair<String, Integer>, String> keys =
         IntStream.range(0, 100).boxed().collect(
             Collectors.toMap(
