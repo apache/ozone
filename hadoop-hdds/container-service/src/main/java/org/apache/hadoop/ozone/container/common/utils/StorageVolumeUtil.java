@@ -227,6 +227,13 @@ public final class StorageVolumeUtil {
       // volume's working directory, depending on the datanode's layout version.
       workingDirName = VersionedDatanodeFeatures.ScmHA
           .chooseContainerPathID(conf, scmId, clusterId);
+      try {
+        volume.createWorkingDir(workingDirName, dbVolumeSet);
+      } catch (IOException e) {
+        logger.error("Prepare working dir failed for volume {}.",
+            volumeRootPath, e);
+        success = false;
+      }
     } else if (rootFiles.length == 2) {
       // The two files are the version file and an existing working directory.
       // If the working directory matches the cluster ID, we do not need to
@@ -252,13 +259,13 @@ public final class StorageVolumeUtil {
       }
     }
 
-    // Once the correct working directory name is identified, create it and
-    // its subdirectories.
+    // Once the correct working directory name is identified, create the
+    // volume level tmp directories under it.
     if (success) {
       try {
-        volume.createWorkingDirs(workingDirName, dbVolumeSet);
+        volume.createTmpDirs(workingDirName);
       } catch (IOException e) {
-        logger.error("Prepare working dir failed for volume {}.",
+        logger.error("Prepare tmp dir failed for volume {}.",
             volumeRootPath, e);
         success = false;
       }

@@ -109,7 +109,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     hddsVolume = new HddsVolume.Builder(volumeDir.getAbsolutePath())
         .conf(conf).datanodeUuid(datanodeUuid).clusterID(clusterID).build();
     hddsVolume.format(clusterID);
-    hddsVolume.createWorkingDirs(clusterID, null);
+    hddsVolume.createWorkingDir(clusterID, null);
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);

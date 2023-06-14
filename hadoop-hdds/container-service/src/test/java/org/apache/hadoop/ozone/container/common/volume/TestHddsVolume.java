@@ -113,7 +113,8 @@ public class TestHddsVolume {
     // Set up volume.
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDirs(CLUSTER_ID, null);
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
 
     // All temp directories should have been created.
     assertTrue(volume.getTmpDir().exists());
@@ -142,7 +143,8 @@ public class TestHddsVolume {
     assertTrue(leftoverContainer.mkdirs());
 
     // Check that tmp dirs are created with expected names.
-    volume.createWorkingDirs(CLUSTER_ID, null);
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
     assertEquals(tmpDir, volume.getTmpDir());
     assertEquals(tmpDeleteDir, volume.getDeletedContainerDir());
 
@@ -318,7 +320,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDirs(CLUSTER_ID, null);
+    volume.createWorkingDir(CLUSTER_ID, null);
 
     // No DbVolume chosen and use the HddsVolume itself to hold
     // a db instance.
@@ -344,7 +346,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDirs(CLUSTER_ID, dbVolumeSet);
+    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
 
     // DbVolume chosen.
     assertNotNull(volume.getDbVolume());
@@ -369,7 +371,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDirs(CLUSTER_ID, null);
+    volume.createWorkingDir(CLUSTER_ID, null);
 
     // No DbVolume chosen and use the HddsVolume itself to hold
     // a db instance.
@@ -401,7 +403,7 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
-    volume.createWorkingDirs(CLUSTER_ID, dbVolumeSet);
+    volume.createWorkingDir(CLUSTER_ID, dbVolumeSet);
 
     // DbVolume chosen.
     assertNotNull(volume.getDbVolume());
@@ -452,7 +454,7 @@ public class TestHddsVolume {
         CLUSTER_ID, CONF, null, StorageVolume.VolumeType.DB_VOLUME,
         null);
     dbVolumeSet.getVolumesList().get(0).format(CLUSTER_ID);
-    dbVolumeSet.getVolumesList().get(0).createWorkingDirs(CLUSTER_ID, null);
+    dbVolumeSet.getVolumesList().get(0).createWorkingDir(CLUSTER_ID, null);
     return dbVolumeSet;
   }
 }
