@@ -258,12 +258,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         component = "dn-" + datanodeDetails.getUuidString();
+        secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
-              DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
               conf.get(
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
@@ -280,13 +281,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
               "supported. Datanode user" + " login " + "failed.");
         }
         LOG.info("Hdds Datanode login successful.");
-
-        secConf = new SecurityConfig(conf);
-        dnCertClient = new DNCertificateClient(secConf,
-            createScmSecurityClient(),
-            datanodeDetails,
-            datanodeDetails.getCertSerialId(), this::saveNewCertId,
-            this::terminateDatanode);
       }
 
       DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
@@ -401,6 +395,14 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       CertificateClient certClient) throws IOException {
     LOG.info("Initializing secure Datanode.");
 
+    if (certClient == null) {
+      dnCertClient = new DNCertificateClient(secConf,
+          createScmSecurityClient(),
+          datanodeDetails,
+          datanodeDetails.getCertSerialId(), this::saveNewCertId,
+          this::terminateDatanode);
+      certClient = dnCertClient;
+    }
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       certClient.close();
