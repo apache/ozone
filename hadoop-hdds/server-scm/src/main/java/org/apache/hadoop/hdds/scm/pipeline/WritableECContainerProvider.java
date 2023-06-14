@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
@@ -138,8 +137,7 @@ public class WritableECContainerProvider
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
-              Optional.ofNullable(containerInfo)
-                  .ifPresent(ContainerInfo::updateLastUsedTime);
+              containerInfo.updateLastUsedTime();
               return containerInfo;
             }
           }
