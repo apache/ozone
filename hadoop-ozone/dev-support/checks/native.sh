@@ -15,5 +15,6 @@
 # limitations under the License.
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-CHECK=unit
-source "${DIR}/junit.sh" -pl \!:ozone-integration-test,\!:mini-chaos-tests -DexcludedGroups=native "$@"
+CHECK=native
+
+source "${DIR}/junit.sh" -Pnative -Drocks_tools_native "$@"
