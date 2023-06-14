@@ -1348,14 +1348,16 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public DatanodeDetails getNodeByUuid(String uuid) {
-    if (Strings.isNullOrEmpty(uuid)) {
-      LOG.warn("uuid is null");
-      return null;
-    }
-    DatanodeDetails temp = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(uuid)).build();
+    return uuid != null && !uuid.isEmpty()
+        ? getNodeByUuid(UUID.fromString(uuid))
+        : null;
+  }
+
+  @Override
+  public DatanodeDetails getNodeByUuid(UUID uuid) {
     try {
-      return nodeStateManager.getNode(temp);
+      return nodeStateManager.getNode(
+          DatanodeDetails.newBuilder().setUuid(uuid).build());
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
