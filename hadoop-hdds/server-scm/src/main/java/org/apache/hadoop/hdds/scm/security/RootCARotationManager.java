@@ -208,8 +208,8 @@ public class RootCARotationManager implements SCMService {
 
     @Override
     public void run() {
-      isScheduled.set(false);
       if (!isRunning.get()) {
+        isScheduled.set(false);
         return;
       }
       // Lock to protect the root CA certificate rotation process,
@@ -233,6 +233,7 @@ public class RootCARotationManager implements SCMService {
               rootCACert.getSerialNumber().toString(), renewalGracePeriod);
         }
       }
+      isScheduled.set(false);
     }
   }
 

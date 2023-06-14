@@ -141,7 +141,7 @@ public class TestRootCARotationManager {
 
   @Test
   public void testRotationOnSchedule() throws Exception {
-    ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
     Date date = Calendar.getInstance().getTime();
     date.setSeconds(date.getSeconds() + 10);
@@ -166,13 +166,13 @@ public class TestRootCARotationManager {
     GenericTestUtils.waitFor(
         () -> !logs.getOutput().contains("Start the rotation immediately") &&
             logs.getOutput().contains(msg),
-        100, 15000);
+        100, 10000);
     assertEquals(1, StringUtils.countMatches(logs.getOutput(), msg));
   }
 
   @Test
   public void testRotationImmediately() throws Exception {
-    ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
     Date date = Calendar.getInstance().getTime();
     date.setMinutes(date.getMinutes() + 5);
