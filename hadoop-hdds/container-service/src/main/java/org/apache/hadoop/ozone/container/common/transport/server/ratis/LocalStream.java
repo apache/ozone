@@ -18,19 +18,18 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import org.apache.hadoop.ozone.container.keyvalue.impl.StreamDataChannelBase;
 import org.apache.ratis.statemachine.StateMachine;
 
-import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
 class LocalStream implements StateMachine.DataStream {
-  private final StateMachine.DataChannel dataChannel;
+  private final StreamDataChannelBase dataChannel;
   private final Executor executor;
 
   LocalStream(StateMachine.DataChannel dataChannel, Executor executor) {
-    this.dataChannel = dataChannel;
+    this.dataChannel = (StreamDataChannelBase) dataChannel;
     this.executor = executor;
   }
 
@@ -41,14 +40,7 @@ class LocalStream implements StateMachine.DataStream {
 
   @Override
   public CompletableFuture<?> cleanUp() {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        dataChannel.close();
-        return true;
-      } catch (IOException e) {
-        throw new CompletionException("Failed to close data channel", e);
-      }
-    });
+    return CompletableFuture.supplyAsync(dataChannel::cleanUp, executor);
   }
 
   @Override

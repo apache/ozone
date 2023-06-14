@@ -131,6 +131,13 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
         refs.forEach(ReferenceCountedObject::release);
       });
     }
+
+    void cleanUpAll() {
+      final int size = deque.size();
+      for (int i = 0; i < size; i++) {
+        Optional.ofNullable(poll()).ifPresent(ReferenceCountedObject::release);
+      }
+    }
   }
 
   interface WriteMethod {
@@ -198,7 +205,18 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   @Override
   public void close() throws IOException {
     if (closed.compareAndSet(false, true)) {
-      putBlockRequest.set(closeBuffers(buffers, super::writeFileChannel));
+      try {
+        putBlockRequest.set(closeBuffers(buffers, super::writeFileChannel));
+      } finally {
+        super.close();
+      }
+    }
+  }
+
+  @Override
+  protected void cleanupInternal() throws IOException {
+    buffers.cleanUpAll();
+    if (!closed.get()) {
       super.close();
     }
   }
