@@ -29,13 +29,12 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
-import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
 
 /**
  * Test {@link Codec} implementations.
@@ -43,22 +42,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public final class TestCodec {
   static final Logger LOG = LoggerFactory.getLogger(TestCodec.class);
   static final int NUM_LOOPS = 10;
-
-  /** Force gc to check leakage. */
-  static void gc() throws InterruptedException {
-    // use WeakReference to detect gc
-    Object obj = new Object();
-    final WeakReference<Object> weakRef = new WeakReference<>(obj);
-    obj = null;
-
-    // loop until gc has completed.
-    for (int i = 0; weakRef.get() != null; i++) {
-      LOG.info("gc {}", i);
-      System.gc();
-      Thread.sleep(100);
-    }
-    CodecBuffer.assertNoLeaks();
-  }
 
   @Test
   public void testShortCodec() throws Exception {
@@ -251,40 +234,9 @@ public final class TestCodec {
     gc();
   }
 
-  static <T> void runTest(Codec<T> codec, T original,
+  public static <T> void runTest(Codec<T> codec, T original,
       Integer serializedSize) throws Exception {
-    Assertions.assertTrue(codec.supportCodecBuffer());
-
-    // serialize to byte[]
-    final byte[] array = codec.toPersistedFormat(original);
-    if (serializedSize != null) {
-      Assertions.assertEquals(serializedSize, array.length);
-    }
-    // deserialize from byte[]
-    final T fromArray = codec.fromPersistedFormat(array);
-    Assertions.assertEquals(original, fromArray);
-
-    // serialize to CodecBuffer
-    final CodecBuffer codecBuffer = codec.toCodecBuffer(
-        original, CodecBuffer::allocateHeap);
-    final ByteBuffer byteBuffer = codecBuffer.asReadOnlyByteBuffer();
-    Assertions.assertEquals(array.length, byteBuffer.remaining());
-    for (int i = 0; i < array.length; i++) {
-      // assert exact content
-      Assertions.assertEquals(array[i], byteBuffer.get(i));
-    }
-
-    // deserialize from CodecBuffer
-    final T fromBuffer = codec.fromCodecBuffer(codecBuffer);
-    codecBuffer.release();
-    Assertions.assertEquals(original, fromBuffer);
-
-    // deserialize from wrapped buffer
-    final CodecBuffer wrapped = CodecBuffer.wrap(array);
-    final T fromWrappedArray = codec.fromCodecBuffer(wrapped);
-    wrapped.release();
-    Assertions.assertEquals(original, fromWrappedArray);
-
+    CodecTestUtil.runTest(codec, original, serializedSize, null);
     runTestBytes(original, codec);
   }
 

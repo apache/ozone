@@ -190,6 +190,33 @@ public class TestOnDemandContainerDataScanner extends
     verifyContainerMarkedUnhealthy(openContainer, never());
   }
 
+  /**
+   * A datanode will have one on-demand scanner thread for the whole process.
+   * When a volume fails, any the containers queued for scanning in that volume
+   * should be skipped but the thread will continue to run and accept new
+   * containers to scan.
+   */
+  @Test
+  @Override
+  public void testWithVolumeFailure() throws Exception {
+    Mockito.when(vol.isFailed()).thenReturn(true);
+
+    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+
+    scanContainer(healthy);
+    verifyContainerMarkedUnhealthy(healthy, never());
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, never());
+    scanContainer(openCorruptMetadata);
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
+    scanContainer(openContainer);
+    verifyContainerMarkedUnhealthy(openContainer, never());
+
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+  }
+
   private void scanContainer(Container<ContainerData> container)
       throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
