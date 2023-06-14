@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ListBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
@@ -289,7 +289,7 @@ public final class ContainerCommandResponseBuilders {
   }
 
   public static ContainerCommandResponseProto getReadChunkResponse(
-      ContainerCommandRequestProto request, ChunkBuffer data,
+      ContainerCommandRequestProto request, ChunkBufferToByteString data,
       Function<ByteBuffer, ByteString> byteBufferToByteString) {
 
     boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())

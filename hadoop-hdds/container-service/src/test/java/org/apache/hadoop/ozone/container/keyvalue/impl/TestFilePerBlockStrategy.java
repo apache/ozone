@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -96,7 +97,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Request to read the whole data in a single go.
     ChunkInfo largeChunk = getChunk(blockID.getLocalID(), 0, 0,
         datalen * chunkCount);
-    ChunkBuffer chunk =
+    final ChunkBufferToByteString chunk =
         subject.readChunk(container, blockID, largeChunk,
             getDispatcherContext());
     ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
@@ -124,18 +125,20 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkManager subject = createTestSubject();
     subject.writeChunk(container, blockID, info, data, ctx);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, ctx);
+    ChunkBufferToByteString readData = subject.readChunk(
+        container, blockID, info, ctx);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
     assertEquals(data.rewind().toByteString(),
-        readData.rewind().toByteString());
+        readData.toByteString());
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, ctx);
+    final ChunkBufferToByteString readData2 = subject.readChunk(
+        container, blockID, info2, ctx);
     assertEquals(length, info2.getLen());
     assertEquals(data.rewind().toByteString().substring(start, start + length),
-        readData2.rewind().toByteString());
+        readData2.toByteString());
   }
 
   @Override

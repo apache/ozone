@@ -17,19 +17,15 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer {
+public interface ChunkBuffer extends ChunkBufferToByteString {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -91,9 +87,7 @@ public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#put(byte[])}. */
   default ChunkBuffer put(byte b) {
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    return put(buf, 0, 1);
+    return put(new byte[]{b}, 0, 1);
   }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
@@ -116,7 +110,7 @@ public interface ChunkBuffer {
 
   /**
    * Iterate the buffer from the current position to the current limit.
-   *
+   * <p>
    * Upon the iteration complete,
    * the buffer's position will be equal to its limit.
    *
@@ -133,53 +127,4 @@ public interface ChunkBuffer {
    * @return The number of bytes written, possibly zero
    */
   long writeTo(GatheringByteChannel channel) throws IOException;
-
-  /**
-   * Convert this buffer to a {@link ByteString}.
-   * The position and limit of this {@link ChunkBuffer} remains unchanged.
-   * The given function must preserve the position and limit
-   * of the input {@link ByteBuffer}.
-   */
-  default ByteString toByteString(Function<ByteBuffer, ByteString> function) {
-    return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
-  }
-
-  /**
-   * Convert this buffer(s) to a list of {@link ByteString}.
-   * The position and limit of this {@link ChunkBuffer} remains unchanged.
-   * The given function must preserve the position and limit
-   * of the input {@link ByteBuffer}.
-   */
-  default List<ByteString> toByteStringList(
-      Function<ByteBuffer, ByteString> function) {
-    return toByteStringListImpl(b -> applyAndAssertFunction(b, function, this));
-  }
-
-  // for testing
-  default ByteString toByteString() {
-    return toByteString(ByteStringConversion::safeWrap);
-  }
-
-  ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);
-
-  List<ByteString> toByteStringListImpl(
-      Function<ByteBuffer, ByteString> function);
-
-  static void assertInt(int expected, int computed, Supplier<String> prefix) {
-    if (expected != computed) {
-      throw new IllegalStateException(prefix.get()
-          + ": expected = " + expected + " but computed = " + computed);
-    }
-  }
-
-  /** Apply the function and assert if it preserves position and limit. */
-  static ByteString applyAndAssertFunction(ByteBuffer buffer,
-      Function<ByteBuffer, ByteString> function, Object name) {
-    final int pos = buffer.position();
-    final int lim = buffer.limit();
-    final ByteString bytes = function.apply(buffer);
-    assertInt(pos, buffer.position(), () -> name + ": Unexpected position");
-    assertInt(lim, buffer.limit(), () -> name + ": Unexpected limit");
-    return bytes;
-  }
 }

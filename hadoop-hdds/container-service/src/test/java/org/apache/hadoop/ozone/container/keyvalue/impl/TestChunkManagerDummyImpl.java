@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -52,7 +52,7 @@ public class TestChunkManagerDummyImpl extends AbstractTestChunkManager {
   public void dummyManagerReadsAnyChunk() throws Exception {
     ChunkManager dummy = createTestSubject();
 
-    ChunkBuffer dataRead = dummy.readChunk(getKeyValueContainer(),
+    ChunkBufferToByteString dataRead = dummy.readChunk(getKeyValueContainer(),
         getBlockID(), getChunkInfo(), getDispatcherContext());
 
     assertNotNull(dataRead);
