@@ -724,20 +724,20 @@ public class TestContainerEndpoint {
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
     MissingContainersResponse responseWithLimitObject
-            = (MissingContainersResponse) responseWithLimit.getEntity();
+        = (MissingContainersResponse) responseWithLimit.getEntity();
     assertEquals(3, responseWithLimitObject.getTotalCount());
     MissingContainerMetadata containerWithLimit =
-            responseWithLimitObject.getContainers().stream().findFirst()
-                    .orElse(null);
+        responseWithLimitObject.getContainers().stream().findFirst()
+            .orElse(null);
     assertNotNull(containerWithLimit);
     assertTrue(containerWithLimit.getReplicas().stream()
         .map(ContainerHistory::getState)
         .allMatch(s -> s.equals("UNHEALTHY")));
 
     Collection<MissingContainerMetadata> recordsWithLimit
-            = responseWithLimitObject.getContainers();
+        = responseWithLimitObject.getContainers();
     List<MissingContainerMetadata> missingWithLimit
-            = new ArrayList<>(recordsWithLimit);
+        = new ArrayList<>(recordsWithLimit);
     assertEquals(3, missingWithLimit.size());
     assertEquals(1L, missingWithLimit.get(0).getContainerID());
     assertEquals(2L, missingWithLimit.get(1).getContainerID());
@@ -919,7 +919,7 @@ public class TestContainerEndpoint {
     assertTrue(records.stream()
         .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
             .map(ContainerHistory::getState))
-            .allMatch(s -> s.equals("UNHEALTHY")));
+        .allMatch(s -> s.equals("UNHEALTHY")));
     // There should only be 5 missing containers and no others as we asked for
     // only missing.
     assertEquals(5, records.size());
@@ -1272,11 +1272,17 @@ public class TestContainerEndpoint {
         containerEndpoint.getContainerMisMatchInsights(10, 0, "SCM");
     Map<String, Object> response =
         (Map<String, Object>) containerInsights.getEntity();
-    long prevKey = (long) response.get("prevKey");
-    assertEquals(1, prevKey);
+
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) response.get(
             "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) response.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(1, containerDiscrepancyInfo.getContainerID());
@@ -1372,6 +1378,13 @@ public class TestContainerEndpoint {
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) response.get(
             "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) response.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(2, containerDiscrepancyInfo.getContainerID());
@@ -1407,6 +1420,12 @@ public class TestContainerEndpoint {
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         (List<ContainerDiscrepancyInfo>) response.get(
             "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) response.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
 
     // Check the first two ContainerDiscrepancyInfo objects in the response
     assertEquals(3, containerDiscrepancyInfoList.size());

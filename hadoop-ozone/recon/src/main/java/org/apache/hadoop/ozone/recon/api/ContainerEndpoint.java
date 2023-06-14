@@ -108,8 +108,39 @@ public class ContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
-  private static final String SCM_FILTER = "SCM";
-  private static final String OM_FILTER = "OM";
+
+  /**
+   * Enumeration representing different data filters.
+   * Each filter has an associated value.
+   */
+  public enum DataFilter {
+    SCM("SCM"),  // Filter for SCM
+    OM("OM");    // Filter for OM
+
+    private final String value;
+
+    DataFilter(String value) {
+      this.value = value;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    /**
+     * Convert a String value to the corresponding DataFilter enum constant.
+     * The comparison is case-insensitive.
+     */
+    public static DataFilter fromValue(String value) {
+      for (DataFilter filter : DataFilter.values()) {
+        if (filter.getValue().equalsIgnoreCase(value)) {
+          return filter;
+        }
+      }
+      throw new IllegalArgumentException("Invalid DataFilter value: " + value);
+    }
+  }
+
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
@@ -543,9 +574,11 @@ public class ContainerEndpoint {
                   HddsProtos.LifeCycleState.DELETED)
               .map(containerInfo -> containerInfo.getContainerID())
               .collect(Collectors.toList());
+      DataFilter dataFilter = DataFilter.fromValue(missingIn.toUpperCase());
 
-      switch (missingIn.toUpperCase()) {
-      case SCM_FILTER:
+      switch (dataFilter) {
+
+      case SCM:
         List<Map.Entry<Long, ContainerMetadata>> notSCMContainers =
             omContainers.entrySet().stream()
                 .filter(
@@ -583,7 +616,7 @@ public class ContainerEndpoint {
         });
         break;
 
-      case OM_FILTER:
+      case OM:
         List<Long> nonOMContainers = scmNonDeletedContainers.stream()
             .filter(containerId -> !omContainers.containsKey(containerId))
             .collect(Collectors.toList());
