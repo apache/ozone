@@ -687,8 +687,8 @@ public class ReplicationManager implements SCMService {
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcDeletionCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
-        getMetrics().incrNumDeletionCmdsSent();
-        getMetrics().incrNumDeletionBytesTotal(containerInfo.getUsedBytes());
+        getMetrics().incrDeletionCmdsSentTotal();
+        getMetrics().incrDeletionBytesTotal(containerInfo.getUsedBytes());
       }
     } else if (cmd.getType() == Type.reconstructECContainersCommand) {
       ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
@@ -725,7 +725,7 @@ public class ReplicationManager implements SCMService {
       if (rcc.getReplicaIndex() > 0) {
         getMetrics().incrEcReplicationCmdsSentTotal();
       } else if (rcc.getReplicaIndex() == 0) {
-        getMetrics().incrNumReplicationCmdsSent();
+        getMetrics().incrReplicationCmdsSentTotal();
       }
     }
   }
