@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
@@ -128,6 +129,8 @@ public class WritableECContainerProvider
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
+          Optional.ofNullable(containerInfo)
+              .ifPresent(ContainerInfo::updateLastUsedTime);
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
