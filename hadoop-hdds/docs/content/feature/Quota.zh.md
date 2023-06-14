@@ -69,13 +69,13 @@ g. 对于移动到垃圾桶的文件和目录，垃圾桶将在以下情况下�
 - 来源：/<vol>/<bucket>/dir1/dir2/file.txt
 场景 1：
 - 将 file.txt 移至回收站（删除操作时）
-- 使用“dir1 和 dir2”作为额外命名空间创建的垃圾桶与垃圾桶中的源具有相同的路径：
+- 使用“dir1”和“dir2” 在垃圾桶中创建与来源相同的路径
   /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
   所以这将消耗“2”的额外名称空间
   
 场景 2：
 - 将 dir2 移至垃圾箱（删除操作时）
-- 使用“dir1”创建的垃圾作为额外的命名空间
+- 使用“dir1”在垃圾桶中创建与来源相同的路径
   /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
   所以这将为 dir1 消耗额外的命名空间“1”
   
