@@ -18,7 +18,7 @@
 
 import React from 'react';
 import { AgChartsReact } from 'ag-charts-react';
-import {byteToSize} from 'utils/common';
+import { byteToSize } from 'utils/common';
 
 interface ITreeResponse {
   label: string;
@@ -42,8 +42,8 @@ interface IHeatmapConfigurationProps {
 }
 
 const colourScheme = {
-  "pastel_greens": [
-    '#CCFFD9',  //light green start (least accessed)
+  pastel_greens: [
+    '#CCFFD9', //light green start (least accessed)
     '#B9FBD5',
     '#A7F7D1',
     '#94F2CD',
@@ -54,8 +54,8 @@ const colourScheme = {
     '#38DEBA',
     '#25D9B6',
     '#13D5B2',
-    '#00D1AE',  //dark green ends (light to moderate accces)
-    '#FFD28F',  //light orange (moderate access)
+    '#00D1AE', //dark green ends (light to moderate accces)
+    '#FFD28F', //light orange (moderate access)
     '#FFC58A',
     '#FFB984',
     '#FEAC7F',
@@ -63,7 +63,7 @@ const colourScheme = {
     '#FE9274',
     '#FE866F',
     '#FD7969',
-    '#FD6C64',  //red (most accessed)
+    '#FD6C64' //red (most accessed)
   ]
 };
 
@@ -75,14 +75,13 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
       // Tree Map Options Start
       options: {
         data,
-        series: [
-          {
+        series: [{
           type: 'treemap',
           labelKey: 'label',// the name of the key to fetch the label value from
           sizeKey: 'normalizedSize',// the name of the key to fetch the value that will determine tile size
           colorKey: 'color',
-          title: { color: '#424242', fontSize: 16, fontFamily:'Roboto', fontWeight: '600'},
-          subtitle: { color: '#424242', fontSize: 12, fontFamily:'Roboto', fontWeight: '400' },
+          title: { color: '#424242', fontSize: 16, fontFamily: 'Roboto', fontWeight: '600' },
+          subtitle: { color: '#424242', fontSize: 12, fontFamily: 'Roboto', fontWeight: '400' },
           tooltip: {
             renderer: (params) => {
               return {
@@ -112,52 +111,49 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
             text: {
               color: '#424242',
             },
-            item:{
+            item: {
               fill: undefined,
             },
           },
           listeners: {
-              nodeClick: (event) => {
-              var data = event.datum;
+            nodeClick: (event) => {
+              const data = event.datum;
               if (data.path) {
                 this.props.onClick(data.path);
               }
-              },
             },
+          },
         }],
-        title: { text: 'Volumes and Buckets'},
-        }
-    // Tree Map Options End
-    }
+        title: { text: 'Volumes and Buckets' },
+      }
+      // Tree Map Options End
+    };
   };
 
-    
-  tooltipContent = (params:any) => {
+
+  tooltipContent = (params: any) => {
     let tooltipContent = `<span>
       Size:
       ${byteToSize(params.datum.size, 1)}
       `;
-      if(params.datum.accessCount!==undefined ){
-        tooltipContent += `<br/>
+    if (params.datum.accessCount !== undefined) {
+      tooltipContent += `<br/>
         Access count:
-      ${params.datum.accessCount }
-    `;}
+      ${params.datum.accessCount}
+    `;
+    }
     if (params.datum.label !== "") {
-        tooltipContent += `<br/>
+      tooltipContent += `<br/>
           File Name:
           ${params.datum.label ? params.datum.label.split("/").slice(-1) : "None"}
         `;
-      }
+    }
     tooltipContent += '</span>';
     return tooltipContent;
   };
 
   render() {
     const { options } = this.state;
-    return (
-      <AgChartsReact options={options} />
-    );
+    return <AgChartsReact options={options} />;
   }
-
 }
-

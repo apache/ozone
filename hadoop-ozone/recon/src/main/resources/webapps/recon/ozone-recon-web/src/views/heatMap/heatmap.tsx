@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import React from 'react';
 import axios from 'axios';
 import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker } from 'antd';
@@ -43,7 +42,7 @@ interface IChildren {
 
 interface ITreeState {
   isLoading: boolean;
-  treeResponse: ITreeResponse[]
+  treeResponse: ITreeResponse[];
   showPanel: boolean;
   inputPath: string;
   entityType: string;
@@ -69,7 +68,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   handleCalendarChange = (e: any) => {
     if (e.key === '24H' || e.key === '7D' || e.key === '90D') {
-      this.setState((prevState, newState) => ({
+      this.setState((prevState, _newState) => ({
         date: e.key,
         inputPath: prevState.inputPath,
         entityType: prevState.entityType
@@ -83,7 +82,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     if (e.key === 'volume' || e.key === 'bucket' || e.key === 'key') {
       minSize = Infinity;
       maxSize = 0;
-      this.setState((prevState, newState) => ({
+      this.setState((prevState, _newState) => ({
         entityType: e.key,
         date: prevState.date,
         inputPath: prevState.inputPath
@@ -107,7 +106,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     }
     this.setState({
       inputPath: validExpression
-    })
+    });
   };
 
   handleSubmit = (_e: any) => {
@@ -124,7 +123,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     axios.get(treeEndpoint).then(response => {
       minSize = this.minmax(response.data)[0];
       maxSize = this.minmax(response.data)[1];
-      let treeResponse: ITreeResponse = this.updateSize(response.data);
+      const treeResponse: ITreeResponse = this.updateSize(response.data);
       this.setState({
         isLoading: false,
         showPanel: false,
@@ -159,21 +158,20 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   onChange = (date: any[]) => {
-
     this.setState(prevState => ({
       date: moment(date).unix(),
       entityType: prevState.entityType,
       inputPath: prevState.inputPath
     }), () => {
-      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
+      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date);
     });
-  }
+  };
 
   disabledDate(current: any) {
     return current > moment() || current < moment().subtract(90, 'day');
   }
 
-  resetInputpath = (e: any, path: string) => {
+  resetInputpath = (_e: any, path: string) => {
     if (!path || path === '/') {
       return;
     }
@@ -185,10 +183,11 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   minmax = (obj: any) => {
-    if (obj.hasOwnProperty('children')) {
-      obj.children.forEach((child: any) => this.minmax(child))
-    };
-    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
+    if (Object.prototype.hasOwnProperty.call(obj, 'children')) {
+      obj.children.forEach((child: any) => this.minmax(child));
+    }
+
+    if (Object.prototype.hasOwnProperty.call(obj, 'size') && Object.prototype.hasOwnProperty.call(obj, 'color')) {
       minSize = Math.min(minSize, obj.size);
       maxSize = Math.max(maxSize, obj.size);
     }
@@ -197,11 +196,11 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   updateSize = (obj: any) => {
     //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
-    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
-      let newSize = this.normalize(minSize, maxSize, obj.size);
+    if (Object.prototype.hasOwnProperty.call(obj, 'size') && Object.prototype.hasOwnProperty.call(obj, 'color')) {
+      const newSize = this.normalize(minSize, maxSize, obj.size);
       obj['normalizedSize'] = newSize;
     }
-    if (obj.hasOwnProperty('children')) {
+    if (Object.prototype.hasOwnProperty.call(obj, 'children')) {
       obj.children.forEach((child: any) => this.updateSize(child));
     }
     return obj;
@@ -209,24 +208,24 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   normalize = (min: number, max: number, size: number) => {
     //Normaized Size using Deviation and mid Point
-    var mean = (max + min) / 2;
-    var highMean = (max + mean) / 2;
-    var lowMean1 = (min + mean) / 2;
-    var lowMean2 = (lowMean1 + min) / 2;
+    const mean = (max + min) / 2;
+    const highMean = (max + mean) / 2;
+    const lowMean1 = (min + mean) / 2;
+    const lowMean2 = (lowMean1 + min) / 2;
 
     if (size > highMean) {
-      var newsize = highMean + (size * 0.1);
+      const newsize = highMean + (size * 0.1);
       return (newsize);
     }
     // lowmean2= 100 value=10, diff=
     // min= 10 ,max=100, mean=55, lowmean1=32.5,lowmean2=22, value= 15, diff=7, diff/2=3.5, newsize= 22-3.5=18.5
     if (size < lowMean2) {
-      var diff = (lowMean2 - size) / 2;
-      var newSize = lowMean2 - diff;
+      const diff = (lowMean2 - size) / 2;
+      const newSize = lowMean2 - diff;
       return (newSize);
     }
     return size;
-  }
+  };
 
   render() {
     const { treeResponse, isLoading, inputPath, date } = this.state;
@@ -329,10 +328,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                   No Data Available.{' '}<br />
                 </div>
               }
-
             </div>
-          )
-          }
+          )}
         </div>
       </div>
     );
