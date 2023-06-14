@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAllRootCaCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -61,8 +62,6 @@ import org.apache.hadoop.ipc.RPC;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
-import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.*;
-
 /**
  * This class is the client-side translator that forwards requests for
  * {@link SCMSecurityProtocol} to the {@link SCMSecurityProtocolPB} proxy.
@@ -89,7 +88,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * Helper method to wrap the request and send the message.
    */
   private SCMSecurityResponse submitRequest(
-      Type type,
+      SCMSecurityProtocolProtos.Type type,
       Consumer<Builder> builderConsumer) throws IOException {
     final SCMSecurityResponse response;
     try {
@@ -118,7 +117,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    */
   private SCMSecurityResponse handleError(SCMSecurityResponse resp)
       throws SCMSecurityException {
-    if (resp.getStatus() != Status.OK) {
+    if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
       throw new SCMSecurityException(resp.getMessage(),
           SCMSecurityException.ErrorCode.values()[resp.getStatus().ordinal()]);
     }

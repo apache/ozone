@@ -26,9 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.SortedSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -891,7 +888,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // We need to pass getCACertificate as rootCA certificate,
     // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        rootCertificateServer, scmCertificateServer, rootCaList, this, secretKeyManager);
+        rootCertificateServer,
+        scmCertificateServer,
+        rootCaList,
+        this,
+        secretKeyManager);
 
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
