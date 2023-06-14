@@ -237,13 +237,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getAllRootCaCertificates() throws IOException {
+  public List<String> getAllRootCaCertificates() throws IOException {
     ArrayList<String> pemEncodedList =
         new ArrayList<>(rootCACertificate.size());
     for (X509Certificate cert : rootCACertificate) {
       pemEncodedList.add(getPEMEncodedString(cert));
     }
-    return StringUtils.join(pemEncodedList, "\n");
+    return pemEncodedList;
   }
 
   /**

@@ -21,6 +21,8 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAllRootCaCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAllRootCaCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
@@ -150,10 +152,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         return scmSecurityResponse.setGetCertResponseProto(
                 getCertificate(request.getGetCertRequest()))
             .build();
-
       case GetAllRootCaCertificates:
-        return scmSecurityResponse.setGetCertResponseProto(
-            getAllRootCa()).build();
+        return scmSecurityResponse.setAllRootCaCertificatesResponseProto(
+            getAllRootCa()
+        ).build();
 
       default:
         throw new IllegalArgumentException(
@@ -401,9 +403,12 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         ".scm.ratis.enable config");
   }
 
-  public SCMGetCertResponseProto getAllRootCa() throws IOException {
-    return SCMGetCertResponseProto.newBuilder()
-        .setX509Certificate(impl.getAllRootCaCertificates())
+  public SCMGetAllRootCaCertificatesResponseProto getAllRootCa()
+      throws IOException {
+    return SCMGetAllRootCaCertificatesResponseProto.newBuilder()
+        .setResponseCode(SCMGetAllRootCaCertificatesResponseProto
+            .ResponseCode.success)
+        .addAllAllX509RootCaCertificates(impl.getAllRootCaCertificates())
         .build();
   }
 

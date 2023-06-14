@@ -177,6 +177,6 @@ public interface SCMSecurityProtocol {
    * @return String     - pem encoded concatanation of root CA certificates
    * @return
    */
-  String getAllRootCaCertificates() throws IOException;
+  List<String> getAllRootCaCertificates() throws IOException;
 
 }

@@ -82,6 +82,8 @@ message SCMSecurityResponse {
     optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
 
     optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
+
+    optional SCMGetAllRootCaCertificatesResponseProto allRootCaCertificatesResponseProto = 11;
 }
 
 enum Type {
@@ -196,6 +198,15 @@ message SCMListCertificateResponseProto {
     }
     required ResponseCode responseCode = 1;
     repeated string certificates = 2;
+}
+
+message SCMGetAllRootCaCertificatesResponseProto {
+    enum ResponseCode {
+        success = 1;
+        authenticationFailed = 2;
+    }
+    required ResponseCode responseCode = 1;
+    repeated string allX509RootCaCertificates = 2;
 }
 
 message SCMGetRootCACertificateRequestProto {
