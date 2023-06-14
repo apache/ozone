@@ -944,7 +944,7 @@ public class TestOmSnapshot {
   private String createFileKey(OzoneBucket bucket, String keyPrefix)
       throws IOException {
     byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    String key = keyPrefix + counter.incrementAndGet();
+    String key = keyPrefix;
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
@@ -1087,5 +1087,32 @@ public class TestOmSnapshot {
     // RocksDBCheckpointDiffer should be null for snapshot DB store.
     assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
     assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
+  }
+
+  @Test
+  public void testSnapDiffHandlingReclaimWithLatestUse1() throws Exception {
+    String testVolumeName = "vol";
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    volume.createBucket(testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+    for (int i = 1;i<=5;i++) {
+      String key1 = "k"+i;
+      key1 = createFileKey(bucket, key1);
+    }
+
+    String snap1 = "snap1";
+
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    String snap2 = "snap2";
+    bucket.deleteKey("k1");
+    bucket.deleteKey("k2");
+    bucket.renameKey("k3","k3_renamed");
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReportOzone diff =
+        getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+    System.out.println(diff.getDiffList());
+
   }
 }
