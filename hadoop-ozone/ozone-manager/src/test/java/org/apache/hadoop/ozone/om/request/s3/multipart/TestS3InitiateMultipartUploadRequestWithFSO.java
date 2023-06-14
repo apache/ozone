@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -144,6 +146,82 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       OMRequest initiateMPURequest) {
     return new S3InitiateMultipartUploadRequestWithFSO(initiateMPURequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Test
+  public void testMultipartUploadInheritParentDefaultAcls()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String prefix = "a/b/c/";
+    List<String> dirs = new ArrayList<>();
+    dirs.add("a");
+    dirs.add("b");
+    dirs.add("c");
+    String keyName = prefix + UUID.randomUUID();
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls();
+    Assert.assertEquals(acls, bucketAcls);
+
+    // create file inherit bucket DEFAULT acls
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+        bucketName);
+    OMRequest modifiedRequest = doPreExecuteInitiateMPUWithFSO(volumeName,
+        bucketName, keyName);
+
+    S3InitiateMultipartUploadRequest s3InitiateMultipartUploadReqFSO =
+        getS3InitiateMultipartUploadReq(modifiedRequest);
+
+    OMClientResponse omClientResponse =
+        s3InitiateMultipartUploadReqFSO.validateAndUpdateCache(
+            ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    verifyKeyInheritAcls(dirs, volumeId, bucketId, bucketAcls);
+
+  }
+
+  private void verifyKeyInheritAcls(List<String> dirs,
+      long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
+      throws IOException {
+    // bucketID is the parent
+    long parentID = bucketId;
+    List<OzoneAcl> expectedParentAcls = bucketAcls;
+
+    for (int indx = 0; indx < dirs.size(); indx++) {
+      String dirName = dirs.get(indx);
+      String dbKey = "";
+      // for index=0, parentID is bucketID
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+          parentID, dirName);
+      OmDirectoryInfo omDirInfo =
+          omMetadataManager.getDirectoryTable().get(dbKey);
+      List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
+
+      Assert.assertEquals("Failed to inherit parent acls!,",
+          expectedParentAcls, omDirAcls);
+
+      parentID = omDirInfo.getObjectID();
+      expectedParentAcls = omDirAcls;
+    }
   }
 
   @Override

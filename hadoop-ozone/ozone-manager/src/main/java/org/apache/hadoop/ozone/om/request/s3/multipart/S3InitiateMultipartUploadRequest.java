@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -57,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -152,6 +154,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      OMFileRequest.OMPathInfo pathInfo =
+          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+              bucketName, keyName, Paths.get(keyName));
+
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
       // ever finally commit the key, we see that key in ozone. Suppose if we
@@ -202,7 +208,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(getAclsForKey(keyArgs, bucketInfo, null,
+          .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfo,
               ozoneManager.getPrefixManager()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)

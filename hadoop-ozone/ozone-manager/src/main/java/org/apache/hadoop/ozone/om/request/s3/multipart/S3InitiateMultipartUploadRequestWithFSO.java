@@ -118,10 +118,13 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
+      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+          volumeName, bucketName);
+
       // add all missing parents to dir table
       missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, pathInfoFSO,
-              transactionLogIndex);
+          .getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
+              pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -156,8 +159,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
-          volumeName, bucketName);
       final ReplicationConfig replicationConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),

@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -236,19 +235,19 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omMetadataManager.getBucketKey(volumeName, bucketName));
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
-      List< OzoneAcl > inheritAcls;
       if (LOG.isDebugEnabled()) {
         LOG.debug("BucketName: {}, BucketLayout: {}",
             bucketInfo.getBucketName(), bucketInfo.getBucketLayout());
       }
+
+      OMFileRequest.OMPathInfo pathInfo =
+          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+              bucketName, keyName, Paths.get(keyName));
+
       if (bucketInfo.getBucketLayout()
           .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
-        OMFileRequest.OMPathInfo pathInfo =
-            OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-                bucketName, keyName, Paths.get(keyName));
         OMFileRequest.OMDirectoryResult omDirectoryResult =
             pathInfo.getDirectoryResult();
-        inheritAcls = pathInfo.getAcls();
 
         // Check if a file or directory exists with same key name.
         if (omDirectoryResult == DIRECTORY_EXISTS) {
@@ -263,7 +262,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
         missingParentInfos = OMDirectoryCreateRequest
             .getAllParentInfo(ozoneManager, keyArgs,
-                pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
+                pathInfo.getMissingParents(), bucketInfo,
+                pathInfo, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
       }
@@ -276,7 +276,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled(), replicationConfig);
 

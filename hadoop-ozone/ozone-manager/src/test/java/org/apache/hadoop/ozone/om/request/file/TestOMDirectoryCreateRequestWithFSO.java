@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -708,6 +707,30 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   }
 
+  private void verifyDirectoriesInheritAcls(List<String> dirs,
+      long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
+      throws IOException {
+    // bucketID is the parent
+    long parentID = bucketId;
+    List<OzoneAcl> expectedParentAcls = bucketAcls;
+
+    for (int indx = 0; indx < dirs.size(); indx++) {
+      String dirName = dirs.get(indx);
+      String dbKey = "";
+      // for index=0, parentID is bucketID
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+          parentID, dirName);
+      OmDirectoryInfo omDirInfo =
+          omMetadataManager.getDirectoryTable().get(dbKey);
+      List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
+
+      Assert.assertEquals("Failed to inherit parent acls!,",
+          expectedParentAcls, omDirAcls);
+
+      parentID = omDirInfo.getObjectID();
+      expectedParentAcls = omDirAcls;
+    }
+  }
 
   @NotNull
   private String createDirKey(List<String> dirs, int depth) {
@@ -759,33 +782,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
               omMetadataManager.getDirectoryTable()
                       .getCacheValue(new CacheKey<>(dbKey));
       Assert.assertNull("Unexpected directory!", omDirInfoCacheValue);
-    }
-  }
-
-  private void verifyDirectoriesInheritAcls(List<String> dirs,
-      long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
-      throws IOException {
-    // bucketID is the parent
-    long parentID = bucketId;
-    List<OzoneAcl> expectedParentAcls =
-        OzoneAclUtil.filterDefaultScope(bucketAcls);
-
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
-      String dbKey = "";
-      // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-          parentID, dirName);
-      OmDirectoryInfo omDirInfo =
-          omMetadataManager.getDirectoryTable().get(dbKey);
-      List<OzoneAcl> omDirAcls =
-          OzoneAclUtil.filterDefaultScope(omDirInfo.getAcls());
-
-      Assert.assertEquals("Failed to inherit parent acls!,",
-          expectedParentAcls, omDirAcls);
-
-      parentID = omDirInfo.getObjectID();
-      expectedParentAcls = omDirAcls;
     }
   }
 

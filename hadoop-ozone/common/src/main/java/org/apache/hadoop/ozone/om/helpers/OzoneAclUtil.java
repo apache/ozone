@@ -190,16 +190,6 @@ public final class OzoneAclUtil {
   }
 
   /**
-   * Helper function to filter the DEFAULT scope ACLs.
-   * This method is called in ACL inheritance scenarios.
-   * @param acls
-   */
-  public static List<OzoneAcl> filterDefaultScope(List<OzoneAcl> acls) {
-    return acls.stream().filter(a -> a.getAclScope() == DEFAULT)
-        .collect(Collectors.toList());
-  }
-
-  /**
    * Convert a list of OzoneAclInfo(protoc) to list of OzoneAcl(java).
    * @param protoAcls
    * @return list of OzoneAcl.

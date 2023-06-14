@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -150,10 +149,12 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
 
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
         // prepare all missing parents
         missingParentInfos =
-                OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-                        ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
+            OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+                ozoneManager, keyArgs, omBucketInfo, omPathInfo, trxnLogIndex);
 
         final long volumeId = omMetadataManager.getVolumeId(volumeName);
         final long bucketId = omMetadataManager
@@ -161,8 +162,6 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
         // total number of keys created.
         numKeysCreated = missingParentInfos.size() + 1;
-        OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
         checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated);
         omBucketInfo.incrUsedNamespace(numKeysCreated);
 
@@ -171,7 +170,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
             omPathInfo.getLeafNodeName(),
             keyArgs, omPathInfo.getLeafNodeObjectId(),
             omPathInfo.getLastKnownParentId(), trxnLogIndex,
-            buildAcls(keyArgs, omPathInfo.getAcls()));
+            omBucketInfo, omPathInfo);
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
             volumeId, bucketId, trxnLogIndex,
             missingParentInfos, dirInfo);
@@ -253,9 +252,9 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
    * @throws IOException DB failure
    */
   public static List<OmDirectoryInfo> getAllMissingParentDirInfo(
-          OzoneManager ozoneManager, KeyArgs keyArgs,
-          OMFileRequest.OMPathInfoWithFSO pathInfo, long trxnLogIndex)
-          throws IOException {
+      OzoneManager ozoneManager, KeyArgs keyArgs, OmBucketInfo bucketInfo,
+      OMFileRequest.OMPathInfoWithFSO pathInfo, long trxnLogIndex)
+      throws IOException {
     List<OmDirectoryInfo> missingParentInfos = new ArrayList<>();
 
     // The base id is left shifted by 8 bits for creating space to
@@ -272,7 +271,6 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     long lastKnownParentId = pathInfo.getLastKnownParentId();
     List<String> missingParents = pathInfo.getMissingParents();
-    List<OzoneAcl> acls = buildAcls(keyArgs, pathInfo.getAcls());
     for (String missingKey : missingParents) {
       long nextObjId = baseObjId + objectCount;
       if (nextObjId > maxObjId) {
@@ -285,7 +283,8 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       LOG.debug("missing parent {} getting added to DirectoryTable",
               missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
-              keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, acls);
+          keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
+          bucketInfo, pathInfo);
       objectCount++;
 
       missingParentInfos.add(dirInfo);
@@ -300,28 +299,27 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
   /**
    * Fill in a DirectoryInfo for a new directory entry in OM database.
-   * without initializing ACLs from the KeyArgs - used for intermediate
-   * directories which get created internally/recursively during file
-   * and directory create.
    * @param dirName
    * @param keyArgs
    * @param objectId
    * @param parentObjectId
-   * @param inheritAcls
+   * @param bucketInfo
+   * @param omPathInfo
    * @return the OmDirectoryInfo structure
    */
   private static OmDirectoryInfo createDirectoryInfoWithACL(
-          String dirName, KeyArgs keyArgs, long objectId,
-          long parentObjectId, long transactionIndex,
-          List<OzoneAcl> inheritAcls) {
+      String dirName, KeyArgs keyArgs, long objectId,
+      long parentObjectId, long transactionIndex,
+      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo) {
 
     return OmDirectoryInfo.newBuilder()
-            .setName(dirName)
-            .setCreationTime(keyArgs.getModificationTime())
-            .setModificationTime(keyArgs.getModificationTime())
-            .setObjectID(objectId)
-            .setUpdateID(transactionIndex)
-            .setParentObjectID(parentObjectId)
-            .setAcls(inheritAcls).build();
+        .setName(dirName)
+        .setCreationTime(keyArgs.getModificationTime())
+        .setModificationTime(keyArgs.getModificationTime())
+        .setObjectID(objectId)
+        .setUpdateID(transactionIndex)
+        .setParentObjectID(parentObjectId)
+        .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo))
+        .build();
   }
 }
