@@ -89,7 +89,7 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
               };
             }
           },
-          formatter: ({highlighted}) => {
+          formatter: ({ highlighted }) => {
             const stroke = highlighted ? '#CED4D9' : '#FFFFFF';
             return { stroke };
           },

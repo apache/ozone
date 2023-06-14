@@ -31,8 +31,7 @@
         "no-unused-vars": [
             "warn",
             {
-                "argsIgnorePattern": "_[a-z]",
-                "varsIgnorePattern": "_[a-z]"
+                "argsIgnorePattern": "_[a-z]"
             }
         ],
         "constructor-super": "warn",
