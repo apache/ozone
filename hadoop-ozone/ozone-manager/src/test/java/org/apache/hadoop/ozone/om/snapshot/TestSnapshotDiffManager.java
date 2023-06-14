@@ -749,7 +749,7 @@ public class TestSnapshotDiffManager {
 
   @ParameterizedTest
   @MethodSource("snapDiffCancelFailureScenarios")
-  public void testCancelSnapshotDiffFailure(JobStatus jobStatus,
+  public void testSnapshotDiffCancelFailure(JobStatus jobStatus,
                                             CancelStatus cancelStatus,
                                             boolean jobIsCanceled)
       throws IOException {
