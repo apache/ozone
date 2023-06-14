@@ -522,7 +522,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX =
       "ozone.om.lock.striped.size.";
 
-  public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 1024;
+  public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
   public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
       "ozone.client.list.trash.keys.max";

@@ -92,7 +92,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
 
         testSameKeyPathWriteLockMultiThreadingUtil(iterations, lock, counter,
             countDownLatch, listTokens, sampleResourceName);
-      });
+      }, "Thread-" + i);
 
       threads[i].start();
     }
@@ -185,8 +185,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
 
         testDiffKeyPathWriteLockMultiThreadingUtil(lock, countDown,
             sampleResourceName);
-      });
-
+      }, "Thread-" + i);
       threads[i].start();
     }
 
@@ -222,15 +221,6 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     // Waiting for all the threads to be instantiated/to reach
     // acquireWriteHashedLock.
     countDown.countDown();
-    while (countDown.getCount() > 0) {
-      try {
-        Thread.sleep(500);
-        LOG.info("countDown.getCount() -> " + countDown.getCount());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-
     Assert.assertEquals(1, lock.getCurrentLocks().size());
 
     lock.releaseWriteLock(resource, sampleResourceName);

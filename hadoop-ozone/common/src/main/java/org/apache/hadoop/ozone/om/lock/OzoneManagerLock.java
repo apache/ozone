@@ -20,20 +20,25 @@ package org.apache.hadoop.ozone.om.lock;
 
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.lock.LockManager;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
+import static org.apache.hadoop.hdds.utils.CompositeKey.combineKeys;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -78,14 +83,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
  */
 
 public class OzoneManagerLock implements IOzoneManagerLock {
-
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerLock.class);
 
-  private static final String READ_LOCK = "read";
-  private static final String WRITE_LOCK = "write";
+  private final Map<Resource, Striped<ReadWriteLock>> stripedLockByResource;
 
-  private final LockManager<String> manager;
   private OMLockMetrics omLockMetrics;
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
@@ -95,10 +97,35 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * @param conf Configuration object
    */
   public OzoneManagerLock(ConfigurationSource conf) {
-    boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
-        OZONE_MANAGER_FAIR_LOCK_DEFAULT);
-    manager = new LockManager<>(conf, fair);
     omLockMetrics = OMLockMetrics.create();
+
+    // TODO: for now, guava Striped doesn't allow create a striped
+    //  ReadWriteLock with fair-lock yet.
+    //  https://github.com/google/guava/issues/2514.
+    //  We may have to consider implement our own striped locks.
+    //boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
+    //    OZONE_MANAGER_FAIR_LOCK_DEFAULT);
+
+    Map<Resource, Striped<ReadWriteLock>> stripedLockMap = new HashMap<>();
+    for (Resource r : Resource.values()) {
+      stripedLockMap.put(r, createStripeLock(r, conf));
+    }
+    this.stripedLockByResource = Collections.unmodifiableMap(stripedLockMap);
+  }
+
+  private Striped<ReadWriteLock> createStripeLock(Resource r,
+      ConfigurationSource conf) {
+    String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
+        r.name().toLowerCase();
+    int size = conf.getInt(stripeSizeKey,
+        OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT);
+    return Striped.readWriteLock(size);
+  }
+
+  private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
+    Object key = keys.length == 1 ? keys[0] : combineKeys(keys);
+    Striped<ReadWriteLock> lockStriped = stripedLockByResource.get(resource);
+    return (ReentrantReadWriteLock) lockStriped.get(key);
   }
 
   /**
@@ -113,15 +140,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * Special Note for USER_LOCK: Single thread can acquire single user lock/
    * multi user lock. But not both at the same time.
    * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
+   * @param keys - Resource names on which user want to acquire lock.
    * For Resource type BUCKET_LOCK, first param should be volume, second param
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
   @Override
-  public boolean acquireReadLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return lock(resource, resourceName, manager::readLock, READ_LOCK);
+  public boolean acquireReadLock(Resource resource, String... keys) {
+    return acquireLock(resource, true, keys);
   }
 
   /**
@@ -136,54 +162,47 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * Special Note for USER_LOCK: Single thread can acquire single user lock/
    * multi user lock. But not both at the same time.
    * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
+   * @param keys - Resource names on which user want to acquire lock.
    * For Resource type BUCKET_LOCK, first param should be volume, second param
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
   @Override
-  public boolean acquireWriteLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return lock(resource, resourceName, manager::writeLock, WRITE_LOCK);
+  public boolean acquireWriteLock(Resource resource, String... keys) {
+    return acquireLock(resource, false, keys);
   }
 
-  private boolean lock(Resource resource, String resourceName,
-      Consumer<String> lockFn, String lockType) {
+  private boolean acquireLock(Resource resource, boolean isReadLock,
+      String... keys) {
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
-    } else {
-      long startWaitingTimeNanos = Time.monotonicNowNanos();
-      lockFn.accept(resourceName);
-
-      switch (lockType) {
-      case READ_LOCK:
-        updateReadLockMetrics(resource, resourceName, startWaitingTimeNanos);
-        break;
-      case WRITE_LOCK:
-        updateWriteLockMetrics(resource, resourceName, startWaitingTimeNanos);
-        break;
-      default:
-        break;
-      }
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Acquired {} {} lock on resource {}", lockType, resource.name,
-            resourceName);
-      }
-      lockSet.set(resource.setLock(lockSet.get()));
-      return true;
     }
+
+    long startWaitingTimeNanos = Time.monotonicNowNanos();
+
+    ReentrantReadWriteLock lock = getLock(resource, keys);
+    if (isReadLock) {
+      lock.readLock().lock();
+      updateReadLockMetrics(resource, lock, startWaitingTimeNanos);
+    } else {
+      lock.writeLock().lock();
+      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos);
+    }
+
+    lockSet.set(resource.setLock(lockSet.get()));
+    return true;
   }
 
-  private void updateReadLockMetrics(Resource resource, String resourceName,
-                                     long startWaitingTimeNanos) {
-    /**
+  private void updateReadLockMetrics(Resource resource,
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+
+    /*
      *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
      */
-    if (manager.getReadHoldCount(resourceName) == 1) {
+    if (lock.getReadHoldCount() == 1) {
       long readLockWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
@@ -195,15 +214,15 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private void updateWriteLockMetrics(Resource resource, String resourceName,
-                                      long startWaitingTimeNanos) {
-    /**
+  private void updateWriteLockMetrics(Resource resource,
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
+    /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
      *  by the current thread.
      */
-    if ((manager.getWriteHoldCount(resourceName) == 1) &&
-        manager.isWriteLockedByCurrentThread(resourceName)) {
+    if ((lock.getWriteHoldCount() == 1) &&
+        lock.isWriteLockedByCurrentThread()) {
       long writeLockWaitingTimeNanos =
           Time.monotonicNowNanos() - startWaitingTimeNanos;
 
@@ -212,30 +231,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
           TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
 
       resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
-    }
-  }
-
-  /**
-   * Generate resource name to be locked.
-   * @param resource
-   * @param resources
-   */
-  private String generateResourceName(Resource resource, String... resources) {
-    if (resources.length == 1 && resource != Resource.BUCKET_LOCK) {
-      return OzoneManagerLockUtil.generateResourceLockName(resource,
-          resources[0]);
-    } else if (resources.length == 2 && resource == Resource.BUCKET_LOCK) {
-      return OzoneManagerLockUtil.generateBucketLockName(resources[0],
-          resources[1]);
-    } else if (resources.length == 3 && resource == Resource.SNAPSHOT_LOCK) {
-      return OzoneManagerLockUtil.generateSnapshotLockName(resources[0],
-          resources[1], resources[2]);
-    } else if (resources.length == 3 && resource == Resource.KEY_PATH_LOCK) {
-      return OzoneManagerLockUtil.generateKeyPathLockName(resources[0],
-          resources[1], resources[2]);
-    } else {
-      throw new IllegalArgumentException("acquire lock is supported on single" +
-          " resource for all locks except for resource bucket/snapshot");
     }
   }
 
@@ -260,14 +255,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   /**
    * Acquire lock on multiple users.
-   * @param firstUser
-   * @param secondUser
    */
   @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
     Resource resource = Resource.USER_LOCK;
-    firstUser = generateResourceName(resource, firstUser);
-    secondUser = generateResourceName(resource, secondUser);
 
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
@@ -300,28 +291,26 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
       if (compare == 0) {
         // both users are equal.
-        manager.writeLock(firstUser);
+        acquireUserLock(firstUser);
       } else {
-        manager.writeLock(firstUser);
+        acquireUserLock(firstUser);
         try {
-          manager.writeLock(secondUser);
+          acquireUserLock(secondUser);
         } catch (Exception ex) {
           // We got an exception acquiring 2nd user lock. Release already
           // acquired user lock, and throw exception to the user.
-          manager.writeUnlock(firstUser);
+          releaseUserLock(firstUser);
           throw ex;
         }
-      }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Acquired Write {} lock on resource {} and {}", resource.name,
-            firstUser, secondUser);
       }
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
     }
   }
 
-
+  private void acquireUserLock(String user) {
+    getLock(Resource.USER_LOCK, user).writeLock().lock();
+  }
 
   /**
    * Release lock on multiple users.
@@ -330,10 +319,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    Resource resource = Resource.USER_LOCK;
-    firstUser = generateResourceName(resource, firstUser);
-    secondUser = generateResourceName(resource, secondUser);
-
     int compare = firstUser.compareTo(secondUser);
 
     String temp;
@@ -346,79 +331,71 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     if (compare == 0) {
       // both users are equal.
-      manager.writeUnlock(firstUser);
+      releaseUserLock(firstUser);
     } else {
-      manager.writeUnlock(firstUser);
-      manager.writeUnlock(secondUser);
+      releaseUserLock(firstUser);
+      releaseUserLock(secondUser);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Release Write {} lock on resource {} and {}", resource.name,
-          firstUser, secondUser);
+      LOG.debug("Release Write {} lock on resource {} and {}",
+          Resource.USER_LOCK, firstUser, secondUser);
     }
-    lockSet.set(resource.clearLock(lockSet.get()));
+    lockSet.set(Resource.USER_LOCK.clearLock(lockSet.get()));
+  }
+
+  private void releaseUserLock(String user) {
+    getLock(Resource.USER_LOCK, user).writeLock().unlock();
   }
 
   /**
    * Release write lock on resource.
    * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
+   * @param keys - Resource names on which user want to acquire lock.
    * For Resource type BUCKET_LOCK, first param should be volume, second param
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
   @Override
-  public void releaseWriteLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    unlock(resource, resourceName, manager::writeUnlock, WRITE_LOCK);
+  public void releaseWriteLock(Resource resource, String... keys) {
+    releaseLock(resource, false, keys);
   }
 
   /**
    * Release read lock on resource.
    * @param resource - Type of the resource.
-   * @param resources - Resource names on which user want to acquire lock.
+   * @param keys - Resource names on which user want to acquire lock.
    * For Resource type BUCKET_LOCK, first param should be volume, second param
    * should be bucket name. For remaining all resource only one param should
    * be passed.
    */
   @Override
-  public void releaseReadLock(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    unlock(resource, resourceName, manager::readUnlock, READ_LOCK);
+  public void releaseReadLock(Resource resource, String... keys) {
+    releaseLock(resource, true, keys);
   }
 
-  private void unlock(Resource resource, String resourceName,
-      Consumer<String> lockFn, String lockType) {
-    boolean isWriteLocked = manager.isWriteLockedByCurrentThread(resourceName);
-    // TODO: Not checking release of higher order level lock happened while
-    // releasing lower order level lock, as for that we need counter for
-    // locks, as some locks support acquiring lock again.
-    lockFn.accept(resourceName);
+  private void releaseLock(Resource resource, boolean isReadLock,
+      String... keys) {
 
-    switch (lockType) {
-    case READ_LOCK:
-      updateReadUnlockMetrics(resource, resourceName);
-      break;
-    case WRITE_LOCK:
-      updateWriteUnlockMetrics(resource, resourceName, isWriteLocked);
-      break;
-    default:
-      break;
+    ReentrantReadWriteLock lock = getLock(resource, keys);
+    if (isReadLock) {
+      lock.readLock().unlock();
+      updateReadUnlockMetrics(resource, lock);
+    } else {
+      boolean isWriteLocked = lock.isWriteLockedByCurrentThread();
+      lock.writeLock().unlock();
+      updateWriteUnlockMetrics(resource, lock, isWriteLocked);
     }
 
-    // clear lock
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Release {} {}, lock on resource {}", lockType, resource.name,
-          resourceName);
-    }
     lockSet.set(resource.clearLock(lockSet.get()));
   }
 
-  private void updateReadUnlockMetrics(Resource resource, String resourceName) {
-    /**
+  private void updateReadUnlockMetrics(Resource resource,
+      ReentrantReadWriteLock lock) {
+    /*
      *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
      */
-    if (manager.getReadHoldCount(resourceName) == 0) {
+    if (lock.getReadHoldCount() == 0) {
       long readLockHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartReadHeldTimeNanos();
 
@@ -428,14 +405,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     }
   }
 
-  private void updateWriteUnlockMetrics(Resource resource, String resourceName,
-                                        boolean isWriteLocked) {
-    /**
+  private void updateWriteUnlockMetrics(Resource resource,
+      ReentrantReadWriteLock lock, boolean isWriteLocked) {
+    /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
      *  by the current thread.
      */
-    if ((manager.getWriteHoldCount(resourceName) == 0) && isWriteLocked) {
+    if ((lock.getWriteHoldCount() == 0) && isWriteLocked) {
       long writeLockHeldTimeNanos =
           Time.monotonicNowNanos() - resource.getStartWriteHeldTimeNanos();
 
@@ -448,44 +425,38 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   /**
    * Returns readHoldCount for a given resource lock name.
    *
-   * @param resourceName resource lock name
    * @return readHoldCount
    */
   @Override
   @VisibleForTesting
-  public int getReadHoldCount(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return manager.getReadHoldCount(resourceName);
+  public int getReadHoldCount(Resource resource, String... keys) {
+    return getLock(resource, keys).getReadHoldCount();
   }
 
 
   /**
    * Returns writeHoldCount for a given resource lock name.
    *
-   * @param resourceName resource lock name
    * @return writeHoldCount
    */
   @Override
   @VisibleForTesting
-  public int getWriteHoldCount(Resource resource, String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return manager.getWriteHoldCount(resourceName);
+  public int getWriteHoldCount(Resource resource, String... keys) {
+    return getLock(resource, keys).getWriteHoldCount();
   }
 
   /**
    * Queries if the write lock is held by the current thread for a given
    * resource lock name.
    *
-   * @param resourceName resource lock name
    * @return {@code true} if the current thread holds the write lock and
    *         {@code false} otherwise
    */
   @Override
   @VisibleForTesting
   public boolean isWriteLockedByCurrentThread(Resource resource,
-      String... resources) {
-    String resourceName = generateResourceName(resource, resources);
-    return manager.isWriteLockedByCurrentThread(resourceName);
+      String... keys) {
+    return getLock(resource, keys).isWriteLockedByCurrentThread();
   }
 
   /**

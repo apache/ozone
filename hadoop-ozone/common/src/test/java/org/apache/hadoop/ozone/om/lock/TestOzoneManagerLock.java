@@ -25,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 /**
@@ -51,15 +53,13 @@ public class TestOzoneManagerLock {
   @Test
   public void acquireResourceLock() {
     String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
       resourceName = generateResourceName(resource);
       testResourceLock(resourceName, resource);
     }
   }
 
-  private void testResourceLock(String[] resourceName,
-      OzoneManagerLock.Resource resource) {
+  private void testResourceLock(String[] resourceName, Resource resource) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     lock.acquireWriteLock(resource, resourceName);
     lock.releaseWriteLock(resource, resourceName);
@@ -69,21 +69,20 @@ public class TestOzoneManagerLock {
   @Test
   public void reacquireResourceLock() {
     String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
       resourceName = generateResourceName(resource);
       testResourceReacquireLock(resourceName, resource);
     }
   }
 
   private void testResourceReacquireLock(String[] resourceName,
-      OzoneManagerLock.Resource resource) {
+      Resource resource) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     // Lock re-acquire not allowed by same thread.
-    if (resource == OzoneManagerLock.Resource.USER_LOCK ||
-        resource == OzoneManagerLock.Resource.S3_SECRET_LOCK ||
-        resource == OzoneManagerLock.Resource.PREFIX_LOCK) {
+    if (resource == Resource.USER_LOCK ||
+        resource == Resource.S3_SECRET_LOCK ||
+        resource == Resource.PREFIX_LOCK) {
       lock.acquireWriteLock(resource, resourceName);
       try {
         lock.acquireWriteLock(resource, resourceName);
@@ -112,14 +111,12 @@ public class TestOzoneManagerLock {
     // What this test does is iterate all resources. For each resource
     // acquire lock, and then in inner loop acquire all locks with higher
     // lock level, finally release the locks.
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
       Stack<ResourceInfo> stack = new Stack<>();
       resourceName = generateResourceName(resource);
       lock.acquireWriteLock(resource, resourceName);
       stack.push(new ResourceInfo(resourceName, resource));
-      for (OzoneManagerLock.Resource higherResource :
-          OzoneManagerLock.Resource.values()) {
+      for (Resource higherResource : Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           resourceName = generateResourceName(higherResource);
           lock.acquireWriteLock(higherResource, resourceName);
@@ -139,10 +136,8 @@ public class TestOzoneManagerLock {
   @Test
   public void testLockViolationsWithOneHigherLevelLock() {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
-      for (OzoneManagerLock.Resource higherResource :
-          OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
+      for (Resource higherResource : Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           String[] resourceName = generateResourceName(higherResource);
           lock.acquireWriteLock(higherResource, resourceName);
@@ -169,12 +164,10 @@ public class TestOzoneManagerLock {
     // What this test does is iterate all resources. For each resource
     // acquire an higher level lock above the resource, and then take the the
     // lock. This should fail. Like that it tries all error combinations.
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
       Stack<ResourceInfo> stack = new Stack<>();
       List<String> currentLocks = new ArrayList<>();
-      for (OzoneManagerLock.Resource higherResource :
-          OzoneManagerLock.Resource.values()) {
+      for (Resource higherResource : Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           resourceName = generateResourceName(higherResource);
           lock.acquireWriteLock(higherResource, resourceName);
@@ -206,23 +199,17 @@ public class TestOzoneManagerLock {
   public void releaseLockWithOutAcquiringLock() {
     OzoneManagerLock lock =
         new OzoneManagerLock(new OzoneConfiguration());
-    try {
-      lock.releaseWriteLock(OzoneManagerLock.Resource.USER_LOCK, "user3");
-      fail("releaseLockWithOutAcquiringLock failed");
-    } catch (IllegalMonitorStateException ex) {
-      String message = "Releasing lock on resource $user3 without acquiring " +
-          "lock";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
-    }
+    assertThrows(IllegalMonitorStateException.class,
+        () -> lock.releaseWriteLock(Resource.USER_LOCK, "user3"));
   }
 
 
-  private String[] generateResourceName(OzoneManagerLock.Resource resource) {
-    if (resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
+  private String[] generateResourceName(Resource resource) {
+    if (resource == Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
-    } else if ((resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) ||
-        (resource == OzoneManagerLock.Resource.SNAPSHOT_LOCK)) {
+    } else if ((resource == Resource.KEY_PATH_LOCK) ||
+        (resource == Resource.SNAPSHOT_LOCK)) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString(), UUID.randomUUID().toString()};
     } else {
@@ -235,9 +222,9 @@ public class TestOzoneManagerLock {
    */
   public static class ResourceInfo {
     private String[] lockName;
-    private OzoneManagerLock.Resource resource;
+    private Resource resource;
 
-    ResourceInfo(String[] resourceName, OzoneManagerLock.Resource resource) {
+    ResourceInfo(String[] resourceName, Resource resource) {
       this.lockName = resourceName;
       this.resource = resource;
     }
@@ -246,7 +233,7 @@ public class TestOzoneManagerLock {
       return lockName.clone();
     }
 
-    public OzoneManagerLock.Resource getResource() {
+    public Resource getResource() {
       return resource;
     }
   }
@@ -277,7 +264,7 @@ public class TestOzoneManagerLock {
   @Test
   public void acquireMultiUserLockAfterUserLock() {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-    lock.acquireWriteLock(OzoneManagerLock.Resource.USER_LOCK, "user3");
+    lock.acquireWriteLock(Resource.USER_LOCK, "user3");
     try {
       lock.acquireMultiUserLock("user1", "user2");
       fail("acquireMultiUserLockAfterUserLock failed");
@@ -286,7 +273,7 @@ public class TestOzoneManagerLock {
           "[USER_LOCK] lock(s).";
       Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
     }
-    lock.releaseWriteLock(OzoneManagerLock.Resource.USER_LOCK, "user3");
+    lock.releaseWriteLock(Resource.USER_LOCK, "user3");
   }
 
   @Test
@@ -294,7 +281,7 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     lock.acquireMultiUserLock("user1", "user2");
     try {
-      lock.acquireWriteLock(OzoneManagerLock.Resource.USER_LOCK, "user3");
+      lock.acquireWriteLock(Resource.USER_LOCK, "user3");
       fail("acquireUserLockAfterMultiUserLock failed");
     } catch (RuntimeException ex) {
       String message = "cannot acquire USER_LOCK lock while holding " +
@@ -308,8 +295,8 @@ public class TestOzoneManagerLock {
   public void testLockResourceParallel() throws Exception {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource :
+        Resource.values()) {
       final String[] resourceName = generateResourceName(resource);
       lock.acquireWriteLock(resource, resourceName);
 
@@ -361,20 +348,19 @@ public class TestOzoneManagerLock {
   @Test
   public void testLockHoldCount() {
     String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource : Resource.values()) {
       // USER_LOCK, S3_SECRET_LOCK and PREFIX_LOCK disallow lock re-acquire by
       // the same thread.
-      if (resource != OzoneManagerLock.Resource.USER_LOCK &&
-          resource != OzoneManagerLock.Resource.S3_SECRET_LOCK &&
-          resource != OzoneManagerLock.Resource.PREFIX_LOCK) {
+      if (resource != Resource.USER_LOCK &&
+          resource != Resource.S3_SECRET_LOCK &&
+          resource != Resource.PREFIX_LOCK) {
         resourceName = generateResourceName(resource);
         testLockHoldCountUtil(resource, resourceName);
       }
     }
   }
 
-  private void testLockHoldCountUtil(OzoneManagerLock.Resource resource,
+  private void testLockHoldCountUtil(Resource resource,
                                      String[] resourceName) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
@@ -418,8 +404,8 @@ public class TestOzoneManagerLock {
   @Test
   public void testLockConcurrentStats() throws InterruptedException {
     String[] resourceName;
-    for (OzoneManagerLock.Resource resource :
-        OzoneManagerLock.Resource.values()) {
+    for (Resource resource :
+        Resource.values()) {
       resourceName = generateResourceName(resource);
       testReadLockConcurrentStats(resource, resourceName, 10);
       testWriteLockConcurrentStats(resource, resourceName, 5);
@@ -428,7 +414,7 @@ public class TestOzoneManagerLock {
   }
 
 
-  public void testReadLockConcurrentStats(OzoneManagerLock.Resource resource,
+  public void testReadLockConcurrentStats(Resource resource,
                                           String[] resourceName,
                                           int threadCount)
       throws InterruptedException {
@@ -466,7 +452,7 @@ public class TestOzoneManagerLock {
         readWaitingStat.contains("Samples = " + threadCount));
   }
 
-  public void testWriteLockConcurrentStats(OzoneManagerLock.Resource resource,
+  public void testWriteLockConcurrentStats(Resource resource,
                                            String[] resourceName,
                                            int threadCount)
       throws InterruptedException {
@@ -505,7 +491,7 @@ public class TestOzoneManagerLock {
   }
 
   public void testSyntheticReadWriteLockConcurrentStats(
-      OzoneManagerLock.Resource resource, String[] resourceName,
+      Resource resource, String[] resourceName,
       int readThreadCount, int writeThreadCount)
       throws InterruptedException {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
