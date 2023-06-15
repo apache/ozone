@@ -193,6 +193,11 @@ class RDBTable implements Table<byte[], byte[]> {
     db.delete(family, key);
   }
 
+  public void delete(ByteBuffer key) throws IOException {
+    db.delete(family, key);
+  }
+
+
   @Override
   public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
     db.deleteRange(family, beginKey, endKey);
