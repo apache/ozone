@@ -133,7 +133,7 @@ public class HeatMapServiceImpl extends HeatMapService {
 
   private void addVolumeData(
       EntityReadAccessHeatMapResponse rootEntity,
-      String[] split, int readAccessCount, long keySize) {
+      String[] split, int readAccessCount, long entitySize) {
     List<EntityReadAccessHeatMapResponse> children =
         rootEntity.getChildren();
     EntityReadAccessHeatMapResponse volumeInfo =
@@ -141,8 +141,12 @@ public class HeatMapServiceImpl extends HeatMapService {
     volumeInfo.setLabel(split[0]);
     volumeInfo.setPath(split[0]);
     children.add(volumeInfo);
+    if (split.length < 2) {
+      volumeInfo.setSize(entitySize);
+      return;
+    }
     addBucketAndPrefixPath(split, rootEntity, volumeInfo, readAccessCount,
-        keySize);
+        entitySize);
   }
 
   private void updateVolumeSize(
@@ -375,9 +379,9 @@ public class HeatMapServiceImpl extends HeatMapService {
       if (split.length == 0) {
         return;
       }
-      long keySize = 0;
+      long entitySize = 0;
       try {
-        keySize = getEntitySize(path);
+        entitySize = getEntitySize(path);
       } catch (IOException e) {
         LOG.error("IOException while getting key size for key : " +
             "{} - {}", path, e);
@@ -394,13 +398,13 @@ public class HeatMapServiceImpl extends HeatMapService {
           return;
         }
         addBucketData(rootEntity, volumeEntity, split,
-            entityMetaData.getReadAccessCount(), keySize);
+            entityMetaData.getReadAccessCount(), entitySize);
       } else {
         if (validateLength(split, 1)) {
           return;
         }
         addVolumeData(rootEntity, split,
-            entityMetaData.getReadAccessCount(), keySize);
+            entityMetaData.getReadAccessCount(), entitySize);
       }
     });
     updateRootEntitySize(rootEntity);

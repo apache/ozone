@@ -782,4 +782,114 @@ public class TestHeatMapInfo {
     }
   }
 
+  @Test
+  public void testHeatMapInfoResponseWithEntityTypeVolume() throws IOException {
+    // Run the test
+    String auditRespStrWithVolumeEntityType = "{\n" +
+        "  \"responseHeader\": {\n" +
+        "    \"zkConnected\": true,\n" +
+        "    \"status\": 0,\n" +
+        "    \"QTime\": 21,\n" +
+        "    \"params\": {\n" +
+        "      \"q\": \"*:*\",\n" +
+        "      \"json.facet\": \"{\\n    resources:{\\n      type : terms," +
+        "\\n      field : resource,\\n      sort : " +
+        "\\\"read_access_count desc\\\",\\n      limit : 100,\\n      " +
+        "facet:{\\n        read_access_count : \\\"sum(event_count)\\\"\\n" +
+        "      }\\n    }\\n  }\",\n" +
+        "      \"doAs\": " +
+        "\"solr/hdfs-ru11-5.hdfs-ru11.root.hwx.site@ROOT.HWX.SITE\",\n" +
+        "      \"fl\": " +
+        "\"access, agent, repo, resource, resType, event_count\",\n" +
+        "      \"start\": \"0\",\n" +
+        "      \"fq\": [\n" +
+        "        \"resType:volume\",\n" +
+        "        \"evtTime:[2023-06-14T03:59:44Z TO NOW]\",\n" +
+        "        \"access:read\",\n" +
+        "        \"repo:cm_ozone\"\n" +
+        "      ],\n" +
+        "      \"sort\": \"event_count desc\",\n" +
+        "      \"_forwardedCount\": \"1\",\n" +
+        "      \"rows\": \"0\",\n" +
+        "      \"wt\": \"json\"\n" +
+        "    }\n" +
+        "  },\n" +
+        "  \"response\": {\n" +
+        "    \"numFound\": 9248,\n" +
+        "    \"start\": 0,\n" +
+        "    \"docs\": []\n" +
+        "  },\n" +
+        "  \"facets\": {\n" +
+        "    \"count\": 9248,\n" +
+        "    \"resources\": {\n" +
+        "      \"buckets\": [\n" +
+        "        {\n" +
+        "          \"val\": \"s3v\",\n" +
+        "          \"count\": 8886,\n" +
+        "          \"read_access_count\": 19263\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2\",\n" +
+        "          \"count\": 362,\n" +
+        "          \"read_access_count\": 8590\n" +
+        "        }\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  }\n" +
+        "}";
+    JsonElement jsonElement =
+        JsonParser.parseString(auditRespStrWithVolumeEntityType);
+    JsonObject jsonObject = jsonElement.getAsJsonObject();
+    JsonElement facets = jsonObject.get("facets");
+    JsonElement resources = facets.getAsJsonObject().get("resources");
+    JsonObject facetsBucketsObject = new JsonObject();
+    if (null != resources) {
+      facetsBucketsObject = resources.getAsJsonObject();
+    }
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    HeatMapProviderDataResource auditLogFacetsResources =
+        objectMapper.readValue(
+            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
+    if (null != entities && entities.length > 0) {
+      List<EntityMetaData> entityMetaDataList =
+          Arrays.stream(entities).collect(Collectors.toList());
+      // Below heatmap response would be of format like:
+      //{
+      //  "label": "root",
+      //  "path": "/",
+      //  "children": [
+      //    {
+      //      "label": "s3v",
+      //      "path": "s3v",
+      //      "size": 256
+      //    },
+      //    {
+      //      "label": "testnewvol2",
+      //      "path": "testnewvol2",
+      //      "size": 256
+      //    }
+      //  ],
+      //  "size": 512,
+      //  "minAccessCount": 19263
+      //}
+      EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
+          heatMapService.generateHeatMap(entityMetaDataList);
+      Assertions.assertTrue(
+          entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      Assertions.assertEquals(2,
+          entityReadAccessHeatMapResponse.getChildren().size());
+      Assertions.assertEquals(512, entityReadAccessHeatMapResponse.
+          getSize());
+      Assertions.assertEquals(19263, entityReadAccessHeatMapResponse.
+          getMinAccessCount());
+      Assertions.assertEquals(0, entityReadAccessHeatMapResponse.
+          getMaxAccessCount());
+      Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
+          getLabel());
+    } else {
+      Assertions.assertNull(entities);
+    }
+  }
 }
