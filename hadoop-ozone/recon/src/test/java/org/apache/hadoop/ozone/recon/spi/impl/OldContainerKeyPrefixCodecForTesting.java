@@ -34,19 +34,19 @@ import com.google.common.primitives.Longs;
 /**
  * Codec to serialize/deserialize {@link ContainerKeyPrefix}.
  */
-public final class ContainerKeyPrefixCodec
+public final class OldContainerKeyPrefixCodecForTesting
     implements Codec<ContainerKeyPrefix> {
 
   private static final String KEY_DELIMITER = "_";
 
   private static final Codec<ContainerKeyPrefix> INSTANCE =
-      new ContainerKeyPrefixCodec();
+      new OldContainerKeyPrefixCodecForTesting();
 
   public static Codec<ContainerKeyPrefix> get() {
     return INSTANCE;
   }
 
-  private ContainerKeyPrefixCodec() {
+  private OldContainerKeyPrefixCodecForTesting() {
     // singleton
   }
 

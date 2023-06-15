@@ -17,7 +17,17 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.ratis.util.Preconditions;
+
+import javax.annotation.Nonnull;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.IntFunction;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * An implementation of both {@link ContainerKeyPrefix}
@@ -39,7 +49,7 @@ final class ContainerKeyPrefixImpl
   private ContainerKeyPrefixImpl(long containerId, String keyPrefix,
       long keyVersion) {
     this.containerId = containerId;
-    this.keyPrefix = keyPrefix;
+    this.keyPrefix = keyPrefix == null ? "" : keyPrefix;
     this.keyVersion = keyVersion;
   }
 
@@ -49,7 +59,7 @@ final class ContainerKeyPrefixImpl
   }
 
   @Override
-  public String getKeyPrefix() {
+  public @Nonnull String getKeyPrefix() {
     return keyPrefix;
   }
 
@@ -65,7 +75,7 @@ final class ContainerKeyPrefixImpl
 
   @Override
   public KeyPrefixContainer toKeyPrefixContainer() {
-    return keyPrefix == null || keyPrefix.isEmpty() ? null : this;
+    return keyPrefix.isEmpty() ? null : this;
   }
 
   @Override
@@ -87,5 +97,89 @@ final class ContainerKeyPrefixImpl
     return this.containerId == that.containerId
         && Objects.equals(this.keyPrefix, that.keyPrefix)
         && this.keyVersion == that.keyVersion;
+  }
+
+  @Override
+  public String toString() {
+    return "Impl{" +
+        "containerId=" + containerId +
+        ", keyPrefix='" + keyPrefix + '\'' +
+        ", keyVersion=" + keyVersion +
+        '}';
+  }
+
+  /**
+   * For implementing {@link ContainerKeyPrefix#getCodec()}
+   * and {@link KeyPrefixContainer#getCodec()}.
+   * These two codecs are essentially the same
+   * except for the serialization ordering.
+   */
+  abstract static class CodecBase implements Codec<ContainerKeyPrefix> {
+    /** A delimiter to separate fields in the serializations. */
+    public static class Delimiter {
+      private static final String VALUE = "_";
+      private static final byte[] BYTES = VALUE.getBytes(UTF_8);
+      private static final byte[] COPY = Arrays.copyOf(BYTES, BYTES.length);
+
+      static byte[] getBytes() {
+        Preconditions.assertTrue(Arrays.equals(COPY, BYTES));
+        return BYTES;
+      }
+
+      static int length() {
+        return BYTES.length;
+      }
+
+      static CodecBuffer skip(CodecBuffer buffer) {
+        final String d = buffer.getUtf8(BYTES.length);
+        Preconditions.assertTrue(Objects.equals(d, VALUE),
+            () -> "Unexpected delimiter: \"" + d
+                + "\", KEY_DELIMITER = \"" + VALUE + "\"");
+        return buffer;
+      }
+    }
+
+    CodecBase() { }
+
+    @Override
+    public final int getSerializedSizeUpperBound(ContainerKeyPrefix object) {
+      final String keyPrefix = object.getKeyPrefix();
+      // containerId
+      return Long.BYTES // containerId
+          + Delimiter.length()
+          + StringCodec.get().getSerializedSizeUpperBound(keyPrefix)
+          + Delimiter.length()
+          + Long.BYTES; // keyVersion
+    }
+
+    @Override
+    public final boolean supportCodecBuffer() {
+      return true;
+    }
+
+    @Override
+    public abstract CodecBuffer toCodecBuffer(
+        @Nonnull ContainerKeyPrefix object, IntFunction<CodecBuffer> allocator);
+
+    @Override
+    public abstract ContainerKeyPrefix fromCodecBuffer(
+        @Nonnull CodecBuffer buffer);
+
+    @Override
+    public final byte[] toPersistedFormat(ContainerKeyPrefix object) {
+      try (CodecBuffer b = toCodecBuffer(object, CodecBuffer::allocateHeap)) {
+        return b.getArray();
+      }
+    }
+
+    @Override
+    public final ContainerKeyPrefix fromPersistedFormat(byte[] rawData) {
+      return fromCodecBuffer(CodecBuffer.wrap(rawData));
+    }
+
+    @Override
+    public final ContainerKeyPrefix copyObject(ContainerKeyPrefix object) {
+      return object;
+    }
   }
 }

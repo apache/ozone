@@ -47,7 +47,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
       new DBColumnFamilyDefinition<>(
           "containerKeyTable",
           ContainerKeyPrefix.class,
-          ContainerKeyPrefixCodec.get(),
+          ContainerKeyPrefix.getCodec(),
           Integer.class,
           IntegerCodec.get());
 
@@ -56,7 +56,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
       new DBColumnFamilyDefinition<>(
           "keyContainerTable",
           KeyPrefixContainer.class,
-          KeyPrefixContainerCodec.get(),
+          KeyPrefixContainer.getCodec(),
           Integer.class,
           IntegerCodec.get());
 
