@@ -441,7 +441,10 @@ public class OzoneAddress {
       if (OmUtils.isBucketSnapshotIndicator(keyName)) {
         // If snapshot, ensure snapshot URI
         ensureSnapshotAddress();
+        return;
       }
+      throw new OzoneClientException(
+          "Key address is not supported.");
     } else if (volumeName.length() == 0) {
       // Volume must be present
       // Bucket may or may not be present

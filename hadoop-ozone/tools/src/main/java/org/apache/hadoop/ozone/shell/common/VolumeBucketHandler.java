@@ -22,7 +22,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
 /**
- * Base class for either volume or bucket command handlers.
+ * Base class for commands that accept both volume and bucket.
  */
 public abstract class VolumeBucketHandler extends Handler {
 
