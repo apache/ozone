@@ -318,7 +318,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
         .put("/sampleVol/fso_Bucket/fso_key3", omKeyInfo3);
     reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .put("/sampleVol/fso_Bucket/fso_key4", omKeyInfo3);
+        .put("/sampleVol/fso_Bucket/fso_key4", omKeyInfo4);
 
     // CASE 1 :- Display only FSO keys in response
     // includeFsoKeys=true, includeNonFsoKeys=false
