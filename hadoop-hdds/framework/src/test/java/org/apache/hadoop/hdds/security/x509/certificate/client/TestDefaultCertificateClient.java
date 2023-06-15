@@ -305,16 +305,16 @@ public class TestDefaultCertificateClient {
     codec.writeCertificate(certPath, "3.crt",
         getPEMEncodedString(cert3));
     codec.writeCertificate(certPath,
-        CAType.ROOT.getFileNamePrefix() + "rootCa1.crt",
+        CAType.ROOT.getFileNamePrefix() + "1.crt",
         getPEMEncodedString(rootCa1));
     codec.writeCertificate(certPath,
-        CAType.ROOT.getFileNamePrefix() + "rootCa2.crt",
+        CAType.ROOT.getFileNamePrefix() + "2.crt",
         getPEMEncodedString(rootCa2));
     codec.writeCertificate(certPath,
-        CAType.SUBORDINATE.getFileNamePrefix() + "subCa1.crt",
+        CAType.SUBORDINATE.getFileNamePrefix() + "1.crt",
         getPEMEncodedString(subCa1));
     codec.writeCertificate(certPath,
-        CAType.SUBORDINATE.getFileNamePrefix() + "subCa2.crt",
+        CAType.SUBORDINATE.getFileNamePrefix() + "2.crt",
         getPEMEncodedString(subCa2));
 
     // Re instantiate DN client which will load certificates from filesystem.
