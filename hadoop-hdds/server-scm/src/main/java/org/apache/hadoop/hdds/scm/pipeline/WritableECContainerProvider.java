@@ -136,9 +136,11 @@ public class WritableECContainerProvider
           } else {
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
-            } else {
+            } else if (containerInfo.getOwner().equals(owner)) {
               containerInfo.updateLastUsedTime();
               return containerInfo;
+            } else {
+              existingPipelines.remove(pipelineIndex);
             }
           }
         } catch (PipelineNotFoundException | ContainerNotFoundException e) {

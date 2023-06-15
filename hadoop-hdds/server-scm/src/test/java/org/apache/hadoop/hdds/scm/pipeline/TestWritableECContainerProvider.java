@@ -149,6 +149,18 @@ public class TestWritableECContainerProvider {
 
   @ParameterizedTest
   @MethodSource("policies")
+  void testContainerOwner(PipelineChoosePolicy policy)
+      throws IOException, TimeoutException {
+    provider = createSubject(policy);
+
+    Set<ContainerInfo> allocated = assertDistinctContainers(1);
+
+    assertEquals(1, allocated.size());
+    assertEquals(allocated.iterator().next().getOwner(), OWNER);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
   void testPipelinesCreatedBasedOnTotalDiskCount(PipelineChoosePolicy policy)
       throws IOException, TimeoutException {
     provider = createSubject(policy);
