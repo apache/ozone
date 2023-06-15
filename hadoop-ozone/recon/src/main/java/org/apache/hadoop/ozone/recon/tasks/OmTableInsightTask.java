@@ -252,7 +252,24 @@ public class OmTableInsightTask implements ReconOmTask {
             }
           }
           break;
-
+        case UPDATE:
+          if (omdbUpdateEvent.getValue() instanceof OmKeyInfo &&
+              sizeRelatedTables.contains(tableName) &&
+              omdbUpdateEvent.getOldValue() != null) {
+            OmKeyInfo oldKeyInfo = (OmKeyInfo) omdbUpdateEvent.getOldValue();
+            OmKeyInfo newKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
+            // Update key size by subtracting the oldSize and adding newSize
+            unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+                (k, size) -> size - oldKeyInfo.getDataSize() +
+                    newKeyInfo.getDataSize());
+            replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+                (k, size) -> size - oldKeyInfo.getReplicatedSize() +
+                    newKeyInfo.getReplicatedSize());
+          } else if (omdbUpdateEvent.getValue() != null) {
+            LOG.warn("Update event does not have the old Key Info for {}.",
+                omdbUpdateEvent.getKey());
+          }
+          break;
         default:
           LOG.trace("Skipping DB update event : Table: {}, Action: {}",
               tableName, omdbUpdateEvent.getAction());

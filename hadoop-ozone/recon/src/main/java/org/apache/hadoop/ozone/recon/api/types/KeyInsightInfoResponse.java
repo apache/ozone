@@ -34,7 +34,7 @@ public class KeyInsightInfoResponse {
 
   /** Keys summary. Includes aggregated information about the keys. */
   @JsonProperty("keysSummary")
-  private Map<String, Object> keysSummary;
+  private Map<String, Long> keysSummary;
 
   /** last key sent. */
   @JsonProperty("lastKey")
@@ -84,11 +84,11 @@ public class KeyInsightInfoResponse {
     keysSummary = new HashMap<>();
   }
 
-  public Map<String, Object> getKeysSummary() {
+  public Map<String, Long> getKeysSummary() {
     return keysSummary;
   }
 
-  public void setKeysSummary(Map<String, Object> keysSummary) {
+  public void setKeysSummary(Map<String, Long> keysSummary) {
     this.keysSummary = keysSummary;
   }
 

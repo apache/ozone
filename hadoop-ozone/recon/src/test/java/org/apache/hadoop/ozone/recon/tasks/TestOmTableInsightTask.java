@@ -51,7 +51,6 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -163,14 +162,14 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Create 5 put, 1 delete and 1 update event for each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
       for (int i = 0; i < 5; i++) {
-        events.add(getOMUpdateEvent("item" + i, null, tableName, PUT));
+        events.add(getOMUpdateEvent("item" + i, null, tableName, PUT, null));
       }
       // for delete event, if value is set to null, the counter will not be
       // decremented. This is because the value will be null if item does not
       // exist in the database and there is no need to delete.
       events.add(getOMUpdateEvent("item0", mock(OmKeyInfo.class), tableName,
-          DELETE));
-      events.add(getOMUpdateEvent("item1", null, tableName, UPDATE));
+          DELETE, null));
+      events.add(getOMUpdateEvent("item1", null, tableName, UPDATE, null));
     }
     OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(events);
     omTableInsightTask.process(omUpdateEventBatch);
@@ -185,9 +184,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT));
+      newEvents.add(getOMUpdateEvent("item5", null, tableName, PUT, null));
       // This delete event should be a noop since value is null
-      newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE));
+      newEvents.add(getOMUpdateEvent("item0", null, tableName, DELETE, null));
     }
 
     omUpdateEventBatch = new OMUpdateEventBatch(newEvents);
@@ -213,7 +212,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
     for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       for (int i = 0; i < 5; i++) {
-        putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT));
+        putEvents.add(
+            getOMUpdateEvent("item" + i, omKeyInfo, tableName, PUT, null));
       }
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
@@ -229,7 +229,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
     for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
       // Delete "item0"
-      deleteEvents.add(getOMUpdateEvent("item0", omKeyInfo, tableName, DELETE));
+      deleteEvents.add(
+          getOMUpdateEvent("item0", omKeyInfo, tableName, DELETE, null));
     }
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
     omTableInsightTask.process(deleteEventBatch);
@@ -240,30 +241,40 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       assertEquals(12000L, getReplicatedSizeForTable(tableName));
     }
 
-    // Null pointer exception should be thrown if table is not in database
-    for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (!omTableInsightTask.getTablesToCalculateSize().contains(tableName)) {
-        assertThrows(
-            NullPointerException.class,
-            () -> assertEquals(0L, getUnReplicatedSizeForTable(tableName))
-        );
-        assertThrows(
-            NullPointerException.class,
-            () -> assertEquals(0L, getReplicatedSizeForTable(tableName))
-        );
-      }
+    // Test UPDATE events
+    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
+    Long newSizeToBeReturned = 2000L;
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+      // Update "item1" with a new size
+      OmKeyInfo newKeyInfo = mock(OmKeyInfo.class);
+      when(newKeyInfo.getDataSize()).thenReturn(newSizeToBeReturned);
+      when(newKeyInfo.getReplicatedSize()).thenReturn(newSizeToBeReturned * 3);
+      updateEvents.add(
+          getOMUpdateEvent("item1", newKeyInfo, tableName, UPDATE, omKeyInfo));
+    }
+    OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
+    omTableInsightTask.process(updateEventBatch);
+
+    // After updating "item1", size should be 4000 - 1000 + 2000 = 5000
+    //  presentValue - oldValue + newValue = updatedValue
+    for (String tableName : omTableInsightTask.getTablesToCalculateSize()) {
+      assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
   }
 
 
-  private OMDBUpdateEvent getOMUpdateEvent(String name, Object value,
-                                           String table,
-                           OMDBUpdateEvent.OMDBUpdateAction action) {
+  private OMDBUpdateEvent getOMUpdateEvent(
+      String name, Object value,
+      String table,
+      OMDBUpdateEvent.OMDBUpdateAction action,
+      Object oldValue) {
     return new OMUpdateEventBuilder()
         .setAction(action)
         .setKey(name)
         .setValue(value)
         .setTable(table)
+        .setOldValue(oldValue)
         .build();
   }
 

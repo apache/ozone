@@ -57,6 +57,11 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+
 
 /**
  * Endpoint to get following key level info under OM DB Insight page of Recon.
@@ -155,23 +160,36 @@ public class OMDBInsightEndpoint {
   @Path("/open")
   public Response getOpenKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-      int limit,
+          int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKey) {
+          String prevKey,
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_FSO)
+      @QueryParam(RECON_OPEN_KEY_INCLUDE_FSO)
+          boolean includeFso,
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO)
+      @QueryParam(RECON_OPEN_KEY_INCLUDE_NON_FSO)
+          boolean includeNonFso) {
     KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
 
     // Create a HashMap for the keysSummary
-    Map<String, Object> keysSummary = new HashMap<>();
+    Map<String, Long> keysSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
+
     String lastKey = "";
     List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
-    for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    for (BucketLayout layout : Arrays.asList(
+        BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       isLegacyBucketLayout = (layout == BucketLayout.LEGACY);
+      // Skip bucket iteration based on parameters includeFso and includeNonFso
+      if ((!includeFso && !isLegacyBucketLayout) ||
+          (!includeNonFso && isLegacyBucketLayout)) {
+        continue;
+      }
+
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(layout);
       try (
@@ -253,7 +271,7 @@ public class OMDBInsightEndpoint {
    * @param keysSummary A map to store the keys summary information.
    */
   private void createKeysSummaryForOpenKey(
-      Map<String, Object> keysSummary) {
+      Map<String, Long> keysSummary) {
     Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
     Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
