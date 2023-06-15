@@ -892,4 +892,227 @@ public class TestHeatMapInfo {
       Assertions.assertNull(entities);
     }
   }
+
+  @Test
+  @SuppressWarnings("methodlength")
+  public void testHeatMapInfoResponseForPath() throws IOException {
+    // Run the test
+    String auditRespStrWithPathAndBucketEntityType = "{\n" +
+        "  \"responseHeader\": {\n" +
+        "    \"zkConnected\": true,\n" +
+        "    \"status\": 0,\n" +
+        "    \"QTime\": 12,\n" +
+        "    \"params\": {\n" +
+        "      \"q\": \"*:*\",\n" +
+        "      \"json.facet\": \"{\\n    resources:{\\n      type : terms," +
+        "\\n      field : resource,\\n      " +
+        "sort : \\\"read_access_count desc\\\",\\n      limit : 100,\\n" +
+        "      facet:{\\n        read_access_count : \\\"sum(event_count)\\\"" +
+        "\\n      }\\n    }\\n  }\",\n" +
+        "      \"doAs\": " +
+        "\"solr/hdfs-ru11-5.hdfs-ru11.root.hwx.site@ROOT.HWX.SITE\",\n" +
+        "      \"fl\": \"access, agent, repo, resource, resType, " +
+        "event_count\",\n" +
+        "      \"start\": \"0\",\n" +
+        "      \"fq\": [\n" +
+        "        \"resource:*testnewvol2*\",\n" +
+        "        \"resType:bucket\",\n" +
+        "        \"evtTime:[2023-06-14T06:42:03Z TO NOW]\",\n" +
+        "        \"access:read\",\n" +
+        "        \"repo:cm_ozone\"\n" +
+        "      ],\n" +
+        "      \"sort\": \"event_count desc\",\n" +
+        "      \"_forwardedCount\": \"1\",\n" +
+        "      \"rows\": \"0\",\n" +
+        "      \"wt\": \"json\"\n" +
+        "    }\n" +
+        "  },\n" +
+        "  \"response\": {\n" +
+        "    \"numFound\": 99,\n" +
+        "    \"start\": 0,\n" +
+        "    \"docs\": []\n" +
+        "  },\n" +
+        "  \"facets\": {\n" +
+        "    \"count\": 99,\n" +
+        "    \"resources\": {\n" +
+        "      \"buckets\": [\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck11\",\n" +
+        "          \"count\": 12,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck12\",\n" +
+        "          \"count\": 18,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck13\",\n" +
+        "          \"count\": 21,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck11\",\n" +
+        "          \"count\": 18,\n" +
+        "          \"read_access_count\": 263\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck12\",\n" +
+        "          \"count\": 16,\n" +
+        "          \"read_access_count\": 200\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck13\",\n" +
+        "          \"count\": 14,\n" +
+        "          \"read_access_count\": 200\n" +
+        "        }\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  }\n" +
+        "}";
+    JsonElement jsonElement =
+        JsonParser.parseString(auditRespStrWithPathAndBucketEntityType);
+    JsonObject jsonObject = jsonElement.getAsJsonObject();
+    JsonElement facets = jsonObject.get("facets");
+    JsonElement resources = facets.getAsJsonObject().get("resources");
+    JsonObject facetsBucketsObject = new JsonObject();
+    if (null != resources) {
+      facetsBucketsObject = resources.getAsJsonObject();
+    }
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    HeatMapProviderDataResource auditLogFacetsResources =
+        objectMapper.readValue(
+            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
+    if (null != entities && entities.length > 0) {
+      List<EntityMetaData> entityMetaDataList =
+          Arrays.stream(entities).collect(Collectors.toList());
+      // Below heatmap response would be of format like:
+      //{
+      //    "label": "root",
+      //    "path": "/",
+      //    "children": [
+      //        {
+      //            "label": "testnewvol2",
+      //            "path": "testnewvol2",
+      //            "children": [
+      //                {
+      //                    "label": "fsobuck11",
+      //                    "path": "/testnewvol2/fsobuck11",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck11/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "fsobuck12",
+      //                    "path": "/testnewvol2/fsobuck12",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck12/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "fsobuck13",
+      //                    "path": "/testnewvol2/fsobuck13",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck13/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "obsbuck11",
+      //                    "path": "/testnewvol2/obsbuck11",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck11/",
+      //                            "size": 107,
+      //                            "accessCount": 263,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 107,
+      //                    "minAccessCount": 263,
+      //                    "maxAccessCount": 263
+      //                },
+      //                {
+      //                    "label": "obsbuck12",
+      //                    "path": "/testnewvol2/obsbuck12",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck12/",
+      //                            "size": 100,
+      //                            "accessCount": 200,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 200,
+      //                    "maxAccessCount": 200
+      //                },
+      //                {
+      //                    "label": "obsbuck13",
+      //                    "path": "/testnewvol2/obsbuck13",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck13/",
+      //                            "size": 100,
+      //                            "accessCount": 200,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 200,
+      //                    "maxAccessCount": 200
+      //                }
+      //            ],
+      //            "size": 607
+      //        }
+      //    ],
+      //    "size": 607,
+      //    "minAccessCount": 200,
+      //    "maxAccessCount": 701
+      //}
+      EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
+          heatMapService.generateHeatMap(entityMetaDataList);
+      Assertions.assertTrue(
+          entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      Assertions.assertEquals(1,
+          entityReadAccessHeatMapResponse.getChildren().size());
+      String path =
+          entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+              .get(0).getPath();
+      Assertions.assertEquals("/testnewvol2/fsobuck11", path);
+    } else {
+      Assertions.assertNull(entities);
+    }
+  }
 }

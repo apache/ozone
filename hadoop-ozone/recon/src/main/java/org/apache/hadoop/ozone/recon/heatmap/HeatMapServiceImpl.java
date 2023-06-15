@@ -207,8 +207,10 @@ public class HeatMapServiceImpl extends HeatMapService {
     bucket.setPath(omMetadataManager.getBucketKey(split[0], split[1]));
     bucketEntities.add(bucket);
     bucket.setMinAccessCount(readAccessCount);
-    addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
-        keySize);
+    if (split.length > 2) {
+      addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
+          keySize);
+    }
   }
 
   private void addPrefixPathInfoToBucket(
