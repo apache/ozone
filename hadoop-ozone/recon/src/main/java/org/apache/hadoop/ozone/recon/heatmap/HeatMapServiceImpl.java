@@ -210,6 +210,8 @@ public class HeatMapServiceImpl extends HeatMapService {
     if (split.length > 2) {
       addPrefixPathInfoToBucket(rootEntity, split, bucket, readAccessCount,
           keySize);
+    } else {
+      updateBucketSize(bucket, keySize);
     }
   }
 
