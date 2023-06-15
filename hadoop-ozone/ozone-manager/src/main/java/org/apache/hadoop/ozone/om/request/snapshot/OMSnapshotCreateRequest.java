@@ -223,14 +223,14 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
-    SnapshotChainManager snapshotChainManager =
-        omMetadataManager.getSnapshotChainManager();
-
-    // It is synchronized at SnapshotChainManager object so that this block is
+    // It is synchronized on SnapshotChainManager object so that this block is
     // synchronized with OMSnapshotPurgeResponse#cleanupSnapshotChain and only
     // one of these two operation gets executed at a time otherwise we could be
     // in similar situation explained above if snapshot gets deleted.
     synchronized (omMetadataManager.getSnapshotChainManager()) {
+      SnapshotChainManager snapshotChainManager =
+          omMetadataManager.getSnapshotChainManager();
+
       try {
         UUID latestPathSnapshot =
             snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
