@@ -226,10 +226,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     SnapshotChainManager snapshotChainManager =
         omMetadataManager.getSnapshotChainManager();
 
-    // It is synchronized at SnapshotChainManager#LOCK so that addSnapshot and
-    // deleteSnapshot are synchronized and only one of these two operation gets
-    // executed at a time.
-    synchronized (SnapshotChainManager.LOCK) {
+    // It is synchronized at SnapshotChainManager object so that this block is
+    // synchronized with OMSnapshotPurgeResponse#cleanupSnapshotChain and only
+    // one of these two operation gets executed at a time otherwise we could be
+    // in similar situation explained above if snapshot gets deleted.
+    synchronized (omMetadataManager.getSnapshotChainManager()) {
       try {
         UUID latestPathSnapshot =
             snapshotChainManager.getLatestPathSnapshotId(snapshotPath);

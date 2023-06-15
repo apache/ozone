@@ -47,10 +47,6 @@ import java.util.concurrent.ConcurrentMap;
 public class SnapshotChainManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotChainManager.class);
-  // Dummy lock to synchronize addSnapshot and deleteSnapshot.
-  // This lock is also used by OMSnapshotCreateRequest to make sure that
-  // snapshot gets added to chain only if addition to cache is successfully.
-  public static final Object LOCK = new Object();
 
   private final Map<UUID, SnapshotChainInfo> globalSnapshotChain;
   private final ConcurrentMap<String, LinkedHashMap<UUID, SnapshotChainInfo>>
@@ -59,8 +55,7 @@ public class SnapshotChainManager {
   private final ConcurrentMap<UUID, String> snapshotIdToTableKey;
   private UUID latestGlobalSnapshotId;
 
-  public SnapshotChainManager(OMMetadataManager metadataManager)
-      throws IOException {
+  public SnapshotChainManager(OMMetadataManager metadataManager) {
     globalSnapshotChain = Collections.synchronizedMap(new LinkedHashMap<>());
     snapshotChainByPath = new ConcurrentHashMap<>();
     latestSnapshotIdByPath = new ConcurrentHashMap<>();
@@ -233,8 +228,7 @@ public class SnapshotChainManager {
   /**
    * Loads the snapshot chain from SnapshotInfo table.
    */
-  private void loadFromSnapshotInfoTable(OMMetadataManager metadataManager)
-      throws IOException {
+  private void loadFromSnapshotInfoTable(OMMetadataManager metadataManager) {
     // read from snapshotInfo table to populate
     // snapshot chains - both global and local path
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
@@ -253,38 +247,39 @@ public class SnapshotChainManager {
       for (SnapshotInfo snapshotInfo : snaps.values()) {
         addSnapshot(snapshotInfo);
       }
+    } catch (IOException ioException) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(ioException);
     }
   }
 
   /**
    * Add snapshot to snapshot chain.
    */
-  public void addSnapshot(SnapshotInfo snapshotInfo) throws IOException {
-    synchronized (LOCK) {
-      addSnapshotGlobal(snapshotInfo.getSnapshotId(),
-          snapshotInfo.getGlobalPreviousSnapshotId());
-      addSnapshotPath(snapshotInfo.getSnapshotPath(),
-          snapshotInfo.getSnapshotId(),
-          snapshotInfo.getPathPreviousSnapshotId());
-      // store snapshot ID to snapshot DB table key in the map
-      snapshotIdToTableKey.put(snapshotInfo.getSnapshotId(),
-          snapshotInfo.getTableKey());
-    }
+  public synchronized void addSnapshot(SnapshotInfo snapshotInfo)
+      throws IOException {
+    addSnapshotGlobal(snapshotInfo.getSnapshotId(),
+        snapshotInfo.getGlobalPreviousSnapshotId());
+    addSnapshotPath(snapshotInfo.getSnapshotPath(),
+        snapshotInfo.getSnapshotId(),
+        snapshotInfo.getPathPreviousSnapshotId());
+    // store snapshot ID to snapshot DB table key in the map
+    snapshotIdToTableKey.put(snapshotInfo.getSnapshotId(),
+        snapshotInfo.getTableKey());
   }
 
   /**
    * Delete snapshot from snapshot chain.
    */
-  public boolean deleteSnapshot(SnapshotInfo snapshotInfo) throws IOException {
-    synchronized (LOCK) {
-      boolean status = deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
-          deleteSnapshotPath(snapshotInfo.getSnapshotPath(),
-              snapshotInfo.getSnapshotId());
-      if (status) {
-        snapshotIdToTableKey.remove(snapshotInfo.getSnapshotId());
-      }
-      return status;
+  public synchronized boolean deleteSnapshot(SnapshotInfo snapshotInfo)
+      throws IOException {
+    boolean status = deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
+        deleteSnapshotPath(snapshotInfo.getSnapshotPath(),
+            snapshotInfo.getSnapshotId());
+    if (status) {
+      snapshotIdToTableKey.remove(snapshotInfo.getSnapshotId());
     }
+    return status;
   }
 
   /**
