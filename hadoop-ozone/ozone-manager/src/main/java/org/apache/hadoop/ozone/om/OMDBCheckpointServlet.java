@@ -275,9 +275,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
    */
   @VisibleForTesting
   public static void processFile(Path file, Set<Path> copyFiles,
-                           Map<Path, Path> hardLinkFiles,
-                           Set<Path> toExcludeFiles,
-                           List<String> excluded) {
+                                 Map<Path, Path> hardLinkFiles,
+                                 Set<Path> toExcludeFiles,
+                                 List<String> excluded) {
     if (toExcludeFiles.contains(file)) {
       excluded.add(file.toString());
     } else {
@@ -301,7 +301,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
             copyFiles.add(file);
           }
         }
-      } else { // Not sst file.
+      } else {
+        // Not sst file.
         copyFiles.add(file);
       }
     }

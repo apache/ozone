@@ -60,6 +60,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
   private final AtomicReference<String> lastLeaderRef;
   private final AtomicLong numDownloaded;
   private FaultInjector injector;
+  // The number of times init() is called
   private final AtomicLong initCount;
 
   public RDBSnapshotProvider(File snapshotDir, String dbName) {
@@ -136,7 +137,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
    * @param currentLeader the ID of leader node
    */
   @VisibleForTesting
-  void checkLeaderConsistent(String currentLeader) throws IOException {
+  void checkLeaderConsistency(String currentLeader) throws IOException {
     String lastLeader = lastLeaderRef.get();
     if (lastLeader != null) {
       if (!lastLeader.equals(currentLeader)) {

@@ -240,7 +240,7 @@ public class TestRDBSnapshotProvider {
   }
 
   @Test
-  public void testCheckLeaderConsistent() throws IOException {
+  public void testCheckLeaderConsistency() throws IOException {
     // Leader initialized to null at startup.
     assertEquals(1, rdbSnapshotProvider.getInitCount());
     File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
