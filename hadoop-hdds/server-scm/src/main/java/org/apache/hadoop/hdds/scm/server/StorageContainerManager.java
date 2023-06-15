@@ -366,7 +366,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
-    initializeCertificateClient();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
 
@@ -379,6 +378,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       loginAsSCMUserIfSecurityEnabled(scmHANodeDetails, conf);
     }
+    initializeCertificateClient();
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
