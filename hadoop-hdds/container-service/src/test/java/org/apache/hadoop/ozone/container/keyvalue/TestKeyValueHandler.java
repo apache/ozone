@@ -91,6 +91,7 @@ public class TestKeyValueHandler {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
 
   private static final long DUMMY_CONTAINER_ID = 9999;
+  private static final String DUMMY_PATH = "/dummy/dir/doesnt/exist";
 
   private final ContainerLayoutVersion layout;
 
@@ -417,7 +418,7 @@ public class TestKeyValueHandler {
       Assert.assertEquals(3, icrReceived.get());
       Assert.assertNotNull(containerSet.getContainer(container2ID));
       // to simulate failed move
-      hddsVolume.setTmpDirPath(Paths.get("/dummy/dir/doesnt/exist"));
+      hddsVolume.setTmpDirPath(Paths.get(DUMMY_PATH));
       try {
         kvHandler.deleteContainer(containerSet.getContainer(container2ID),
             true);
