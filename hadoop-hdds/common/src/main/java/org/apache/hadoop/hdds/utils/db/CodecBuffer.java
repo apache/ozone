@@ -34,7 +34,11 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
+
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
 
 /**
  * A buffer used by {@link Codec}
@@ -45,15 +49,45 @@ public final class CodecBuffer implements AutoCloseable {
 
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
+  private static final IntFunction<ByteBuf> POOL_DIRECT = c -> c >= 0
+      ? POOL.directBuffer(c, c) // allocate exact size
+      : POOL.directBuffer(-c);  // allocate a resizable buffer
+  private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
+      ? POOL.heapBuffer(c, c)   // allocate exact size
+      : POOL.heapBuffer(-c);    // allocate a resizable buffer
 
-  /** Allocate a direct buffer. */
-  public static CodecBuffer allocateDirect(int exactSize) {
-    return new CodecBuffer(POOL.directBuffer(exactSize, exactSize));
+  private final StackTraceElement[] elements;
+
+  /**
+   * Allocate a buffer using the given allocator.
+   *
+   * @param allocator Take a capacity parameter and return an allocated buffer.
+   *                  When the capacity is non-negative,
+   *                  allocate a buffer by setting the initial capacity
+   *                  and the maximum capacity to the given capacity.
+   *                  When the capacity is negative,
+   *                  allocate a buffer by setting only the initial capacity
+   *                  to the absolute value of it and, as a result,
+   *                  the buffer's capacity can be increased if necessary.
+   */
+  static CodecBuffer allocate(int capacity, IntFunction<ByteBuf> allocator) {
+    return new CodecBuffer(allocator.apply(capacity));
   }
 
-  /** Allocate a heap buffer. */
-  public static CodecBuffer allocateHeap(int exactSize) {
-    return new CodecBuffer(POOL.heapBuffer(exactSize, exactSize));
+  /**
+   * Allocate a pooled direct buffer.
+   * @see #allocate(int, IntFunction)
+   */
+  public static CodecBuffer allocateDirect(int capacity) {
+    return allocate(capacity, POOL_DIRECT);
+  }
+
+  /**
+   * Allocate a pooled heap buffer.
+   * @see #allocate(int, IntFunction)
+   */
+  public static CodecBuffer allocateHeap(int capacity) {
+    return allocate(capacity, POOL_HEAP);
   }
 
   /** Wrap the given array. */
@@ -76,6 +110,7 @@ public final class CodecBuffer implements AutoCloseable {
 
   private CodecBuffer(ByteBuf buf) {
     this.buf = buf;
+    this.elements = getStackTrace(LOG);
     assertRefCnt(1);
   }
 
@@ -91,8 +126,11 @@ public final class CodecBuffer implements AutoCloseable {
       final int refCnt = buf.refCnt();
       if (refCnt > 0) {
         final int leak = LEAK_COUNT.incrementAndGet();
-        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}",
-            leak, this, refCnt, capacity);
+        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}{}",
+            leak, this, refCnt, capacity,
+            elements != null
+                ? " allocation:\n" + formatStackTrace(elements, 3)
+                : "");
         buf.release(refCnt);
       }
     }
@@ -121,6 +159,31 @@ public final class CodecBuffer implements AutoCloseable {
     return released;
   }
 
+  /** Clear this buffer. */
+  public void clear() {
+    buf.clear();
+  }
+
+  /**
+   * Set the capacity of this buffer.
+   *
+   * @return true iff it has successfully changed the capacity.
+   */
+  public boolean setCapacity(int newCapacity) {
+    if (newCapacity < 0) {
+      throw new IllegalArgumentException(
+          "newCapacity = " + newCapacity + " < 0");
+    }
+    LOG.debug("setCapacity: {} -> {}, max={}",
+        buf.capacity(), newCapacity, buf.maxCapacity());
+    if (newCapacity <= buf.maxCapacity()) {
+      final ByteBuf returned = buf.capacity(newCapacity);
+      Preconditions.assertSame(buf, returned, "buf");
+      return true;
+    }
+    return false;
+  }
+
   /** @return the number of bytes can be read. */
   public int readableBytes() {
     return buf.readableBytes();
@@ -133,9 +196,30 @@ public final class CodecBuffer implements AutoCloseable {
     return buf.nioBuffer().asReadOnlyBuffer();
   }
 
+  /**
+   * @return a new array containing the readable bytes.
+   * @see #readableBytes()
+   */
+  public byte[] getArray() {
+    final byte[] array = new byte[readableBytes()];
+    buf.readBytes(array);
+    return array;
+  }
+
   /** @return an {@link InputStream} reading from this buffer. */
   public InputStream getInputStream() {
     return new ByteBufInputStream(buf.duplicate());
+  }
+
+  /**
+   * Similar to {@link ByteBuffer#putShort(short)}.
+   *
+   * @return this object.
+   */
+  public CodecBuffer putShort(short n) {
+    assertRefCnt(1);
+    buf.writeShort(n);
+    return this;
   }
 
   /**
@@ -188,7 +272,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @param source put bytes to a {@link ByteBuffer} and return the size.
    * @return this object.
    */
-  public CodecBuffer put(ToIntFunction<ByteBuffer> source) {
+  CodecBuffer put(ToIntFunction<ByteBuffer> source) {
     assertRefCnt(1);
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
@@ -201,7 +285,9 @@ public final class CodecBuffer implements AutoCloseable {
    * Put bytes from the given source to this buffer.
    *
    * @param source put bytes to an {@link OutputStream} and return the size.
+   *               The returned size must be non-null and non-negative.
    * @return this object.
+   * @throws IOException in case the source throws an {@link IOException}.
    */
   public CodecBuffer put(
       CheckedFunction<OutputStream, Integer, IOException> source)
@@ -214,5 +300,34 @@ public final class CodecBuffer implements AutoCloseable {
     }
     buf.setIndex(buf.readerIndex(), w + size);
     return this;
+  }
+
+  /**
+   * Put bytes from a source to this buffer.
+   * The source may or may not be available.
+   * The given source function must return the required size (possibly 0)
+   * if the source is available; otherwise, return null.
+   * When the buffer is smaller than the required size,
+   * it may write partial result to the buffer.
+   *
+   * @param source put bytes to a {@link ByteBuffer}.
+   * @return the return value from the source function.
+   * @param <E> The {@link Exception} type may be thrown by the given source.
+   * @throws E in case the source throws it.
+   */
+  <E extends Exception> Integer putFromSource(
+      CheckedFunction<ByteBuffer, Integer, E> source) throws E {
+    assertRefCnt(1);
+    final int i = buf.writerIndex();
+    final int writable = buf.writableBytes();
+    final ByteBuffer buffer = buf.nioBuffer(i, writable);
+    final Integer size = source.apply(buffer);
+    if (size != null) {
+      Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
+      if (size > 0 && size <= writable) {
+        buf.setIndex(buf.readerIndex(), i + size);
+      }
+    }
+    return size;
   }
 }

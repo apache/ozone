@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -104,7 +103,7 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
-  protected OutputStream createFSOutputStream(
+  protected OzoneFSOutputStream createFSOutputStream(
           OzoneFSOutputStream outputStream) {
     return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
   }

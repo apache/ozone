@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 
 /**
@@ -47,6 +48,9 @@ public final class BlockDeletingServiceMetrics {
 
   @Metric(about = "The number of out of order delete block transaction.")
   private MutableCounterLong outOfOrderDeleteBlockTransactionCount;
+
+  @Metric(about = "The total number of blocks pending for processing.")
+  private MutableGaugeLong totalPendingBlockCount;
 
   private BlockDeletingServiceMetrics() {
   }
@@ -82,6 +86,10 @@ public final class BlockDeletingServiceMetrics {
     this.failureCount.incr();
   }
 
+  public void setTotalPendingBlockCount(long count) {
+    this.totalPendingBlockCount.set(count);
+  }
+
   public long getSuccessCount() {
     return successCount.value();
   }
@@ -102,6 +110,10 @@ public final class BlockDeletingServiceMetrics {
     return outOfOrderDeleteBlockTransactionCount.value();
   }
 
+  public long getTotalPendingBlockCount() {
+    return totalPendingBlockCount.value();
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
@@ -109,7 +121,9 @@ public final class BlockDeletingServiceMetrics {
         .append("successBytes = " + successBytes.value()).append("\t")
         .append("failureCount = " + failureCount.value()).append("\t")
         .append("outOfOrderDeleteBlockTransactionCount = "
-            + outOfOrderDeleteBlockTransactionCount.value()).append("\t");
+            + outOfOrderDeleteBlockTransactionCount.value()).append("\t")
+        .append("totalPendingBlockCount = "
+            + totalPendingBlockCount.value()).append("\t");
     return buffer.toString();
   }
 }

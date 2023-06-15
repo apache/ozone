@@ -54,6 +54,8 @@ import org.junit.runners.Parameterized;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
@@ -138,11 +140,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateCache() throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
@@ -154,7 +157,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Before calling
     OmKeyInfo omKeyInfo =
-        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+        omMetadataManager.getOpenKeyTable(
+                omKeyCreateRequest.getBucketLayout())
             .get(openKey);
 
     Assert.assertNull(omKeyInfo);
@@ -172,7 +176,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Disk should have 1 version, as it is fresh key create.
     Assert.assertEquals(1,
-        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+        omMetadataManager.getOpenKeyTable(
+                omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
 
     // Write to DB like key commit.
@@ -190,7 +195,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Before calling
     omKeyInfo =
-        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+        omMetadataManager.getOpenKeyTable(
+                omKeyCreateRequest.getBucketLayout())
             .get(openKey);
     Assert.assertNull(omKeyInfo);
 
@@ -210,7 +216,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Disk should have 1 versions when bucket versioning is off.
     Assert.assertEquals(1,
-        omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
+        omMetadataManager.getOpenKeyTable(
+                omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
 
   }
@@ -489,7 +496,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    */
 
   @SuppressWarnings("parameterNumber")
-  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
+  protected OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
     return createKeyRequest(isMultipartKey, partNumber, keyName);
   }
 
@@ -629,6 +636,28 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   }
 
+  @Test
+  public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(OzoneConsts.OM_SNAPSHOT_INDICATOR + "/" + keyName);
+
+    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+
+    OMException ex = Assert.assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
+    );
+    Assert.assertTrue(ex.getMessage().contains(
+        "Cannot create key under path reserved for snapshot: "
+            + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+  }
+
   protected void addToKeyTable(String keyName) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
@@ -731,5 +760,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   protected OMKeyCreateRequest getOMKeyCreateRequest(
       OMRequest omRequest, BucketLayout layout) {
     return new OMKeyCreateRequest(omRequest, layout);
+  }
+
+  protected boolean getKeyPathLockEnabled() {
+    return keyPathLockEnabled;
+  }
+
+  protected boolean getEnableFileSystemPaths() {
+    return enableFileSystemPaths;
   }
 }

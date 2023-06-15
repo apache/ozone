@@ -613,6 +613,11 @@ public class TestBlockDeletingService {
       Assert.assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      // The value of the getTotalPendingBlockCount Metrics is obtained
+      // before the deletion is processing
+      // So the Pending Block count will be 3
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getTotalPendingBlockCount());
 
       deleteAndWait(svc, 2);
 
@@ -634,8 +639,12 @@ public class TestBlockDeletingService {
 
       // check if blockData get deleted
       assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());
+      // The value of the getTotalPendingBlockCount Metrics is obtained
+      // before the deletion is processing
+      // So the Pending Block count will be 1
+      Assert.assertEquals(1,
+          deletingServiceMetrics.getTotalPendingBlockCount());
     }
-
     svc.shutdown();
   }
 
@@ -830,7 +839,7 @@ public class TestBlockDeletingService {
 
     // get container meta data
     KeyValueContainer container =
-        (KeyValueContainer) containerSet.getContainerIterator().next();
+        (KeyValueContainer) containerSet.iterator().next();
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);

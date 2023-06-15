@@ -175,7 +175,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Given a ContainerReplicaOp, check its index is within the expected
    * bounds and then add it to the relevant list.
-   * @param op
    */
   private void processPendingOp(ContainerReplicaOp op) {
     ensureIndexWithinBounds(op.getReplicaIndex(), "pending" + op.getOpType());
@@ -363,7 +362,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * remainingMaintenanceRedundancy of 1, and two replicas in maintenance,
    * this will return 1, indicating one of the maintenance replicas must be
    * copied to an in-service node to meet the redundancy guarantee.
-   * @return
    */
   public int additionalMaintenanceCopiesNeeded(boolean includePendingAdd) {
     Set<Integer> maintenanceOnly = maintenanceOnlyIndexes(includePendingAdd);
@@ -567,7 +565,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Returns the maximum number of replicas that are allowed to be only on a
    * maintenance node, with no other copies on in-service nodes.
-   * @return
    */
   private int getMaxMaintenance() {
     return Math.max(0, repConfig.getParity() - remainingMaintenanceRedundancy);
@@ -577,7 +574,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * Validate to ensure that the replia index is between 1 and the max expected
    * replica index for the replication config, eg 5 for 3-2, 9 for 6-3 etc.
    * @param index The replica index to check.
-   * @Throws IllegalArgumentException if the index is out of bounds.
+   * @throws IllegalArgumentException if the index is out of bounds.
    */
   private void ensureIndexWithinBounds(Integer index, String setName) {
     if (index < 1 || index > repConfig.getRequiredNodes()) {

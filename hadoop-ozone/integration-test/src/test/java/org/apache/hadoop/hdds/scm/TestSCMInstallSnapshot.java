@@ -151,7 +151,7 @@ public class TestSCMInstallSnapshot {
     SCMStateMachine sm =
         scm.getScmHAManager().getRatisServer().getSCMStateMachine();
     sm.pause();
-    sm.setInstallingDBCheckpoint(checkpoint);
+    sm.setInstallingSnapshotData(checkpoint, null);
     sm.reinitialize();
 
     Assert.assertNotNull(

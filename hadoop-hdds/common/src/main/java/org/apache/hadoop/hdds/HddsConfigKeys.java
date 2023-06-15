@@ -201,6 +201,10 @@ public final class HddsConfigKeys {
       "hdds.x509.renew.grace.duration";
 
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+  public static final String HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED =
+      "hdds.x509.grace.duration.token.checks.enabled";
+  public static final boolean
+      HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT = true;
   public static final String HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX = "-next";
   public static final String HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX = "-previous";
 
@@ -223,6 +227,28 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT =
       "";
+
+  public static final String HDDS_SECRET_KEY_FILE =
+      "hdds.secret.key.file.name";
+  public static final String HDDS_SECRET_KEY_FILE_DEFAULT = "secret_keys.json";
+
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
+      "hdds.secret.key.expiry.duration";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
+      "hdds.secret.key.rotate.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT = "1d";
+
+  public static final String HDDS_SECRET_KEY_ALGORITHM =
+      "hdds.secret.key.algorithm";
+  public static final String HDDS_SECRET_KEY_ALGORITHM_DEFAULT =
+      "HmacSHA256";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION =
+      "hdds.secret.key.rotate.check.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
+      = "10m";
 
   /**
    * Do not instantiate.
@@ -273,6 +299,18 @@ public final class HddsConfigKeys {
   public static final String HDDS_SECURITY_CLIENT_SCM_CERTIFICATE_PROTOCOL_ACL =
       "hdds.security.client.scm.certificate.protocol.acl";
 
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.om.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.scm.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.datanode.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =
@@ -289,7 +327,18 @@ public final class HddsConfigKeys {
       "hdds.datanode.http-address";
   public static final String HDDS_DATANODE_HTTPS_ADDRESS_KEY =
       "hdds.datanode.https-address";
-
+  public static final String HDDS_DATANODE_CLIENT_ADDRESS_KEY =
+      "hdds.datanode.client.address";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_KEY =
+      "hdds.datanode.client.bind.host";
+  public static final String HDDS_DATANODE_CLIENT_BIND_HOST_DEFAULT =
+      "0.0.0.0";
+  public static final String HDDS_DATANODE_CLIENT_PORT_KEY =
+      "hdds.datanode.client.port";
+  public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 9864;
+  public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
+      "hdds.datanode.handler.count";
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;

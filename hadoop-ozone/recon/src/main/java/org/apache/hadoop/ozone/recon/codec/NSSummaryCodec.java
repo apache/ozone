@@ -35,18 +35,28 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Codec for Namespace Summary.
+ * Codec to serialize/deserialize {@link NSSummary}.
  */
-public class NSSummaryCodec implements Codec<NSSummary> {
+public final class NSSummaryCodec implements Codec<NSSummary> {
 
-  private final Codec<Integer> integerCodec = new IntegerCodec();
-  private final Codec<Short> shortCodec = new ShortCodec();
+  private static final Codec<NSSummary> INSTANCE = new NSSummaryCodec();
+
+  public static Codec<NSSummary> get() {
+    return INSTANCE;
+  }
+
+  private final Codec<Integer> integerCodec = IntegerCodec.get();
+  private final Codec<Short> shortCodec = ShortCodec.get();
   private final Codec<Long> longCodec = LongCodec.get();
-  private final Codec<String> stringCodec = new StringCodec();
+  private final Codec<String> stringCodec = StringCodec.get();
   // 1 int fields + 41-length int array
   // + 2 dummy field to track list size/dirName length
   private static final int NUM_OF_INTS =
       3 + ReconConstants.NUM_OF_FILE_SIZE_BINS;
+
+  private NSSummaryCodec() {
+    // singleton
+  }
 
   @Override
   public byte[] toPersistedFormat(NSSummary object) throws IOException {

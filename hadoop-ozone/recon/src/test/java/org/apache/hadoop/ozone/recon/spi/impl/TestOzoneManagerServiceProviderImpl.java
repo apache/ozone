@@ -148,6 +148,48 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
+  public void testReconOmDBCloseAndOpenNewSnapshotDb() throws Exception {
+    OMMetadataManager omMetadataManager =
+        initializeNewOmMetadataManager(temporaryFolder.newFolder());
+    ReconOMMetadataManager reconOMMetadataManager =
+        getTestReconOmMetadataManager(omMetadataManager,
+            temporaryFolder.newFolder());
+
+    writeDataToOm(omMetadataManager, "key_one");
+    writeDataToOm(omMetadataManager, "key_two");
+
+    DBCheckpoint checkpoint = omMetadataManager.getStore()
+        .getCheckpoint(true);
+    File tarFile1 = createTarFile(checkpoint.getCheckpointLocation());
+    File tarFile2 = createTarFile(checkpoint.getCheckpointLocation());
+    InputStream inputStream1 = new FileInputStream(tarFile1);
+    InputStream inputStream2 = new FileInputStream(tarFile2);
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    HttpURLConnection httpURLConnectionMock1 = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock1.getInputStream()).thenReturn(inputStream1);
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenReturn(httpURLConnectionMock1);
+
+    ReconTaskController reconTaskController = getMockTaskController();
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider1 =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock,
+            ozoneManagerProtocol);
+    assertTrue(ozoneManagerServiceProvider1.updateReconOmDBWithNewSnapshot());
+
+    HttpURLConnection httpURLConnectionMock2 = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock2.getInputStream()).thenReturn(inputStream2);
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenReturn(httpURLConnectionMock2);
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider2 =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock,
+            ozoneManagerProtocol);
+    assertTrue(ozoneManagerServiceProvider2.updateReconOmDBWithNewSnapshot());
+  }
+
+  @Test
   public void testGetOzoneManagerDBSnapshot() throws Exception {
 
     File reconOmSnapshotDbDir = temporaryFolder.newFolder();
