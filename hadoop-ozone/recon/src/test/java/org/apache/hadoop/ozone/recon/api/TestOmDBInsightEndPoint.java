@@ -354,7 +354,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(3,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
 
-    // CASE 4 :- Display both FSO and Non-FSO keys in response
+    // CASE 4 :- Don't Display both FSO and Non-FSO keys in response
     // includeFsoKeys=false, includeNonFsoKeys=false
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(10, "", false, false);
