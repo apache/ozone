@@ -599,36 +599,36 @@ public class ContainerStateMachine extends BaseStateMachine {
           "DataStream: " + stream + " is not closed properly"));
     }
 
-    if (dataChannel instanceof KeyValueStreamDataChannel) {
-      final KeyValueStreamDataChannel kvStreamDataChannel =
-          (KeyValueStreamDataChannel) dataChannel;
-
-      ContainerCommandRequestProto request =
-          kvStreamDataChannel.getPutBlockRequest();
-
-      return runCommandAsync(request, entry).whenComplete((response, e) -> {
-        if (e != null) {
-          LOG.warn("Failed to link logEntry {} for request {}",
-              TermIndex.valueOf(entry), request, e);
-        }
-        if (response != null) {
-          final ContainerProtos.Result result = response.getResult();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("{} to link logEntry {} for request {}, response: {}",
-                result, TermIndex.valueOf(entry), request, response);
-          }
-          if (result == ContainerProtos.Result.SUCCESS) {
-            kvStreamDataChannel.setLinked();
-            return;
-          }
-        }
-        // failed to link, cleanup
-        kvStreamDataChannel.cleanUp();
-      });
-    } else {
+    if (!(dataChannel instanceof KeyValueStreamDataChannel)) {
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "Unexpected DataChannel " + dataChannel.getClass()));
     }
+
+    final KeyValueStreamDataChannel kvStreamDataChannel =
+        (KeyValueStreamDataChannel) dataChannel;
+
+    final ContainerCommandRequestProto request =
+        kvStreamDataChannel.getPutBlockRequest();
+
+    return runCommandAsync(request, entry).whenComplete((response, e) -> {
+      if (e != null) {
+        LOG.warn("Failed to link logEntry {} for request {}",
+            TermIndex.valueOf(entry), request, e);
+      }
+      if (response != null) {
+        final ContainerProtos.Result result = response.getResult();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{} to link logEntry {} for request {}, response: {}",
+              result, TermIndex.valueOf(entry), request, response);
+        }
+        if (result == ContainerProtos.Result.SUCCESS) {
+          kvStreamDataChannel.setLinked();
+          return;
+        }
+      }
+      // failed to link, cleanup
+      kvStreamDataChannel.cleanUp();
+    });
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {

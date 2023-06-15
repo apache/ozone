@@ -133,9 +133,8 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     }
 
     void cleanUpAll() {
-      final int size = deque.size();
-      for (int i = 0; i < size; i++) {
-        Optional.ofNullable(poll()).ifPresent(ReferenceCountedObject::release);
+      while (!deque.isEmpty()) {
+        poll().release();
       }
     }
   }
@@ -216,7 +215,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   @Override
   protected void cleanupInternal() throws IOException {
     buffers.cleanUpAll();
-    if (!closed.get()) {
+    if (closed.compareAndSet(false, true)) {
       super.close();
     }
   }

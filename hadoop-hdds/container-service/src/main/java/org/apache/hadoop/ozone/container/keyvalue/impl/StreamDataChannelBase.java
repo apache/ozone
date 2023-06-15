@@ -39,7 +39,7 @@ import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.o
 /**
  * For write state machine data.
  */
-public abstract class StreamDataChannelBase
+abstract class StreamDataChannelBase
     implements StateMachine.DataChannel {
   static final Logger LOG = LoggerFactory.getLogger(
       StreamDataChannelBase.class);
