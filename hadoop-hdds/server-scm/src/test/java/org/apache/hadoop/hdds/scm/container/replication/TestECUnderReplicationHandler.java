@@ -110,6 +110,7 @@ public class TestECUnderReplicationHandler {
   private ContainerInfo container;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
+  private ReplicationManagerMetrics metrics;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private static final int DATA = 3;
@@ -137,6 +138,8 @@ public class TestECUnderReplicationHandler {
         new ReplicationManager.ReplicationManagerConfiguration();
     when(replicationManager.getConfig())
         .thenReturn(rmConf);
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    when(replicationManager.getMetrics()).thenReturn(metrics);
 
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
@@ -200,6 +203,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, never())
         .sendThrottledReconstructionCommand(any(), any());
+    assertEquals(1, metrics.getECPartialReconstructionSkippedTotal());
   }
 
   private static UnderReplicatedHealthResult mockUnderReplicated(
@@ -258,6 +262,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, times(1))
         .sendThrottledReconstructionCommand(any(), any());
+    assertEquals(1, metrics.getECPartialReconstructionCriticalTotal());
   }
 
   @Test
@@ -711,6 +716,7 @@ public class TestECUnderReplicationHandler {
     ReconstructECContainersCommand cmd = (ReconstructECContainersCommand)
         commandsSent.iterator().next().getValue();
     assertEquals(1, cmd.getTargetDatanodes().size());
+    assertEquals(1, metrics.getEcPartialReconstructionNoneOverloadedTotal());
   }
 
   @Test

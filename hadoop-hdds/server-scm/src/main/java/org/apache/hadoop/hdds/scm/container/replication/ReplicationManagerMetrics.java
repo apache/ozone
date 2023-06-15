@@ -187,6 +187,18 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of EC replicas scheduled for delete which timed out.")
   private MutableCounterLong ecReplicaDeleteTimeoutTotal;
 
+  @Metric("Number of times partial EC reconstruction was needed due to " +
+      "overloaded nodes, but skipped as there was still sufficient redundancy.")
+  private MutableCounterLong ecPartialReconstructionSkippedTotal;
+
+  @Metric("Number of times partial EC reconstruction was used due to " +
+      "insufficient nodes available and reconstruction was critical.")
+  private MutableCounterLong ecPartialReconstructionCriticalTotal;
+
+  @Metric("Number of time partial EC reconstruction was used due to " +
+      "insufficient nodes available and with no overloaded nodes.")
+  private MutableCounterLong ecPartialReconstructionNoneOverloadedTotal;
+
   @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
       + "due to the pending commands on the target datanode")
   private MutableCounterLong ecReconstructionCmdsDeferredTotal;
@@ -277,6 +289,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     deleteContainerCmdsDeferredTotal.snapshot(builder, all);
     replicateContainerCmdsDeferredTotal.snapshot(builder, all);
     pendingReplicationLimitReachedTotal.snapshot(builder, all);
+    ecPartialReconstructionSkippedTotal.snapshot(builder, all);
+    ecPartialReconstructionCriticalTotal.snapshot(builder, all);
+    ecPartialReconstructionNoneOverloadedTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -516,6 +531,30 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getPendingReplicationLimitReachedTotal() {
     return pendingReplicationLimitReachedTotal.value();
+  }
+
+  public long getECPartialReconstructionSkippedTotal() {
+    return ecPartialReconstructionSkippedTotal.value();
+  }
+
+  public void incrECPartialReconstructionSkippedTotal() {
+    this.ecPartialReconstructionSkippedTotal.incr();
+  }
+
+  public long getECPartialReconstructionCriticalTotal() {
+    return ecPartialReconstructionCriticalTotal.value();
+  }
+
+  public void incrECPartialReconstructionCriticalTotal() {
+    this.ecPartialReconstructionCriticalTotal.incr();
+  }
+
+  public long getEcPartialReconstructionNoneOverloadedTotal() {
+    return ecPartialReconstructionNoneOverloadedTotal.value();
+  }
+
+  public void incrEcPartialReconstructionNoneOverloadedTotal() {
+    this.ecPartialReconstructionNoneOverloadedTotal.incr();
   }
 
 }
