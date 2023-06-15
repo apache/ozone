@@ -117,7 +117,7 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected void writeOrphanKeysMetaDataToDB(
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<Long, OrphanKeyMetaData> entry :
@@ -127,7 +127,6 @@ public class NSSummaryTaskDbEventHandler {
           OrphanKeyMetaData orphanKeyMetaData =
               orphanKeyMetaDataMap.get(key);
           if (orphanKeyMetaData.getObjectIds().size() > 0) {
-            orphanKeyMetaData.setStatus(status);
             reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
                 rdbBatchOperation, key, orphanKeyMetaData);
           } else {
@@ -238,8 +237,10 @@ public class NSSummaryTaskDbEventHandler {
     // remove parent from orphan map.
     if (null != orphanKeyMetaDataMap) {
       long objectID = fileDirInfo.getObjectID();
-      orphanKeyMetaDataMap.remove(objectID);
-      reconNamespaceSummaryManager.deleteOrphanKeyMetaDataSet(objectID);
+      OrphanKeyMetaData orphanKeyMetaData = orphanKeyMetaDataMap.get(objectID);
+      if (null != orphanKeyMetaData) {
+        orphanKeyMetaData.getObjectIds().clear();
+      }
     }
   }
 
@@ -351,9 +352,9 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected boolean writeFlushAndCommitOrphanKeysMetaDataToDB(
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status) {
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) {
     try {
-      writeOrphanKeysMetaDataToDB(orphanKeyMetaDataMap, status);
+      writeOrphanKeysMetaDataToDB(orphanKeyMetaDataMap);
       orphanKeyMetaDataMap.clear();
     } catch (IOException e) {
       LOG.error("Unable to write orphan keys meta data in Recon DB.", e);
@@ -363,12 +364,12 @@ public class NSSummaryTaskDbEventHandler {
   }
 
   protected boolean checkOrphanDataAndCallWriteFlushToDB(
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status) {
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) {
     // if map contains more than entries, flush to DB and clear the map
     if (null != orphanKeyMetaDataMap && orphanKeyMetaDataMap.size() >=
         orphanKeysFlushToDBMaxThreshold) {
       return writeFlushAndCommitOrphanKeysMetaDataToDB(
-          orphanKeyMetaDataMap, status);
+          orphanKeyMetaDataMap);
     }
     return true;
   }
@@ -444,7 +445,7 @@ public class NSSummaryTaskDbEventHandler {
           objectIds.add(objectID);
           orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
         }
-      // If parent does not exist in NSSummaryMap, this the child can be orphan.
+      // If parent does not exist in NSSummaryMap, then the child can be orphan.
       } else {
         Set<Long> objectIds = new HashSet<>();
         objectIds.add(objectID);
@@ -473,11 +474,11 @@ public class NSSummaryTaskDbEventHandler {
           toBeDeletedBucketObjectIdsFromOrphanMap.add(parentId);
           if (!checkOrphanDataThresholdAndAddToDeleteBatch(
               toBeDeletedBucketObjectIdsFromOrphanMap)) {
-            return true;
+            return false;
           }
         }
       }
-      return false;
+      return true;
     }
   }
 }

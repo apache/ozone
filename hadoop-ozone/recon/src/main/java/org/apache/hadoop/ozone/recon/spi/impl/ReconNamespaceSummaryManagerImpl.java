@@ -29,10 +29,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import javax.inject.Inject;
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.ORPHAN_KEYS_METADATA;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
-
 /**
  * Wrapper functions for DB operations on recon namespace summary metadata.
  */
@@ -45,16 +41,17 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Inject
   public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider)
-          throws IOException {
+      throws IOException {
     namespaceDbStore = reconDBProvider.getDbStore();
-    this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
+    this.nsSummaryTable =
+        ReconDBDefinition.NAMESPACE_SUMMARY.getTable(namespaceDbStore);
     this.orphanKeysMetaDataTable =
-        ORPHAN_KEYS_METADATA.getTable(namespaceDbStore);
+        ReconDBDefinition.ORPHAN_KEYS_METADATA.getTable(namespaceDbStore);
   }
 
   @Override
   public void clearNSSummaryTable() throws IOException {
-    truncateTable(nsSummaryTable);
+    ReconDBProvider.truncateTable(nsSummaryTable);
   }
 
   @Override
@@ -108,7 +105,7 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Override
   public void clearOrphanKeyMetaDataTable() throws IOException {
-    truncateTable(orphanKeysMetaDataTable);
+    ReconDBProvider.truncateTable(orphanKeysMetaDataTable);
   }
 
   @Override

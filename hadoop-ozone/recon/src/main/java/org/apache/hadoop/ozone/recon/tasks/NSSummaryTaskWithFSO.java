@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -47,9 +48,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-
 /**
  * Class for handling FSO specific tasks.
  */
@@ -74,14 +72,15 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
   public Collection<String> getTaskTables() {
-    return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
+    return Arrays.asList(OmMetadataManagerImpl.FILE_TABLE,
+        OmMetadataManagerImpl.DIRECTORY_TABLE);
   }
 
   public boolean processWithFSO(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
-    Map<Long, OrphanKeyMetaData> orphanKeysMetaDataSetMap = new HashMap<>();
+    Map<Long, OrphanKeyMetaData> orphanKeysMetaDataMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
@@ -90,7 +89,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
       // we only process updates on OM's FileTable and Dirtable
       String table = omdbUpdateEvent.getTable();
-      boolean updateOnFileTable = table.equals(FILE_TABLE);
+      boolean updateOnFileTable =
+          table.equals(OmMetadataManagerImpl.FILE_TABLE);
       if (!taskTables.contains(table)) {
         continue;
       }
@@ -108,25 +108,25 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataMap, 1L);
             break;
 
           case DELETE:
             handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap);
+                orphanKeysMetaDataMap);
             break;
 
           case UPDATE:
             if (oldKeyInfo != null) {
               // delete first, then put
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap,
-                  orphanKeysMetaDataSetMap);
+                  orphanKeysMetaDataMap);
             } else {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                       updatedKey);
             }
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataMap, 1L);
             break;
 
           default:
@@ -143,25 +143,25 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataMap, 1L);
             break;
 
           case DELETE:
             handleDeleteDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap);
+                orphanKeysMetaDataMap);
             break;
 
           case UPDATE:
             if (oldDirectoryInfo != null) {
               // delete first, then put
               handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap,
-                  orphanKeysMetaDataSetMap);
+                  orphanKeysMetaDataMap);
             } else {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                       updatedKey);
             }
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataSetMap, 1L);
+                orphanKeysMetaDataMap, 1L);
             break;
 
           default:
@@ -178,7 +178,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         return false;
       }
 
-      if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap, 1L)) {
+      if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataMap)) {
         return false;
       }
     }
@@ -188,8 +188,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return false;
     }
     // flush and commit left out entries at end
-    if (!writeFlushAndCommitOrphanKeysMetaDataToDB(orphanKeysMetaDataSetMap,
-        1L)) {
+    if (!writeFlushAndCommitOrphanKeysMetaDataToDB(orphanKeysMetaDataMap)) {
       return false;
     }
 
@@ -202,18 +201,17 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap = new HashMap<>();
 
     try {
-      if (handleDirectoryTableEvents(omMetadataManager, nsSummaryMap,
+      if (!handleDirectoryTableEvents(omMetadataManager, nsSummaryMap,
           orphanKeyMetaDataMap)) {
         return false;
       }
 
-      if (handleFileTableEvents(omMetadataManager, nsSummaryMap,
+      if (!handleFileTableEvents(omMetadataManager, nsSummaryMap,
           orphanKeyMetaDataMap)) {
         return false;
       }
 
-      if (!writeFlushAndCommitOrphanKeysMetaDataToDB(
-          orphanKeyMetaDataMap, 1L)) {
+      if (!writeFlushAndCommitOrphanKeysMetaDataToDB(orphanKeyMetaDataMap)) {
         return false;
       }
 
@@ -227,7 +225,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       // from orphanKeysMetaDataTable, because child keys for deleted directory
       // will not be treated as orphans.
       Instant start = Instant.now();
-      if (removeDeletedDirEntries(omMetadataManager, orphanMetaDataKeyList)) {
+      if (!removeDeletedDirEntries(omMetadataManager, orphanMetaDataKeyList)) {
         return false;
       }
       if (!batchDeleteAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
@@ -235,7 +233,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       }
       // Verify if child keys for left out parents are really orphans or
       // their parents are bucket objects.
-      if (verifyOrphanParentsForBucket(bucketObjIdSet, orphanMetaDataKeyList)) {
+      if (!verifyOrphanParentsForBucket(bucketObjIdSet,
+          orphanMetaDataKeyList)) {
         return false;
       }
       if (!batchDeleteAndCommitOrphanKeysMetaDataToDB(orphanMetaDataKeyList)) {
@@ -290,17 +289,17 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         orphanMetaDataKeyList.add(omKeyInfo.getObjectID());
         if (!checkOrphanDataThresholdAndAddToDeleteBatch(
             orphanMetaDataKeyList)) {
-          return true;
+          return false;
         }
       }
-      return false;
+      return true;
     }
   }
 
   private boolean handleDirectoryTableEvents(
       OMMetadataManager omMetadataManager,
       Map<Long, NSSummary> nsSummaryMap,
-      Map<Long, OrphanKeyMetaData> orphanKeysMetaDataSetMap)
+      Map<Long, OrphanKeyMetaData> orphanKeysMetaDataMap)
       throws IOException {
     Table<String, OmDirectoryInfo> dirTable =
         omMetadataManager.getDirectoryTable();
@@ -310,18 +309,17 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       while (dirTableIter.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
         OmDirectoryInfo directoryInfo = kv.getValue();
-        handlePutDirEvent(directoryInfo, nsSummaryMap, orphanKeysMetaDataSetMap,
-            1L);
+        handlePutDirEvent(directoryInfo, nsSummaryMap, orphanKeysMetaDataMap,
+            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
         if (!checkAndCallFlushToDB(nsSummaryMap)) {
-          return true;
+          return false;
         }
-        if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap,
-            1L)) {
-          return true;
+        if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataMap)) {
+          return false;
         }
       }
     }
-    return false;
+    return true;
   }
 
   private boolean handleFileTableEvents(
@@ -339,16 +337,62 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
         OmKeyInfo keyInfo = kv.getValue();
         handlePutKeyEvent(keyInfo, nsSummaryMap, orphanKeysMetaDataSetMap,
-            1L);
+            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
         if (!checkAndCallFlushToDB(nsSummaryMap)) {
-          return true;
+          return false;
         }
-        if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap,
-            1L)) {
-          return true;
+        if (!checkOrphanDataAndCallWriteFlushToDB(orphanKeysMetaDataSetMap)) {
+          return false;
         }
       }
     }
-    return false;
+    return true;
+  }
+
+  /**
+   * States that represent if orphan's parent node metadata
+   * update is in progress or completed to avoid dirty read.
+   */
+  public enum NODESTATUS {
+    ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS(1),
+    ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE(2);
+
+    private final int value;
+
+    /**
+     * Constructs states.
+     *
+     * @param value  Enum Value
+     */
+    NODESTATUS(int value) {
+      this.value = value;
+    }
+
+    /**
+     * Returns the in progress status.
+     *
+     * @return progress status.
+     */
+    public static NODESTATUS getOrphanParentNodeUpdateStatusInProgress() {
+      return ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS;
+    }
+
+    /**
+     * Returns the completed status.
+     *
+     * @return completed status.
+     */
+    public static NODESTATUS getOrphanParentNodeUpdateStatusComplete() {
+      return ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE;
+    }
+
+    /**
+     * returns the numeric value associated with the endPoint.
+     *
+     * @return int.
+     */
+    public int getValue() {
+      return value;
+    }
   }
 }
