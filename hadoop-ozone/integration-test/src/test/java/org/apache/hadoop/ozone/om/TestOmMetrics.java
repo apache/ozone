@@ -118,7 +118,6 @@ public class TestOmMetrics {
   /**
    * Shutdown MiniDFSCluster.
    */
-
   @After
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -394,8 +393,7 @@ public class TestOmMetrics {
 
   @Test
   public void testSnapshotOps() throws Exception {
-    // This tests needs enough datanodes to allocate the
-    // blocks for the keys.
+    // This tests needs enough dataNodes to allocate the blocks for the keys.
     clusterBuilder.setNumDatanodes(3);
     startCluster();
 
