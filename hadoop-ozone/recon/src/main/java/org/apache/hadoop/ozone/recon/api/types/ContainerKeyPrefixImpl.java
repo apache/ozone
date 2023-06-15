@@ -144,7 +144,6 @@ final class ContainerKeyPrefixImpl
     @Override
     public final int getSerializedSizeUpperBound(ContainerKeyPrefix object) {
       final String keyPrefix = object.getKeyPrefix();
-      // containerId
       return Long.BYTES // containerId
           + Delimiter.length()
           + StringCodec.get().getSerializedSizeUpperBound(keyPrefix)
