@@ -250,16 +250,16 @@ public class TestRDBSnapshotProvider {
     assertTrue(dummyFile.exists());
 
     // Set the leader.
-    rdbSnapshotProvider.checkLeaderConsistent("node1");
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
     assertEquals(2, rdbSnapshotProvider.getInitCount());
     assertFalse(dummyFile.exists());
 
     // Confirm setting the same leader doesn't reinitialize.
-    rdbSnapshotProvider.checkLeaderConsistent("node1");
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
     assertEquals(2, rdbSnapshotProvider.getInitCount());
 
     // Confirm setting different leader does reinitialize.
-    rdbSnapshotProvider.checkLeaderConsistent("node2");
+    rdbSnapshotProvider.checkLeaderConsistency("node2");
     assertEquals(3, rdbSnapshotProvider.getInitCount());
   }
 }

@@ -108,7 +108,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       throws IOException {
     LOG.info("Prepare to download the snapshot from leader OM {} and " +
         "reloading state from the snapshot.", leaderNodeID);
-    checkLeaderConsistent(leaderNodeID);
+    checkLeaderConsistency(leaderNodeID);
 
     String snapshotFileName = getSnapshotFileName(leaderNodeID);
     File targetFile = new File(snapshotDir, snapshotFileName);

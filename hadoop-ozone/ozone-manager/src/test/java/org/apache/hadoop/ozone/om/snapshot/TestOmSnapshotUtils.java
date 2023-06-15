@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -75,5 +76,6 @@ public class TestOmSnapshotUtils {
         map(Path::toString).collect(Collectors.toSet());
 
     assertEquals(tree1Files, tree2Files);
+    GenericTestUtils.deleteDirectory(tempDir);
   }
 }
