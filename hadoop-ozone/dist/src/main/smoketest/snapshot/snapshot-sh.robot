@@ -54,7 +54,7 @@ Snapshot Diff
                     Should contain      ${result}       +    ${KEY_THREE}
 
 List Snapshot Diff Jobs
-    ${result} =     Execute             ozone sh snapshot listSnapshotDiff /${VOLUME}/${BUCKET} --all
+    ${result} =     Execute             ozone sh snapshot listDiff /${VOLUME}/${BUCKET} --all
                     Should contain      ${result}        ${VOLUME}
                     Should contain      ${result}        ${BUCKET}
                     Should contain      ${result}        ${SNAPSHOT_ONE}
