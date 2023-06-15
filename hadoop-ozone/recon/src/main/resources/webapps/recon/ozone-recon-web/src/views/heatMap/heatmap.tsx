@@ -121,25 +121,32 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       isLoading: true
     });
 
-    const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
-    axios.get(treeEndpoint).then(response => {
-      minSize = this.minmax(response.data)[0];
-      maxSize = this.minmax(response.data)[1];
-      let treeResponse: ITreeResponse = this.updateSize(response.data);
-      this.setState({
-        isLoading: false,
-        showPanel: false,
-        treeResponse
+      if (date && path && entityType) {
+      const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
+      axios.get(treeEndpoint).then(response => {
+        minSize = this.minmax(response.data)[0];
+        maxSize = this.minmax(response.data)[1];
+        let treeResponse: ITreeResponse = this.updateSize(response.data);
+        this.setState({
+          isLoading: false,
+          showPanel: false,
+          treeResponse
+        });
+      }).catch(error => {
+        this.setState({
+          isLoading: false,
+          inputPath: '',
+          entityType: '',
+          date: ''
+        });
+        showDataFetchError(error.toString());
       });
-    }).catch(error => {
-      this.setState({
-        isLoading: false,
-        inputPath: '',
-        entityType: '',
-        date:''
-      });
-      showDataFetchError(error.toString());
-    });
+      }
+      else {
+        this.setState({
+          isLoading: false
+        });
+    }
   };
 
   updateTreemapParent = (path: any) => {
@@ -327,7 +334,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                   </div>
                   :
                   <div className='heatmapinformation'><br />
-                    No Data Available.{' '}<br />
+                    No Data Available. Please Refresh Page.{' '}<br />
                   </div>
                 }
               
