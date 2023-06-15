@@ -30,7 +30,8 @@ import java.util.List;
 /**
  * ozone sh snapshot listSnapshotDiff.
  */
-@CommandLine.Command(name = "listSnapshotDiff",
+@CommandLine.Command(name = "listDiff",
+    aliases = {"listDiffJob", "lsDiff", "lsDiffJob"},
     description = "List snapshotDiff jobs for a bucket.")
 public class ListSnapshotDiffHandler extends Handler {
 
