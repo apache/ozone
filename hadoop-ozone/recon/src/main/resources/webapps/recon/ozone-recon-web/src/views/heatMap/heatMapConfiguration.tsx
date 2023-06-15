@@ -39,38 +39,13 @@ interface IChildren {
 interface IHeatmapConfigurationProps {
   data: ITreeResponse[];
   onClick: Function;
+  colorScheme: string[];
 }
-
-const colourScheme = {
-  pastel_greens: [
-    '#CCFFD9', //light green start (least accessed)
-    '#B9FBD5',
-    '#A7F7D1',
-    '#94F2CD',
-    '#82EEC9',
-    '#6FEAC5',
-    '#5DE6C2',
-    '#4AE2BE',
-    '#38DEBA',
-    '#25D9B6',
-    '#13D5B2',
-    '#00D1AE', //dark green ends (light to moderate accces)
-    '#FFD28F', //light orange (moderate access)
-    '#FFC58A',
-    '#FFB984',
-    '#FEAC7F',
-    '#FE9F7A',
-    '#FE9274',
-    '#FE866F',
-    '#FD7969',
-    '#FD6C64' //red (most accessed)
-  ]
-};
 
 export default class HeatMapConfiguration extends React.Component<IHeatmapConfigurationProps> {
   constructor(props: IHeatmapConfigurationProps) {
     super(props);
-    const { data } = this.props;
+    const { data, colorScheme } = this.props;
     this.state = {
       // Tree Map Options Start
       options: {
@@ -101,7 +76,7 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
           tileStroke: 'white',
           tileStrokeWidth: 1.5,
           colorDomain: [0.000, 0.050, 0.100, 0.150, 0.200, 0.250, 0.300, 0.350, 0.400, 0.450, 0.500, 0.550, 0.600, 0.650, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000],
-          colorRange: [...colourScheme["pastel_greens"]],
+          colorRange: [...colorScheme],
           groupFill: '#E6E6E6',
           groupStroke: "#E1E2E6",
           nodePadding: 3.5,
@@ -128,7 +103,8 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
       }
       // Tree Map Options End
     };
-  };
+  }
+  
 
 
   tooltipContent = (params: any) => {

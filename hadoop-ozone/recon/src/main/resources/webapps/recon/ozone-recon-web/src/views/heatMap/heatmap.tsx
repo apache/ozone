@@ -53,6 +53,55 @@ interface ITreeState {
 let minSize = Infinity;
 let maxSize = 0;
 
+const colourScheme = {
+  pastel_greens: [
+    '#CCFFD9', //light green start (least accessed)
+    '#B9FBD5',
+    '#A7F7D1',
+    '#94F2CD',
+    '#82EEC9',
+    '#6FEAC5',
+    '#5DE6C2',
+    '#4AE2BE',
+    '#38DEBA',
+    '#25D9B6',
+    '#13D5B2',
+    '#00D1AE', //dark green ends (light to moderate accces)
+    '#FFD28F', //light orange (moderate access)
+    '#FFC58A',
+    '#FFB984',
+    '#FEAC7F',
+    '#FE9F7A',
+    '#FE9274',
+    '#FE866F',
+    '#FD7969',
+    '#FD6C64' //red (most accessed)
+  ],
+  amber_alert: [
+    '#FFCF88',
+    '#FFCA87',
+    '#FFC586',
+    '#FFC085',
+    '#FFBB83',
+    '#FFB682',
+    '#FFB181',
+    '#FFA676',
+    '#FF9F6F',
+    '#FF9869',
+    '#FF9262',
+    '#FF8B5B',
+    '#FF8455',
+    '#FF7D4E',
+    '#FF8282',
+    '#FF7776',
+    '#FF6D6A',
+    '#FF625F',
+    '#FF5753',
+    '#FF4D47',
+    '#FF423B'
+  ]
+};
+
 export class Heatmap extends React.Component<Record<string, object>, ITreeState> {
   constructor(props = {}) {
     super(props);
@@ -73,7 +122,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         inputPath: prevState.inputPath,
         entityType: prevState.entityType
       }), () => {
-        this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
+        this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date);
       });
     }
   };
@@ -87,7 +136,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         date: prevState.date,
         inputPath: prevState.inputPath
       }), () => {
-        this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
+        this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date);
       });
     }
   };
@@ -145,11 +194,12 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       isLoading: true,
       inputPath: path
     }, () => {
-      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date)
+      this.updateTreeMap(this.state.inputPath, this.state.entityType, this.state.date);
     });
   };
 
   componentDidMount(): void {
+    
     this.setState({
       isLoading: true
     });
@@ -178,7 +228,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     else {
       this.setState({
         inputPath: '/'
-      })
+      });
     }
   };
 
@@ -306,21 +356,21 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                       </Row>
                       <div className='heatmap-legend-container'>
                         <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: "#CCFFD9", marginRight: "5px" }}> </div>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][0]}`, marginRight: "5px" }}> </div>
                           <span>Less Accessed</span>
                         </div>
                         <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: "#FFD28F", marginRight: "5px" }}> </div>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][8]}`, marginRight: "5px" }}> </div>
                           <span>Moderate Accessed</span>
                         </div>
                         <div className='heatmap-legend-item'>
-                          <div style={{ width: "13px", height: "13px", backgroundColor: "#FD6C64", marginRight: "5px" }}> </div>
+                          <div style={{ width: "13px", height: "13px", backgroundColor: `${colourScheme["amber_alert"][20]}`, marginRight: "5px" }}> </div>
                           <span>Most Accessed</span>
                         </div>
                       </div>
                     </div>
                     <div id="heatmap-chart-container">
-                      <HeatMapConfiguration data={treeResponse} onClick={this.updateTreemapParent}></HeatMapConfiguration>
+                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                     </div>
                   </div>
                 :
