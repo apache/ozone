@@ -165,6 +165,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return this.scmhaService.getServiceByIndex(index);
   }
 
+  public StorageContainerManager getScmLeader() {
+    return getStorageContainerManagers().stream()
+        .filter(StorageContainerManager::checkLeader)
+        .findFirst().orElse(null);
+  }
+
   private OzoneManager getOMLeader(boolean waitForLeaderElection)
       throws TimeoutException, InterruptedException {
     if (waitForLeaderElection) {
@@ -643,10 +649,15 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmServiceId, scmNodeId);
         String scmGrpcPortKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, scmServiceId, scmNodeId);
+        String scmSecurityAddrKey = ConfUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, scmServiceId,
+            scmNodeId);
 
         conf.set(scmAddrKey, "127.0.0.1");
         conf.set(scmHttpAddrKey, localhostWithFreePort());
         conf.set(scmHttpsAddrKey, localhostWithFreePort());
+        conf.set(scmSecurityAddrKey, localhostWithFreePort());
+        conf.set("ozone.scm.update.service.port", "0");
 
         int ratisPort = getFreePort();
         conf.setInt(scmRatisPortKey, ratisPort);

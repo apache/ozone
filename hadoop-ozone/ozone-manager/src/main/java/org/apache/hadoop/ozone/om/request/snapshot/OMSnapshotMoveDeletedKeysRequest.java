@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
@@ -125,15 +126,16 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   /**
    * Get the next non deleted snapshot in the snapshot chain.
    */
-  private SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
-      throws IOException {
+  private SnapshotInfo getNextActiveSnapshot(
+      SnapshotInfo snapInfo,
+      SnapshotChainManager chainManager,
+      OmSnapshotManager omSnapshotManager
+  ) throws IOException {
     while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotID())) {
+        snapInfo.getSnapshotId())) {
 
-      String nextPathSnapshot =
-          chainManager.nextPathSnapshot(
-              snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
+      UUID nextPathSnapshot = chainManager.nextPathSnapshot(
+              snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
 
       String tableKey = chainManager.getTableKey(nextPathSnapshot);
       SnapshotInfo nextSnapshotInfo =
@@ -143,7 +145,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
         return nextSnapshotInfo;
       }
-
       snapInfo = nextSnapshotInfo;
     }
     return null;

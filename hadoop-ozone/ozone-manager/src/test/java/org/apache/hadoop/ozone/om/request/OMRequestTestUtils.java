@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
@@ -365,7 +366,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
-        bucketName, snapshotName, UUID.randomUUID().toString(), Time.now());
+        bucketName, snapshotName, UUID.randomUUID(), Time.now());
     addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
   }
 
@@ -376,7 +377,7 @@ public final class OMRequestTestUtils {
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-        snapshotName, UUID.randomUUID().toString(), Time.now());
+        snapshotName, UUID.randomUUID(), Time.now());
     addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
   }
 
@@ -1126,7 +1127,7 @@ public final class OMRequestTestUtils {
         OzoneManagerProtocolProtos.CreateSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setSnapshotId(UUID.randomUUID().toString())
+            .setSnapshotId(HddsUtils.toProtobuf(UUID.randomUUID()))
             .setSnapshotName(snapshotName)
             .build();
 
