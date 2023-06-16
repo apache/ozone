@@ -46,10 +46,10 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
   /**
    * Parent instance whose callback will be triggered upon this RC closure.
    */
-  private final U parentSnapshotCache;
+  private final U parentWithCallback;
 
   public ReferenceCounted(T obj, boolean disableCounter,
-      U parentSnapshotCache) {
+      U parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
@@ -60,7 +60,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       this.threadMap = new ConcurrentHashMap<>();
       this.refCount = new AtomicLong(0L);
     }
-    this.parentSnapshotCache = parentSnapshotCache;
+    this.parentWithCallback = parentWithCallback;
   }
 
   /**
@@ -70,7 +70,6 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
     return obj;
   }
 
-  // TODO: [SNAPSHOT] Rename to increment()
   public long incrementRefCount() {
     if (refCount == null || threadMap == null) {
       return -1L;
@@ -80,7 +79,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
     threadMap.putIfAbsent(tid, 0L);
 
-    synchronized (refCount) {
+    synchronized (threadMap) {
       threadMap.computeIfPresent(tid, (k, v) -> {
         long newVal = v + 1;
         Preconditions.checkState(newVal > 0L,
@@ -95,7 +94,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       if (refCount.get() == 1L) {
         // ref count increased to one (from zero), remove from
         // pendingEvictionList if added
-        parentSnapshotCache.callback(this);
+        parentWithCallback.callback(this);
       }
     }
 
@@ -115,7 +114,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
     Preconditions.checkState(threadMap.get(tid) > 0L, "This thread " + tid +
         " already have a reference count of zero.");
 
-    synchronized (refCount) {
+    synchronized (threadMap) {
       threadMap.computeIfPresent(tid, (k, v) -> {
         long newValue = v - 1L;
         Preconditions.checkState(newValue >= 0L,
@@ -130,7 +129,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
       if (refCount.get() == 0L) {
         // ref count decreased to zero, add to pendingEvictionList
-        parentSnapshotCache.callback(this);
+        parentWithCallback.callback(this);
       }
     }
 
