@@ -192,7 +192,7 @@ public abstract class TestOzoneRpcClientAbstract {
       remoteGroupName, READ, ACCESS);
 
   private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId = UUID.randomUUID().toString();
+  private static String clusterId;
 
 
   /**
@@ -203,6 +203,7 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
+    clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
