@@ -44,6 +44,11 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
   private final AtomicLong refCount;
 
   /**
+   * Object lock to synchronize refCount and threadMap operations.
+   */
+  private final Object refCountLock = new Object();
+
+  /**
    * Parent instance whose callback will be triggered upon this RC closure.
    */
   private final U parentWithCallback;
@@ -79,7 +84,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
     threadMap.putIfAbsent(tid, 0L);
 
-    synchronized (threadMap) {
+    synchronized (refCountLock) {
       threadMap.computeIfPresent(tid, (k, v) -> {
         long newVal = v + 1;
         Preconditions.checkState(newVal > 0L,
@@ -114,7 +119,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
     Preconditions.checkState(threadMap.get(tid) > 0L, "This thread " + tid +
         " already have a reference count of zero.");
 
-    synchronized (threadMap) {
+    synchronized (refCountLock) {
       threadMap.computeIfPresent(tid, (k, v) -> {
         long newValue = v - 1L;
         Preconditions.checkState(newValue >= 0L,
