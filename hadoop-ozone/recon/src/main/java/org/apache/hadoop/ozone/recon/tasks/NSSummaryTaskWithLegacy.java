@@ -124,7 +124,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         if (!updatedKeyInfo.getKeyName().endsWith(OM_KEY_PREFIX)) {
           switch (action) {
           case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null, 1L);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null,
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
             break;
 
           case DELETE:
@@ -140,7 +142,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
               LOG.warn("Update event does not have the old keyInfo for {}.",
                   updatedKey);
             }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null, 1L);
+            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, null,
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
             break;
 
           default:
@@ -168,7 +172,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           switch (action) {
           case PUT:
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null, 1L);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null,
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
             break;
 
           case DELETE:
@@ -183,7 +189,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
               LOG.warn("Update event does not have the old dirInfo for {}.",
                   updatedKey);
             }
-            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null, 1L);
+            handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap, null,
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
             break;
 
           default:
@@ -249,10 +257,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                     .setObjectID(keyInfo.getObjectID())
                     .setParentObjectID(keyInfo.getParentObjectID())
                     .build();
-            handlePutDirEvent(directoryInfo, nsSummaryMap, null, 0L);
+            handlePutDirEvent(directoryInfo, nsSummaryMap, null,
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
           } else {
             handlePutKeyEvent(keyInfo, nsSummaryMap, null,
-                0L);
+                NSSummaryTaskDbEventHandler.NODESTATUS
+                    .ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
           }
           if (!checkAndCallFlushToDB(nsSummaryMap)) {
             return false;

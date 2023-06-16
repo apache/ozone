@@ -310,7 +310,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
         OmDirectoryInfo directoryInfo = kv.getValue();
         handlePutDirEvent(directoryInfo, nsSummaryMap, orphanKeysMetaDataMap,
-            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
+            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS.getValue());
         if (!checkAndCallFlushToDB(nsSummaryMap)) {
           return false;
         }
@@ -337,7 +337,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
         OmKeyInfo keyInfo = kv.getValue();
         handlePutKeyEvent(keyInfo, nsSummaryMap, orphanKeysMetaDataSetMap,
-            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE.getValue());
+            NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS.getValue());
         if (!checkAndCallFlushToDB(nsSummaryMap)) {
           return false;
         }
@@ -349,50 +349,4 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  /**
-   * States that represent if orphan's parent node metadata
-   * update is in progress or completed to avoid dirty read.
-   */
-  public enum NODESTATUS {
-    ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS(1),
-    ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE(2);
-
-    private final int value;
-
-    /**
-     * Constructs states.
-     *
-     * @param value  Enum Value
-     */
-    NODESTATUS(int value) {
-      this.value = value;
-    }
-
-    /**
-     * Returns the in progress status.
-     *
-     * @return progress status.
-     */
-    public static NODESTATUS getOrphanParentNodeUpdateStatusInProgress() {
-      return ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS;
-    }
-
-    /**
-     * Returns the completed status.
-     *
-     * @return completed status.
-     */
-    public static NODESTATUS getOrphanParentNodeUpdateStatusComplete() {
-      return ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE;
-    }
-
-    /**
-     * returns the numeric value associated with the endPoint.
-     *
-     * @return int.
-     */
-    public int getValue() {
-      return value;
-    }
-  }
 }

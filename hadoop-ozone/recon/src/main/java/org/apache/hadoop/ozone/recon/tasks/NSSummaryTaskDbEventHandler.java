@@ -238,6 +238,10 @@ public class NSSummaryTaskDbEventHandler {
     if (null != orphanKeyMetaDataMap) {
       long objectID = fileDirInfo.getObjectID();
       OrphanKeyMetaData orphanKeyMetaData = orphanKeyMetaDataMap.get(objectID);
+      if (null == orphanKeyMetaData) {
+        orphanKeyMetaData =
+            reconNamespaceSummaryManager.getOrphanKeyMetaData(objectID);
+      }
       if (null != orphanKeyMetaData) {
         orphanKeyMetaData.getObjectIds().clear();
       }
@@ -479,6 +483,53 @@ public class NSSummaryTaskDbEventHandler {
         }
       }
       return true;
+    }
+  }
+
+  /**
+   * States that represent if orphan's parent node metadata
+   * update is in progress or completed to avoid dirty read.
+   */
+  public enum NODESTATUS {
+    ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS(1),
+    ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE(2);
+
+    private final int value;
+
+    /**
+     * Constructs states.
+     *
+     * @param value  Enum Value
+     */
+    NODESTATUS(int value) {
+      this.value = value;
+    }
+
+    /**
+     * Returns the in progress status.
+     *
+     * @return progress status.
+     */
+    public static NODESTATUS getOrphanParentNodeUpdateStatusInProgress() {
+      return ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS;
+    }
+
+    /**
+     * Returns the completed status.
+     *
+     * @return completed status.
+     */
+    public static NODESTATUS getOrphanParentNodeUpdateStatusComplete() {
+      return ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE;
+    }
+
+    /**
+     * returns the numeric value associated with the endPoint.
+     *
+     * @return int.
+     */
+    public int getValue() {
+      return value;
     }
   }
 }
