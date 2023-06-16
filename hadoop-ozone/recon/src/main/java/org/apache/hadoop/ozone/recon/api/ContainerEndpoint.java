@@ -677,9 +677,14 @@ public class ContainerEndpoint {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     Map<String, Object> response = new HashMap<>();
-    response.put("prevKey", containerDiscrepancyInfoList.get(
-        containerDiscrepancyInfoList.size() - 1).getContainerID());
+    if (!containerDiscrepancyInfoList.isEmpty()) {
+      response.put("prevKey", containerDiscrepancyInfoList.get(
+          containerDiscrepancyInfoList.size() - 1).getContainerID());
+    } else {
+      response.put("prevKey", null);
+    }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
+
 
     return Response.ok(response).build();
   }
