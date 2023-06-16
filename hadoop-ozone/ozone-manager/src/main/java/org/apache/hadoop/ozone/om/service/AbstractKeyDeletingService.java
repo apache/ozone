@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -35,15 +34,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -389,7 +384,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     }
 
     // TODO: need to handle delete with non-ratis
-    if (isRatisEnabled()) {
+    if (isRatisEnabled() && !purgePathRequestList.isEmpty()) {
       submitPurgePaths(purgePathRequestList, snapTableKey);
     }
 
@@ -462,59 +457,6 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   @VisibleForTesting
   public long getMovedFilesCount() {
     return movedFilesCount.get();
-  }
-
-  protected void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-      List<SnapshotMoveKeyInfos> toReclaimList,
-      List<SnapshotMoveKeyInfos> toNextDBList,
-      List<HddsProtos.KeyValue> renamedList,
-      List<String> dirsToMove) throws InterruptedException {
-
-    SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
-        SnapshotMoveDeletedKeysRequest.newBuilder()
-            .setFromSnapshot(snapInfo.getProtobuf());
-
-    SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-        .addAllReclaimKeys(toReclaimList)
-        .addAllNextDBKeys(toNextDBList)
-        .addAllRenamedKeys(renamedList)
-        .addAllDeletedDirsToMove(dirsToMove)
-        .build();
-
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(Type.SnapshotMoveDeletedKeys)
-        .setSnapshotMoveDeletedKeysRequest(moveDeletedKeys)
-        .setClientId(clientId.toString())
-        .build();
-
-    try (BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock()) {
-      submitRequest(omRequest);
-    }
-  }
-
-  protected void submitRequest(OMRequest omRequest) {
-    try {
-      if (isRatisEnabled()) {
-        OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
-
-        RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-            .setClientId(clientId)
-            .setServerId(server.getRaftPeerId())
-            .setGroupId(server.getRaftGroupId())
-            .setCallId(getRunCount().get())
-            .setMessage(Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-            .setType(RaftClientRequest.writeRequestType())
-            .build();
-
-        server.submitRequest(omRequest, raftClientRequest);
-      } else {
-        ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
-      }
-    } catch (ServiceException e) {
-      LOG.error("Snapshot Deleting request failed. " +
-          "Will retry at next run.", e);
-    }
   }
 
   public BootstrapStateHandler.Lock getBootstrapStateLock() {

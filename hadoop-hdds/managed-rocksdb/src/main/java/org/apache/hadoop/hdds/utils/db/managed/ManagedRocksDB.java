@@ -31,6 +31,7 @@ import java.util.List;
  */
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;
+  public static final int NOT_FOUND = RocksDB.NOT_FOUND;
 
   ManagedRocksDB(RocksDB original) {
     super(original);

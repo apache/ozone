@@ -236,9 +236,9 @@ public class ObjectEndpoint extends EndpointBase {
 
       output = getClientProtocol().createKey(volume.getName(), bucketName,
           keyPath, length, replicationConfig, customMetadata);
-      IOUtils.copy(body, output);
-
-      getMetrics().updateCreateKeySuccessStats(startNanos);
+      getMetrics().updatePutKeyMetadataStats(startNanos);
+      long putLength = IOUtils.copyLarge(body, output);
+      getMetrics().incPutKeySuccessLength(putLength);
       return Response.ok().status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
@@ -275,12 +275,13 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     } finally {
+      if (output != null) {
+        output.close();
+      }
       if (auditSuccess) {
         AUDIT.logWriteSuccess(
             buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
-      }
-      if (output != null) {
-        output.close();
+        getMetrics().updateCreateKeySuccessStats(startNanos);
       }
     }
   }
@@ -340,8 +341,10 @@ public class ObjectEndpoint extends EndpointBase {
       if (rangeHeaderVal == null || rangeHeader.isReadFull()) {
         StreamingOutput output = dest -> {
           try (OzoneInputStream key = keyDetails.getContent()) {
-            IOUtils.copy(key, dest);
+            long readLength = IOUtils.copyLarge(key, dest);
+            getMetrics().incGetKeySuccessLength(readLength);
           }
+          getMetrics().updateGetKeySuccessStats(startNanos);
         };
         responseBuilder = Response
             .ok(output)
@@ -357,9 +360,11 @@ public class ObjectEndpoint extends EndpointBase {
         StreamingOutput output = dest -> {
           try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
             ozoneInputStream.seek(startOffset);
-            IOUtils.copyLarge(ozoneInputStream, dest, 0,
+            long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
+            getMetrics().incGetKeySuccessLength(readLength);
           }
+          getMetrics().updateGetKeySuccessStats(startNanos);
         };
         responseBuilder = Response
             .status(Status.PARTIAL_CONTENT)
@@ -399,7 +404,7 @@ public class ObjectEndpoint extends EndpointBase {
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
-      getMetrics().updateGetKeySuccessStats(startNanos);
+      getMetrics().updateGetKeyMetadataStats(startNanos);
       return responseBuilder.build();
     } catch (OMException ex) {
       auditSuccess = false;
@@ -747,8 +752,8 @@ public class ObjectEndpoint extends EndpointBase {
                                       String uploadID, InputStream body)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
+    String copyHeader = null;
     try {
-      String copyHeader;
       OzoneOutputStream ozoneOutputStream = null;
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
@@ -783,6 +788,7 @@ public class ObjectEndpoint extends EndpointBase {
 
             String range =
                 headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+            long copyLength;
             if (range != null) {
               RangeHeader rangeHeader =
                   RangeHeaderParserUtil.parseRangeHeader(range, 0);
@@ -793,15 +799,20 @@ public class ObjectEndpoint extends EndpointBase {
                     "Bytes to skip: "
                         + rangeHeader.getStartOffset() + " actual: " + skipped);
               }
-              IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
+              getMetrics().updateCopyKeyMetadataStats(startNanos);
+              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
                   rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
                       + 1);
             } else {
-              IOUtils.copy(sourceObject, ozoneOutputStream);
+              getMetrics().updateCopyKeyMetadataStats(startNanos);
+              copyLength = IOUtils.copyLarge(sourceObject, ozoneOutputStream);
             }
+            getMetrics().incCopyObjectSuccessLength(copyLength);
           }
         } else {
-          IOUtils.copy(body, ozoneOutputStream);
+          getMetrics().updatePutKeyMetadataStats(startNanos);
+          long putLength = IOUtils.copyLarge(body, ozoneOutputStream);
+          getMetrics().incPutKeySuccessLength(putLength);
         }
       } finally {
         if (ozoneOutputStream != null) {
@@ -814,16 +825,21 @@ public class ObjectEndpoint extends EndpointBase {
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
-      getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
       if (copyHeader != null) {
+        getMetrics().updateCopyObjectSuccessStats(startNanos);
         return Response.ok(new CopyPartResult(eTag)).build();
       } else {
+        getMetrics().updateCreateMultipartKeySuccessStats(startNanos);
         return Response.ok().header("ETag",
             eTag).build();
       }
 
     } catch (OMException ex) {
-      getMetrics().updateCreateMultipartKeyFailureStats(startNanos);
+      if (copyHeader != null) {
+        getMetrics().updateCopyObjectFailureStats(startNanos);
+      } else {
+        getMetrics().updateCreateMultipartKeyFailureStats(startNanos);
+      }
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
@@ -907,12 +923,14 @@ public class ObjectEndpoint extends EndpointBase {
       String destKey, String destBucket,
       ReplicationConfig replication,
             Map<String, String> metadata) throws IOException {
+    long copyLength;
     try (OzoneOutputStream dest =
                  getClientProtocol().createKey(
         volume.getName(), destBucket, destKey, srcKeyLen,
         replication, metadata)) {
-      IOUtils.copy(src, dest);
+      copyLength = IOUtils.copyLarge(src, dest);
     }
+    getMetrics().incCopyObjectSuccessLength(copyLength);
   }
 
   private CopyObjectResponse copyObject(OzoneVolume volume,
@@ -961,6 +979,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
+        getMetrics().updateCopyKeyMetadataStats(startNanos);
         copy(volume, src, sourceKeyLen, destkey, destBucket, replicationConfig,
                 sourceKeyDetails.getMetadata());
       }

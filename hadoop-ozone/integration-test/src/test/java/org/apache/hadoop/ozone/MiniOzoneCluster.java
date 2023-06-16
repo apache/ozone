@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -346,6 +347,7 @@ public interface MiniOzoneCluster {
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
+    protected SecretKeyClient secretKeyClient;
     protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
@@ -405,6 +407,11 @@ public interface MiniOzoneCluster {
      */
     public Builder setCertificateClient(CertificateClient client) {
       this.certClient = client;
+      return this;
+    }
+
+    public Builder setSecretKeyClient(SecretKeyClient client) {
+      this.secretKeyClient = client;
       return this;
     }
 

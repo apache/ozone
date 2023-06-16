@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.Objects;
@@ -25,6 +28,15 @@ import java.util.Objects;
  * S3Secret to be saved in database.
  */
 public class S3SecretValue {
+  private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(OzoneManagerProtocolProtos.S3Secret.class),
+      S3SecretValue::fromProtobuf,
+      S3SecretValue::getProtobuf);
+
+  public static Codec<S3SecretValue> getCodec() {
+    return CODEC;
+  }
+
   // TODO: This field should be renamed to accessId for generalization.
   private String kerberosID;
   private String awsSecret;

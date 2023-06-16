@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -39,11 +41,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.NativeConstants;
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -52,7 +51,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-
 import org.apache.commons.io.file.PathUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -152,7 +150,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    * similar type of request at any point of time.
    */
   private final PersistentMap<String, SnapshotDiffJob> snapDiffJobTable;
-  private final ExecutorService executorService;
+  private final ExecutorService snapDiffExecutor;
 
   /**
    * Directory to keep hardlinks of SST files for a snapDiff job temporarily.
@@ -164,6 +162,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean snapshotForceFullDiff;
   private final Optional<ManagedSSTDumpTool> sstDumpTool;
+
+  private Optional<ExecutorService> sstDumptoolExecService;
 
   @SuppressWarnings("parameternumber")
   public SnapshotDiffManager(ManagedRocksDB db,
@@ -213,7 +213,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         byte[].class,
         byte[].class);
 
-    this.executorService = new ThreadPoolExecutor(threadPoolSize,
+    this.snapDiffExecutor = new ThreadPoolExecutor(threadPoolSize,
         threadPoolSize,
         0,
         TimeUnit.MILLISECONDS,
@@ -249,11 +249,6 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private Optional<ManagedSSTDumpTool> initSSTDumpTool(
       final OzoneConfiguration conf) {
-    if (!NativeLibraryLoader.getInstance()
-        .loadLibrary(NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
-      return Optional.empty();
-    }
-
     try {
       int threadPoolSize = conf.getInt(
               OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE,
@@ -264,16 +259,19 @@ public class SnapshotDiffManager implements AutoCloseable {
           OMConfigKeys
               .OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      ExecutorService execService = new ThreadPoolExecutor(0,
+      this.sstDumptoolExecService = Optional.of(new ThreadPoolExecutor(0,
               threadPoolSize, 60, TimeUnit.SECONDS,
               new SynchronousQueue<>(), new ThreadFactoryBuilder()
               .setNameFormat("snapshot-diff-manager-sst-dump-tool-TID-%d")
               .build(),
-              new ThreadPoolExecutor.DiscardPolicy());
-      return Optional.of(new ManagedSSTDumpTool(execService, bufferSize));
+              new ThreadPoolExecutor.DiscardPolicy()));
+      return Optional.of(new ManagedSSTDumpTool(sstDumptoolExecService.get(),
+          bufferSize));
     } catch (NativeLibraryNotLoadedException e) {
-      return Optional.empty();
+      this.sstDumptoolExecService.ifPresent(exec ->
+          closeExecutorService(exec, "SstDumpToolExecutor"));
     }
+    return Optional.empty();
   }
 
   /**
@@ -352,7 +350,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     final OMMetadataManager snapshotOMMM = omSnapshot.getMetadataManager();
     final String checkpointPath =
         snapshotOMMM.getStore().getDbLocation().getPath();
-    final String snapshotId = snapshotInfo.getSnapshotID();
+    final UUID snapshotId = snapshotInfo.getSnapshotId();
     final long dbTxSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
     return new DifferSnapshotInfo(
@@ -384,8 +382,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
         volumeName, bucketName, toSnapshotName);
 
-    String snapDiffJobKey = fsInfo.getSnapshotID() + DELIMITER +
-        tsInfo.getSnapshotID();
+    String snapDiffJobKey = fsInfo.getSnapshotId() + DELIMITER +
+        tsInfo.getSnapshotId();
 
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
@@ -433,15 +431,17 @@ public class SnapshotDiffManager implements AutoCloseable {
     return new OFSPath(bucketPath, new OzoneConfiguration());
   }
 
-  private SnapshotDiffReportOzone createPageResponse(
-      final SnapshotDiffJob snapDiffJob,
-      final String volumeName,
-      final String bucketName,
-      final String fromSnapshotName,
-      final String toSnapshotName,
-      final int index,
-      final int pageSize
-  ) throws IOException {
+  @VisibleForTesting
+  SnapshotDiffReportOzone createPageResponse(final SnapshotDiffJob snapDiffJob,
+      final String volumeName, final String bucketName,
+      final String fromSnapshotName, final String toSnapshotName,
+      final int index, final int pageSize) throws IOException {
+    if (index < 0 || pageSize <= 0) {
+      throw new IllegalArgumentException(String.format(
+          "Index should be a number >= 0. Given index %d. Page size " +
+          "should be a positive number > 0. Given page size is %d",
+          index, pageSize));
+    }
     List<DiffReportEntry> diffReportList = new ArrayList<>();
 
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);
@@ -462,9 +462,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     String tokenString = hasMoreEntries ? String.valueOf(idx) : null;
 
-    if (!hasMoreEntries) {
-      checkReportsIntegrity(snapDiffJob, idx);
-    }
+    checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
 
     return new SnapshotDiffReportOzone(path.toString(), volumeName, bucketName,
         fromSnapshotName, toSnapshotName, diffReportList, tokenString);
@@ -477,13 +475,16 @@ public class SnapshotDiffManager implements AutoCloseable {
    * service and throws the exception to client.
    */
   private void checkReportsIntegrity(final SnapshotDiffJob diffJob,
-                                     final int totalDiffEntries)
+                                     final int pageStartIdx,
+                                     final int numberOfEntriesInPage)
       throws IOException {
-    if (diffJob.getTotalDiffEntries() != totalDiffEntries) {
-      LOG.error("Expected TotalDiffEntries: {} but found only " +
+    if ((pageStartIdx >= diffJob.getTotalDiffEntries() &&
+        numberOfEntriesInPage != 0) || (pageStartIdx <
+        diffJob.getTotalDiffEntries() && numberOfEntriesInPage == 0)) {
+      LOG.error("Expected TotalDiffEntries: {} but found " +
               "TotalDiffEntries: {}",
           diffJob.getTotalDiffEntries(),
-          totalDiffEntries);
+          pageStartIdx + numberOfEntriesInPage);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
       throw new IOException("Report integrity check failed. Retry after: " +
           ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
@@ -560,7 +561,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
-      executorService.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
+      snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
@@ -632,8 +633,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
         bucketName, toSnapshotName);
 
-    checkSnapshotActive(fromSnapInfo);
-    checkSnapshotActive(toSnapInfo);
+    checkSnapshotActive(fromSnapInfo, false);
+    checkSnapshotActive(toSnapInfo, false);
   }
 
   private void generateSnapshotDiffReport(final String jobKey,
@@ -783,7 +784,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentSet<byte[]> objectIDsToCheck,
-      final String diffDir 
+      final String diffDir
   ) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
@@ -831,20 +832,17 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
-                                Table<String, ? extends WithObjectID> tsTable,
-                                Set<String> deltaFiles,
-                                boolean nativeRocksToolsLoaded,
-                                PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-                                PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-                                PersistentSet<byte[]> objectIDsToCheck,
-                                Map<String, String> tablePrefixes)
-      throws IOException, NativeLibraryNotLoadedException, RocksDBException {
-
+  void addToObjectIdMap(Table<String, ? extends WithObjectID> fsTable,
+                        Table<String, ? extends WithObjectID> tsTable,
+                        Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
+                        PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                        PersistentMap<byte[], byte[]> newObjIdToKeyMap,
+                        PersistentSet<byte[]> objectIDsToCheck,
+                        Map<String, String> tablePrefixes) throws IOException,
+      NativeLibraryNotLoadedException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
-
     boolean isDirectoryTable =
         fsTable.getName().equals(OmMetadataManagerImpl.DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
@@ -899,17 +897,12 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private Set<String> getDeltaFiles(OmSnapshot fromSnapshot,
-                                    OmSnapshot toSnapshot,
-                                    List<String> tablesToLookUp,
-                                    SnapshotInfo fsInfo,
-                                    SnapshotInfo tsInfo,
-                                    boolean useFullDiff,
-                                    Map<String, String> tablePrefixes,
-                                    String diffDir)
+  Set<String> getDeltaFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot,
+                            List<String> tablesToLookUp, SnapshotInfo fsInfo,
+                            SnapshotInfo tsInfo, boolean useFullDiff,
+                            Map<String, String> tablePrefixes, String diffDir)
       throws RocksDBException, IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
-
     final Set<String> deltaFiles = new HashSet<>();
 
     // Check if compaction DAG is available, use that if so
@@ -970,13 +963,12 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private long generateDiffReport(
-      final String jobId,
-      final PersistentSet<byte[]> objectIDsToCheck,
-      final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-      final PersistentMap<byte[], byte[]> newObjIdToKeyMap
-  ) {
 
+  long generateDiffReport(final String jobId,
+                          final PersistentSet<byte[]> objectIDsToCheck,
+                          final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                          final PersistentMap<byte[], byte[]>
+                              newObjIdToKeyMap) {
     LOG.debug("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
@@ -1204,8 +1196,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   /**
    * check if the given key is in the bucket specified by tablePrefix map.
    */
-  private boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
-      String tableName) {
+  boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
+                        String tableName) {
     String volumeBucketDbPrefix;
     // In case of FSO - either File/Directory table
     // the key Prefix would be volumeId/bucketId and
@@ -1261,9 +1253,28 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
+    if (snapDiffExecutor != null) {
+      closeExecutorService(snapDiffExecutor, "SnapDiffExecutor");
+    }
+    this.sstDumptoolExecService.ifPresent(exec ->
+        closeExecutorService(exec, "SstDumpToolExecutor"));
+  }
+
+  private void closeExecutorService(ExecutorService executorService,
+                                    String serviceName) {
     if (executorService != null) {
-      executorService.shutdown();
+      LOG.info("Shutting down executorService: '{}'", serviceName);
+      executorService.shutdownNow();
+      try {
+        if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+        executorService.shutdownNow();
+      }
     }
   }
 }

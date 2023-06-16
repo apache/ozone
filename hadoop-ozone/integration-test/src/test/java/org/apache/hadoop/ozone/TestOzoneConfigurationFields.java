@@ -92,6 +92,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_KEY_ALGORITHM,
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
@@ -106,6 +107,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
+        OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
         ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,

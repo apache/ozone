@@ -19,6 +19,12 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -32,8 +38,22 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  * the same key name. This is useful as part of GDPR compliance where an
  * admin wants to confirm if a given key is deleted from deletedTable metadata.
  */
-public class RepeatedOmKeyInfo {
-  private List<OmKeyInfo> omKeyInfoList;
+public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
+  private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
+  private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
+
+  private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
+    return new DelegatedCodec<>(
+        Proto2Codec.get(RepeatedKeyInfo.class),
+        RepeatedOmKeyInfo::getFromProto,
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION));
+  }
+
+  public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
+    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  }
+
+  private final List<OmKeyInfo> omKeyInfoList;
 
   public RepeatedOmKeyInfo(List<OmKeyInfo> omKeyInfos) {
     this.omKeyInfoList = omKeyInfos;
@@ -100,6 +120,7 @@ public class RepeatedOmKeyInfo {
     }
   }
 
+  @Override
   public RepeatedOmKeyInfo copyObject() {
     return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
   }

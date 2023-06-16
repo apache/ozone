@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -90,6 +91,9 @@ public class TestStorageContainerManagerHA {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        "5s");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, "1");
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
@@ -123,9 +127,11 @@ public class TestStorageContainerManagerHA {
     Assertions.assertEquals(numOfSCMs, scms.size());
     int peerSize = cluster.getStorageContainerManager().getScmHAManager()
         .getRatisServer().getDivision().getGroup().getPeers().size();
+    StorageContainerManager leaderScm = null;
     for (StorageContainerManager scm : scms) {
       if (scm.checkLeader()) {
         count++;
+        leaderScm = scm;
       }
       Assertions.assertEquals(peerSize, numOfSCMs);
     }
@@ -139,7 +145,22 @@ public class TestStorageContainerManagerHA {
       }
     }
     Assertions.assertEquals(1, count);
+    
+    // verify timer based transaction buffer flush is working
+    SnapshotInfo latestSnapshot = leaderScm.getScmHAManager()
+        .asSCMHADBTransactionBuffer().getLatestSnapshot();
     testPutKey();
+    final StorageContainerManager leaderScmTmp = leaderScm;
+    GenericTestUtils.waitFor(() -> {
+      if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
+          .getLatestSnapshot() != null) {
+        if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
+            .getLatestSnapshot().getIndex() > latestSnapshot.getIndex()) {
+          return true;
+        }
+      }
+      return false;
+    }, 2000, 30000);
   }
 
   @Test
@@ -275,7 +296,7 @@ public class TestStorageContainerManagerHA {
     DefaultConfigManager.clearDefaultConfigs();
     scmStorageConfig.initialize();
     Assertions.assertThrows(ConfigurationException.class,
-            () -> StorageContainerManager.scmInit(conf, clusterId));
+        () -> StorageContainerManager.scmInit(conf, clusterId));
   }
 
   @Test

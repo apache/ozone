@@ -47,11 +47,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
-import static org.apache.hadoop.ozone.om.KeyManagerImpl.getRemoteUser;
 import static org.apache.hadoop.ozone.om.OzoneManager.getS3Auth;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -113,8 +113,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
-        authorizer.setOzoneAdmins(ozoneManager.getOmAdmins());
-        authorizer.setOzoneReadOnlyAdmins(ozoneManager.getReadOnlyAdmins());
+        authorizer.setAdminCheck(ozoneManager::isAdmin);
+        authorizer.setReadOnlyAdminCheck(ozoneManager::isReadOnlyAdmin);
         authorizer.setAllowListAllVolumes(allowListAllVolumes);
       } else {
         isNativeAuthorizerEnabled = false;
@@ -130,7 +130,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    *
    * @param args - attributes of the key.
    * @return OmKeyInfo - the info about the requested key.
-   * @throws IOException
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
@@ -371,12 +370,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @throws IOException if there is error.
    */
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
+
+    String volumeName = obj.getVolumeName();
+    String bucketName = obj.getBucketName();
+    String keyName = obj.getKeyName();
+    if (obj.getResourceType() == ResourceType.KEY) {
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(volumeName, bucketName));
+      volumeName = resolvedBucket.realVolume();
+      bucketName = resolvedBucket.realBucket();
+    }
     boolean auditSuccess = true;
 
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
+            volumeName, bucketName, keyName);
       }
       metrics.incNumGetAcl();
       switch (obj.getResourceType()) {
@@ -513,9 +522,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * Looks up the configuration to see if there is custom class specified.
    * Constructs the instance by passing the configuration directly to the
    * constructor to achieve thread safety using final fields.
-   *
-   * @param conf
-   * @return IAccessAuthorizer
    */
   private IAccessAuthorizer getACLAuthorizerInstance(OzoneConfiguration conf) {
     Class<? extends IAccessAuthorizer> clazz = conf.getClass(
