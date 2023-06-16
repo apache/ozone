@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.Ignore;
@@ -94,6 +95,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Tests the Ratis snapshots feature in OM.
  */
 @Timeout(5000)
+@Flaky({ "HDDS-8876", "HDDS-8880"})
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
