@@ -435,4 +435,22 @@ public class OzoneAddress {
       out.printf("Key Name : %s%n", keyName);
     }
   }
+
+  public void ensureVolumeOrBucketAddress() throws OzoneClientException {
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        // If snapshot, ensure snapshot URI
+        ensureSnapshotAddress();
+        return;
+      }
+      throw new OzoneClientException(
+          "Key address is not supported.");
+    } else if (volumeName.length() == 0) {
+      // Volume must be present
+      // Bucket may or may not be present
+      // Depending on operation is on volume or bucket
+      throw new OzoneClientException(
+            "Volume name is missing.");
+    }
+  }
 }

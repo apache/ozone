@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
@@ -364,7 +365,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param uuid datanode uuid
    * @return the given datanode, or null if not found
    */
-  DatanodeDetails getNodeByUuid(String uuid);
+  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
+
+  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
+    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
+  };
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

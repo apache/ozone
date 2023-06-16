@@ -204,11 +204,11 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuidString()))
+    when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuid()))
         .thenReturn(datanodes.get(0));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(1).getUuidString()))
+    when(mockNodeManager.getNodeByUuid(datanodes.get(1).getUuid()))
         .thenReturn(datanodes.get(1));
-    when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuidString()))
+    when(mockNodeManager.getNodeByUuid(datanodes.get(2).getUuid()))
         .thenReturn(datanodes.get(2));
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
