@@ -36,8 +36,8 @@ public final class ReconConstants {
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
   // By default, limit the number of results returned
-  public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "true";
-  public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "true";
+  public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
+  public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "false";
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
