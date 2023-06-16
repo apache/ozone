@@ -765,6 +765,8 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    assertEquals(1,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -788,6 +790,11 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    // The partial recovery here is due to overloaded nodes, not insufficient
+    // nodes. The "deferred" metric should be updated when all sources are
+    // overloaded.
+    assertEquals(0,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -813,6 +820,8 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    assertEquals(1,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -837,6 +846,11 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    // The partial recovery here is due to overloaded nodes, not insufficient
+    // nodes. The "deferred" metric should be updated when all sources are
+    // overloaded.
+    assertEquals(0,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test

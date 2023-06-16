@@ -462,6 +462,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             " to fully replicate the decommission indexes for container {}." +
             " Requested {} received {}", container.getContainerID(),
             decomIndexes.size(), selectedDatanodes.size());
+        metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
         throw new InsufficientDatanodesException(decomIndexes.size(),
             selectedDatanodes.size());
       }
@@ -546,6 +547,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               " to fully replicate the maintenance indexes for container {}." +
               " Requested {} received {}", container.getContainerID(),
           maintIndexes.size(), targets.size());
+      metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
       throw new InsufficientDatanodesException(maintIndexes.size(),
           targets.size());
     }
