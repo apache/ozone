@@ -127,9 +127,6 @@ devDependencies:
   eslint-config-xo-typescript:
     specifier: ^0.28.0
     version: 0.28.0(@typescript-eslint/eslint-plugin@2.34.0)(eslint@6.8.0)(typescript@3.4.5)
-  eslint-plugin-header:
-    specifier: ^3.1.1
-    version: 3.1.1(eslint@6.8.0)
   eslint-plugin-import:
     specifier: ^2.20.2
     version: 2.21.2(@typescript-eslint/parser@2.34.0)(eslint-import-resolver-webpack@0.12.1)(eslint@6.8.0)
@@ -6331,14 +6328,6 @@ packages:
       eslint: 6.8.0
       lodash: 4.17.15
     dev: false
-
-  /eslint-plugin-header@3.1.1(eslint@6.8.0):
-    resolution: {integrity: sha512-9vlKxuJ4qf793CmeeSrZUvVClw6amtpghq3CuWcB5cUNnWHQhgcqy5eF8oVKFk1G3Y/CbchGfEaw3wiIJaNmVg==}
-    peerDependencies:
-      eslint: '>=7.7.0'
-    dependencies:
-      eslint: 6.8.0
-    dev: true
 
   /eslint-plugin-import@2.20.1(@typescript-eslint/parser@2.34.0)(eslint@6.8.0):
     resolution: {integrity: sha512-qQHgFOTjguR+LnYRoToeZWT62XM55MBVXObHM6SKFd1VzDcX/vqT1kAz8ssqigh5eMj8qXcRoXXGZpPP6RfdCw==}
