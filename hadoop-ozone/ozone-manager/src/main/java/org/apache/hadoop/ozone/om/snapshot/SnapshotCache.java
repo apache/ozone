@@ -259,7 +259,7 @@ public class SnapshotCache {
    */
   private void cleanup() {
     long numEntriesToEvict = (long) dbMap.size() - cacheSizeLimit;
-    while (pendingEvictionList.size() > 0 && numEntriesToEvict > 0L) {
+    while (numEntriesToEvict > 0L && pendingEvictionList.size() > 0) {
       // Get the first instance in the clean up list
       ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
           pendingEvictionList.iterator().next();

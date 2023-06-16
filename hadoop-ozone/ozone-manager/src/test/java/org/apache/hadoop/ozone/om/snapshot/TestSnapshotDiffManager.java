@@ -17,9 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.snapshot;
 
-import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -37,9 +35,11 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -91,6 +91,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Test class for SnapshotDiffManager Class.
@@ -108,7 +109,7 @@ public class TestSnapshotDiffManager {
   @Mock
   private OzoneManager ozoneManager;
 
-  private LoadingCache<String, OmSnapshot> snapshotCache;
+  private SnapshotCache snapshotCache;
 
   @Mock
   private ColumnFamilyHandle snapdiffJobCFH;
@@ -126,6 +127,9 @@ public class TestSnapshotDiffManager {
   private RocksIterator jobTableIterator;
 
   private static CodecRegistry codecRegistry;
+
+  @Mock
+  private static OmSnapshotManager omSnapshotManager;
 
   @BeforeAll
   public static void initCodecRegistry() {
@@ -152,7 +156,8 @@ public class TestSnapshotDiffManager {
     return omSnapshot;
   }
 
-  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize) {
+  private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize)
+      throws IOException {
 
     Mockito.when(snapdiffDB.get()).thenReturn(rocksDB);
     Mockito.when(rocksDB.newIterator(snapdiffJobCFH))
@@ -164,9 +169,11 @@ public class TestSnapshotDiffManager {
             return getMockedOmSnapshot(key);
           }
         };
-    snapshotCache = CacheBuilder.newBuilder()
-        .maximumSize(cacheSize)
-        .build(loader);
+    omSnapshotManager = Mockito.mock(OmSnapshotManager.class);
+    Mockito.when(omSnapshotManager.isSnapshotStatus(any(), any()))
+        .thenReturn(true);
+    snapshotCache = new SnapshotCache(
+        omSnapshotManager, loader, cacheSize);
     Mockito.when(ozoneManager.getConfiguration())
         .thenReturn(new OzoneConfiguration());
     OMMetadataManager mockedMetadataManager =
@@ -207,12 +214,23 @@ public class TestSnapshotDiffManager {
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
     Mockito.when(jobTableIterator.isValid()).thenReturn(false);
+
+    ReferenceCounted<IOmMetadataReader> rcFromSnapshot =
+        snapshotCache.get(snap1.toString());
+    ReferenceCounted<IOmMetadataReader> rcToSnapshot =
+        snapshotCache.get(snap2.toString());
+    OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+    OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+
     Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-        snapshotCache.get(snap1.toString()),
-        snapshotCache.get(snap2.toString()),
+        fromSnapshot,
+        toSnapshot,
         Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
         Collections.EMPTY_MAP, diffDir);
     Assertions.assertEquals(randomStrings, deltaFiles);
+
+    rcFromSnapshot.close();
+    rcToSnapshot.close();
   }
 
   @ParameterizedTest
@@ -263,13 +281,24 @@ public class TestSnapshotDiffManager {
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       Mockito.when(jobTableIterator.isValid()).thenReturn(false);
+
+      ReferenceCounted<IOmMetadataReader> rcFromSnapshot =
+          snapshotCache.get(snap1.toString());
+      ReferenceCounted<IOmMetadataReader> rcToSnapshot =
+          snapshotCache.get(snap2.toString());
+      OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+      OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
+
       Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
-          snapshotCache.get(snap1.toString()),
-          snapshotCache.get(snap2.toString()),
+          fromSnapshot,
+          toSnapshot,
           Arrays.asList("cf1", "cf2"), fromSnapshotInfo, toSnapshotInfo, false,
           Collections.EMPTY_MAP, Files.createTempDirectory("snapdiff_dir")
               .toAbsolutePath().toString());
       Assertions.assertEquals(deltaStrings, deltaFiles);
+
+      rcFromSnapshot.close();
+      rcToSnapshot.close();
     }
   }
 
