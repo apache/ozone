@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -711,6 +712,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void writeLockInterruptibly() throws InterruptedException {
     this.lock.writeLock().lockInterruptibly();
 
+  }
+
+  public boolean writeLockTryLock(long time, TimeUnit unit)
+      throws InterruptedException {
+    return this.lock.writeLock().tryLock(time, unit);
   }
 
   /**

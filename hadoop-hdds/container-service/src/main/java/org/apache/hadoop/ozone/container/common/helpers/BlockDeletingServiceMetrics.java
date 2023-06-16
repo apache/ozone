@@ -52,6 +52,10 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of blocks pending for processing.")
   private MutableGaugeLong totalPendingBlockCount;
 
+  @Metric(about = "The total number of transactions witch was failed " +
+      "cause by wait Container lock timeout.")
+  private MutableGaugeLong totalLockTimeoutTransactionCount;
+
   private BlockDeletingServiceMetrics() {
   }
 
@@ -90,6 +94,10 @@ public final class BlockDeletingServiceMetrics {
     this.totalPendingBlockCount.set(count);
   }
 
+  public void incrTotalLockTimeoutTransactionCount() {
+    totalLockTimeoutTransactionCount.incr();
+  }
+
   public long getSuccessCount() {
     return successCount.value();
   }
@@ -114,6 +122,10 @@ public final class BlockDeletingServiceMetrics {
     return totalPendingBlockCount.value();
   }
 
+  public long getTotalLockTimeoutTransactionCount() {
+    return totalLockTimeoutTransactionCount.value();
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
@@ -123,7 +135,9 @@ public final class BlockDeletingServiceMetrics {
         .append("outOfOrderDeleteBlockTransactionCount = "
             + outOfOrderDeleteBlockTransactionCount.value()).append("\t")
         .append("totalPendingBlockCount = "
-            + totalPendingBlockCount.value()).append("\t");
+            + totalPendingBlockCount.value()).append("\t")
+        .append("totalLockTimeoutTransactionCount = "
+            + totalLockTimeoutTransactionCount.value()).append("\t");
     return buffer.toString();
   }
 }

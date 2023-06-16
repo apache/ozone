@@ -192,6 +192,24 @@ public class DatanodeConfiguration {
   private long recoveringContainerScrubInterval =
       Duration.ofMinutes(10).toMillis();
 
+  /**
+   * Timeout for the thread used to process the delete block command
+   * to wait for the container lock.
+   * It takes about 200ms to open a RocksDB with HDD media.
+   * Set the default value to 100ms, so that after one times retry
+   * after waiting timeout, the hold time spent waiting for the lock
+   * is not greater than the time spent operating RocksDB
+   */
+  @Config(key = "block.delete.command.handle.lock.timeout",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION},
+      description = "Timeout for the thread used to process the delete" +
+          " block command to wait for the container lock."
+  )
+  private long blockDeleteCommandHandleLockTimeoutMs =
+      Duration.ofMillis(100).toMillis();
+
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
   }
@@ -557,6 +575,10 @@ public class DatanodeConfiguration {
 
   public int getBlockDeleteQueueLimit() {
     return blockDeleteQueueLimit;
+  }
+
+  public long getBlockDeleteCommandHandleLockTimeoutMs() {
+    return blockDeleteCommandHandleLockTimeoutMs;
   }
 
   public void setBlockDeleteQueueLimit(int queueLimit) {
