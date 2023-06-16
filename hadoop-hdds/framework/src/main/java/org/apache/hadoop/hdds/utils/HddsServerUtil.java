@@ -576,6 +576,7 @@ public final class HddsServerUtil {
       JvmMetrics.create(serverName,
           configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
+      CpuMetrics.create();
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
@@ -57,13 +59,19 @@ public class TestReplicationManagerMetrics {
         LegacyReplicationManager.class);
     Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
         .thenReturn(0);
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager replicationManager =
         Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
     Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
     Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
     Mockito.when(replicationManager.getContainerReplicaPendingOps())
         .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
+    Mockito.when(replicationManager.getQueue())
+        .thenReturn(new ReplicationQueue());
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 
@@ -75,17 +83,17 @@ public class TestReplicationManagerMetrics {
   @Test
   public void testLifeCycleStateMetricsPresent() {
     Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
-        getGauge("NumOpenContainers"));
+        getGauge("OpenContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
-        getGauge("NumClosingContainers"));
+        getGauge("ClosingContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
-        getGauge("NumQuasiClosedContainers"));
+        getGauge("QuasiClosedContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
-        getGauge("NumClosedContainers"));
+        getGauge("ClosedContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
-        getGauge("NumDeletingContainers"));
+        getGauge("DeletingContainers"));
     Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
-        getGauge("NumDeletedContainers"));
+        getGauge("DeletedContainers"));
   }
 
   @Test
