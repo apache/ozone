@@ -3885,6 +3885,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omNodeDetails.getNodeId();
   }
 
+  public String getOMId() {
+    return omId;
+  }
+
   public String getOMServiceId() {
     return omNodeDetails.getServiceId();
   }
