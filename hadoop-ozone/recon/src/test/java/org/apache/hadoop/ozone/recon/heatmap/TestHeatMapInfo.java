@@ -769,8 +769,11 @@ public class TestHeatMapInfo {
         getMaxAccessCount());
     Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
         getLabel());
-    Assertions.assertEquals(1.0,
+    Assertions.assertEquals(0.0,
         entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+    Assertions.assertEquals(0.442,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+            .get(0).getChildren().get(1).getColor());
     Assertions.assertEquals(0.058,
         entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
             .get(1).getChildren().get(3).getColor());
@@ -880,6 +883,8 @@ public class TestHeatMapInfo {
           getMinAccessCount());
       Assertions.assertEquals(19263, entityReadAccessHeatMapResponse.
           getMaxAccessCount());
+      Assertions.assertEquals(1.0,
+          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
           getLabel());
     } else {
@@ -889,7 +894,7 @@ public class TestHeatMapInfo {
 
   @Test
   @SuppressWarnings("methodlength")
-  public void testHeatMapInfoResponseForPath() throws IOException {
+  public void testHeatMapInfoResponseWithEntityTypeBucket() throws IOException {
     // Run the test
     String auditRespStrWithPathAndBucketEntityType = "{\n" +
         "  \"responseHeader\": {\n" +
@@ -1107,6 +1112,8 @@ public class TestHeatMapInfo {
           entityReadAccessHeatMapResponse.getChildren().size() > 0);
       Assertions.assertEquals(2,
           entityReadAccessHeatMapResponse.getChildren().size());
+      Assertions.assertEquals(0.0,
+          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       String path =
           entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
               .get(0).getPath();
