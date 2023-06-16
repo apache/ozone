@@ -215,9 +215,9 @@ public class TestSnapshotDiffManager {
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
     Mockito.when(jobTableIterator.isValid()).thenReturn(false);
 
-    ReferenceCounted<IOmMetadataReader> rcFromSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
         snapshotCache.get(snap1.toString());
-    ReferenceCounted<IOmMetadataReader> rcToSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
         snapshotCache.get(snap2.toString());
     OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
     OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
@@ -282,9 +282,9 @@ public class TestSnapshotDiffManager {
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       Mockito.when(jobTableIterator.isValid()).thenReturn(false);
 
-      ReferenceCounted<IOmMetadataReader> rcFromSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
-      ReferenceCounted<IOmMetadataReader> rcToSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
           snapshotCache.get(snap2.toString());
       OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();

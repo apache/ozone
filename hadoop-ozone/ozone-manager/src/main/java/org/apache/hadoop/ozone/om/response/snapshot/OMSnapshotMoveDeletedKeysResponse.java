@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -92,17 +93,18 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         ((OmMetadataManagerImpl) omMetadataManager)
             .getOzoneManager().getOmSnapshotManager();
 
-    try (ReferenceCounted<IOmMetadataReader> rcOmFromSnapshot =
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
         omSnapshotManager.checkForSnapshot(
             fromSnapshot.getVolumeName(),
             fromSnapshot.getBucketName(),
-            getSnapshotPrefix(fromSnapshot.getName()), true)) {
+            getSnapshotPrefix(fromSnapshot.getName()),
+            true)) {
 
       OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
-        try (ReferenceCounted<IOmMetadataReader> rcOmNextSnapshot =
-            omSnapshotManager.checkForSnapshot(
+        try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+            rcOmNextSnapshot = omSnapshotManager.checkForSnapshot(
                 nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),
                 getSnapshotPrefix(nextSnapshot.getName()),

@@ -582,7 +582,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
-  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(
+  public ReferenceCounted<IOmMetadataReader, SnapshotCache> checkForSnapshot(
       String volumeName,
       String bucketName,
       String keyName,

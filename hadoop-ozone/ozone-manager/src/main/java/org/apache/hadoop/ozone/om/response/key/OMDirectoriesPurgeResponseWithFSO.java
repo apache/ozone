@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -59,14 +60,14 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
   private boolean isRatisEnabled;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
-  private ReferenceCounted<IOmMetadataReader> rcFromSnapshot;
+  private ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot;
 
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       boolean isRatisEnabled, @Nonnull BucketLayout bucketLayout,
       Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
-      ReferenceCounted<IOmMetadataReader> rcFromSnapshot) {
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot) {
     super(omResponse, bucketLayout);
     this.paths = paths;
     this.isRatisEnabled = isRatisEnabled;

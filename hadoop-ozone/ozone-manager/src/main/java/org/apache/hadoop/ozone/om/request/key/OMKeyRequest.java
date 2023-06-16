@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -385,7 +386,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String volume, String bucket, String key,
       IAccessAuthorizer.ACLType aclType, long clientId) throws IOException {
     final boolean nativeAuthorizerEnabled;
-    try (ReferenceCounted<IOmMetadataReader> rcMetadataReader =
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
         ozoneManager.getOmMetadataReader()) {
       OmMetadataReader mdReader = (OmMetadataReader) rcMetadataReader.get();
       nativeAuthorizerEnabled = mdReader.isNativeAuthorizerEnabled();

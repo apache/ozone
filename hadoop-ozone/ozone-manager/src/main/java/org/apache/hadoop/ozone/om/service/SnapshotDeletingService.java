@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveDeletedKeysRequest;
@@ -131,8 +132,10 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       getRunCount().incrementAndGet();
 
-      ReferenceCounted<IOmMetadataReader> rcOmSnapshot = null;
-      ReferenceCounted<IOmMetadataReader> rcOmPreviousSnapshot = null;
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
+          null;
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmPreviousSnapshot =
+          null;
 
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();

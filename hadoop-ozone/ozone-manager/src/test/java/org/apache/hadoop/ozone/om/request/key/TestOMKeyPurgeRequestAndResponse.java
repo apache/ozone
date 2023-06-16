@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -220,7 +221,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setName("snap1")
         .build();
 
-    ReferenceCounted<IOmMetadataReader> rcOmSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
         ozoneManager.getOmSnapshotManager().checkForSnapshot(
             fromSnapshotInfo.getVolumeName(),
             fromSnapshotInfo.getBucketName(),
