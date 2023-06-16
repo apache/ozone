@@ -78,10 +78,9 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
     long tid = Thread.currentThread().getId();
 
-    // Put the new mapping if absent, atomically
     threadMap.putIfAbsent(tid, 0L);
 
-    // Update the value and do some checks, atomically
+    // Update the value and do some checks
     threadMap.computeIfPresent(tid, (k, v) -> {
       long newVal = v + 1;
       Preconditions.checkState(newVal > 0L, "Thread reference count overflown");
@@ -112,8 +111,8 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
     Preconditions.checkState(threadMap.containsKey(tid),
         "Current thread have not holden reference before");
 
-    Preconditions.checkNotNull(threadMap.get(tid), "This thread " + tid +
-        " has not incremented the reference count before.");
+    Preconditions.checkState(threadMap.get(tid) > 0L, "This thread " + tid +
+        " already have a reference count of zero.");
 
     // Atomically update value and purge entry if count reaches zero
     threadMap.computeIfPresent(tid, (k, v) -> {

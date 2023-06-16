@@ -189,7 +189,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
 
     // If the snapshot is already loaded in cache, the check inside the loader
     // above is ignored. But we would still want to reject all get()s except
-    // when called from SDT (and some) if the snapshot is not active any more.
+    // when called from SDT (and some) if the snapshot is not active anymore.
     if (!skipActiveCheck &&
         !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
       throw new OMException("Unable to load snapshot. " +
