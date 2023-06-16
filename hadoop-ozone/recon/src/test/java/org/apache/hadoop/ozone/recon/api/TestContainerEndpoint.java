@@ -1269,15 +1269,21 @@ public class TestContainerEndpoint {
     // delete container Id 1 from SCM
     reconContainerManager.deleteContainer(ContainerID.valueOf(1));
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights(10, 0);
+        containerEndpoint.getContainerMisMatchInsights(10, 0, "SCM");
+    Map<String, Object> response =
+        (Map<String, Object>) containerInsights.getEntity();
+    long prevKey = (long) response.get("prevKey");
+    assertEquals(0, prevKey);
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+        (List<ContainerDiscrepancyInfo>) response.get(
+            "missingContainerList");
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(1, containerDiscrepancyInfo.getContainerID());
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
   }
+
 
   @Test
   public void testGetContainerInsightsNonSCMContainersWithPrevKey()
@@ -1314,9 +1320,12 @@ public class TestContainerEndpoint {
     int limit = 10;
 
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights(limit, prevKey);
+        containerEndpoint.getContainerMisMatchInsights(limit, prevKey, "SCM");
+    Map<String, Object> response =
+        (Map<String, Object>) containerInsights.getEntity();
+    long responsePrevKey = (long) response.get("prevKey");
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
 
     // Check the first ContainerDiscrepancyInfo object in the response
     assertEquals(3, containerDiscrepancyInfoList.size());
@@ -1325,8 +1334,8 @@ public class TestContainerEndpoint {
         containerDiscrepancyInfoList.get(0);
     assertEquals(3, containerDiscrepancyInfo.getContainerID());
     assertEquals("OM", containerDiscrepancyInfo.getExistsAt());
+    assertEquals(prevKey, responsePrevKey);
   }
-
 
   @Test
   public void testGetContainerInsightsNonOMContainers()
@@ -1346,9 +1355,11 @@ public class TestContainerEndpoint {
       }
     });
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights(10, 0);
+        containerEndpoint.getContainerMisMatchInsights(10, 0, "OM");
+    Map<String, Object> response =
+        (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
     ContainerDiscrepancyInfo containerDiscrepancyInfo =
         containerDiscrepancyInfoList.get(0);
     assertEquals(2, containerDiscrepancyInfo.getContainerID());
@@ -1378,9 +1389,11 @@ public class TestContainerEndpoint {
     int limit = 3;
 
     Response containerInsights =
-        containerEndpoint.getContainerMisMatchInsights(limit, prevKey);
+        containerEndpoint.getContainerMisMatchInsights(limit, prevKey, "OM");
+    Map<String, Object> response =
+        (Map<String, Object>) containerInsights.getEntity();
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>) containerInsights.getEntity();
+        (List<ContainerDiscrepancyInfo>) response.get("missingContainerList");
 
     // Check the first two ContainerDiscrepancyInfo objects in the response
     assertEquals(3, containerDiscrepancyInfoList.size());
@@ -1394,6 +1407,58 @@ public class TestContainerEndpoint {
         containerDiscrepancyInfoList.get(1);
     assertEquals(4, containerDiscrepancyInfo2.getContainerID());
     assertEquals("SCM", containerDiscrepancyInfo2.getExistsAt());
+  }
+
+
+  @Test
+  public void testContainerMissingFilter()
+      throws IOException, TimeoutException {
+    // Put 5 containers in SCM with containerID 1 to 5
+    putContainerInfos(5);
+    // Delete containerID 1 and 2 from SCM so that they are missing in SCM
+    // but present in OM
+    reconContainerManager.deleteContainer(ContainerID.valueOf(1));
+    reconContainerManager.deleteContainer(ContainerID.valueOf(2));
+
+    // There are currently 2 containers in OM with containerID 1 and 2
+    Map<Long, ContainerMetadata> omContainers =
+        reconContainerMetadataManager.getContainers(-1, 0);
+    assertEquals(2, omContainers.size());
+
+    // Set the filter to "OM" to get missing containers in OM
+    Response responseOM =
+        containerEndpoint.getContainerMisMatchInsights(10, 0, "OM");
+    Map<String, Object> responseMapOM =
+        (Map<String, Object>) responseOM.getEntity();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoListOM =
+        (List<ContainerDiscrepancyInfo>)
+            responseMapOM.get("missingContainerList");
+    assertEquals(3, containerDiscrepancyInfoListOM.size());
+
+    // Set the filter to "SCM" to get missing containers in SCM
+    Response responseSCM =
+        containerEndpoint.getContainerMisMatchInsights(10, 0, "SCM");
+    Map<String, Object> responseMapSCM =
+        (Map<String, Object>) responseSCM.getEntity();
+    List<ContainerDiscrepancyInfo> containerDiscrepancyInfoListSCM =
+        (List<ContainerDiscrepancyInfo>)
+            responseMapSCM.get("missingContainerList");
+    assertEquals(2, containerDiscrepancyInfoListSCM.size());
+
+    List<Long> missingContainerIdsOM = containerDiscrepancyInfoListOM.stream()
+        .map(ContainerDiscrepancyInfo::getContainerID)
+        .collect(Collectors.toList());
+    // ContainerID 1 and 2 are missing in OM but present in SCM
+    assertTrue(missingContainerIdsOM.contains(3L));
+    assertTrue(missingContainerIdsOM.contains(4L));
+    assertTrue(missingContainerIdsOM.contains(5L));
+
+    List<Long> missingContainerIdsSCM = containerDiscrepancyInfoListSCM.stream()
+        .map(ContainerDiscrepancyInfo::getContainerID)
+        .collect(Collectors.toList());
+    // ContainerID 1 and 2 are missing in SCM but present in OM
+    assertTrue(missingContainerIdsSCM.contains(1L));
+    assertTrue(missingContainerIdsSCM.contains(2L));
   }
 
 
