@@ -1759,14 +1759,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         SnapshotInfo.SnapshotStatus snapshotStatus =
             info.getSnapshotStatus();
 
-        if (snapshotStatus.equals(SnapshotInfo
-            .SnapshotStatus.SNAPSHOT_ACTIVE)) {
+        if (snapshotStatus == SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
           activeGauge++;
-        } else if (snapshotStatus.equals(SnapshotInfo
-            .SnapshotStatus.SNAPSHOT_DELETED)) {
+        } else if (snapshotStatus ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
           deletedGauge++;
-        } else if (snapshotStatus.equals(SnapshotInfo
-            .SnapshotStatus.SNAPSHOT_RECLAIMED)) {
+        } else if (snapshotStatus ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_RECLAIMED) {
           reclaimedGauge++;
         }
       }
@@ -2831,28 +2830,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<SnapshotInfo> listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
-    if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
-          ACLType.LIST, volumeName, bucketName, null);
-    }
-    boolean auditSuccess = true;
+    metrics.incNumSnapshotLists();
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
     try {
-      metrics.incNumSnapshotLists();
-      return metadataManager.listSnapshot(volumeName, bucketName,
-          snapshotPrefix, prevSnapshot, maxListResult);
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
+            ACLType.LIST, volumeName, bucketName, null);
+      }
+      List<SnapshotInfo> snapshotInfoList =
+          metadataManager.listSnapshot(volumeName, bucketName,
+              snapshotPrefix, prevSnapshot, maxListResult);
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          OMAction.LIST_SNAPSHOT, auditMap));
+      return snapshotInfoList;
     } catch (Exception ex) {
       metrics.incNumSnapshotListFails();
-      auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT,
           auditMap, ex));
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.LIST_SNAPSHOT, auditMap));
-      }
     }
   }
 
