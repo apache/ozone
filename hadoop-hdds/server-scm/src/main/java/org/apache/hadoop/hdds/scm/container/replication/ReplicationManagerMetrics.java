@@ -207,6 +207,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "insufficient nodes available.")
   private MutableCounterLong partialReplicationTotal;
 
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated ratis container due to insufficient nodes available.")
+  private MutableCounterLong partialReplicationForMisReplicationTotal;
+
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated EC container due to insufficient nodes available.")
+  private MutableCounterLong ecPartialReplicationForMisReplicationTotal;
+
   @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
       + "due to the pending commands on the target datanode")
   private MutableCounterLong ecReconstructionCmdsDeferredTotal;
@@ -302,6 +310,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecPartialReconstructionNoneOverloadedTotal.snapshot(builder, all);
     ecPartialReplicationForOutOfServiceReplicasTotal.snapshot(builder, all);
     partialReplicationTotal.snapshot(builder, all);
+    ecPartialReplicationForMisReplicationTotal.snapshot(builder, all);
+    partialReplicationForMisReplicationTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -581,6 +591,22 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public void incrPartialReplicationTotal() {
     this.partialReplicationTotal.incr();
+  }
+
+  public void incrEcPartialReplicationForMisReplicationTotal() {
+    this.ecPartialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getEcPartialReplicationForMisReplicationTotal() {
+    return this.ecPartialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationForMisReplicationTotal() {
+    this.partialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getPartialReplicationForMisReplicationTotal() {
+    return this.partialReplicationForMisReplicationTotal.value();
   }
 
 }
