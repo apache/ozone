@@ -769,7 +769,11 @@ public class TestHeatMapInfo {
         getMaxAccessCount());
     Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
         getLabel());
-
+    Assertions.assertEquals(1.0,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+    Assertions.assertEquals(0.058,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+            .get(1).getChildren().get(3).getColor());
   }
 
   @Test
@@ -891,23 +895,23 @@ public class TestHeatMapInfo {
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
         "    \"status\": 0,\n" +
-        "    \"QTime\": 12,\n" +
+        "    \"QTime\": 11,\n" +
         "    \"params\": {\n" +
         "      \"q\": \"*:*\",\n" +
         "      \"json.facet\": \"{\\n    resources:{\\n      type : terms," +
         "\\n      field : resource,\\n      " +
-        "sort : \\\"read_access_count desc\\\",\\n      limit : 100,\\n" +
-        "      facet:{\\n        read_access_count : \\\"sum(event_count)\\\"" +
-        "\\n      }\\n    }\\n  }\",\n" +
+        "sort : \\\"read_access_count desc\\\",\\n      limit : 100,\\n      " +
+        "facet:{\\n        read_access_count : \\\"sum(event_count)\\\"\\n" +
+        "      }\\n    }\\n  }\",\n" +
         "      \"doAs\": " +
         "\"solr/hdfs-ru11-5.hdfs-ru11.root.hwx.site@ROOT.HWX.SITE\",\n" +
         "      \"fl\": \"access, agent, repo, resource, resType, " +
-        "event_count\",\n" +
+        "event_count\"" +
+        ",\n" +
         "      \"start\": \"0\",\n" +
         "      \"fq\": [\n" +
-        "        \"resource:*testnewvol2*\",\n" +
         "        \"resType:bucket\",\n" +
-        "        \"evtTime:[2023-06-14T06:42:03Z TO NOW]\",\n" +
+        "        \"evtTime:[2023-03-18T07:21:32Z TO NOW]\",\n" +
         "        \"access:read\",\n" +
         "        \"repo:cm_ozone\"\n" +
         "      ],\n" +
@@ -918,14 +922,20 @@ public class TestHeatMapInfo {
         "    }\n" +
         "  },\n" +
         "  \"response\": {\n" +
-        "    \"numFound\": 99,\n" +
+        "    \"numFound\": 7050,\n" +
         "    \"start\": 0,\n" +
         "    \"docs\": []\n" +
         "  },\n" +
         "  \"facets\": {\n" +
-        "    \"count\": 99,\n" +
+        "    \"count\": 7050,\n" +
         "    \"resources\": {\n" +
         "      \"buckets\": [\n" +
+        "        {\n" +
+        "          \"val\": " +
+        "\"s3v/cloudera-health-monitoring-ozone-basic-canary-bucket\",\n" +
+        "          \"count\": 6951,\n" +
+        "          \"read_access_count\": 10653\n" +
+        "        },\n" +
         "        {\n" +
         "          \"val\": \"testnewvol2/fsobuck11\",\n" +
         "          \"count\": 12,\n" +
@@ -1095,10 +1105,10 @@ public class TestHeatMapInfo {
           heatMapService.generateHeatMap(entityMetaDataList);
       Assertions.assertTrue(
           entityReadAccessHeatMapResponse.getChildren().size() > 0);
-      Assertions.assertEquals(1,
+      Assertions.assertEquals(2,
           entityReadAccessHeatMapResponse.getChildren().size());
       String path =
-          entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+          entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
               .get(0).getPath();
       Assertions.assertEquals("/testnewvol2/fsobuck11", path);
     } else {
