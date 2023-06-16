@@ -108,7 +108,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataMap, 1L);
+                orphanKeysMetaDataMap,
+                NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS
+                    .getValue());
             break;
 
           case DELETE:
@@ -126,7 +128,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
                       updatedKey);
             }
             handlePutKeyEvent(updatedKeyInfo, nsSummaryMap,
-                orphanKeysMetaDataMap, 1L);
+                orphanKeysMetaDataMap,
+                NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS
+                    .getValue());
             break;
 
           default:
@@ -143,7 +147,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           switch (action) {
           case PUT:
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataMap, 1L);
+                orphanKeysMetaDataMap,
+                NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS
+                    .getValue());
             break;
 
           case DELETE:
@@ -161,7 +167,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
                       updatedKey);
             }
             handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap,
-                orphanKeysMetaDataMap, 1L);
+                orphanKeysMetaDataMap,
+                NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS
+                    .getValue());
             break;
 
           default:

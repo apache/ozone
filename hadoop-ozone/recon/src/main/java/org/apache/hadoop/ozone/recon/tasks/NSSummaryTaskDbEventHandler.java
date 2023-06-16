@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +120,8 @@ public class NSSummaryTaskDbEventHandler {
   protected void writeOrphanKeysMetaDataToDB(
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap)
       throws IOException {
+    List<Long> orphanKeysParentIdListToBeDeleted =
+        new ArrayList<>(orphanKeyMetaDataMap.keySet().size());
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<Long, OrphanKeyMetaData> entry :
           orphanKeyMetaDataMap.entrySet()) {
@@ -130,13 +133,18 @@ public class NSSummaryTaskDbEventHandler {
             reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
                 rdbBatchOperation, key, orphanKeyMetaData);
           } else {
-            orphanKeyMetaDataMap.remove(key);
+            orphanKeysParentIdListToBeDeleted.add(key);
           }
         } catch (IOException e) {
           LOG.error("Unable to write orphan keys meta data in Recon DB.",
               e);
           throw e;
         }
+      }
+      if (orphanKeysParentIdListToBeDeleted.size() > 0) {
+        deleteOrphanKeysMetaDataFromDB(orphanKeysParentIdListToBeDeleted);
+        orphanKeyMetaDataMap.keySet()
+            .removeAll(orphanKeysParentIdListToBeDeleted);
       }
       try {
         reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
@@ -372,8 +380,7 @@ public class NSSummaryTaskDbEventHandler {
     // if map contains more than entries, flush to DB and clear the map
     if (null != orphanKeyMetaDataMap && orphanKeyMetaDataMap.size() >=
         orphanKeysFlushToDBMaxThreshold) {
-      return writeFlushAndCommitOrphanKeysMetaDataToDB(
-          orphanKeyMetaDataMap);
+      return writeFlushAndCommitOrphanKeysMetaDataToDB(orphanKeyMetaDataMap);
     }
     return true;
   }
