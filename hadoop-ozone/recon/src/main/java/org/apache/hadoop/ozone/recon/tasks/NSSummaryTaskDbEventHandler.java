@@ -310,8 +310,6 @@ public class NSSummaryTaskDbEventHandler {
         objectIds.remove(objectID);
         if (objectIds.size() > 0) {
           orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
-        } else {
-          orphanKeyMetaDataMap.remove(parentObjectID);
         }
       }
     }
