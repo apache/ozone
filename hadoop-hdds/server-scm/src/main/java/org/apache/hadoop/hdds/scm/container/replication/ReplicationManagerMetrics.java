@@ -203,6 +203,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "replicas were not all replicated due to insufficient nodes available.")
   private MutableCounterLong ecPartialReplicationForOutOfServiceReplicasTotal;
 
+  @Metric("Number of times partial Ratis replication occurred due to " +
+      "insufficient nodes available.")
+  private MutableCounterLong partialReplicationTotal;
+
   @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
       + "due to the pending commands on the target datanode")
   private MutableCounterLong ecReconstructionCmdsDeferredTotal;
@@ -297,6 +301,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecPartialReconstructionCriticalTotal.snapshot(builder, all);
     ecPartialReconstructionNoneOverloadedTotal.snapshot(builder, all);
     ecPartialReplicationForOutOfServiceReplicasTotal.snapshot(builder, all);
+    partialReplicationTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -568,6 +573,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public void incrEcPartialReplicationForOutOfServiceReplicasTotal() {
     this.ecPartialReplicationForOutOfServiceReplicasTotal.incr();
+  }
+
+  public long getPartialReplicationTotal() {
+    return partialReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationTotal() {
+    this.partialReplicationTotal.incr();
   }
 
 }
