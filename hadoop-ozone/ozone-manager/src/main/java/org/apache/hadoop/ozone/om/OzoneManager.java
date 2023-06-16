@@ -3537,6 +3537,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     TermIndex termIndex = null;
     try {
+      // Install hard links.
+      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
@@ -3767,15 +3769,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // an inconsistent state and this marker file will fail OM from
       // starting up.
       Files.createFile(markerFile);
-      // Copy the candidate DB to real DB
-      org.apache.commons.io.FileUtils.copyDirectory(checkpointPath.toFile(),
+      // Link each of the candidate DB files to real DB directory.  This
+      // preserves the links that already exist between files in the
+      // candidate db.
+      OmSnapshotUtils.linkFiles(checkpointPath.toFile(),
           oldDB);
       moveOmSnapshotData(oldDB.toPath(), dbSnapshotsDir.toPath());
       Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
-              "directory {}. Resetting to original DB.", checkpointPath,
-          oldDB.toPath());
+              "directory {}. Exception: {}. Resetting to original DB.",
+          checkpointPath, oldDB.toPath(), e);
       try {
         FileUtil.fullyDelete(oldDB);
         Files.move(dbBackup.toPath(), oldDB.toPath());
@@ -3792,14 +3796,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  // Move the new snapshot directory into place and create hard links.
+  // Move the new snapshot directory into place.
   private void moveOmSnapshotData(Path dbPath, Path dbSnapshotsDir)
       throws IOException {
     Path incomingSnapshotsDir = Paths.get(dbPath.toString(),
         OM_SNAPSHOT_DIR);
     if (incomingSnapshotsDir.toFile().exists()) {
       Files.move(incomingSnapshotsDir, dbSnapshotsDir);
-      OmSnapshotUtils.createHardLinks(dbPath);
     }
   }
 
