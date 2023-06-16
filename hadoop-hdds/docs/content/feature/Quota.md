@@ -63,6 +63,31 @@ e. Linked bucket will consume namespace quota of volume.
 
 f. If the cluster is upgraded from old version less than 1.1.0, use of quota on older volumes and buckets(We can confirm by looking at the info for the volume or bucket, and if the quota value is -2 then volume or bucket is old) is not recommended. Since the old key is not counted to the bucket's namespace quota, the quota setting is inaccurate at this point.
 
+g. For FSO bucket, while files and directory moving to trash, trash will consume extra namespace for below cases:
+- for internal directory path of trash in the bucket, i.e. /.trash/<user>/<current or timestamp>
+- for extra path created while moving file / directory to trash present at some hierarchy.
+  eg: 
+
+```
+- source: /<vol>/<bucket>/dir1/dir2/file.txt
+Scenario 1:
+- move file.txt to trash (while delete operation)
+- trash created with "dir1 and dir2" as extra namespace to have same path as source in trash:
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+  So this will consume extra name space of "2"
+  
+Scenaro 2:
+- move dir2 to trash (while delete operation)
+- trash created with "dir1" as extra namespace
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+  So this will consume extra namespace of "1" for dir1
+  
+Scenario 3:
+- move dir1 to trash (while delete operation), in this case, no extra namespace is required
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+
+```
+
 ### Note:
 - For FSO bucket with recursive deletion of directory, release of quota happens asynchronously after sub directories and files are removed (when directory is removed, recursive deletion can be in-progress in background).
 
