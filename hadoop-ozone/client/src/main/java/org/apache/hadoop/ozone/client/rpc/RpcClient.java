@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -135,7 +136,6 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -998,18 +998,20 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
                                                     String jobStatus,
                                                     boolean listAll)
       throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(volumeName),
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
-    Preconditions.checkArgument(Strings.isNotBlank(bucketName),
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
 
     return ozoneManagerClient.listSnapshotDiffJobs(
-        volumeName, bucketName, jobStatus, listAll);
+        volumeName, bucketName, jobStatus, listAll).stream()
+        .map(OzoneSnapshotDiff::fromSnapshotDiffJob)
+        .collect(Collectors.toList());
   }
 
   /**

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.shell.snapshot;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
@@ -61,7 +61,7 @@ public class ListSnapshotDiffHandler extends Handler {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    List<SnapshotDiffJob> jobList =
+    List<OzoneSnapshotDiff> jobList =
         client.getObjectStore().listSnapshotDiffJobs(
             volumeName, bucketName, jobStatus, listAll);
 

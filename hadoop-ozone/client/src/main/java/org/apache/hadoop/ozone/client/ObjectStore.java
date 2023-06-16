@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -692,7 +691,7 @@ public class ObjectStore {
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
                                                     String bucketName,
                                                     String jobStatus,
                                                     boolean listAll)
