@@ -92,7 +92,7 @@ public class EntityReadAccessHeatMapResponse {
 
   @JsonProperty("color")
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-  private double color = 1.0;
+  private double color = 1.0d;
 
   public EntityReadAccessHeatMapResponse() {
     this.children = new ArrayList<>();
