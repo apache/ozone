@@ -101,6 +101,7 @@ class TestSnapshotCache {
     assertNotNull(omSnapshot.get());
     assertTrue(omSnapshot.get() instanceof OmSnapshot);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -111,6 +112,7 @@ class TestSnapshotCache {
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1again =
         snapshotCache.get(dbKey1);
@@ -118,6 +120,7 @@ class TestSnapshotCache {
     assertEquals(omSnapshot1, omSnapshot1again);
     assertEquals(omSnapshot1.get(), omSnapshot1again.get());
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -130,12 +133,14 @@ class TestSnapshotCache {
     assertNotNull(omSnapshot1.get());
     assertEquals(1, snapshotCache.size());
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.release(dbKey1);
     // Entry will not be immediately evicted
     assertEquals(1, snapshotCache.size());
     // Entry is queued for eviction as its ref count reaches zero
     assertEquals(1, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -147,12 +152,14 @@ class TestSnapshotCache {
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.release((OmSnapshot) omSnapshot1.get());
     // Entry will not be immediately evicted
     assertEquals(1, snapshotCache.size());
     // Entry is queued for eviction as its ref count reaches zero
     assertEquals(1, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -163,13 +170,16 @@ class TestSnapshotCache {
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.release(dbKey1);
     // Entry will not be immediately evicted
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.invalidate(dbKey1);
     assertEquals(0, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -180,6 +190,7 @@ class TestSnapshotCache {
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey2 = "dbKey2";
     ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot2 =
@@ -188,6 +199,7 @@ class TestSnapshotCache {
     assertEquals(2, snapshotCache.size());
     // Should be difference omSnapshot instances
     assertNotEquals(omSnapshot1, omSnapshot2);
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey3 = "dbKey3";
     ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot3 =
@@ -195,19 +207,23 @@ class TestSnapshotCache {
     assertNotNull(omSnapshot3);
     assertEquals(3, snapshotCache.size());
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.release(dbKey1);
     // Entry will not be immediately evicted
     assertEquals(3, snapshotCache.size());
     assertEquals(1, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.invalidate(dbKey1);
     assertEquals(2, snapshotCache.size());
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     snapshotCache.invalidateAll();
     assertEquals(0, snapshotCache.size());
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   private void assertEntryExistence(String key, boolean shouldExist) {
@@ -231,31 +247,39 @@ class TestSnapshotCache {
     final String dbKey1 = "dbKey1";
     snapshotCache.get(dbKey1);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
     snapshotCache.release(dbKey1);
     assertEquals(1, snapshotCache.size());
     assertEquals(1, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey2 = "dbKey2";
     snapshotCache.get(dbKey2);
     assertEquals(2, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
     snapshotCache.release(dbKey2);
     assertEquals(2, snapshotCache.size());
     assertEquals(2, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey3 = "dbKey3";
     snapshotCache.get(dbKey3);
     assertEquals(3, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
     snapshotCache.release(dbKey3);
     assertEquals(3, snapshotCache.size());
     assertEquals(3, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey4 = "dbKey4";
     snapshotCache.get(dbKey4);
     // dbKey1 would have been evicted by the end of the last get() because
     // it was release()d.
     assertEquals(3, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
     assertEntryExistence(dbKey1, false);
     assertEquals(2, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -265,14 +289,17 @@ class TestSnapshotCache {
     final String dbKey1 = "dbKey1";
     snapshotCache.get(dbKey1);
     assertEquals(1, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey2 = "dbKey2";
     snapshotCache.get(dbKey2);
     assertEquals(2, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey3 = "dbKey3";
     snapshotCache.get(dbKey3);
     assertEquals(3, snapshotCache.size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey4 = "dbKey4";
     snapshotCache.get(dbKey4);
@@ -280,6 +307,7 @@ class TestSnapshotCache {
     assertEquals(4, snapshotCache.size());
     assertEntryExistence(dbKey1, true);
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     // Releasing dbKey2 at this point should immediately trigger its eviction
     // because the cache size exceeded the soft limit
@@ -288,6 +316,7 @@ class TestSnapshotCache {
     assertEntryExistence(dbKey2, false);
     assertEntryExistence(dbKey1, true);
     assertEquals(0, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
   @Test
@@ -300,12 +329,14 @@ class TestSnapshotCache {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(1, snapshotCache.size());
       assertEquals(0, snapshotCache.getPendingEvictionList().size());
+      assertTrue(snapshotCache.isConsistent());
     }
     // ref count should have been decreased because it would be close()d
     // upon exiting try-with-resources.
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey1).getTotalRefCount());
     assertEquals(1, snapshotCache.size());
     assertEquals(1, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey2 = "dbKey2";
     try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
@@ -313,6 +344,7 @@ class TestSnapshotCache {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(2, snapshotCache.size());
       assertEquals(1, snapshotCache.getPendingEvictionList().size());
+      assertTrue(snapshotCache.isConsistent());
       // Get dbKey2 entry a second time
       try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot2 =
           snapshotCache.get(dbKey2)) {
@@ -320,12 +352,15 @@ class TestSnapshotCache {
         assertEquals(2L, rcOmSnapshot2.getTotalRefCount());
         assertEquals(2, snapshotCache.size());
         assertEquals(1, snapshotCache.getPendingEvictionList().size());
+        assertTrue(snapshotCache.isConsistent());
       }
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
+      assertTrue(snapshotCache.isConsistent());
     }
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey2).getTotalRefCount());
     assertEquals(2, snapshotCache.size());
     assertEquals(2, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey3 = "dbKey3";
     try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
@@ -333,10 +368,12 @@ class TestSnapshotCache {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(3, snapshotCache.size());
       assertEquals(2, snapshotCache.getPendingEvictionList().size());
+      assertTrue(snapshotCache.isConsistent());
     }
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey3).getTotalRefCount());
     assertEquals(3, snapshotCache.size());
     assertEquals(3, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
 
     final String dbKey4 = "dbKey4";
     try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
@@ -345,11 +382,13 @@ class TestSnapshotCache {
       assertEquals(3, snapshotCache.size());
       // An entry has been evicted at this point
       assertEquals(2, snapshotCache.getPendingEvictionList().size());
+      assertTrue(snapshotCache.isConsistent());
     }
     assertEquals(0L, snapshotCache.getDbMap().get(dbKey4).getTotalRefCount());
     // Reached cache size limit
     assertEquals(3, snapshotCache.size());
     assertEquals(3, snapshotCache.getPendingEvictionList().size());
+    assertTrue(snapshotCache.isConsistent());
   }
 
 }

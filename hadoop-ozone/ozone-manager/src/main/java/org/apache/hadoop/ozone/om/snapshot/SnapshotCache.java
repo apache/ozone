@@ -324,13 +324,54 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * its knowledge, false if found to be inconsistent and details logged.
    */
   public boolean isConsistent() {
-    // Using dbMap as the source of truth in this cache, whether dbMap entries
+    // Uses dbMap as the source of truth for this check, whether dbMap entries
     // are in OM DB's snapshotInfoTable is out of the scope of this check.
 
-    // TODO: [SNAPSHOT]
-    // 1. Objects in instancesEligibleForClosure must have ref count equals 0
-    // 2. Objects in instancesEligibleForClosure should still be in dbMap
-    // 3. instancesEligibleForClosure must be empty if cache size exceeds limit
+    synchronized (pendingEvictionList) {
+      synchronized (dbMap) {
+        LOG.info("dbMap has {} entries", dbMap.size());
+        LOG.info("pendingEvictionList has {} entries",
+            pendingEvictionList.size());
+
+        // pendingEvictionList must be empty if cache size exceeds limit
+        if (dbMap.size() > cacheSizeLimit) {
+          if (pendingEvictionList.size() != 0) {
+            // cleanup() is not functioning correctly
+            LOG.error("pendingEvictionList is not empty even when cache size"
+                + "exceeds limit");
+          }
+        }
+
+        dbMap.forEach((k, v) -> {
+          if (v.getTotalRefCount() == 0L) {
+            long threadRefCount = v.getCurrentThreadRefCount();
+            if (threadRefCount != 0L) {
+              LOG.error("snapshotTableKey='{}' instance has inconsistent "
+                  + "ref count. Total ref count is 0 but thread "
+                  + "ref count is {}", k, threadRefCount);
+            }
+            // Zero ref count values in dbMap must be in pendingEvictionList
+            if (!pendingEvictionList.contains(v)) {
+              LOG.error("snapshotTableKey='{}' instance has zero ref count but "
+                  + "not in pendingEvictionList", k);
+            }
+          }
+        });
+
+        pendingEvictionList.forEach(v -> {
+          // Objects in pendingEvictionList should still be in dbMap
+          if (!dbMap.contains(v)) {
+            LOG.error("Instance '{}' is in pendingEvictionList but not in "
+                + "dbMap", v);
+          }
+          // Instances in pendingEvictionList must have ref count equals 0
+          if (v.getTotalRefCount() != 0L) {
+            LOG.error("Instance '{}' is in pendingEvictionList but ref count "
+                + "is not zero", v);
+          }
+        });
+      }
+    }
 
     return true;
   }
