@@ -409,10 +409,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (dbCpDiffer != null) {
       final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
+      Objects.requireNonNull(snapshotInfo.getSnapshotId(),
+          "SnapshotId is null for snapshot: " + snapshotInfo.getName());
       // Write snapshot generation (latest sequence number) to compaction log.
       // This will be used for DAG reconstruction as snapshotGeneration.
       dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-          snapshotInfo.getSnapshotID(),
+          snapshotInfo.getSnapshotId().toString(),
           snapshotInfo.getCreationTime());
 
       // Set compaction log filename to the latest DB sequence number
@@ -579,17 +581,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     // one by one.
   }
 
-  // Get OmSnapshot if the keyname has ".snapshot" key indicator
+  // Get OmSnapshot if the keyName has ".snapshot" key indicator
   public ReferenceCounted<IOmMetadataReader> checkForSnapshot(
-      String volumeName, String bucketName, String keyname,
-      boolean skipActiveCheck)
-      throws IOException {
-    if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
+      String volumeName,
+      String bucketName,
+      String keyName,
+      boolean skipActiveCheck) throws IOException {
+    if (keyName == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
 
     // see if key is for a snapshot
-    String[] keyParts = keyname.split(OM_KEY_PREFIX);
+    String[] keyParts = keyName.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
       if (snapshotName == null || snapshotName.isEmpty()) {

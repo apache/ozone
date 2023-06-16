@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -427,9 +428,10 @@ public class TestSnapshotDeletingService {
       throws Exception {
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         om.getMetadataManager();
-    String pathPreviousSnapshotID = deletedSnapshot.getPathPreviousSnapshotID();
-    String globalPreviousSnapshotID = deletedSnapshot
-        .getGlobalPreviousSnapshotID();
+    UUID pathPreviousSnapshotId = deletedSnapshot.getPathPreviousSnapshotId();
+    UUID globalPreviousSnapshotId =
+        deletedSnapshot.getGlobalPreviousSnapshotId();
+
     GenericTestUtils.waitFor(() -> {
       try {
         SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable()
@@ -445,9 +447,9 @@ public class TestSnapshotDeletingService {
       SnapshotInfo nextSnapshotInfo = metadataManager
           .getSnapshotInfoTable().get(nextSnapshot);
       GenericTestUtils.waitFor(() -> Objects.equals(
-          nextSnapshotInfo.getPathPreviousSnapshotID(), pathPreviousSnapshotID)
-          && Objects.equals(nextSnapshotInfo.getGlobalPreviousSnapshotID(),
-          globalPreviousSnapshotID), 100, 10000);
+          nextSnapshotInfo.getPathPreviousSnapshotId(), pathPreviousSnapshotId)
+          && Objects.equals(nextSnapshotInfo.getGlobalPreviousSnapshotId(),
+          globalPreviousSnapshotId), 100, 10000);
     }
   }
 

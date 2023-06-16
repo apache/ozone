@@ -219,14 +219,12 @@ public class TestOmSnapshotManager {
     }
   }
 
-  private SnapshotInfo createSnapshotInfo(
-      String volumeName, String bucketName) {
-    String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
+  private SnapshotInfo createSnapshotInfo(String volumeName,
+                                          String bucketName) {
     return SnapshotInfo.newInstance(volumeName,
         bucketName,
-        snapshotName,
-        snapshotId,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID(),
         Time.now());
   }
 }

@@ -548,7 +548,7 @@ public class PipelineManagerImpl implements PipelineManager {
       return false;
     }
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (nodeManager.getNodeByUuid(dn.getUuidString()) == null) {
+      if (nodeManager.getNodeByUuid(dn.getUuid()) == null) {
         return true;
       }
     }

@@ -204,11 +204,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public CertPath getCACertPath() {
-    return null;
-  }
-
-  @Override
   public List<X509Certificate> getTrustChain() {
     List<X509Certificate> list = new ArrayList<>();
     list.add(x509Certificate);

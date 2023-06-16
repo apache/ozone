@@ -182,6 +182,13 @@ public class BlockDeletingService extends BackgroundService {
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
+
+    long totalPendingBlockCount =
+        containerDataMap.values().stream().mapToLong(
+            containerData -> ((KeyValueContainerData) containerData)
+            .getNumPendingDeletionBlocks())
+        .sum();
+    metrics.setTotalPendingBlockCount(totalPendingBlockCount);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }

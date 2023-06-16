@@ -27,6 +27,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_DEFAULT;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 
 /**
@@ -34,7 +36,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_P
  */
 @Singleton
 public final class FeatureProvider {
-  private static EnumMap<Feature, Boolean> featureSupportMap =
+  private static EnumMap<Feature, Boolean> featureDisableMap =
       new EnumMap<>(Feature.class);
 
   private FeatureProvider() {
@@ -69,13 +71,13 @@ public final class FeatureProvider {
     }
   }
 
-  public static EnumMap<Feature, Boolean> getFeatureSupportMap() {
-    return featureSupportMap;
+  public static EnumMap<Feature, Boolean> getFeatureDisableMap() {
+    return featureDisableMap;
   }
 
   public static List<Feature> getAllDisabledFeatures() {
-    return getFeatureSupportMap().keySet().stream().filter(feature ->
-        Boolean.TRUE.equals(getFeatureSupportMap().get(feature))).collect(
+    return getFeatureDisableMap().keySet().stream().filter(feature ->
+        Boolean.TRUE.equals(getFeatureDisableMap().get(feature))).collect(
         Collectors.toList());
 
   }
@@ -85,13 +87,15 @@ public final class FeatureProvider {
     resetInitOfFeatureSupport();
     String heatMapProviderCls = ozoneConfiguration.get(
         OZONE_RECON_HEATMAP_PROVIDER_KEY);
-    if (StringUtils.isEmpty(heatMapProviderCls)) {
-      getFeatureSupportMap().put(Feature.HEATMAP, true);
+    boolean heatMapEnabled = ozoneConfiguration.getBoolean(
+        OZONE_RECON_HEATMAP_ENABLE_KEY, OZONE_RECON_HEATMAP_ENABLE_DEFAULT);
+    if (!heatMapEnabled || StringUtils.isEmpty(heatMapProviderCls)) {
+      getFeatureDisableMap().put(Feature.HEATMAP, true);
     }
   }
 
   private static void resetInitOfFeatureSupport() {
-    getFeatureSupportMap().keySet()
-        .forEach(feature -> getFeatureSupportMap().put(feature, false));
+    getFeatureDisableMap().keySet()
+        .forEach(feature -> getFeatureDisableMap().put(feature, false));
   }
 }

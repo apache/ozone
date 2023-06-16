@@ -57,3 +57,11 @@ Read Snapshot
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}       /etc/hosts
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_TWO}       /etc/passwd
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_THREE}     /etc/group
+
+Delete snapshot
+    ${output} =         Execute           ozone sh snapshot delete /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
+                        Should not contain      ${output}       Failed
+
+    ${output} =         Execute            ozone sh snapshot ls /${VOLUME}/${BUCKET} | jq '[.[] | select(.name == "${SNAPSHOT_ONE}") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
+                        Should contain   ${output}   SNAPSHOT_DELETED
+
