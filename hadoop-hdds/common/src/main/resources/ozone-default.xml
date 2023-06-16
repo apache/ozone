@@ -2033,7 +2033,7 @@
   </property>
   <property>
     <name>ozone.om.snapshot.provider.request.timeout</name>
-    <value>5000ms</value>
+    <value>300000ms</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
     <description>
       Connection request timeout for HTTP call made by OM Snapshot Provider to

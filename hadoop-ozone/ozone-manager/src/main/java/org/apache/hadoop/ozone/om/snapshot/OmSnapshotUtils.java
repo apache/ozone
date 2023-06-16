@@ -115,8 +115,8 @@ public final class OmSnapshotUtils {
         for (String l : lines) {
           String from = l.split("\t")[1];
           String to = l.split("\t")[0];
-          Path fullFromPath = getFullPath(dbPath, from);
-          Path fullToPath = getFullPath(dbPath, to);
+          Path fullFromPath = Paths.get(dbPath.toString(), from);
+          Path fullToPath = Paths.get(dbPath.toString(), to);
           Files.createLink(fullToPath, fullFromPath);
         }
         if (!hardLinkFile.delete()) {
@@ -126,19 +126,40 @@ public final class OmSnapshotUtils {
     }
   }
 
-  // Prepend the full path to the hard link entry entry.
-  private static Path getFullPath(Path dbPath, String fileName)
-      throws IOException {
-    File file = new File(fileName);
-    // If there is no directory then this file belongs in the db.
-    if (file.getName().equals(fileName)) {
-      return Paths.get(dbPath.toString(), fileName);
+  /**
+   * Link each of the files in oldDir to newDir.
+   *
+   * @param oldDir The dir to create links from.
+   * @param newDir The dir to create links to.
+   */
+  public static void linkFiles(File oldDir, File newDir) throws IOException {
+    int truncateLength = oldDir.toString().length() + 1;
+    List<String> oldDirList;
+    try (Stream<Path> files = Files.walk(oldDir.toPath())) {
+      oldDirList = files.map(Path::toString).
+          // Don't copy the directory itself
+          filter(s -> !s.equals(oldDir.toString())).
+          // Remove the old path
+          map(s -> s.substring(truncateLength)).
+          sorted().
+          collect(Collectors.toList());
     }
-    // Else this file belong in a directory parallel to the db.
-    Path parent = dbPath.getParent();
-    if (parent == null) {
-      throw new IOException("Invalid database " + dbPath);
+    for (String s: oldDirList) {
+      File oldFile = new File(oldDir, s);
+      File newFile = new File(newDir, s);
+      File newParent = newFile.getParentFile();
+      if (!newParent.exists()) {
+        if (!newParent.mkdirs()) {
+          throw new IOException("Directory create fails: " + newParent);
+        }
+      }
+      if (oldFile.isDirectory()) {
+        if (!newFile.mkdirs()) {
+          throw new IOException("Directory create fails: " + newFile);
+        }
+      } else {
+        Files.createLink(newFile.toPath(), oldFile.toPath());
+      }
     }
-    return Paths.get(parent.toString(), fileName);
   }
 }

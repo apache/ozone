@@ -250,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";

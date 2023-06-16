@@ -136,6 +136,7 @@ public class TestOMDbCheckpointServlet {
   private DBCheckpoint dbCheckpoint;
   private String method;
   private File folder;
+  private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -381,7 +382,7 @@ public class TestOMDbCheckpointServlet {
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     int newDbDirLength = newDbDirName.length() + 1;
     File newDbDir = new File(newDbDirName);
-    newDbDir.mkdirs();
+    Assertions.assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
 
     // Move snapshot dir to correct location.
@@ -420,7 +421,7 @@ public class TestOMDbCheckpointServlet {
       for (String line : lines.collect(Collectors.toList())) {
         Assertions.assertFalse(line.contains("CURRENT"),
             "CURRENT file is not a hard link");
-        if (line.contains("fabricatedFile")) {
+        if (line.contains(FABRICATED_FILE_NAME)) {
           fabricatedLinkLines.add(line);
         } else {
           checkLine(shortSnapshotLocation, shortSnapshotLocation2, line);
@@ -620,13 +621,13 @@ public class TestOMDbCheckpointServlet {
         "fabricatedSnapshot");
     fabricatedSnapshot.toFile().mkdirs();
     Assertions.assertTrue(Paths.get(fabricatedSnapshot.toString(),
-            "fabricatedFile").toFile().createNewFile());
+        FABRICATED_FILE_NAME).toFile().createNewFile());
 
     // Create fabricated links to snapshot dirs
     // to confirm that links are recognized even if
-    // they are don't point to the checkpoint directory.
-    Path fabricatedFile = Paths.get(snapshotDirName, "fabricatedFile");
-    Path fabricatedLink = Paths.get(snapshotDirName2, "fabricatedFile");
+    // they don't point to the checkpoint directory.
+    Path fabricatedFile = Paths.get(snapshotDirName, FABRICATED_FILE_NAME);
+    Path fabricatedLink = Paths.get(snapshotDirName2, FABRICATED_FILE_NAME);
 
     Files.write(fabricatedFile,
         "fabricatedData".getBytes(StandardCharsets.UTF_8));
@@ -636,7 +637,7 @@ public class TestOMDbCheckpointServlet {
     compactionDirPath = Paths.get(metaDir.toString(),
         OM_SNAPSHOT_DIFF_DIR, DB_COMPACTION_SST_BACKUP_DIR);
     Path fabricatedLink2 = Paths.get(compactionDirPath.toString(),
-        "fabricatedFile");
+        FABRICATED_FILE_NAME);
     Files.createLink(fabricatedLink2, fabricatedFile);
     Path currentFile = Paths.get(metaDir.toString(),
                                     OM_DB_NAME, "CURRENT");
@@ -706,7 +707,7 @@ public class TestOMDbCheckpointServlet {
     // find the real file
     String realDir = null;
     for (String dir: directories) {
-      if (Paths.get(testDirName, dir, "fabricatedFile").toFile().exists()) {
+      if (Paths.get(testDirName, dir, FABRICATED_FILE_NAME).toFile().exists()) {
         Assertions.assertNull(realDir,
             "Exactly one copy of the fabricated file exists in the tarball");
         realDir = dir;
@@ -730,8 +731,8 @@ public class TestOMDbCheckpointServlet {
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
       Assertions.assertTrue(
-          path0.getFileName().toString().equals("fabricatedFile") &&
-              path1.getFileName().toString().equals("fabricatedFile"),
+          path0.getFileName().toString().equals(FABRICATED_FILE_NAME) &&
+              path1.getFileName().toString().equals(FABRICATED_FILE_NAME),
           "fabricated entries contains correct file name");
     }
   }
