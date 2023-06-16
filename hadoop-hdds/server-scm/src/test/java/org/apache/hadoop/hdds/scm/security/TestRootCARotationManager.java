@@ -50,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -74,8 +75,10 @@ public class TestRootCARotationManager {
     ozoneConfig = new OzoneConfiguration();
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    ozoneConfig.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        testDir.getAbsolutePath());
+    ozoneConfig
+        .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    ozoneConfig
+        .setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     scm = Mockito.mock(StorageContainerManager.class);
     scmCertClient = Mockito.mock(CertificateClient.class);
     scmServiceManager = new SCMServiceManager();
