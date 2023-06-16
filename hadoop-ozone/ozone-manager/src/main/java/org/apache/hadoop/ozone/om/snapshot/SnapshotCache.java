@@ -46,7 +46,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
   // Snapshot cache internal hash map.
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
-  // TODO: Also wrap SoftReference<> around the value?
+  // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
   private final ConcurrentHashMap<String,
       ReferenceCounted<IOmMetadataReader, SnapshotCache>> dbMap;
 
@@ -200,16 +200,15 @@ public class SnapshotCache implements ReferenceCountedCallback {
     // Increment the reference count on the instance.
     rcOmSnapshot.incrementRefCount();
 
-    // Remove instance from clean up list when it exists.
-    // TODO: [SNAPSHOT] Check thread safety with cleanup()
-    //  and other pendingEvictionList usages
-    pendingEvictionList.remove(rcOmSnapshot);
-
-    // Check if any entries can be cleaned up.
-    // At this point, cache size might temporarily exceed cacheSizeLimit
-    // even if there are entries that can be evicted, which is fine since it
-    // is a soft limit.
-    cleanup();
+    synchronized (pendingEvictionList) {
+      // Remove instance from clean up list when it exists.
+      pendingEvictionList.remove(rcOmSnapshot);
+      // Check if any entries can be cleaned up.
+      // At this point, cache size might temporarily exceed cacheSizeLimit
+      // even if there are entries that can be evicted, which is fine since it
+      // is a soft limit.
+      cleanup();
+    }
 
     return rcOmSnapshot;
   }
@@ -225,9 +224,13 @@ public class SnapshotCache implements ReferenceCountedCallback {
         "Key '" + key + "' does not exist in cache");
 
     if (rcOmSnapshot.decrementRefCount() == 0L) {
-      // Eligible to be closed, add it to the list.
-      pendingEvictionList.add(rcOmSnapshot);
-      cleanup();
+      synchronized (pendingEvictionList) {
+        // Eligible to be closed, add it to the list.
+        pendingEvictionList.add(rcOmSnapshot);
+        // The cache size might have already exceed the soft limit
+        // Thus triggering cleanup() to check and evict if applicable
+        cleanup();
+      }
     }
   }
 
@@ -247,14 +250,17 @@ public class SnapshotCache implements ReferenceCountedCallback {
    */
   @Override
   public void callback(ReferenceCounted referenceCounted) {
-    if (referenceCounted.getTotalRefCount() == 0L) {
-      // Reference count reaches zero, add to pendingEvictionList
-      Preconditions.checkState(!pendingEvictionList.contains(referenceCounted),
-          "SnapshotCache is inconsistent. Entry should not be in the "
-              + "pendingEvictionList when ref count just reached zero.");
-      pendingEvictionList.add(referenceCounted);
-    } else if (referenceCounted.getTotalRefCount() == 1L) {
-      pendingEvictionList.remove(referenceCounted);
+    synchronized (pendingEvictionList) {
+      if (referenceCounted.getTotalRefCount() == 0L) {
+        // Reference count reaches zero, add to pendingEvictionList
+        Preconditions.checkState(
+            !pendingEvictionList.contains(referenceCounted),
+            "SnapshotCache is inconsistent. Entry should not be in the "
+                + "pendingEvictionList when ref count just reached zero.");
+        pendingEvictionList.add(referenceCounted);
+      } else if (referenceCounted.getTotalRefCount() == 1L) {
+        pendingEvictionList.remove(referenceCounted);
+      }
     }
   }
 
