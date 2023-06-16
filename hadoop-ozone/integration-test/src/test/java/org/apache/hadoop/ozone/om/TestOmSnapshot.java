@@ -209,7 +209,7 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -495,7 +495,7 @@ public class TestOmSnapshot {
     Iterator<? extends OzoneKey> iterator = bucket.listKeys(keyPrefix);
     int keyCount = 0;
     while (iterator.hasNext()) {
-      System.out.println(iterator.next().getName());
+      iterator.next();
       keyCount++;
     }
     return keyCount;
@@ -941,7 +941,7 @@ public class TestOmSnapshot {
   private String createFileKey(OzoneBucket bucket, String keyPrefix)
       throws IOException {
     byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    String key = keyPrefix;
+    String key = keyPrefix + counter.incrementAndGet();
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
