@@ -28,9 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -54,8 +56,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
   // has reached zero. Those entries are eligible to be evicted and closed.
   // Sorted in last used order.
   // Least-recently-used entry located at the beginning.
-  // TODO: Check thread safety. Try ConcurrentHashMultiset ?
-  private final LinkedHashSet<
+  private final Set<
       ReferenceCounted<IOmMetadataReader, SnapshotCache>> pendingEvictionList;
   private final OmSnapshotManager omSnapshotManager;
   private final CacheLoader<String, OmSnapshot> cacheLoader;
@@ -68,7 +69,8 @@ public class SnapshotCache implements ReferenceCountedCallback {
       CacheLoader<String, OmSnapshot> cacheLoader,
       int cacheSizeLimit) {
     this.dbMap = new ConcurrentHashMap<>();
-    this.pendingEvictionList = new LinkedHashSet<>();
+    this.pendingEvictionList =
+        Collections.synchronizedSet(new LinkedHashSet<>());
     this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
@@ -81,7 +83,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
   }
 
   @VisibleForTesting
-  LinkedHashSet<ReferenceCounted<
+  Set<ReferenceCounted<
       IOmMetadataReader, SnapshotCache>> getPendingEvictionList() {
     return pendingEvictionList;
   }
