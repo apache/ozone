@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -118,15 +119,21 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // task.
       if (shouldRun()) {
         getRunCount().incrementAndGet();
+
+        // Acquire active DB deletedTable write lock because of the
+        // deletedTable read-write here to avoid interleaving with
+        // the table range delete operation in createOmSnapshotCheckpoint()
+        // that is called from OMSnapshotCreateResponse#addToDBBatch.
+        manager.getMetadataManager().getTableLock(
+            OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
+
         try {
           // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
           //  snapshot's deletedTable when active DB's deletedTable
           //  doesn't have enough entries left.
           //  OM would have to keep track of which snapshot the key is coming
-          //  from. And PurgeKeysRequest would have to be adjusted to be able
-          //  to operate on snapshot checkpoints.
+          //  from if the above would be done inside getPendingDeletionKeys().
 
-          // TODO: [SNAPSHOT] HDDS-8067. Acquire deletedTable write lock
           List<BlockGroup> keyBlocksList = manager
               .getPendingDeletionKeys(keyLimitPerTask);
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
@@ -137,9 +144,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
               "retry at next run.", e);
+        } finally {
+          // Release deletedTable write lock
+          manager.getMetadataManager().getTableLock(
+              OmMetadataManagerImpl.DELETED_TABLE).writeLock().unlock();
         }
-        // TODO: [SNAPSHOT] HDDS-8067. Release deletedTable write lock
-        //  in finally block
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();

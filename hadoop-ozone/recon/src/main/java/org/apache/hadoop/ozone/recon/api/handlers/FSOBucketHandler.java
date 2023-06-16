@@ -30,6 +30,8 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -43,7 +45,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Class for handling FSO buckets.
  */
 public class FSOBucketHandler extends BucketHandler {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(FSOBucketHandler.class);
   private final long volumeId;
   private final long bucketId;
   
@@ -257,7 +260,9 @@ public class FSOBucketHandler extends BucketHandler {
               getBucketObjectId(names), dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
               getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
-      dirObjectId = dirInfo.getObjectID();
+      if (null != dirInfo) {
+        dirObjectId = dirInfo.getObjectID();
+      }
     }
     return dirObjectId;
   }

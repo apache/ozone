@@ -188,7 +188,8 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                       String prevBucket, int maxListResult)
+                                       String prevBucket, int maxListResult,
+                                       boolean hasSnapshot)
       throws IOException {
     return null;
   }
@@ -617,17 +618,19 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
+    return null;
+  }
+  
   public void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName)
       throws IOException {
 
   }
 
-  @Override
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
-    return null;
-  }
+
 
   @Override
   public SnapshotDiffResponse snapshotDiff(String volumeName,
@@ -639,6 +642,11 @@ public class ClientProtocolStub implements ClientProtocol {
                                            boolean forceFullDiff)
       throws IOException {
     return null;
+  }
+
+  @Override
+  public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
+      throws IOException {
   }
 
 }

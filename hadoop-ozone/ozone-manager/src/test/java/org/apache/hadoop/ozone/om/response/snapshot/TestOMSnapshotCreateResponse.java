@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -88,11 +89,12 @@ public class TestOMSnapshotCreateResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
+    UUID snapshotId = UUID.randomUUID();
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,
-        snapshotId);
+        snapshotId,
+        Time.now());
 
     // confirm table is empty
     Assert.assertEquals(0,

@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -107,7 +106,7 @@ public final class ContainerTestUtils {
     StateContext context = Mockito.mock(StateContext.class);
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
-    return new OzoneContainer(datanodeDetails, conf, context, null);
+    return new OzoneContainer(datanodeDetails, conf, context);
   }
 
   public static DatanodeDetails createDatanodeDetails() {
@@ -174,20 +173,15 @@ public final class ContainerTestUtils {
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
       boolean scanMetaDataSuccess, boolean scanDataSuccess,
-      AtomicLong containerIdSeq) {
-    setupMockContainer(c, shouldScanData, scanDataSuccess, containerIdSeq);
-    when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
-  }
-
-  public static void setupMockContainer(
-      Container<ContainerData> c, boolean shouldScanData,
-      boolean scanDataSuccess, AtomicLong containerIdSeq) {
+      AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
         .thenReturn(scanDataSuccess);
+    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    when(c.getContainerData().getVolume()).thenReturn(vol);
   }
 
   public static KeyValueContainer setUpTestContainerUnderTmpDir(
@@ -196,7 +190,7 @@ public final class ContainerTestUtils {
       throws IOException {
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
-    long containerId = HddsUtils.getTime();
+    long containerId = ContainerTestHelper.getTestContainerID();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(

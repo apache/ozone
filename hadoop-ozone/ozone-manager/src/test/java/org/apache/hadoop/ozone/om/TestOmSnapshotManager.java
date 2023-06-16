@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -138,7 +139,7 @@ public class TestOmSnapshotManager {
     OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
     OmSnapshot firstSnapshot = (OmSnapshot) omSnapshotManager
         .checkForSnapshot(first.getVolumeName(),
-        first.getBucketName(), getSnapshotPrefix(first.getName()));
+        first.getBucketName(), getSnapshotPrefix(first.getName()), false);
     DBStore firstSnapshotStore = mock(DBStore.class);
     HddsWhiteboxTestUtils.setInternalState(
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
@@ -153,7 +154,7 @@ public class TestOmSnapshotManager {
     // read in second snapshot to evict first
     omSnapshotManager
         .checkForSnapshot(second.getVolumeName(),
-        second.getBucketName(), getSnapshotPrefix(second.getName()));
+        second.getBucketName(), getSnapshotPrefix(second.getName()), false);
 
     // As a workaround, invalidate all cache entries in order to trigger
     // instances close in this test case, since JVM GC most likely would not
@@ -218,12 +219,12 @@ public class TestOmSnapshotManager {
     }
   }
 
-  private SnapshotInfo createSnapshotInfo(
-      String volumeName, String bucketName) {
-    String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
-    return SnapshotInfo.newInstance(
-        volumeName, bucketName, snapshotName, snapshotId);
+  private SnapshotInfo createSnapshotInfo(String volumeName,
+                                          String bucketName) {
+    return SnapshotInfo.newInstance(volumeName,
+        bucketName,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID(),
+        Time.now());
   }
-
 }

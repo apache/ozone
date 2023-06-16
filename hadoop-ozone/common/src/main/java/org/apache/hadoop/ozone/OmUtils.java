@@ -258,6 +258,7 @@ public final class OmUtils {
     case TenantListUser:
     case ListSnapshot:
     case EchoRPC:
+    case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
@@ -315,6 +316,7 @@ public final class OmUtils {
     case SnapshotMoveDeletedKeys:
     case SnapshotPurge:
     case RecoverLease:
+    case SetTimes:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -450,7 +452,6 @@ public final class OmUtils {
    * repeatedOmKeyInfo instance.
    * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
-   * @param repeatedOmKeyInfo key details from deletedTable
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
@@ -459,8 +460,7 @@ public final class OmUtils {
    * @return {@link RepeatedOmKeyInfo}
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
-      RepeatedOmKeyInfo repeatedOmKeyInfo, long trxnLogIndex,
-      boolean isRatisEnabled) {
+      long trxnLogIndex, boolean isRatisEnabled) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
@@ -476,15 +476,8 @@ public final class OmUtils {
     // Set the updateID
     keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
 
-    if (repeatedOmKeyInfo == null) {
-      //The key doesn't exist in deletedTable, so create a new instance.
-      repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyInfo);
-    } else {
-      //The key exists in deletedTable, so update existing instance.
-      repeatedOmKeyInfo.addOmKeyInfo(keyInfo);
-    }
-
-    return repeatedOmKeyInfo;
+    //The key doesn't exist in deletedTable, so create a new instance.
+    return new RepeatedOmKeyInfo(keyInfo);
   }
 
   /**
@@ -608,6 +601,22 @@ public final class OmUtils {
       HddsClientUtils.verifyKeyName(keyName);
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+
+  /**
+   * Verify if key name contains snapshot reserved word.
+   * This verification will run even when
+   * ozone.om.keyname.character.check.enabled sets to false
+   */
+  public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
+          throws OMException {
+    if (keyName != null && 
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new OMException(
+          "Cannot create key under path reserved for "
+              + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
               OMException.ResultCodes.INVALID_KEY_NAME);
     }
   }

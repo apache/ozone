@@ -276,6 +276,10 @@ public class TestDefaultCertificateClient {
     X509Certificate cert1 = generateX509Cert(keyPair);
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
+    X509Certificate rootCa1 = generateX509Cert(keyPair);
+    X509Certificate rootCa2 = generateX509Cert(keyPair);
+    X509Certificate subCa1 = generateX509Cert(keyPair);
+    X509Certificate subCa2 = generateX509Cert(keyPair);
 
     Path certPath = dnSecurityConfig.getCertificateLocation(DN_COMPONENT);
     CertificateCodec codec = new CertificateCodec(dnSecurityConfig,
@@ -300,6 +304,18 @@ public class TestDefaultCertificateClient {
         getPEMEncodedString(cert2));
     codec.writeCertificate(certPath, "3.crt",
         getPEMEncodedString(cert3));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(rootCa1));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(rootCa2));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(subCa1));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(subCa2));
 
     // Re instantiate DN client which will load certificates from filesystem.
     if (dnCertClient != null) {
@@ -315,6 +331,12 @@ public class TestDefaultCertificateClient {
     assertNotNull(dnCertClient.getCertificate(cert3.getSerialNumber()
         .toString()));
 
+    assertEquals(2, dnCertClient.getAllCaCerts().size());
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa1));
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa2));
+    assertEquals(2, dnCertClient.getAllRootCaCerts().size());
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa1));
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa2));
   }
 
   @Test
@@ -333,6 +355,25 @@ public class TestDefaultCertificateClient {
     assertNotNull(dnCertClient.getCertificate(cert2.getSerialNumber()
         .toString()));
     assertNotNull(dnCertClient.getCertificate(cert3.getSerialNumber()
+        .toString()));
+  }
+
+  @Test
+  public void testStoreMultipleRootCACertificate() throws Exception {
+    KeyPair keyPair = keyGenerator.generateKey();
+    X509Certificate cert1 = generateX509Cert(keyPair);
+    X509Certificate cert2 = generateX509Cert(keyPair);
+    X509Certificate cert3 = generateX509Cert(keyPair);
+
+    dnCertClient.storeCertificate(getPEMEncodedString(cert1), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert2), CAType.ROOT);
+    dnCertClient.storeCertificate(getPEMEncodedString(cert3), CAType.ROOT);
+
+    assertEquals(cert1, dnCertClient.getCertificate(cert1.getSerialNumber()
+        .toString()));
+    assertEquals(cert2, dnCertClient.getCertificate(cert2.getSerialNumber()
+        .toString()));
+    assertEquals(cert3, dnCertClient.getCertificate(cert3.getSerialNumber()
         .toString()));
   }
 

@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -155,6 +156,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
@@ -171,6 +174,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
@@ -202,6 +206,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
@@ -601,22 +606,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * List buckets in a volume.
-   *
-   * @param volumeName
-   * @param startKey
-   * @param prefix
-   * @param count
-   * @return
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
   public List<OmBucketInfo> listBuckets(String volumeName,
-      String startKey, String prefix, int count) throws IOException {
+                                        String startKey, String prefix,
+                                        int count, boolean hasSnapshot)
+      throws IOException {
     List<OmBucketInfo> buckets = new ArrayList<>();
     ListBucketsRequest.Builder reqBuilder = ListBucketsRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setCount(count);
+    reqBuilder.setHasSnapshot(hasSnapshot);
     if (startKey != null) {
       reqBuilder.setStartKey(startKey);
     }
@@ -1174,13 +1175,23 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotInfo> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
+  public List<SnapshotInfo> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
         requestBuilder =
         OzoneManagerProtocolProtos.ListSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
-            .setBucketName(bucketName);
+            .setBucketName(bucketName)
+            .setMaxListResult(maxListResult);
+
+    if (prevSnapshot != null) {
+      requestBuilder.setPrevSnapshot(prevSnapshot);
+    }
+
+    if (snapshotPrefix != null) {
+      requestBuilder.setPrefix(snapshotPrefix);
+    }
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshot)
         .setListSnapshotRequest(requestBuilder)
@@ -1353,6 +1364,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final GetS3VolumeContextResponse resp =
         handleError(omResponse).getGetS3VolumeContextResponse();
     return S3VolumeContext.fromProtobuf(resp);
+  }
+
+  @Override
+  public UUID refetchSecretKey() throws IOException {
+    final RefetchSecretKeyRequest.Builder requestBuilder =
+        RefetchSecretKeyRequest.newBuilder();
+    final OMRequest omRequest = createOMRequest(Type.RefetchSecretKey)
+        .setRefetchSecretKeyRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    final RefetchSecretKeyResponse resp =
+        handleError(omResponse).getRefetchSecretKeyResponse();
+    return ProtobufUtils.fromProtobuf(resp.getId());
   }
 
   /**
@@ -2212,6 +2236,27 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     RecoverLeaseResponse recoverLeaseResponse =
             handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
     return recoverLeaseResponse.getResponse();
+  }
+
+  @Override
+  public void setTimes(OmKeyArgs args, long mtime, long atime)
+      throws IOException {
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .setKeyName(args.getKeyName())
+        .build();
+    SetTimesRequest setTimesRequest =
+        SetTimesRequest.newBuilder()
+            .setKeyArgs(keyArgs)
+            .setMtime(mtime)
+            .setAtime(atime)
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.SetTimes)
+        .setSetTimesRequest(setTimesRequest).build();
+
+    handleError(submitRequest(omRequest));
   }
 
   @VisibleForTesting

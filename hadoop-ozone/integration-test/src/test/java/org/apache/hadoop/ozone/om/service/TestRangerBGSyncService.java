@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
@@ -27,7 +28,6 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -45,8 +45,6 @@ import java.util.concurrent.TimeUnit;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -183,11 +181,8 @@ public class TestRangerBGSyncService {
 
     ozoneManager = mock(OzoneManager.class);
 
-    Server.Call call = spy(new Server.Call(1, 1, null, null,
-        RPC.RpcKind.RPC_BUILTIN, new byte[] {1, 2, 3}));
     // Run as alice, so that Server.getRemoteUser() won't return null.
-    when(call.getRemoteUser()).thenReturn(ugiAlice);
-    Server.getCurCall().set(call);
+    mockRemoteUser(ugiAlice);
 
     String omID = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omID);

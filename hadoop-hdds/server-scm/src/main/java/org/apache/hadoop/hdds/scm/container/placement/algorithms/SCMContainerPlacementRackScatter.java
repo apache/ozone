@@ -210,6 +210,7 @@ public final class SCMContainerPlacementRackScatter
    * @throws SCMException  SCMException
    */
   @Override
+  @SuppressWarnings("checkstyle:methodlength")
   protected List<DatanodeDetails> chooseDatanodesInternal(
           List<DatanodeDetails> usedNodes,
           final List<DatanodeDetails> excludedNodes,
@@ -226,18 +227,23 @@ public final class SCMContainerPlacementRackScatter
     }
     int nodesRequired = nodesRequiredToChoose;
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
+    int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
     List<Node> availableNodes = networkTopology.getNodes(
         networkTopology.getMaxLevel());
     int totalNodesCount = availableNodes.size();
     if (excludedNodes != null) {
       availableNodes.removeAll(excludedNodes);
     }
+    if (usedNodes != null) {
+      availableNodes.removeAll(usedNodes);
+    }
     if (availableNodes.size() < nodesRequired) {
       throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + totalNodesCount +
-          " AvailableNode = " + availableNodes.size() +
-          " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount,
+          "TotalNodes = " + totalNodesCount +
+          " AvailableNodes = " + availableNodes.size() +
+          " RequiredNodes = " + nodesRequired +
+          " ExcludedNodes = " + excludedNodesCount +
+          " UsedNodes = " + usedNodesCount,
           FAILED_TO_FIND_SUITABLE_NODE);
     }
     List<DatanodeDetails> mutableFavoredNodes = new ArrayList<>();
@@ -316,8 +322,8 @@ public final class SCMContainerPlacementRackScatter
               + additionalRacksRequired + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes from " +
                       "available racks. {} Available racks count: {},"
-                      + " Excluded nodes count: {}",
-              reason, racks.size(), excludedNodesCount);
+                      + " Excluded nodes count: {}, UsedNodes count: {}",
+              reason, racks.size(), excludedNodesCount, usedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
@@ -337,8 +343,9 @@ public final class SCMContainerPlacementRackScatter
               .size() + ", but required nodes to choose: "
               + nodesRequiredToChoose + " do not match.";
       LOG.warn("Placement policy could not choose the enough nodes."
-               + " {} Available nodes count: {}, Excluded nodes count: {}",
-              reason, totalNodesCount, excludedNodesCount);
+               + " {} Available nodes count: {}, Excluded nodes count: {}, "
+               + " Used nodes count: {}",
+              reason, totalNodesCount, excludedNodesCount, usedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }

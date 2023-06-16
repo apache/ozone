@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +37,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NativeLibraryLoader {
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(NativeLibraryLoader.class);
+      LoggerFactory.getLogger(NativeLibraryLoader.class);
+  public static final int LIBRARY_SHUTDOWN_HOOK_PRIORITY = 1;
   private static final String OS = System.getProperty("os.name").toLowerCase();
+
+  public static final String NATIVE_LIB_TMP_DIR = "native.lib.tmp.dir";
   private Map<String, Boolean> librariesLoaded;
   private static volatile NativeLibraryLoader instance;
 
@@ -91,13 +95,14 @@ public class NativeLibraryLoader {
 
   public static boolean isLibraryLoaded(final String libraryName) {
     return getInstance().librariesLoaded
-            .getOrDefault(libraryName, false);
+        .getOrDefault(libraryName, false);
   }
 
   public synchronized boolean loadLibrary(final String libraryName) {
     if (isLibraryLoaded(libraryName)) {
       return true;
     }
+    LOG.info("Loading Library: {}", libraryName);
     boolean loaded = false;
     try {
       loaded = false;
@@ -122,7 +127,7 @@ public class NativeLibraryLoader {
   }
 
   private Optional<File> copyResourceFromJarToTemp(final String libraryName)
-          throws IOException {
+      throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
     InputStream is = null;
     try {
@@ -132,7 +137,9 @@ public class NativeLibraryLoader {
       }
 
       // create a temporary file to copy the library to
-      final File temp = File.createTempFile(libraryName, getLibOsSuffix());
+      final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
+          new File(Optional.ofNullable(System.getProperty(NATIVE_LIB_TMP_DIR))
+              .orElse("")));
       if (!temp.exists()) {
         return Optional.empty();
       } else {
@@ -140,7 +147,9 @@ public class NativeLibraryLoader {
       }
 
       Files.copy(is, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      return Optional.ofNullable(temp);
+      ShutdownHookManager.get().addShutdownHook(temp::delete,
+          LIBRARY_SHUTDOWN_HOOK_PRIORITY);
+      return Optional.of(temp);
     } finally {
       if (is != null) {
         is.close();

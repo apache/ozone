@@ -265,41 +265,12 @@ public abstract class OMClientRequest implements RequestAuditor {
       contextBuilder.setAclType(IAccessAuthorizer.ACLIdentityType.USER);
 
       boolean isVolOwner = isOwner(currentUser, volumeOwner);
-      IAccessAuthorizer.ACLType parentAclRight = aclType;
       if (isVolOwner) {
         contextBuilder.setOwnerName(volumeOwner);
       } else {
         contextBuilder.setOwnerName(bucketOwner);
       }
-      if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
-        if (aclType == IAccessAuthorizer.ACLType.CREATE ||
-                aclType == IAccessAuthorizer.ACLType.DELETE ||
-                aclType == IAccessAuthorizer.ACLType.WRITE_ACL) {
-          parentAclRight = IAccessAuthorizer.ACLType.WRITE;
-        } else if (aclType == IAccessAuthorizer.ACLType.READ_ACL ||
-                aclType == IAccessAuthorizer.ACLType.LIST) {
-          parentAclRight = IAccessAuthorizer.ACLType.READ;
-        }
-      } else {
-        parentAclRight = IAccessAuthorizer.ACLType.READ;
 
-      }
-      OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder()
-              .setResType(OzoneObj.ResourceType.VOLUME)
-              .setStoreType(OzoneObj.StoreType.OZONE)
-              .setVolumeName(volumeName)
-              .setBucketName(bucketName)
-              .setKeyName(keyName).build();
-      RequestContext volumeContext = RequestContext.newBuilder()
-              .setClientUgi(currentUser)
-              .setIp(getRemoteAddress())
-              .setHost(getHostName())
-              .setAclType(IAccessAuthorizer.ACLIdentityType.USER)
-              .setAclRights(parentAclRight)
-              .setOwnerName(volumeOwner)
-              .build();
-      ozoneManager.getOmMetadataReader().checkAcls(volumeObj,
-          volumeContext, true);
       ozoneManager.getOmMetadataReader().checkAcls(obj,
           contextBuilder.build(), true);
     }

@@ -64,9 +64,6 @@ public abstract class AbstractOverReplicationHandler
    * Allow the placement policy to indicate which replicas can be removed for
    * an over replicated container, so that the placement policy is not violated
    * by removing them.
-   * @param replicas
-   * @param expectedCountPerUniqueReplica
-   * @return
    */
   protected Set<ContainerReplica> selectReplicasToRemove(
       Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {

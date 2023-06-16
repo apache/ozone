@@ -20,12 +20,18 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+
+import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
 /**
  * Factory class to obtain a container to which a block can be allocated for
@@ -38,12 +44,19 @@ public class WritableContainerFactory {
   private final WritableContainerProvider<ECReplicationConfig> ecProvider;
 
   public WritableContainerFactory(StorageContainerManager scm) {
+    ConfigurationSource conf = scm.getConfiguration();
+
     this.ratisProvider = new WritableRatisContainerProvider(
-        scm.getConfiguration(), scm.getPipelineManager(),
+        conf, scm.getPipelineManager(),
         scm.getContainerManager(), scm.getPipelineChoosePolicy());
     this.standaloneProvider = ratisProvider;
-    this.ecProvider = new WritableECContainerProvider(scm.getConfiguration(),
-        scm.getPipelineManager(), scm.getContainerManager(),
+
+    this.ecProvider = new WritableECContainerProvider(
+        conf.getObject(WritableECContainerProviderConfig.class),
+        getConfiguredContainerSize(conf),
+        scm.getScmNodeManager(),
+        scm.getPipelineManager(),
+        scm.getContainerManager(),
         scm.getPipelineChoosePolicy());
   }
 
@@ -64,4 +77,10 @@ public class WritableContainerFactory {
           + " is an invalid replication type");
     }
   }
+
+  private long getConfiguredContainerSize(ConfigurationSource conf) {
+    return (long) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
+        OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
+  }
+
 }

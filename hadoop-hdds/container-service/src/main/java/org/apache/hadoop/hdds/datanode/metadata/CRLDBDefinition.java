@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfoCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.io.File;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -38,24 +38,33 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 /**
  * Class defines the structure and types of the crl.db.
  */
-public class CRLDBDefinition implements DBDefinition {
+public class CRLDBDefinition extends DBDefinition.WithMap {
 
   public static final DBColumnFamilyDefinition<Long, CRLInfo> PENDING_CRLS =
       new DBColumnFamilyDefinition<>(
           "pendingCrls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
-          new CRLInfoCodec());
+          CRLInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       CRL_SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          PENDING_CRLS, CRL_SEQUENCE_ID);
+
+  public CRLDBDefinition() {
+    // TODO: change it to singleton
+    super(COLUMN_FAMILIES);
+  }
 
   @Override
   public String getName() {
@@ -87,10 +96,5 @@ public class CRLDBDefinition implements DBDefinition {
         + DNCertificateClient.COMPONENT_NAME
         + File.separator
         + OzoneConsts.CRL_DB_DIRECTORY_NAME);
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {PENDING_CRLS, CRL_SEQUENCE_ID};
   }
 }
