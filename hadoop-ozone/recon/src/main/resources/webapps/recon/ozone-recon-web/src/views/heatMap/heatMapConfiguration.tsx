@@ -97,10 +97,13 @@ export default class HeatMapConfiguration extends Component {
           listeners: {
               nodeClick: (event) => {
               var data = event.datum;
-              if (data.path) {
-                console.log("Path", data.path);
-                this.props.onClick(data.path);
-              }
+              console.log("node-", data);
+              // Leaf level box should not call API
+              if (!data.color)
+                if (data.path) {
+                  console.log("Path", data.path);
+                  this.props.onClick(data.path);
+                }
               },
             },
         }],
