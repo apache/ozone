@@ -380,7 +380,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         checkSnapshotDirExist(checkpoint);
       }
       setStore(loadDB(conf, metaDir, dbName, false,
-          java.util.Optional.of(Boolean.TRUE), Optional.of(maxOpenFiles), false, false));
+          java.util.Optional.of(Boolean.TRUE),
+          Optional.of(maxOpenFiles), false, false));
       initializeOmTables(false);
     } catch (IOException e) {
       stop();
@@ -538,6 +539,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         disableAutoCompaction, maxOpenFiles, true, true);
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
                                String dbName, boolean readOnly,
                                java.util.Optional<Boolean>
