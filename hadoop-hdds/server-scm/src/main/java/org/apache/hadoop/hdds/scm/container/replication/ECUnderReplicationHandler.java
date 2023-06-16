@@ -291,7 +291,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           replicationManager.getExcludedNodes();
       final boolean hasOverloaded = !excludedDueToLoad.isEmpty();
       final List<DatanodeDetails> excludedOrOverloadedNodes = hasOverloaded
-          ? ImmutableList.copyOf(ImmutableSet.<DatanodeDetails>builder()
+          ? new ArrayList<>(ImmutableSet.<DatanodeDetails>builder()
               .addAll(excludedNodes)
               .addAll(excludedDueToLoad)
               .build())

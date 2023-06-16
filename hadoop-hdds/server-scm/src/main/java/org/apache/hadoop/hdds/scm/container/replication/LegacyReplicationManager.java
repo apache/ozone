@@ -433,13 +433,13 @@ public class LegacyReplicationManager {
         updateInflightAction(container, inflightReplication,
             action -> replicas.stream().anyMatch(
                 r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrNumReplicationCmdsTimeout(),
+            () -> metrics.incrReplicaCreateTimeoutTotal(),
             action -> updateCompletedReplicationMetrics(container, action));
 
         updateInflightAction(container, inflightDeletion,
             action -> replicas.stream().noneMatch(
                 r -> r.getDatanodeDetails().equals(action.getDatanode())),
-            () -> metrics.incrNumDeletionCmdsTimeout(),
+            () -> metrics.incrReplicaDeleteTimeoutTotal(),
             action -> updateCompletedDeletionMetrics(container, action));
 
         /*
@@ -544,15 +544,15 @@ public class LegacyReplicationManager {
 
   private void updateCompletedReplicationMetrics(ContainerInfo container,
       InflightAction action) {
-    metrics.incrNumReplicationCmdsCompleted();
-    metrics.incrNumReplicationBytesCompleted(container.getUsedBytes());
+    metrics.incrReplicasCreatedTotal();
+    metrics.incrReplicationBytesCompletedTotal(container.getUsedBytes());
     metrics.addReplicationTime(clock.millis() - action.getTime());
   }
 
   private void updateCompletedDeletionMetrics(ContainerInfo container,
       InflightAction action) {
-    metrics.incrNumDeletionCmdsCompleted();
-    metrics.incrNumDeletionBytesCompleted(container.getUsedBytes());
+    metrics.incrReplicasDeletedTotal();
+    metrics.incrDeletionBytesCompletedTotal(container.getUsedBytes());
     metrics.addDeletionTime(clock.millis() - action.getTime());
   }
 
@@ -1471,8 +1471,8 @@ public class LegacyReplicationManager {
         action -> addInflight(InflightType.REPLICATION, id, action));
 
     if (sent) {
-      metrics.incrNumReplicationCmdsSent();
-      metrics.incrNumReplicationBytesTotal(container.getUsedBytes());
+      metrics.incrReplicationCmdsSentTotal();
+      metrics.incrReplicationBytesTotal(container.getUsedBytes());
     }
   }
 
@@ -1498,8 +1498,8 @@ public class LegacyReplicationManager {
         action -> addInflight(InflightType.DELETION, id, action));
 
     if (sent) {
-      metrics.incrNumDeletionCmdsSent();
-      metrics.incrNumDeletionBytesTotal(container.getUsedBytes());
+      metrics.incrDeletionCmdsSentTotal();
+      metrics.incrDeletionBytesTotal(container.getUsedBytes());
     }
   }
 
