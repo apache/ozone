@@ -843,15 +843,15 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private void addToObjectIdMap(
-      Table<String, ? extends WithParentObjectId> fsTable,
-      Table<String, ? extends WithParentObjectId> tsTable,
-      Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
-      PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-      PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-      PersistentSet<byte[]> objectIDsToCheck, Set<Long> oldParentIds,
-      Set<Long> newParentIds, Map<String, String> tablePrefixes)
-      throws IOException, NativeLibraryNotLoadedException, RocksDBException {
+  void addToObjectIdMap(Table<String, ? extends WithParentObjectId> fsTable,
+                        Table<String, ? extends WithParentObjectId> tsTable,
+                        Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
+                        PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                        PersistentMap<byte[], byte[]> newObjIdToKeyMap,
+                        PersistentSet<byte[]> objectIDsToCheck,
+                        Set<Long> oldParentIds, Set<Long> newParentIds,
+                        Map<String, String> tablePrefixes) throws IOException,
+      NativeLibraryNotLoadedException, RocksDBException {
     if (deltaFiles.isEmpty()) {
       return;
     }
@@ -892,7 +892,7 @@ public class SnapshotDiffManager implements AutoCloseable {
           if (newKey != null) {
             byte[] rawObjId = codecRegistry.asRawData(newKey.getObjectID());
             byte[] rawValue = codecRegistry.asRawData(
-                getKeyOrDirectoryName(isDirectoryTable, newKey));
+                key.substring(tablePrefix.length()));
             newObjIdToKeyMap.put(rawObjId, rawValue);
             objectIDsToCheck.add(rawObjId);
             if (newParentIds != null) {
@@ -1003,14 +1003,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     return Paths.get("/").resolve(key).toString();
   }
 
-  private long generateDiffReport(
-      final String jobId,
-      final PersistentSet<byte[]> objectIDsToCheck,
-      final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
-      final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-      final boolean isFSOBucket,
-      final Map<Long, Path> oldParentIdPathMap,
-      final Map<Long, Path> newParentIdPathMap) {
+  long generateDiffReport(final String jobId,
+                          final PersistentSet<byte[]> objectIDsToCheck,
+                          final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
+                          final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
+                          final boolean isFSOBucket,
+                          final Map<Long, Path> oldParentIdPathMap,
+                          final Map<Long, Path> newParentIdPathMap) {
 
     LOG.debug("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
@@ -1253,7 +1252,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (tableName.equals(
         OmMetadataManagerImpl.DIRECTORY_TABLE) || tableName.equals(
         OmMetadataManagerImpl.FILE_TABLE)) {
-      return  tablePrefixes.get(OmMetadataManagerImpl.DIRECTORY_TABLE);
+      return tablePrefixes.get(OmMetadataManagerImpl.DIRECTORY_TABLE);
     }
     return tablePrefixes.get(OmMetadataManagerImpl.KEY_TABLE);
   }
@@ -1261,7 +1260,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   /**
    * check if the given key is in the bucket specified by tablePrefix map.
    */
-  private boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
+  boolean isKeyInBucket(String key, Map<String, String> tablePrefixes,
       String tableName) {
     return key.startsWith(getTablePrefix(tablePrefixes, tableName));
   }

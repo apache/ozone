@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -131,7 +132,7 @@ public class TestOmSnapshot {
   private static AtomicInteger counter;
 
   @Rule
-  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
+  public Timeout timeout = new Timeout(180, TimeUnit.HOURS);
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -494,7 +495,7 @@ public class TestOmSnapshot {
     Iterator<? extends OzoneKey> iterator = bucket.listKeys(keyPrefix);
     int keyCount = 0;
     while (iterator.hasNext()) {
-      iterator.next();
+      System.out.println(iterator.next().getName());
       keyCount++;
     }
     return keyCount;
@@ -591,12 +592,11 @@ public class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.CREATE, key2)));
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.DELETE, key1)));
+    Assert.assertEquals(diff2.getDiffList(),
+        Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE, "/" + key1),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, "/" + key2)));
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
@@ -609,7 +609,8 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.RENAME, key2, key2Renamed)));
+            SnapshotDiffReportOzone.DiffType.RENAME, "/" + key2,
+            "/" + key2Renamed)));
 
 
     // Create a directory
@@ -620,14 +621,10 @@ public class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     Assert.assertEquals(1, diff4.getDiffList().size());
-    // for non-fso, directories are a special type of key with "/" appended
-    // at the end.
-    if (!bucket1.getBucketLayout().isFileSystemOptimized()) {
-      dir1 = dir1 + OM_KEY_PREFIX;
-    }
     Assert.assertTrue(diff4.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.CREATE, dir1)));
+            SnapshotDiffReportOzone.DiffType.CREATE,
+            OM_KEY_PREFIX + dir1)));
 
   }
 

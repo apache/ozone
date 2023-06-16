@@ -87,6 +87,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
           ObjectIDPathVal pathVal = new ObjectIDPathVal(dir.getObjectID(),
               parent.getPath().resolve(dir.getName()));
           addToPathMap(pathVal, dirObjIds, pathMap);
+          objectIdPathVals.add(pathVal);
         }
       }
     }
