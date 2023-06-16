@@ -55,13 +55,16 @@ public class TestUnderReplicatedProcessor {
     // use real queue
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
-    underReplicatedProcessor = new UnderReplicatedProcessor(
-        replicationManager, rmConf::getUnderReplicatedInterval);
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    ReplicationManagerMetrics rmMetrics =
+        ReplicationManagerMetrics.create(replicationManager);
     Mockito.when(replicationManager.getMetrics())
-        .thenReturn(ReplicationManagerMetrics.create(replicationManager));
+        .thenReturn(rmMetrics);
     Mockito.when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(0L);
+    underReplicatedProcessor = new UnderReplicatedProcessor(
+        replicationManager, rmConf::getUnderReplicatedInterval);
   }
 
   @Test

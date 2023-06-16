@@ -835,7 +835,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, replicationManager.getMetrics()
             .getEcDeletionCmdsSentTotal());
     Assertions.assertEquals(0, replicationManager.getMetrics()
-        .getNumDeletionCmdsSent());
+        .getDeletionCmdsSentTotal());
 
     // Repeat with Ratis container, as different metrics should be incremented
     Mockito.clearInvocations(nodeManager);
@@ -859,9 +859,9 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getEcDeletionCmdsSentTotal());
     Assertions.assertEquals(1, replicationManager.getMetrics()
-        .getNumDeletionCmdsSent());
+        .getDeletionCmdsSentTotal());
     Assertions.assertEquals(20, replicationManager.getMetrics()
-        .getNumDeletionBytesTotal());
+        .getDeletionBytesTotal());
   }
 
   @Test
@@ -953,7 +953,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
     Assertions.assertEquals(0, replicationManager.getMetrics()
-        .getNumReplicationCmdsSent());
+        .getReplicationCmdsSentTotal());
 
     // Repeat with Ratis container, as different metrics should be incremented
     Mockito.clearInvocations(nodeManager);
@@ -976,7 +976,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
     Assertions.assertEquals(1, replicationManager.getMetrics()
-        .getNumReplicationCmdsSent());
+        .getReplicationCmdsSentTotal());
   }
 
   /**
@@ -1019,7 +1019,7 @@ public class TestReplicationManager {
     Assertions.assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
     Assertions.assertEquals(0, replicationManager.getMetrics()
-        .getNumReplicationCmdsSent());
+        .getReplicationCmdsSentTotal());
   }
 
   @Test
