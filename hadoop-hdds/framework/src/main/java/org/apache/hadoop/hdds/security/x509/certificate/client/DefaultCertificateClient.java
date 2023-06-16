@@ -43,11 +43,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -55,6 +57,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -110,6 +113,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private PublicKey publicKey;
   private CertPath certPath;
   private Map<String, CertPath> certificateMap;
+  private Set<X509Certificate> rootCaCertificates;
+  private Set<X509Certificate> caCertificates;
   private String certSerialId;
   private String caCertId;
   private String rootCaCertId;
@@ -137,6 +142,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     this.certIdSaveCallback = saveCertId;
     this.shutdownCallback = shutdown;
     this.notificationReceivers = new HashSet<>();
+    this.rootCaCertificates = ConcurrentHashMap.newKeySet();
+    this.caCertificates = ConcurrentHashMap.newKeySet();
 
     updateCertSerialId(certSerialId);
   }
@@ -180,6 +187,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         this.certPath = allCertificates;
       }
       certificateMap.putIfAbsent(readCertSerialId, allCertificates);
+      addCertsToSubCaMapIfNeeded(fileName, allCertificates);
+      addCertToRootCaMapIfNeeded(fileName, allCertificates);
 
       updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
       updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
@@ -219,6 +228,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (caCertId == null
         || Long.parseLong(s) > Long.parseLong(caCertId)) {
       caCertId = s;
+    }
+  }
+
+  private void addCertsToSubCaMapIfNeeded(String fileName, CertPath certs) {
+    if (fileName.startsWith(CAType.SUBORDINATE.getFileNamePrefix())) {
+      caCertificates.addAll(
+          certs.getCertificates().stream()
+              .map(x -> (X509Certificate) x)
+              .collect(Collectors.toSet()));
+    }
+  }
+
+  private void addCertToRootCaMapIfNeeded(String fileName, CertPath certs) {
+    if (fileName.startsWith(CAType.ROOT.getFileNamePrefix())) {
+      rootCaCertificates.add(firstCertificateFrom(certs));
     }
   }
 
@@ -323,7 +347,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * the last one is the root CA certificate.
    */
   @Override
-  public synchronized List<X509Certificate> getTrustChain() {
+  public synchronized List<X509Certificate> getTrustChain()
+      throws IOException {
     CertPath path = getCertPath();
     if (path == null || path.getCertificates() == null) {
       return null;
@@ -337,21 +362,40 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       }
     } else {
       // case before certificate bundle is supported
-      chain.add(getCertificate());
-      X509Certificate cert = getCACertificate();
-      if (cert != null) {
-        chain.add(getCACertificate());
+      X509Certificate lastInsertedCert = getCertificate();
+      chain.add(lastInsertedCert);
+      List<X509Certificate> caCertList =
+          OzoneSecurityUtil.convertToX509(listCA());
+      while (!getAllRootCaCerts().contains(lastInsertedCert)) {
+        Optional<X509Certificate> issuerOpt =
+            getIssuerForCert(lastInsertedCert, caCertList);
+        if (issuerOpt.isPresent()) {
+          X509Certificate issuer = issuerOpt.get();
+          chain.add(issuer);
+          lastInsertedCert = issuer;
+        } else {
+          throw new CertificateException("No issuer found for certificate: " +
+              lastInsertedCert);
+        }
       }
-      cert = getRootCACertificate();
-      if (cert != null) {
-        chain.add(cert);
-      }
+      //add root ca to the cert chain at the end
+      chain.add(lastInsertedCert);
     }
-
     return chain;
   }
 
-  private synchronized CertPath getCACertPath() {
+  private Optional<X509Certificate> getIssuerForCert(X509Certificate cert,
+      Iterable<X509Certificate> issuerCerts) {
+    for (X509Certificate issuer : issuerCerts) {
+      if (cert.getIssuerX500Principal().equals(
+          issuer.getSubjectX500Principal())) {
+        return Optional.of(issuer);
+      }
+    }
+    return Optional.empty();
+  }
+
+  public synchronized CertPath getCACertPath() {
     if (caCertId != null) {
       return certificateMap.get(caCertId);
     }
@@ -844,6 +888,16 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return firstCertificateFrom(certificateMap.get(rootCaCertId));
     }
     return null;
+  }
+
+  @Override
+  public Set<X509Certificate> getAllRootCaCerts() {
+    return Collections.unmodifiableSet(rootCaCertificates);
+  }
+
+  @Override
+  public Set<X509Certificate> getAllCaCerts() {
+    return Collections.unmodifiableSet(caCertificates);
   }
 
   @Override

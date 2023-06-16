@@ -28,9 +28,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 /**
- * ozone snapshot create.
+ * ozone snapshot diff.
  */
-@CommandLine.Command(name = "snapshotDiff",
+@CommandLine.Command(name = "diff", aliases = "snapshotDiff",
     description = "Get the differences between two snapshots")
 public class SnapshotDiffHandler extends Handler {
 

@@ -25,6 +25,8 @@ import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -38,6 +40,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
@@ -116,6 +122,10 @@ public class SecurityConfig {
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
+  private final Duration caCheckInterval;
+  private final String caRotationTimeOfDay;
+  private final Pattern caRotationTimeOfDayPattern =
+      Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
 
   /**
    * Constructs a SecurityConfig.
@@ -180,6 +190,23 @@ public class SecurityConfig {
         HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
     renewalGracePeriod = Duration.parse(renewalGraceDurationString);
 
+    String caCheckIntervalString = configuration.get(
+        HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
+        HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT);
+    caCheckInterval = Duration.parse(caCheckIntervalString);
+
+    String timeOfDayString = configuration.get(
+        HDDS_X509_CA_ROTATION_TIME_OF_DAY,
+        HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT);
+
+    Matcher matcher = caRotationTimeOfDayPattern.matcher(timeOfDayString);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Property value of " +
+          HDDS_X509_CA_ROTATION_TIME_OF_DAY +
+          " should follow the hh:mm:ss format.");
+    }
+    caRotationTimeOfDay = "1970-01-01T" + timeOfDayString;
+
     validateCertificateValidityConfig();
 
     this.externalRootCaCert = this.configuration.get(
@@ -243,6 +270,12 @@ public class SecurityConfig {
               + HDDS_X509_DEFAULT_DURATION;
       LOG.error(msg);
       throw new IllegalArgumentException(msg);
+    }
+
+    if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
+      throw new IllegalArgumentException("Property value of " +
+          HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
     }
   }
 
@@ -448,6 +481,14 @@ public class SecurityConfig {
 
   public String getExternalRootCaCert() {
     return externalRootCaCert;
+  }
+
+  public Duration getCaCheckInterval() {
+    return caCheckInterval;
+  }
+
+  public String getCaRotationTimeOfDay() {
+    return caRotationTimeOfDay;
   }
 
   /**

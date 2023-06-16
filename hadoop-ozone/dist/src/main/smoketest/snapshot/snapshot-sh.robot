@@ -47,9 +47,9 @@ Snapshot Diff
     Set Suite Variable      ${KEY_THREE}        ${key_three}
     ${snapshot_two} =       Create snapshot     ${VOLUME}       ${BUCKET}
     Set Suite Variable      ${SNAPSHOT_TWO}     ${snapshot_two}
-    ${result} =     Execute             ozone sh snapshot snapshotDiff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      ${result}       Snapshot diff job is IN_PROGRESS
-    ${result} =     Execute             ozone sh snapshot snapshotDiff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
 
