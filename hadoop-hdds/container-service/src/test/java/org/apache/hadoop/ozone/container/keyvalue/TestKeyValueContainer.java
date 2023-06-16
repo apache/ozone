@@ -377,6 +377,23 @@ public class TestKeyValueContainer {
     populate(keyValueContainer, numberOfKeysToWrite);
   }
 
+  private void populateWithoutBlock(KeyValueContainer container,
+                                    long numberOfKeysToWrite)
+      throws IOException {
+    KeyValueContainerData cData = container.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
+      // Just update metdata, and don't insert in block table
+      // As for test, we are doing manually so adding key count to DB.
+      metadataStore.getStore().getMetadataTable()
+          .put(cData.getBlockCountKey(), numberOfKeysToWrite);
+    }
+
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("key1", "value1");
+    container.update(metadata, true);
+  }
+
+
   /**
    * Set container state to CLOSED.
    */
@@ -767,6 +784,95 @@ public class TestKeyValueContainer {
             new File(c.getContainerData().getContainerPath());
         FileUtils.deleteDirectory(directory);
       }
+    }
+  }
+
+  @Test
+  public void testIsEmptyContainerStateWhileImport() throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 1;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = folder.newFile("export.tar");
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
+
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
+
+      //delete the original one
+      keyValueContainer.delete();
+
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+      container.populatePathFields(scmId, containerVolume);
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      }
+
+      // After import check whether isEmpty flag is false
+      Assert.assertFalse(container.getContainerData().isEmpty());
+    }
+  }
+
+  @Test
+  public void testIsEmptyContainerStateWhileImportWithoutBlock()
+      throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 1;
+    closeContainer();
+    populateWithoutBlock(keyValueContainer, numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = folder.newFile("export.tar");
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
+
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
+
+      //delete the original one
+      keyValueContainer.delete();
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+      container.populatePathFields(scmId, containerVolume);
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      }
+
+      // After import check whether isEmpty flag is true
+      // since there are no blocks in rocksdb
+      Assert.assertTrue(container.getContainerData().isEmpty());
     }
   }
 }
