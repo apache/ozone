@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -206,9 +207,14 @@ public class TestRootCARotationManager {
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);
     return new JcaX509CertificateConverter().getCertificate(
-        SelfSignedCertificate.newBuilder().setBeginDate(start)
-            .setEndDate(end).setClusterID("cluster").setKey(keyPair)
-            .setSubject("localhost").setConfiguration(conf).setScmID("test")
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(start)
+            .setEndDate(end)
+            .setClusterID("cluster")
+            .setKey(keyPair)
+            .setSubject("localhost")
+            .setConfiguration(new SecurityConfig(conf))
+            .setScmID("test")
             .build());
   }
 }
