@@ -187,8 +187,8 @@ public class SnapshotCache {
     // If the snapshot is already loaded in cache, the check inside the loader
     // above is ignored. But we would still want to reject all get()s except
     // when called from SDT (and some) if the snapshot is not active any more.
-    if (!omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE) &&
-        !skipActiveCheck) {
+    if (!skipActiveCheck &&
+        !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
           FILE_NOT_FOUND);

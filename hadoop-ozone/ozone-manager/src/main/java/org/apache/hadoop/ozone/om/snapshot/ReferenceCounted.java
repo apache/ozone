@@ -71,7 +71,7 @@ public class ReferenceCounted<T> implements AutoCloseable {
   }
 
   public long incrementRefCount() { // TODO: [SNAPSHOT] Rename to increment()
-    if (refCount == null) {
+    if (refCount == null || threadMap == null) {
       return -1L;
     }
 
@@ -102,7 +102,7 @@ public class ReferenceCounted<T> implements AutoCloseable {
   }
 
   public long decrementRefCount() {
-    if (refCount == null) {
+    if (refCount == null || threadMap == null) {
       return -1L;
     }
 
