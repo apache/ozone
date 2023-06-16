@@ -44,6 +44,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -400,7 +401,12 @@ public class ObjectEndpoint extends EndpointBase {
           headerValue = queryValue;
         }
         if (headerValue != null) {
-          responseBuilder.header(entry.getKey(), headerValue);
+          try {
+            responseBuilder.header(entry.getKey(),
+                URLEncoder.encode(headerValue, "UTF-8"));
+          } catch (UnsupportedEncodingException e) {
+            responseBuilder.header(entry.getKey(), headerValue);
+          }
         }
       }
       addLastModifiedDate(responseBuilder, keyDetails);
