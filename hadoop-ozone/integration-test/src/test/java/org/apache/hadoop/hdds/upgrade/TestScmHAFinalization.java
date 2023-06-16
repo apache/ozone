@@ -35,9 +35,9 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.Upgra
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -61,7 +61,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM
  * HA.
  */
-@Disabled("HDDS-8714, HDDS-8740")
 public class TestScmHAFinalization {
   private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final Logger LOG =
@@ -189,6 +188,7 @@ public class TestScmHAFinalization {
 
   @ParameterizedTest
   @MethodSource(METHOD_SOURCE)
+  @Flaky("HDDS-8714")
   public void testFinalizationWithRestart(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
     CountDownLatch terminateLatch = new CountDownLatch(1);

@@ -147,7 +147,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
     DatanodeDetails datanodeDetails =
-        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+        nodeManager.getNodeByUuid(dnFromReport.getUuid());
     if (datanodeDetails == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);

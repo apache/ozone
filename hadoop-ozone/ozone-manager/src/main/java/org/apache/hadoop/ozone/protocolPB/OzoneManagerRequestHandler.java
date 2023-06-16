@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
@@ -78,6 +79,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -137,6 +139,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -310,6 +313,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case TransferLeadership:
         responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
             request.getTransferOmLeadershipRequest()));
+        break;
+      case RefetchSecretKey:
+        responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -946,6 +952,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
   }
 
+  private RefetchSecretKeyResponse refetchSecretKey() {
+    UUID uuid = impl.refetchSecretKey();
+    RefetchSecretKeyResponse response =
+        RefetchSecretKeyResponse.newBuilder()
+            .setId(ProtobufUtils.toProtobuf(uuid)).build();
+    return response;
+  }
+
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
@@ -1270,7 +1284,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       OzoneManagerProtocolProtos.ListSnapshotRequest request)
       throws IOException {
     List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
-        request.getVolumeName(), request.getBucketName());
+        request.getVolumeName(), request.getBucketName(), request.getPrefix(),
+        request.getPrevSnapshot(), request.getMaxListResult());
     List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
         snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
             .collect(Collectors.toList());

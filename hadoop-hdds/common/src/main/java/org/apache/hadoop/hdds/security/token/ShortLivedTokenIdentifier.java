@@ -24,6 +24,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Base class for short-lived tokens (block, container).
@@ -33,18 +34,16 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
 
   private String ownerId;
   private Instant expiry;
-  private String certSerialId;
+  private UUID secretKeyId;
 
   public abstract String getService();
 
   protected ShortLivedTokenIdentifier() {
   }
 
-  protected ShortLivedTokenIdentifier(String ownerId, Instant expiry,
-      String certSerialId) {
+  protected ShortLivedTokenIdentifier(String ownerId, Instant expiry) {
     this.ownerId = ownerId;
     this.expiry = expiry;
-    this.certSerialId = certSerialId;
   }
 
   @Override
@@ -67,20 +66,21 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
     this.expiry = expiry;
   }
 
-  protected void setCertSerialId(String certSerialId) {
-    this.certSerialId = certSerialId;
+  public void setSecretKeyId(UUID secretKeyId) {
+    this.secretKeyId = secretKeyId;
   }
 
   public Instant getExpiry() {
     return expiry;
   }
 
-  public String getCertSerialId() {
-    return certSerialId;
-  }
 
   public String getOwnerId() {
     return ownerId;
+  }
+
+  public UUID getSecretKeyId() {
+    return secretKeyId;
   }
 
   @Override
@@ -95,18 +95,18 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
     ShortLivedTokenIdentifier that = (ShortLivedTokenIdentifier) o;
     return Objects.equals(ownerId, that.ownerId) &&
         Objects.equals(expiry, that.expiry) &&
-        Objects.equals(certSerialId, that.certSerialId);
+        Objects.equals(secretKeyId, that.secretKeyId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(ownerId, expiry, certSerialId);
+    return Objects.hash(ownerId, expiry, secretKeyId);
   }
 
   @Override
   public String toString() {
     return "ownerId=" + ownerId +
         ", expiry=" + expiry +
-        ", certSerialId=" + certSerialId;
+        ", secretKeyId=" + secretKeyId;
   }
 }

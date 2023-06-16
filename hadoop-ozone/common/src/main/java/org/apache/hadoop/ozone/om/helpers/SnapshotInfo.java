@@ -40,6 +40,8 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.LinkedHashMap;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
@@ -106,28 +108,27 @@ public final class SnapshotInfo implements Auditable {
 
   private static final String SEPARATOR = "-";
   private static final long INVALID_TIMESTAMP = -1;
-  private static final String INITIAL_SNAPSHOT_ID =
-      UUID.randomUUID().toString();
-    
-  private final String snapshotID;  // UUID
+  private static final UUID INITIAL_SNAPSHOT_ID = UUID.randomUUID();
+
+  private final UUID snapshotId;
   private String name;
   private String volumeName;
   private String bucketName;
   private SnapshotStatus snapshotStatus;
   private final long creationTime;
   private long deletionTime;
-  private String pathPreviousSnapshotID;
-  private String globalPreviousSnapshotID;
+  private UUID pathPreviousSnapshotId;
+  private UUID globalPreviousSnapshotId;
   private String snapshotPath; // snapshot mask
   private String checkpointDir;
   /**
-   * RocksDB transaction sequence number at the time of checkpoint creation.
+   * RocksDB's transaction sequence number at the time of checkpoint creation.
    */
   private long dbTxSequenceNumber;
 
   /**
    * Private constructor, constructed via builder.
-   * @param snapshotID - Snapshot UUID.
+   * @param snapshotId - Snapshot UUID.
    * @param name - snapshot name.
    * @param volumeName - volume name.
    * @param bucketName - bucket name.
@@ -135,33 +136,33 @@ public final class SnapshotInfo implements Auditable {
    *                      SNAPSHOT_RECLAIMED
    * @param creationTime - Snapshot creation time.
    * @param deletionTime - Snapshot deletion time.
-   * @param pathPreviousSnapshotID - Snapshot path previous snapshot id.
-   * @param globalPreviousSnapshotID - Snapshot global previous snapshot id.
+   * @param pathPreviousSnapshotId - Snapshot path previous snapshot id.
+   * @param globalPreviousSnapshotId - Snapshot global previous snapshot id.
    * @param snapshotPath - Snapshot path, bucket .snapshot path.
    * @param checkpointDir - Snapshot checkpoint directory.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private SnapshotInfo(String snapshotID,
+  private SnapshotInfo(UUID snapshotId,
                        String name,
                        String volumeName,
                        String bucketName,
                        SnapshotStatus snapshotStatus,
                        long creationTime,
                        long deletionTime,
-                       String pathPreviousSnapshotID,
-                       String globalPreviousSnapshotID,
+                       UUID pathPreviousSnapshotId,
+                       UUID globalPreviousSnapshotId,
                        String snapshotPath,
                        String checkpointDir,
                        long dbTxSequenceNumber) {
-    this.snapshotID = snapshotID;
+    this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.snapshotStatus = snapshotStatus;
     this.creationTime = creationTime;
     this.deletionTime = deletionTime;
-    this.pathPreviousSnapshotID = pathPreviousSnapshotID;
-    this.globalPreviousSnapshotID = globalPreviousSnapshotID;
+    this.pathPreviousSnapshotId = pathPreviousSnapshotId;
+    this.globalPreviousSnapshotId = globalPreviousSnapshotId;
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
     this.dbTxSequenceNumber = dbTxSequenceNumber;
@@ -187,12 +188,12 @@ public final class SnapshotInfo implements Auditable {
     this.deletionTime = delTime;
   }
 
-  public void setPathPreviousSnapshotID(String pathPreviousSnapshotID) {
-    this.pathPreviousSnapshotID = pathPreviousSnapshotID;
+  public void setPathPreviousSnapshotId(UUID pathPreviousSnapshotId) {
+    this.pathPreviousSnapshotId = pathPreviousSnapshotId;
   }
 
-  public void setGlobalPreviousSnapshotID(String globalPreviousSnapshotID) {
-    this.globalPreviousSnapshotID = globalPreviousSnapshotID;
+  public void setGlobalPreviousSnapshotId(UUID globalPreviousSnapshotId) {
+    this.globalPreviousSnapshotId = globalPreviousSnapshotId;
   }
 
   public void setSnapshotPath(String snapshotPath) {
@@ -203,8 +204,8 @@ public final class SnapshotInfo implements Auditable {
     this.checkpointDir = checkpointDir;
   }
 
-  public String getSnapshotID() {
-    return snapshotID;
+  public UUID getSnapshotId() {
+    return snapshotId;
   }
 
   public String getName() {
@@ -231,12 +232,12 @@ public final class SnapshotInfo implements Auditable {
     return deletionTime;
   }
 
-  public String getPathPreviousSnapshotID() {
-    return pathPreviousSnapshotID;
+  public UUID getPathPreviousSnapshotId() {
+    return pathPreviousSnapshotId;
   }
 
-  public String getGlobalPreviousSnapshotID() {
-    return globalPreviousSnapshotID;
+  public UUID getGlobalPreviousSnapshotId() {
+    return globalPreviousSnapshotId;
   }
 
   public String getSnapshotPath() {
@@ -254,15 +255,15 @@ public final class SnapshotInfo implements Auditable {
 
   public SnapshotInfo.Builder toBuilder() {
     return new SnapshotInfo.Builder()
-        .setSnapshotID(snapshotID)
+        .setSnapshotId(snapshotId)
         .setName(name)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setSnapshotStatus(snapshotStatus)
         .setCreationTime(creationTime)
         .setDeletionTime(deletionTime)
-        .setPathPreviousSnapshotID(pathPreviousSnapshotID)
-        .setGlobalPreviousSnapshotID(globalPreviousSnapshotID)
+        .setPathPreviousSnapshotId(pathPreviousSnapshotId)
+        .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir);
   }
@@ -271,15 +272,15 @@ public final class SnapshotInfo implements Auditable {
    * Builder of SnapshotInfo.
    */
   public static class Builder {
-    private String snapshotID;
+    private UUID snapshotId;
     private String name;
     private String volumeName;
     private String bucketName;
     private SnapshotStatus snapshotStatus;
     private long creationTime;
     private long deletionTime;
-    private String pathPreviousSnapshotID;
-    private String globalPreviousSnapshotID;
+    private UUID pathPreviousSnapshotId;
+    private UUID globalPreviousSnapshotId;
     private String snapshotPath;
     private String checkpointDir;
     private long dbTxSequenceNumber;
@@ -289,8 +290,8 @@ public final class SnapshotInfo implements Auditable {
       this.snapshotStatus = SnapshotStatus.DEFAULT;
     }
 
-    public Builder setSnapshotID(String snapshotID) {
-      this.snapshotID = snapshotID;
+    public Builder setSnapshotId(UUID snapshotId) {
+      this.snapshotId = snapshotId;
       return this;
     }
 
@@ -324,14 +325,13 @@ public final class SnapshotInfo implements Auditable {
       return this;
     }
 
-    public Builder setPathPreviousSnapshotID(String pathPreviousSnapshotID) {
-      this.pathPreviousSnapshotID = pathPreviousSnapshotID;
+    public Builder setPathPreviousSnapshotId(UUID pathPreviousSnapshotId) {
+      this.pathPreviousSnapshotId = pathPreviousSnapshotId;
       return this;
     }
 
-    public Builder setGlobalPreviousSnapshotID(
-        String globalPreviousSnapshotID) {
-      this.globalPreviousSnapshotID = globalPreviousSnapshotID;
+    public Builder setGlobalPreviousSnapshotId(UUID globalPreviousSnapshotId) {
+      this.globalPreviousSnapshotId = globalPreviousSnapshotId;
       return this;
     }
 
@@ -353,15 +353,15 @@ public final class SnapshotInfo implements Auditable {
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
-          snapshotID,
+          snapshotId,
           name,
           volumeName,
           bucketName,
           snapshotStatus,
           creationTime,
           deletionTime,
-          pathPreviousSnapshotID,
-          globalPreviousSnapshotID,
+          pathPreviousSnapshotId,
+          globalPreviousSnapshotId,
           snapshotPath,
           checkpointDir,
           dbTxSequenceNumber
@@ -375,7 +375,7 @@ public final class SnapshotInfo implements Auditable {
   public OzoneManagerProtocolProtos.SnapshotInfo getProtobuf() {
     OzoneManagerProtocolProtos.SnapshotInfo.Builder sib =
         OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
-        .setSnapshotID(snapshotID)
+        .setSnapshotID(toProtobuf(snapshotId))
         .setName(name)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -383,12 +383,12 @@ public final class SnapshotInfo implements Auditable {
         .setCreationTime(creationTime)
         .setDeletionTime(deletionTime);
 
-    if (pathPreviousSnapshotID != null) {
-      sib.setPathPreviousSnapshotID(pathPreviousSnapshotID);
+    if (pathPreviousSnapshotId != null) {
+      sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
     }
 
-    if (globalPreviousSnapshotID != null) {
-      sib.setGlobalPreviousSnapshotID(globalPreviousSnapshotID);
+    if (globalPreviousSnapshotId != null) {
+      sib.setGlobalPreviousSnapshotID(toProtobuf(globalPreviousSnapshotId));
     }
 
     sib.setSnapshotPath(snapshotPath)
@@ -404,8 +404,9 @@ public final class SnapshotInfo implements Auditable {
    */
   public static SnapshotInfo getFromProtobuf(
       OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto) {
+
     SnapshotInfo.Builder osib = SnapshotInfo.newBuilder()
-        .setSnapshotID(snapshotInfoProto.getSnapshotID())
+        .setSnapshotId(fromProtobuf(snapshotInfoProto.getSnapshotID()))
         .setName(snapshotInfoProto.getName())
         .setVolumeName(snapshotInfoProto.getVolumeName())
         .setBucketName(snapshotInfoProto.getBucketName())
@@ -415,13 +416,13 @@ public final class SnapshotInfo implements Auditable {
         .setDeletionTime(snapshotInfoProto.getDeletionTime());
 
     if (snapshotInfoProto.hasPathPreviousSnapshotID()) {
-      osib.setPathPreviousSnapshotID(snapshotInfoProto.
-          getPathPreviousSnapshotID());
+      osib.setPathPreviousSnapshotId(
+          fromProtobuf(snapshotInfoProto.getPathPreviousSnapshotID()));
     }
 
     if (snapshotInfoProto.hasGlobalPreviousSnapshotID()) {
-      osib.setGlobalPreviousSnapshotID(snapshotInfoProto.
-          getGlobalPreviousSnapshotID());
+      osib.setGlobalPreviousSnapshotId(
+          fromProtobuf(snapshotInfoProto.getGlobalPreviousSnapshotID()));
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -443,14 +444,16 @@ public final class SnapshotInfo implements Auditable {
   /**
    * Get the name of the checkpoint directory.
    */
-  public static String getCheckpointDirName(String snapshotId) {
+  public static String getCheckpointDirName(UUID snapshotId) {
+    Objects.requireNonNull(snapshotId,
+        "SnapshotId is needed to create checkpoint directory");
     return SEPARATOR + snapshotId;
   }
   /**
    * Get the name of the checkpoint directory, (non-static).
    */
   public String getCheckpointDirName() {
-    return getCheckpointDirName(getSnapshotID());
+    return getCheckpointDirName(getSnapshotId());
   }
 
   public long getDbTxSequenceNumber() {
@@ -492,22 +495,25 @@ public final class SnapshotInfo implements Auditable {
   public static SnapshotInfo newInstance(String volumeName,
                                          String bucketName,
                                          String snapshotName,
-                                         String snapshotId,
+                                         UUID snapshotId,
                                          long creationTime) {
     SnapshotInfo.Builder builder = new SnapshotInfo.Builder();
     if (StringUtils.isBlank(snapshotName)) {
       snapshotName = generateName(creationTime);
     }
-    builder.setSnapshotID(snapshotId)
+    builder.setSnapshotId(snapshotId)
         .setName(snapshotName)
         .setCreationTime(creationTime)
         .setDeletionTime(INVALID_TIMESTAMP)
-        .setPathPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(INITIAL_SNAPSHOT_ID)
+        .setPathPreviousSnapshotId(INITIAL_SNAPSHOT_ID)
+        .setGlobalPreviousSnapshotId(INITIAL_SNAPSHOT_ID)
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setCheckpointDir(getCheckpointDirName(snapshotId));
+        .setBucketName(bucketName);
+
+    if (snapshotId != null) {
+      builder.setCheckpointDir(getCheckpointDirName(snapshotId));
+    }
     return builder.build();
   }
 
@@ -522,22 +528,22 @@ public final class SnapshotInfo implements Auditable {
     SnapshotInfo that = (SnapshotInfo) o;
     return creationTime == that.creationTime &&
         deletionTime == that.deletionTime &&
-        snapshotID.equals(that.snapshotID) &&
+        snapshotId.equals(that.snapshotId) &&
         name.equals(that.name) && volumeName.equals(that.volumeName) &&
         bucketName.equals(that.bucketName) &&
         snapshotStatus == that.snapshotStatus &&
-        Objects.equals(pathPreviousSnapshotID, that.pathPreviousSnapshotID) &&
+        Objects.equals(pathPreviousSnapshotId, that.pathPreviousSnapshotId) &&
         Objects.equals(
-            globalPreviousSnapshotID, that.globalPreviousSnapshotID) &&
+            globalPreviousSnapshotId, that.globalPreviousSnapshotId) &&
         snapshotPath.equals(that.snapshotPath) &&
         checkpointDir.equals(that.checkpointDir);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(snapshotID, name, volumeName, bucketName,
+    return Objects.hash(snapshotId, name, volumeName, bucketName,
         snapshotStatus,
-        creationTime, deletionTime, pathPreviousSnapshotID,
-        globalPreviousSnapshotID, snapshotPath, checkpointDir);
+        creationTime, deletionTime, pathPreviousSnapshotId,
+        globalPreviousSnapshotId, snapshotPath, checkpointDir);
   }
 }

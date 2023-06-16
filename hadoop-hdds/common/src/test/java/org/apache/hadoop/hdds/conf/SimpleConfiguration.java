@@ -25,42 +25,62 @@ import java.util.concurrent.TimeUnit;
 @ConfigGroup(prefix = "test.scm.client")
 public class SimpleConfiguration extends SimpleConfigurationParent {
 
-  @Config(key = "address", defaultValue = "localhost", description = "Client "
-      + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
+  @Config(key = "address",
+      defaultValue = "localhost",
+      description = "Client address (To test string injection).",
+      tags = ConfigTag.MANAGEMENT)
   private String clientAddress;
 
-  @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Bind "
-      + "host(To test string injection).", tags = ConfigTag.MANAGEMENT)
+  @Config(key = "bind.host",
+      defaultValue = "0.0.0.0",
+      description = "Bind host(To test string injection).",
+      tags = ConfigTag.MANAGEMENT)
   private String bindHost;
 
-  @Config(key = "compression.enabled", defaultValue = "true", description =
-      "Compression enabled. (Just to test boolean flag)", tags =
-      ConfigTag.MANAGEMENT)
+  @Config(key = "compression.enabled",
+      defaultValue = "true",
+      reconfigurable = true,
+      description = "Compression enabled. (Just to test boolean flag)",
+      tags = ConfigTag.MANAGEMENT)
   private boolean compressionEnabled;
 
-  @Config(key = "port", defaultValue = "9878", description = "Port number "
-      + "config (To test in injection)", tags = ConfigTag.MANAGEMENT)
+  @Config(key = "port",
+      defaultValue = "9878",
+      description = "Port number config (To test int injection)",
+      tags = ConfigTag.MANAGEMENT)
   private int port;
 
-  @Config(key = "wait", type = ConfigType.TIME, timeUnit =
-      TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
-      + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
+  @Config(key = "wait",
+      type = ConfigType.TIME,
+      timeUnit = TimeUnit.SECONDS,
+      defaultValue = "30m",
+      reconfigurable = true,
+      description = "Wait time (To test TIME config type)",
+      tags = ConfigTag.MANAGEMENT)
   private long waitTime;
 
-  @Config(key = "class", type = ConfigType.CLASS,
-      defaultValue = "java.lang.Object", description = "",
+  @Config(key = "class",
+      type = ConfigType.CLASS,
+      defaultValue = "java.lang.Object",
+      description = "",
       tags = ConfigTag.OZONE)
   private Class<?> myClass = Object.class;
 
-  @Config(key = "threshold", type = ConfigType.DOUBLE,
-      defaultValue = "10", description = "Threshold (To test DOUBLE config" +
-      " type)", tags = ConfigTag.MANAGEMENT)
+  @Config(key = "threshold",
+      type = ConfigType.DOUBLE,
+      defaultValue = "10",
+      description = "Threshold (To test DOUBLE config type)",
+      tags = ConfigTag.MANAGEMENT)
   private double threshold;
 
   @PostConstruct
   public void validate() {
     if (port < 0) {
       throw new NumberFormatException("Please use a positive port number");
+    }
+    if (waitTime < 42) {
+      throw new IllegalArgumentException("Wait time less than 42 seconds: " +
+          waitTime);
     }
   }
 

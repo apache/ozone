@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -145,6 +146,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
 
   @Override
   public DBCheckpoint downloadCheckpointFromLeader(String leaderId) {
+    return null;
+  }
+
+  @Override
+  public List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID) {
     return null;
   }
 
