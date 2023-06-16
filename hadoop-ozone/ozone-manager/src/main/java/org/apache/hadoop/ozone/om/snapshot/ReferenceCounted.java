@@ -80,10 +80,13 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
     threadMap.putIfAbsent(tid, 0L);
 
-    // Update the value and do some checks
-    threadMap.computeIfPresent(tid, (k, v) -> {
-      long newVal = v + 1;
-      Preconditions.checkState(newVal > 0L, "Thread reference count overflown");
+    synchronized (refCount) {
+      threadMap.computeIfPresent(tid, (k, v) -> {
+        long newVal = v + 1;
+        Preconditions.checkState(newVal > 0L,
+            "Thread reference count overflown");
+        return newVal;
+      });
 
       long newValTotal = refCount.incrementAndGet();
       Preconditions.checkState(newValTotal > 0L,
@@ -94,9 +97,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
         // pendingEvictionList if added
         parentSnapshotCache.callback(this);
       }
-
-      return newVal;
-    });
+    }
 
     return refCount.get();
   }
@@ -114,10 +115,14 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
     Preconditions.checkState(threadMap.get(tid) > 0L, "This thread " + tid +
         " already have a reference count of zero.");
 
-    // Atomically update value and purge entry if count reaches zero
-    threadMap.computeIfPresent(tid, (k, v) -> {
-      long newValue = v - 1L;
-      Preconditions.checkState(newValue >= 0L, "Reference count underflow");
+    synchronized (refCount) {
+      threadMap.computeIfPresent(tid, (k, v) -> {
+        long newValue = v - 1L;
+        Preconditions.checkState(newValue >= 0L,
+            "Thread reference count underflow");
+        // Remove entry by returning null here if thread ref count reaches zero
+        return newValue != 0L ? newValue : null;
+      });
 
       long newValTotal = refCount.decrementAndGet();
       Preconditions.checkState(newValTotal >= 0L,
@@ -127,10 +132,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
         // ref count decreased to zero, add to pendingEvictionList
         parentSnapshotCache.callback(this);
       }
-
-      // Remove entry by returning null here when thread ref count reaches zero
-      return newValue != 0L ? newValue : null;
-    });
+    }
 
     return refCount.get();
   }

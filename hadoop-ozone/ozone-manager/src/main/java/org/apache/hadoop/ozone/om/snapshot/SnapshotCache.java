@@ -201,7 +201,8 @@ public class SnapshotCache implements ReferenceCountedCallback {
     rcOmSnapshot.incrementRefCount();
 
     // Remove instance from clean up list when it exists.
-    // TODO: [SNAPSHOT] Check thread safety with release()
+    // TODO: [SNAPSHOT] Check thread safety with cleanup()
+    //  and other pendingEvictionList usages
     pendingEvictionList.remove(rcOmSnapshot);
 
     // Check if any entries can be cleaned up.
