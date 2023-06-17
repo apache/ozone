@@ -355,7 +355,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                   </div>
                   :
                   <div className='heatmapinformation'><br />
-                    No Data Available. Please refresh page or Click on Heatmap.{' '}<br />
+                    No Data Available. {' '}<br />
                   </div>
               }
 
