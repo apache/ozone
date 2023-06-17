@@ -27,6 +27,7 @@ import HeatMapConfiguration from './heatMapConfiguration';
 
 interface ITreeResponse {
   label: string;
+  path: string;
   maxAccessCount: number;
   minAccessCount: number;
   size: number;
@@ -216,8 +217,13 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
       // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
       if (obj && obj.size === 0 && obj.accessCount === 0) {
-        obj.size = 0;
+        obj['normalizedSize'] = 0;
       } else if (obj && obj.size === 0 && obj.maxAccessCount === 0) {
+        obj['normalizedSize'] = 0;
+      }
+      else if (obj && obj.size === 0 && (obj.accessCount >= 0 || obj.maxAccessCount >= 0))
+      {
+        obj['normalizedSize'] = 1;
         obj.size = 0;
       }
       else {
@@ -305,7 +311,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
           { isLoading ? <span><Icon type='loading'/> Loading...</span> : (
             <div>
               {treeEndpointFailed ? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br /></div> :
-                (Object.keys(treeResponse).length > 0) ?
+                (Object.keys(treeResponse).length > 0 && (treeResponse.label !== null || treeResponse.path !== null)) ?
                   <div>
                     <Row>
                             <div className='go-back-button'>
@@ -349,7 +355,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                   </div>
                   :
                   <div className='heatmapinformation'><br />
-                    No Data Available. Please Refresh Page.{' '}<br />
+                    No Data Available. Please refresh page or Click on Heatmap.{' '}<br />
                   </div>
               }
 
