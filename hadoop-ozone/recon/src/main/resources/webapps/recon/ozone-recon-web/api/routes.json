@@ -24,5 +24,9 @@
   "/namespace/summary?path=*": "/metadata",
   "/namespace/quota?path=*": "/quota",
   "/task/status": "/taskStatus",
-  "/containers/unhealthy": "/unhealthyContainers"
+  "/containers/unhealthy": "/unhealthyContainers",
+  "/heatmap/readaccess?startDate=*&path=*&entityType=bucket": "/bucketHeatmap",
+  "/heatmap/readaccess?startDate=*&path=*&entityType=key": "/keyHeatmap",
+  "/heatmap/readaccess?startDate=*&path=*&entityType=volume": "/heatmap",
+  "/features/disabledFeatures": "/disabledFeatures"
 }

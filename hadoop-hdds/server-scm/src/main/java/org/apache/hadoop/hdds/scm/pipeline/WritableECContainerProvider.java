@@ -137,6 +137,7 @@ public class WritableECContainerProvider
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
+              containerInfo.updateLastUsedTime();
               return containerInfo;
             }
           }

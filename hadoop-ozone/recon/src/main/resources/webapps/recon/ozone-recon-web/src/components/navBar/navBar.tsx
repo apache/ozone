@@ -22,15 +22,55 @@ import {Layout, Menu, Icon} from 'antd';
 import './navBar.less';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
+import axios from 'axios';
+import {showDataFetchError} from 'utils/common';
 
 const {Sider} = Layout;
 
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
+  isHeatmapAvailable: boolean;
+  isLoading: boolean;
 }
 
 class NavBar extends React.Component<INavBarProps> {
+  constructor(props = {}) {
+    super(props);
+    this.state = {
+      isHeatmapAvailable: false,
+      isLoading: false
+    };
+  }
+
+  componentDidMount(): void {
+    this.setState({
+      isLoading: true
+    });
+    this.fetchDisableFeatures();
+  }
+  
+  fetchDisableFeatures = () => {
+    this.setState({
+      isLoading: true
+    });
+
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    axios.get(disabledfeaturesEndpoint).then(response => {
+      const disabledFeaturesFlag = response.data && response.data.includes('HEATMAP');
+      // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
+      this.setState({
+        isLoading: false,
+        isHeatmapAvailable: !disabledFeaturesFlag
+      });
+    }).catch(error => {
+      this.setState({
+        isLoading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
   render() {
     const {location} = this.props;
     return (
@@ -81,6 +121,14 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Disk Usage</span>
             <Link to='/DiskUsage'/>
           </Menu.Item>
+          {
+            this.state.isHeatmapAvailable ?
+              <Menu.Item key='/Heatmap'>
+                <Icon type='bar-chart' />
+                <span>Heatmap</span>
+                <Link to='/Heatmap' />
+              </Menu.Item> : ""
+          }
         </Menu>
       </Sider>
     );
