@@ -22,7 +22,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -45,7 +44,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -278,7 +276,8 @@ public class TestSnapshotDiffManager {
   private Table<String, ? extends WithParentObjectId> getMockedTable(
       Map<String, WithParentObjectId> map, String tableName)
       throws IOException {
-    Table<String, ? extends WithParentObjectId> mocked = Mockito.mock(Table.class);
+    Table<String, ? extends WithParentObjectId> mocked =
+        Mockito.mock(Table.class);
     Mockito.when(mocked.get(Matchers.any()))
         .thenAnswer(invocation -> map.get(invocation.getArgument(0)));
     Mockito.when(mocked.getName()).thenReturn(tableName);
@@ -360,7 +359,7 @@ public class TestSnapshotDiffManager {
       Map<String, WithParentObjectId> fromSnapshotTableMap =
           IntStream.range(0, 50)
               .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
-                  i -> getKeyInfo(i, i, i +100, snapshotTableName)));
+                  i -> getKeyInfo(i, i, i + 100, snapshotTableName)));
       // Expected Diff 25-50 are newly created keys & keys b/w are deleted,
       // when reding keys with tombstones the keys would be added to
       // objectIdsToBeChecked otherwise it wouldn't be added
