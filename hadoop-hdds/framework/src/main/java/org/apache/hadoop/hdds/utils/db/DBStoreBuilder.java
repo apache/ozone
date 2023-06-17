@@ -185,7 +185,7 @@ public final class DBStoreBuilder {
 
   private void setDBOptionsProps(ManagedDBOptions dbOptions) {
     if (maxNumberOfOpenFiles != null) {
-      rocksDBOption.setMaxOpenFiles(maxNumberOfOpenFiles);
+      dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
     }
   }
 
