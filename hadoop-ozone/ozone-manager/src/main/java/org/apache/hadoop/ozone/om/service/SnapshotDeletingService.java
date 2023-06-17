@@ -63,7 +63,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,7 +70,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -190,7 +188,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           }
 
           //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
-          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(snapInfo);
+          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
+              snapInfo, chainManager, omSnapshotManager);
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -475,91 +474,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       }
 
       return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
-    }
-
-    private boolean isKeyReclaimable(
-        Table<String, OmKeyInfo> previousKeyTable,
-        Table<String, String> renamedTable,
-        OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
-        long volumeId, HddsProtos.KeyValue.Builder renamedKeyBuilder)
-        throws IOException {
-
-      String dbKey;
-      // Handle case when the deleted snapshot is the first snapshot.
-      if (previousKeyTable == null) {
-        return true;
-      }
-
-      // These are uncommitted blocks wrapped into a pseudo KeyInfo
-      if (deletedKeyInfo.getObjectID() == OBJECT_ID_RECLAIM_BLOCKS) {
-        return true;
-      }
-
-      // Construct keyTable or fileTable DB key depending on the bucket type
-      if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
-        dbKey = ozoneManager.getMetadataManager().getOzonePathKey(
-            volumeId,
-            bucketInfo.getObjectID(),
-            deletedKeyInfo.getParentObjectID(),
-            deletedKeyInfo.getKeyName());
-      } else {
-        dbKey = ozoneManager.getMetadataManager().getOzoneKey(
-            deletedKeyInfo.getVolumeName(),
-            deletedKeyInfo.getBucketName(),
-            deletedKeyInfo.getKeyName());
-      }
-
-      /*
-       snapshotRenamedTable:
-       1) /volumeName/bucketName/objectID ->
-                   /volumeId/bucketId/parentId/fileName (FSO)
-       2) /volumeName/bucketName/objectID ->
-                  /volumeName/bucketName/keyName (non-FSO)
-      */
-      String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
-          deletedKeyInfo.getVolumeName(), deletedKeyInfo.getBucketName(),
-          deletedKeyInfo.getObjectID());
-
-      // Condition: key should not exist in snapshotRenamedTable
-      // of the current snapshot and keyTable of the previous snapshot.
-      // Check key exists in renamedTable of the Snapshot
-      String renamedKey = renamedTable.getIfExist(dbRenameKey);
-
-      if (renamedKey != null) {
-        renamedKeyBuilder.setKey(dbRenameKey).setValue(renamedKey);
-      }
-      // previousKeyTable is fileTable if the bucket is FSO,
-      // otherwise it is the keyTable.
-      OmKeyInfo prevKeyInfo = renamedKey != null ? previousKeyTable
-          .get(renamedKey) : previousKeyTable.get(dbKey);
-
-      if (prevKeyInfo == null ||
-          prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID()) {
-        return true;
-      }
-
-      // For key overwrite the objectID will remain the same, In this
-      // case we need to check if OmKeyLocationInfo is also same.
-      return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
-    }
-
-    private SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo)
-        throws IOException {
-      SnapshotInfo currSnapInfo = snapInfo;
-      while (chainManager.hasPreviousPathSnapshot(
-          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
-
-        UUID prevPathSnapshot = chainManager.previousPathSnapshot(
-            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
-        String tableKey = chainManager.getTableKey(prevPathSnapshot);
-        SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
-        if (prevSnapInfo.getSnapshotStatus() ==
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
-          return prevSnapInfo;
-        }
-        currSnapInfo = prevSnapInfo;
-      }
-      return null;
     }
 
     public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,

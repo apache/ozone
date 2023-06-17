@@ -35,7 +35,9 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -48,12 +50,24 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 public class OMSnapshotPurgeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
-  private final List<String> snapshotDbKeys;
+  private List<String> snapshotDbKeys;
+  private HashMap<String, SnapshotInfo> updatedSnapInfo;
 
   public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> snapshotDbKeys) {
+      @Nonnull List<String> snapshotDbKeys,
+      HashMap<String, SnapshotInfo> updatedSnapInfo) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
+    this.updatedSnapInfo = updatedSnapInfo;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
@@ -62,6 +76,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
+    updateSnapInfo(metadataManager, batchOperation);
     for (String dbKey: snapshotDbKeys) {
       SnapshotInfo snapshotInfo = omMetadataManager
           .getSnapshotInfoTable().get(dbKey);
@@ -77,6 +92,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation,
           dbKey);
+    }
+  }
+
+  private void updateSnapInfo(OmMetadataManagerImpl metadataManager,
+                              BatchOperation batchOp)
+      throws IOException {
+    for (Map.Entry<String, SnapshotInfo> entry : updatedSnapInfo.entrySet()) {
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp,
+          entry.getKey(), entry.getValue());
     }
   }
 
