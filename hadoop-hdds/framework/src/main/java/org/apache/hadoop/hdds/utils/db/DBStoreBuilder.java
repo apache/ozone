@@ -183,11 +183,6 @@ public final class DBStoreBuilder {
     }
   }
 
-  public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
-    this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
-    return this;
-  }
-
   private void setDBOptionsProps(ManagedDBOptions dbOptions) {
     if (maxNumberOfOpenFiles != null) {
       rocksDBOption.setMaxOpenFiles(maxNumberOfOpenFiles);
@@ -212,7 +207,7 @@ public final class DBStoreBuilder {
       if (rocksDBOption == null) {
         rocksDBOption = getDefaultDBOptions(tableConfigs);
       }
-      setDBOptions(rocksDBOption);
+      setDBOptionsProps(rocksDBOption);
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
@@ -301,6 +296,11 @@ public final class DBStoreBuilder {
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
     setDefaultCFOptions(prof.getColumnFamilyOptions());
+    return this;
+  }
+
+  public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
+    this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
     return this;
   }
 
