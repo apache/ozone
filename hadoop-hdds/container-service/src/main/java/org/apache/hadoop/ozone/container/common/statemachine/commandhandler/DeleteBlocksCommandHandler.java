@@ -62,8 +62,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -99,6 +102,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final BlockDeletingServiceMetrics blockDeleteMetrics;
   private final long tryLockTimeoutMs;
   private final Map<String, SchemaHandler> schemaHandlers;
+  private final CommittedTransactionCache committedTransactionCache;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, DatanodeConfiguration dnConf,
@@ -112,6 +116,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
+    this.committedTransactionCache = new CommittedTransactionCache(
+        dnConf.getMaxCachedRecentCommittedTransactionsCount());
 
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadNamePrefix +
@@ -260,6 +266,46 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
+        }
+      }
+    }
+  }
+
+  /**
+   * A cache to store committed transaction IDs with a fixed maximum size,
+   * ensuring the oldest entries are evicted when capacity is exceeded.
+   */
+  public static final class CommittedTransactionCache {
+    private final Set<Long> committedTransactionIds;
+    private final int maxCacheSize;
+
+    public CommittedTransactionCache(int maxCacheSize) {
+      this.committedTransactionIds = new LinkedHashSet<>(maxCacheSize);
+      this.maxCacheSize = maxCacheSize;
+    }
+
+    public boolean contains(Long txID) {
+      return committedTransactionIds.contains(txID);
+    }
+
+    public int getCacheSize() {
+      return committedTransactionIds.size();
+    }
+
+    public void adds(List<Long> txIDs) {
+      committedTransactionIds.addAll(txIDs);
+      ensureCapacity();
+    }
+
+    private void ensureCapacity() {
+      int size = committedTransactionIds.size();
+      if (size > maxCacheSize) {
+        int numToRemove = size - maxCacheSize;
+        Iterator<Long> it = committedTransactionIds.iterator();
+        while (numToRemove > 0 && it.hasNext()) {
+          it.next();
+          it.remove();
+          numToRemove--;
         }
       }
     }
@@ -418,16 +464,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     transactions.forEach(tx -> idToTransaction.put(tx.getTxID(), tx));
     List<DeletedBlocksTransaction> retryTransaction = new ArrayList<>();
 
+    List<DeletedBlocksTransaction> filteredTxs = filterDuplicateTxs(transactions, results);
     List<Future<DeleteBlockTransactionExecutionResult>> futures =
-        submitTasks(transactions);
+        submitTasks(filteredTxs);
     // Wait for tasks to finish
+    List<Long> committedTransactionIDs = new ArrayList<>();
     handleTasksResults(futures, result -> {
       if (result.isLockAcquisitionFailed()) {
         retryTransaction.add(idToTransaction.get(result.getResult().getTxID()));
       } else {
+        if (result.getResult().getSuccess()) {
+          committedTransactionIDs.add(result.getResult().getTxID());
+        }
         results.add(result.getResult());
       }
     });
+    committedTransactionCache.adds(committedTransactionIDs);
 
     idToTransaction.clear();
     // Wait for all tasks to complete before retrying, usually it takes
@@ -443,6 +495,26 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       });
     }
     return results;
+  }
+
+  private List<DeletedBlocksTransaction> filterDuplicateTxs(
+      List<DeletedBlocksTransaction> transactions,
+      List<DeleteBlockTransactionResult> results) {
+    List<DeletedBlocksTransaction> deduplicatedTx = new ArrayList<>(transactions.size());
+    for (DeletedBlocksTransaction tx : transactions) {
+      if (committedTransactionCache.contains(tx.getTxID())) {
+        // Those duplicate Transaction have been committed to DB before,
+        // So we can set its to successful directly.
+        results.add(DeleteBlockTransactionResult.newBuilder()
+            .setTxID(tx.getTxID())
+            .setContainerID(tx.getContainerID())
+            .setSuccess(true)
+            .build());
+      } else {
+        deduplicatedTx.add(tx);
+      }
+    }
+    return deduplicatedTx;
   }
 
   @VisibleForTesting
