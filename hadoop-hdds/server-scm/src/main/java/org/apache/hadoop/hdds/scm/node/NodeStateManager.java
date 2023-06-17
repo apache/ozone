@@ -374,7 +374,12 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public DatanodeInfo getNode(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    return getNode(datanodeDetails.getUuid());
+  }
+
+  public DatanodeInfo getNode(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getNodeInfo(uuid);
   }
 
   /**
