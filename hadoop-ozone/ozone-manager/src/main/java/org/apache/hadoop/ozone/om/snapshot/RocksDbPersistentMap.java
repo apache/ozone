@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 /**
  * Persistent map backed by RocksDB.
@@ -93,7 +92,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
                                                     Optional<K> upperBound) {
     final ManagedReadOptions readOptions;
-    RocksIterator rocksIterator;
+    ManagedRocksIterator iterator;
     if (lowerBound.isPresent() || upperBound.isPresent()) {
       readOptions = new ManagedReadOptions();
       try {
@@ -103,7 +102,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
         }
 
         if (upperBound.isPresent()) {
-          readOptions.setIterateLowerBound(new ManagedSlice(
+          readOptions.setIterateUpperBound(new ManagedSlice(
               codecRegistry.asRawData(upperBound.get())));
         }
       } catch (IOException exception) {
@@ -111,13 +110,14 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
         throw new RuntimeException(exception);
       }
 
-      rocksIterator = db.get().newIterator(columnFamilyHandle, readOptions);
+      iterator = ManagedRocksIterator.managed(
+          db.get().newIterator(columnFamilyHandle, readOptions));
     } else {
       readOptions = null;
-      rocksIterator = db.get().newIterator(columnFamilyHandle);
+      iterator = ManagedRocksIterator.managed(
+          db.get().newIterator(columnFamilyHandle));
     }
 
-    ManagedRocksIterator iterator = new ManagedRocksIterator(rocksIterator);
     iterator.get().seekToFirst();
 
     return new ClosableIterator<Map.Entry<K, V>>() {

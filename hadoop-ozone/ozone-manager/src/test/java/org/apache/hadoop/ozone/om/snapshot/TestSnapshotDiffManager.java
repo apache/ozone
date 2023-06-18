@@ -83,6 +83,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -434,6 +435,10 @@ public class TestSnapshotDiffManager {
                   PersistentMap obj =
                       new SnapshotTestUtils.StubbedPersistentMap<>();
                   Mockito.when(mock.iterator()).thenReturn(obj.iterator());
+                  Mockito.when(mock.iterator(Mockito.any(Optional.class),
+                      Mockito.any(Optional.class)))
+                      .thenAnswer(i -> obj.iterator(i.getArgument(0),
+                          i.getArgument(1)));
                   Mockito.when(mock.get(Matchers.any()))
                       .thenAnswer(i -> obj.get(i.getArgument(0)));
                   Mockito.doAnswer((Answer<Void>) i -> {
@@ -556,6 +561,9 @@ public class TestSnapshotDiffManager {
                   PersistentMap obj =
                       new SnapshotTestUtils.StubbedPersistentMap<>();
                   Mockito.when(mock.iterator()).thenReturn(obj.iterator());
+                  Mockito.when(mock.iterator(Mockito.any(Optional.class),
+                      Mockito.any(Optional.class))).thenAnswer(i ->
+                      obj.iterator(i.getArgument(0), i.getArgument(1)));
                   Mockito.when(mock.get(Matchers.any()))
                       .thenAnswer(i -> obj.get(i.getArgument(0)));
                   Mockito.doAnswer((Answer<Void>) i -> {
@@ -570,10 +578,12 @@ public class TestSnapshotDiffManager {
       IntStream.range(0, totalNumberOfRecords).boxed().forEach(idx -> {
         try {
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
-              .put(codecRegistry.asRawData(testJobId + DELIMITER + idx),
+              .put(codecRegistry.asRawData(SnapshotDiffManager
+                      .getReportKeyForIndex(testJobId,idx)),
                   codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
-              .put(codecRegistry.asRawData(testJobId2 + DELIMITER + idx),
+              .put(codecRegistry.asRawData(SnapshotDiffManager
+                      .getReportKeyForIndex(testJobId2, idx)),
                   codecRegistry.asRawData(getTestDiffEntry(testJobId2, idx)));
         } catch (IOException e) {
           throw new RuntimeException(e);

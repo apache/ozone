@@ -374,7 +374,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    * @return report Key of the snapshot diff job
    */
 
-  private String getReportKeyForIndex(String jobId, long index) {
+  static String getReportKeyForIndex(String jobId, long index) {
     return String.format("%s%s%020d", jobId, DELIMITER, index);
   }
 
