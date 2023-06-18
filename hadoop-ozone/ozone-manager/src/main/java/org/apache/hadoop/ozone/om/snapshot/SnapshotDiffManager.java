@@ -467,12 +467,14 @@ public class SnapshotDiffManager implements AutoCloseable {
     try (ClosableIterator<Map.Entry<byte[], byte[]>> iterator =
              snapDiffReportTable.iterator(Optional.of(lowerIndex),
                  Optional.of(upperIndex))) {
-      while (iterator.hasNext() && diffReportList.size() < pageSize) {
+      int itemsFetched = 0;
+      while (iterator.hasNext() && itemsFetched < pageSize) {
         Map.Entry<byte[], byte[]> entry = iterator.next();
         byte[] bytes = entry.getValue();
         diffReportList.add(codecRegistry.asObject(bytes,
             DiffReportEntry.class));
         idx += 1;
+        itemsFetched += 1;
       }
       if (diffReportList.size() < pageSize) {
         hasMoreEntries = false;

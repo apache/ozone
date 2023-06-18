@@ -69,6 +69,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -157,6 +158,9 @@ public class TestSnapshotDiffManager {
 
     Mockito.when(snapdiffDB.get()).thenReturn(rocksDB);
     Mockito.when(rocksDB.newIterator(snapdiffJobCFH))
+        .thenReturn(jobTableIterator);
+    Mockito.when(rocksDB.newIterator(Mockito.eq(snapdiffJobCFH),
+            Mockito.any(ReadOptions.class)))
         .thenReturn(jobTableIterator);
     CacheLoader<String, OmSnapshot> loader =
         new CacheLoader<String, OmSnapshot>() {
@@ -579,7 +583,7 @@ public class TestSnapshotDiffManager {
         try {
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
               .put(codecRegistry.asRawData(SnapshotDiffManager
-                      .getReportKeyForIndex(testJobId,idx)),
+                      .getReportKeyForIndex(testJobId, idx)),
                   codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
               .put(codecRegistry.asRawData(SnapshotDiffManager
