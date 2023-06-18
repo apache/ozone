@@ -64,13 +64,25 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
     return mostAvailableSpace;
   }
 
+  protected void setMostAvailableSpace(long mostAvailableSpace) {
+    this.mostAvailableSpace = mostAvailableSpace;
+  }
+
+  protected long getRequiredSpace() {
+    return requiredSpace;
+  }
+
+  protected Map<HddsVolume, AvailableSpace> getFullVolumes() {
+    return fullVolumes;
+  }
+
   @Override
   public String toString() {
     return "required space: " + requiredSpace +
         ", volumes: " + fullVolumes;
   }
 
-  private static class AvailableSpace {
+  protected static class AvailableSpace {
     private final long free;
     private final long committed;
 

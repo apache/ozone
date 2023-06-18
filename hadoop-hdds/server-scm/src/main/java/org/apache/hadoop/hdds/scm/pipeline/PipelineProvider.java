@@ -26,8 +26,8 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.StorageUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -89,7 +89,7 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
     int nodesRequired = replicationConfig.getRequiredNodes();
     List<DatanodeDetails> healthyDNs = pickAllNodesNotUsed(replicationConfig);
     List<DatanodeDetails> healthyDNsWithSpace = healthyDNs.stream()
-        .filter(dn -> SCMCommonPlacementPolicy
+        .filter(dn -> StorageUtils
             .hasEnoughSpace(dn, metadataSizeRequired, dataSizeRequired))
         .limit(nodesRequired)
         .collect(Collectors.toList());

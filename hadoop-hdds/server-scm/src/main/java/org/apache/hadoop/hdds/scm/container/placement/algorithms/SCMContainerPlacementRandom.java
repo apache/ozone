@@ -39,7 +39,7 @@ import java.util.List;
  * Balancer will need to support containers as a feature before this class
  * can be practically used.
  */
-public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
+public class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     implements PlacementPolicy {
   @VisibleForTesting
   public static final Logger LOG =

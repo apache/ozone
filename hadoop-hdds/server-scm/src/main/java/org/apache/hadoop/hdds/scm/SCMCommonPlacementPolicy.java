@@ -19,15 +19,13 @@ package org.apache.hadoop.hdds.scm;
 
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.StorageUtils;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -290,50 +288,16 @@ public abstract class SCMCommonPlacementPolicy implements
     return nodesWithSpace;
   }
 
-  /**
-   * Returns true if this node has enough space to meet our requirement.
-   *
-   * @param datanodeDetails DatanodeDetails
-   * @return true if we have enough space.
-   */
-  public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long metadataSizeRequired, long dataSizeRequired) {
-    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
-
-    boolean enoughForData = false;
-    boolean enoughForMeta = false;
-
-    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-
-    if (dataSizeRequired > 0) {
-      for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (reportProto.getRemaining() > dataSizeRequired) {
-          enoughForData = true;
-          break;
-        }
-      }
-    } else {
-      enoughForData = true;
-    }
-
-    if (!enoughForData) {
-      return false;
-    }
-
-    if (metadataSizeRequired > 0) {
-      for (MetadataStorageReportProto reportProto
-          : datanodeInfo.getMetadataStorageReports()) {
-        if (reportProto.getRemaining() > metadataSizeRequired) {
-          enoughForMeta = true;
-          break;
-        }
-      }
-    } else {
-      enoughForMeta = true;
-    }
-
-    return enoughForData && enoughForMeta;
+  protected boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
+                                   long metadataSizeRequired,
+                                   long dataSizeRequired) {
+    return StorageUtils.hasEnoughSpace(
+        datanodeDetails,
+        metadataSizeRequired,
+        dataSizeRequired);
   }
+
+
 
   /**
    * This function invokes the derived classes chooseNode Function to build a
@@ -479,8 +443,8 @@ public abstract class SCMCommonPlacementPolicy implements
           datanodeDetails);
     } else {
       if (datanodeInfo.getNodeStatus().isNodeWritable() &&
-          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-              dataSizeRequired))) {
+          hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+              dataSizeRequired)) {
         LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
                 "required data size is {}",
             datanodeDetails, metadataSizeRequired, dataSizeRequired);
