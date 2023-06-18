@@ -91,7 +91,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   @Override
   public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
                                                     Optional<K> upperBound) {
-    final ManagedReadOptions readOptions = new ManagedReadOptions();;
+    final ManagedReadOptions readOptions = new ManagedReadOptions();
     ManagedRocksIterator iterator;
     if (lowerBound.isPresent() || upperBound.isPresent()) {
       try {
