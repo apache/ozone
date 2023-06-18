@@ -42,6 +42,8 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
+import static org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition.NODES;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.SCM_TABLE_COUNT_TABLE_NAME;
 
 
@@ -72,7 +74,7 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   @Override
-  protected void run() {
+  protected synchronized void run() {
     try {
       while (canRun()) {
         wait(interval);
@@ -110,7 +112,7 @@ public class ScmTableCountTask extends ReconScmTask {
    *
    * @throws IOException if an I/O error occurs during table count processing.
    */
-  private void processTableCount() throws IOException {
+  public void processTableCount() throws IOException {
     // Acquire write lock
     lock.writeLock().lock();
     try {
@@ -190,8 +192,19 @@ public class ScmTableCountTask extends ReconScmTask {
     return objectCountMap;
   }
 
+  /**
+   * Returns the list of SCM tables to be processed by the task.
+   *
+   * @return the list of SCM tables to be processed by the task.
+   * @throws IOException if an I/O error occurs.
+   */
   public Collection<String> getTaskTables() throws IOException {
-    return new ArrayList<>(scmDBStore.getTableNames().values());
+    Collection<String> tables = new ArrayList<>();
+
+    // Add the table names to the array list
+    tables.add(DELETED_BLOCKS.getName());
+
+    return tables;
   }
 
   /**
