@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.ozone.test.tag;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,9 +25,7 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Annotation to mark test classes or methods with some intermittent failures.
- * These are handled separately from the normal tests.  (Not required to pass,
- * may be repeated automatically, etc.)
+ * Annotation to mark test classes that require native libraries.
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
@@ -36,5 +34,5 @@ public @interface Native {
   /**
    * Native Library being used.
    */
-  String value() default "";
+  String value();
 }

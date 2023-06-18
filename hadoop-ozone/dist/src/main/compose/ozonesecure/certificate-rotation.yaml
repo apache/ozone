@@ -21,6 +21,7 @@ x-cert-rotation-config:
   environment:
     - OZONE-SITE.XML_hdds.x509.default.duration=PT40s
     - OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT30s
+    - OZONE-SITE.XML_hdds.x509.ca.rotation.check.interval=PT1S
     - OZONE-SITE.XML_hdds.x509.grace.duration.token.checks.enabled=false
 services:
   datanode:

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.reconfig;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.junit.jupiter.api.Test;
 
@@ -43,7 +44,7 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  void adminUsernames() {
+  void adminUsernames() throws ReconfigurationException {
     final String newValue = randomAlphabetic(10);
 
     getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
