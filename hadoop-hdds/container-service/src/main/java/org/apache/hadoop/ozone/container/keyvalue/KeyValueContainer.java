@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -108,6 +109,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container are synchronous.
   private Set<Long> pendingPutBlockCache;
 
+  private final boolean bCheckChunksFilePath;
+
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
     Preconditions.checkNotNull(containerData,
@@ -123,6 +126,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
     }
+    bCheckChunksFilePath =
+        ozoneConfig.getBoolean(
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+            DatanodeConfiguration.
+                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
   }
 
   @Override
@@ -311,8 +320,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean isEmpty() throws IOException {
-    return KeyValueContainerUtil.noBlocksInContainer(containerData);
+  public boolean hasBlocks() throws IOException {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      return !KeyValueContainerUtil.noBlocksInContainer(db.getStore(),
+          containerData, bCheckChunksFilePath);
+    }
   }
 
   @Override
@@ -566,8 +578,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // delete all other temporary data in case of any exception.
       try {
-        if (containerData.getSchemaVersion() != null &&
-            containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           BlockUtils.removeContainerFromDB(containerData, config);
         }
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
@@ -595,7 +606,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     //rewriting the yaml file with new checksum calculation.
     update(originalContainerData.getMetadata(), true);
 
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // load metadata from received dump files before we try to parse kv
       BlockUtils.loadKVContainerDataFromFiles(containerData, config);
     }
@@ -622,7 +633,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
       try {
-        if (!containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           compactDB();
           // Close DB (and remove from cache) to avoid concurrent modification
           // while packing it.
@@ -803,7 +814,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setReplicaIndex(containerData.getReplicaIndex())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
-        .setOriginNodeId(containerData.getOriginNodeId());
+        .setOriginNodeId(containerData.getOriginNodeId())
+        .setIsEmpty(containerData.isEmpty());
     return ciBuilder.build();
   }
 
@@ -860,8 +872,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean shouldScanData() {
-    return containerData.getState() == ContainerDataProto.State.CLOSED
+    boolean shouldScan =
+        containerData.getState() == ContainerDataProto.State.CLOSED
         || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its data scanned.",
+          containerData.getContainerID(), containerData.getState());
+    }
+    return shouldScan;
   }
 
   @Override
@@ -880,10 +898,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return checker.fullCheck(throttler, canceler);
   }
 
-  private enum ContainerCheckLevel {
-    NO_CHECK, FAST_CHECK, FULL_CHECK
-  }
-
   /**
    * Creates a temporary file.
    * @param file
@@ -898,7 +912,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void packContainerToDestination(OutputStream destination,
       ContainerPacker<KeyValueContainerData> packer)
       throws IOException {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // Synchronize the dump and pack operation,
       // so concurrent exports don't get dump files overwritten.
       // We seldom got concurrent exports for a container,

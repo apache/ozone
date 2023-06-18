@@ -53,6 +53,10 @@ public final class OMConfigKeys {
   // multiple entries for performance (sharding)..
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
 
+  // SCM DB directory permission
+  public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
+      "ozone.om.db.dirs.permissions";
+
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
   public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 100;
@@ -76,6 +80,19 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
   public static final String OZONE_OM_GRPC_PORT_KEY =
       "ozone.om.grpc.port";
+
+  public static final String OZONE_OM_GRPC_BOSSGROUP_SIZE_KEY =
+      "ozone.om.grpc.bossgroup.size";
+  public static final int OZONE_OM_GRPC_BOSSGROUP_SIZE_DEFAULT = 8;
+
+  public static final String OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY =
+      "ozone.om.grpc.workergroup.size";
+  public static final int OZONE_OM_GRPC_WORKERGROUP_SIZE_DEFAULT = 32;
+
+  public static final String OZONE_OM_GRPC_READ_THREAD_NUM_KEY =
+      "ozone.om.grpc.read.thread.num";
+  public static final int OZONE_OM_GRPC_READ_THREAD_NUM_DEFAULT = 32;
+
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -233,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";

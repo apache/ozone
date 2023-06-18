@@ -291,15 +291,18 @@ public interface ClientProtocol {
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.
-   * @param volumeName Name of the Volume
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Starting point of the list, this bucket is excluded
+   *
+   * @param volumeName    Name of the Volume
+   * @param bucketPrefix  Bucket prefix to match
+   * @param prevBucket    Starting point of the list, this bucket is excluded
    * @param maxListResult Max number of buckets to return.
+   * @param hasSnapshot   flag to list the buckets which have snapshot.
    * @return {@code List<OzoneBucket>}
    * @throws IOException
    */
   List<OzoneBucket> listBuckets(String volumeName, String bucketPrefix,
-                                String prevBucket, int maxListResult)
+                                String prevBucket, int maxListResult,
+                                boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -1042,13 +1045,17 @@ public interface ClientProtocol {
 
   /**
    * List snapshots in a volume/bucket.
-   * @param volumeName volume name
-   * @param bucketName bucket name
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
    * @return list of snapshots for volume/bucket snapshotpath.
    * @throws IOException
    */
-  List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException;
+  List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException;
 
 
   /**
@@ -1067,5 +1074,18 @@ public interface ClientProtocol {
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
                                     boolean forceFullDiff)
+      throws IOException;
+
+  /**
+   * Time to be set for given Ozone object. This operations updates modification
+   * time and access time for the given key.
+   * @param obj Ozone object.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   *
+   * @throws IOException if there is error.
+   * */
+  void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException;
 }

@@ -48,8 +48,8 @@ public class InterSCMGrpcProtocolService {
   private Server server;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
-  public InterSCMGrpcProtocolService(final ConfigurationSource conf,
-      final StorageContainerManager scm) {
+  InterSCMGrpcProtocolService(final ConfigurationSource conf,
+      final StorageContainerManager scm) throws IOException {
     Preconditions.checkNotNull(conf);
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);

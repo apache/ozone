@@ -71,8 +71,6 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - name: Cache for npm dependencies
         uses: actions/cache@v3
         with:
@@ -153,7 +151,6 @@ jobs:
         run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }}
         env:
           OZONE_WITH_COVERAGE: false
-          CANCEL_NATIVE_VERSION_CHECK: true
       - name: Delete temporary build artifacts before caching
         run: |
           #Never cache local artifacts
@@ -254,6 +251,7 @@ jobs:
           - secure
           - unsecure
           - compat
+          - EC
           - HA-secure
           - HA-unsecure
           - MR

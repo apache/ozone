@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -41,6 +42,8 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -60,6 +63,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -129,11 +133,11 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
+      List<String> purgeSnapshotKeys = new ArrayList<>();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
 
         long snapshotLimit = snapshotDeletionPerTask;
-        List<String> purgeSnapshotKeys = new ArrayList<>();
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
@@ -149,7 +153,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           OmSnapshot omSnapshot = (OmSnapshot) omSnapshotManager
               .checkForSnapshot(snapInfo.getVolumeName(),
                   snapInfo.getBucketName(),
-                  getSnapshotPrefix(snapInfo.getName()));
+                  getSnapshotPrefix(snapInfo.getName()), true);
 
           Table<String, RepeatedOmKeyInfo> snapshotDeletedTable =
               omSnapshot.getMetadataManager().getDeletedTable();
@@ -179,14 +183,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               .getBucketKey(Long.toString(volumeId),
                   Long.toString(bucketInfo.getObjectID())) + OM_KEY_PREFIX;
 
-          if (checkSnapshotReclaimable(snapshotDeletedTable,
+          if (isSnapshotReclaimable(snapshotDeletedTable,
               snapshotDeletedDirTable, snapshotBucketKey, dbBucketKeyForDir)) {
             purgeSnapshotKeys.add(snapInfo.getTableKey());
             continue;
           }
 
           //TODO: [SNAPSHOT] Add lock to deletedTable and Active DB.
-          SnapshotInfo previousSnapshot = getPreviousSnapshot(snapInfo);
+          SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(snapInfo);
           Table<String, OmKeyInfo> previousKeyTable = null;
           Table<String, OmDirectoryInfo> previousDirTable = null;
           OmSnapshot omPreviousSnapshot = null;
@@ -197,7 +201,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             omPreviousSnapshot = (OmSnapshot) omSnapshotManager
                 .checkForSnapshot(previousSnapshot.getVolumeName(),
                     previousSnapshot.getBucketName(),
-                    getSnapshotPrefix(previousSnapshot.getName()));
+                    getSnapshotPrefix(previousSnapshot.getName()), true);
 
             previousKeyTable = omPreviousSnapshot
                 .getMetadataManager().getKeyTable(bucketInfo.getBucketLayout());
@@ -279,12 +283,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
             // Delete keys From deletedTable
             processKeyDeletes(keysToPurge, omSnapshot.getKeyManager(),
-                snapInfo.getTableKey());
+                null, snapInfo.getTableKey());
             successRunCount.incrementAndGet();
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
                 "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
-                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                snapInfo.getSnapshotId() + ". Processed " + deletionCount +
                 " keys and " + (keyLimitPerSnapshot - remainNum) +
                 " directories and files", ex);
           }
@@ -293,15 +297,15 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           submitSnapshotMoveDeletedKeys(snapInfo, toReclaimList,
               toNextDBList, renamedList, dirsToMove);
         }
-        submitSnapshotPurgeRequest(purgeSnapshotKeys);
       } catch (IOException e) {
         LOG.error("Error while running Snapshot Deleting Service", e);
       }
+      submitSnapshotPurgeRequest(purgeSnapshotKeys);
 
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
-    private boolean checkSnapshotReclaimable(
+    private boolean isSnapshotReclaimable(
         Table<String, RepeatedOmKeyInfo> snapshotDeletedTable,
         Table<String, OmKeyInfo> snapshotDeletedDirTable,
         String snapshotBucketKey, String dbBucketKeyForDir) throws IOException {
@@ -311,14 +315,18 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       try (TableIterator<String, ? extends Table.KeyValue<String,
           RepeatedOmKeyInfo>> iterator = snapshotDeletedTable.iterator();) {
         iterator.seek(snapshotBucketKey);
-        isKeyTableCleanedUp = iterator.hasNext() && iterator.next().getKey()
+        // If the next entry doesn't start with snapshotBucketKey then
+        // deletedKeyTable is already cleaned up.
+        isKeyTableCleanedUp = !iterator.hasNext() || !iterator.next().getKey()
             .startsWith(snapshotBucketKey);
       }
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
                iterator = snapshotDeletedDirTable.iterator()) {
         iterator.seek(dbBucketKeyForDir);
-        isDirTableCleanedUp = iterator.hasNext() && iterator.next().getKey()
+        // If the next entry doesn't start with dbBucketKeyForDir then
+        // deletedDirTable is already cleaned up.
+        isDirTableCleanedUp = !iterator.hasNext() || !iterator.next().getKey()
             .startsWith(dbBucketKeyForDir);
       }
 
@@ -353,7 +361,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           Table.KeyValue<String, OmKeyInfo> deletedDir =
               deletedDirIterator.next();
 
-          if (checkDirReclaimable(deletedDir, previousDirTable,
+          if (isDirReclaimable(deletedDir, previousDirTable,
               renamedTable, renamedList)) {
             // Reclaim here
             PurgePathRequest request = prepareDeleteDirRequest(
@@ -399,9 +407,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             .setClientId(clientId.toString())
             .build();
 
-        // TODO: [SNAPSHOT] Submit request once KeyDeletingService,
-        //  DirectoryDeletingService for snapshots are modified.
-        // submitRequest(omRequest);
+        submitRequest(omRequest);
       }
     }
 
@@ -413,45 +419,19 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         Table<String, String> renamedTable,
         OmBucketInfo bucketInfo, long volumeId) throws IOException {
 
-      if (checkKeyReclaimable(previousKeyTable, renamedTable,
+      if (isKeyReclaimable(previousKeyTable, renamedTable,
           keyInfo, bucketInfo, volumeId, renamedKey)) {
-        // Move to next non deleted snapshot's deleted table
-        toNextDb.addKeyInfos(keyInfo.getProtobuf(
-            ClientVersion.CURRENT_VERSION));
-      } else {
         // Update in current db's deletedKeyTable
         toReclaim.addKeyInfos(keyInfo
             .getProtobuf(ClientVersion.CURRENT_VERSION));
+      } else {
+        // Move to next non deleted snapshot's deleted table
+        toNextDb.addKeyInfos(keyInfo.getProtobuf(
+            ClientVersion.CURRENT_VERSION));
       }
     }
 
-    private void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
-        List<SnapshotMoveKeyInfos> toReclaimList,
-        List<SnapshotMoveKeyInfos> toNextDBList,
-        List<HddsProtos.KeyValue> renamedList,
-        List<String> dirsToMove) {
-
-      SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
-          SnapshotMoveDeletedKeysRequest.newBuilder()
-              .setFromSnapshot(snapInfo.getProtobuf());
-
-      SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
-          .addAllReclaimKeys(toReclaimList)
-          .addAllNextDBKeys(toNextDBList)
-          .addAllRenamedKeys(renamedList)
-          .addAllDeletedDirsToMove(dirsToMove)
-          .build();
-
-      OMRequest omRequest = OMRequest.newBuilder()
-          .setCmdType(Type.SnapshotMoveDeletedKeys)
-          .setSnapshotMoveDeletedKeysRequest(moveDeletedKeys)
-          .setClientId(clientId.toString())
-          .build();
-
-      submitRequest(omRequest);
-    }
-
-    private boolean checkDirReclaimable(
+    private boolean isDirReclaimable(
         Table.KeyValue<String, OmKeyInfo> deletedDir,
         Table<String, OmDirectoryInfo> previousDirTable,
         Table<String, String> renamedTable,
@@ -497,7 +477,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       return prevDirectoryInfo.getObjectID() != deletedDirInfo.getObjectID();
     }
 
-    private boolean checkKeyReclaimable(
+    private boolean isKeyReclaimable(
         Table<String, OmKeyInfo> previousKeyTable,
         Table<String, String> renamedTable,
         OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
@@ -507,12 +487,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       String dbKey;
       // Handle case when the deleted snapshot is the first snapshot.
       if (previousKeyTable == null) {
-        return false;
+        return true;
       }
 
       // These are uncommitted blocks wrapped into a pseudo KeyInfo
       if (deletedKeyInfo.getObjectID() == OBJECT_ID_RECLAIM_BLOCKS) {
-        return false;
+        return true;
       }
 
       // Construct keyTable or fileTable DB key depending on the bucket type
@@ -553,26 +533,64 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       OmKeyInfo prevKeyInfo = renamedKey != null ? previousKeyTable
           .get(renamedKey) : previousKeyTable.get(dbKey);
 
-      if (prevKeyInfo == null) {
-        return false;
+      if (prevKeyInfo == null ||
+          prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID()) {
+        return true;
       }
 
-      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
+      // For key overwrite the objectID will remain the same, In this
+      // case we need to check if OmKeyLocationInfo is also same.
+      return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
     }
 
-    private SnapshotInfo getPreviousSnapshot(SnapshotInfo snapInfo)
+    private SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo)
         throws IOException {
-      if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
-          snapInfo.getSnapshotID())) {
-        String previousPathSnapshot = chainManager.previousPathSnapshot(
-            snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-        String tableKey = chainManager.getTableKey(previousPathSnapshot);
-        return omSnapshotManager.getSnapshotInfo(tableKey);
+      SnapshotInfo currSnapInfo = snapInfo;
+      while (chainManager.hasPreviousPathSnapshot(
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
+
+        UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
+        String tableKey = chainManager.getTableKey(prevPathSnapshot);
+        SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+        if (prevSnapInfo.getSnapshotStatus() ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+          return prevSnapInfo;
+        }
+        currSnapInfo = prevSnapInfo;
       }
       return null;
     }
 
-    private void submitRequest(OMRequest omRequest) {
+    public void submitSnapshotMoveDeletedKeys(SnapshotInfo snapInfo,
+        List<SnapshotMoveKeyInfos> toReclaimList,
+        List<SnapshotMoveKeyInfos> toNextDBList,
+        List<HddsProtos.KeyValue> renamedList,
+        List<String> dirsToMove) throws InterruptedException {
+
+      SnapshotMoveDeletedKeysRequest.Builder moveDeletedKeysBuilder =
+          SnapshotMoveDeletedKeysRequest.newBuilder()
+              .setFromSnapshot(snapInfo.getProtobuf());
+
+      SnapshotMoveDeletedKeysRequest moveDeletedKeys = moveDeletedKeysBuilder
+          .addAllReclaimKeys(toReclaimList)
+          .addAllNextDBKeys(toNextDBList)
+          .addAllRenamedKeys(renamedList)
+          .addAllDeletedDirsToMove(dirsToMove)
+          .build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(Type.SnapshotMoveDeletedKeys)
+          .setSnapshotMoveDeletedKeysRequest(moveDeletedKeys)
+          .setClientId(clientId.toString())
+          .build();
+
+      try (BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock()) {
+        submitRequest(omRequest);
+      }
+    }
+
+    public void submitRequest(OMRequest omRequest) {
       try {
         if (isRatisEnabled()) {
           OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
@@ -598,6 +616,50 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
+  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
+                                                OmKeyInfo deletedKeyInfo) {
+
+    // For hsync, Though the blockLocationInfo of a key may not be same
+    // at the time of snapshot and key deletion as blocks can be appended.
+    // If the objectId is same then the key is same.
+    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
+      return true;
+    }
+
+    if (prevKeyInfo.getKeyLocationVersions().size() !=
+        deletedKeyInfo.getKeyLocationVersions().size()) {
+      return false;
+    }
+
+    OmKeyLocationInfoGroup deletedOmKeyLocation =
+        deletedKeyInfo.getLatestVersionLocations();
+    OmKeyLocationInfoGroup prevOmKeyLocation =
+        prevKeyInfo.getLatestVersionLocations();
+
+    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
+      return false;
+    }
+
+    List<OmKeyLocationInfo> deletedLocationList =
+        deletedOmKeyLocation.getLocationList();
+    List<OmKeyLocationInfo> prevLocationList =
+        prevOmKeyLocation.getLocationList();
+
+    if (deletedLocationList.size() != prevLocationList.size()) {
+      return false;
+    }
+
+    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
+      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
+      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
+      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -613,7 +675,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
    * Suspend the service.
    */
   @VisibleForTesting
-  void suspend() {
+  public void suspend() {
     suspended.set(true);
   }
 
@@ -621,7 +683,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
    * Resume the service if suspended.
    */
   @VisibleForTesting
-  void resume() {
+  public void resume() {
     suspended.set(false);
   }
 
@@ -634,4 +696,3 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     successRunCount.getAndSet(num);
   }
 }
-

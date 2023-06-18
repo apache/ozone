@@ -72,11 +72,8 @@ import static org.mockito.Mockito.doAnswer;
  * Tests the ECOverReplicationHandling functionality.
  */
 public class TestECOverReplicationHandler {
-  private ECReplicationConfig repConfig;
   private ContainerInfo container;
-  private NodeManager nodeManager;
   private ReplicationManager replicationManager;
-  private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private DatanodeDetails staleNode;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
@@ -102,9 +99,9 @@ public class TestECOverReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    nodeManager = new MockNodeManager(true, 10);
-    conf = SCMTestUtils.getConf();
-    repConfig = new ECReplicationConfig(3, 2);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     policy = ReplicationTestUtil
@@ -136,7 +133,7 @@ public class TestECOverReplicationHandler {
         container.containerID(), 5, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
     availableReplicas.add(excess);
-    List<ContainerReplicaOp> pendingOps = new ArrayList();
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(ContainerReplicaOp.create(DELETE,
         excess.getDatanodeDetails(), 5));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),

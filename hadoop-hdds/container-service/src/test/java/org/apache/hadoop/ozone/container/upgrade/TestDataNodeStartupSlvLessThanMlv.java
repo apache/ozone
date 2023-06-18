@@ -65,8 +65,7 @@ public class TestDataNodeStartupSlvLessThanMlv {
         HddsProtos.NodeType.DATANODE, mlv);
 
     try {
-      new DatanodeStateMachine(getNewDatanodeDetails(), conf, null,
-                   null, null);
+      new DatanodeStateMachine(getNewDatanodeDetails(), conf);
       Assert.fail("Expected IOException due to incorrect MLV on DataNode " +
           "creation.");
     } catch (IOException e) {

@@ -182,6 +182,13 @@ public class BlockDeletingService extends BackgroundService {
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
+
+    long totalPendingBlockCount =
+        containerDataMap.values().stream().mapToLong(
+            containerData -> ((KeyValueContainerData) containerData)
+            .getNumPendingDeletionBlocks())
+        .sum();
+    metrics.setTotalPendingBlockCount(totalPendingBlockCount);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
@@ -294,11 +301,11 @@ public class BlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
       try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-        if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
           crr = deleteViaSchema2(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
           crr = deleteViaSchema3(meta, container, dataDir, startTime);
         } else {
           throw new UnsupportedOperationException(
@@ -389,6 +396,12 @@ public class BlockDeletingService extends BackgroundService {
           int deletedBlocksCount = succeedBlocks.size();
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status.
@@ -523,6 +536,12 @@ public class BlockDeletingService extends BackgroundService {
           // batched together while committing to DB.
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status and used space in volume.

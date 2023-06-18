@@ -25,11 +25,15 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +60,15 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
 
+  private IncrementalReportSender<Container> mockIcrSender;
+
+  @BeforeEach
+  public void init() {
+    mockIcrSender = Mockito.mock(IncrementalReportSender.class);
+  }
+
   @Test
-  public void testRead() throws IOException {
+  public void testRead() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -69,7 +80,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
-  public void testGetBlock() throws IOException {
+  public void testGetBlock() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -81,7 +92,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
-  public void testGetCommittedBlockLength() throws IOException {
+  public void testGetCommittedBlockLength() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -94,7 +105,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
-  public void testReadChunk() throws IOException {
+  public void testReadChunk() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -107,7 +118,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   }
 
   @Test
-  public void testGetSmallFile() throws IOException {
+  public void testGetSmallFile() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -137,9 +148,31 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     assertEquals(CONTAINER_INTERNAL_ERROR, response.getResult());
   }
 
+  @Test
+  public void testMarkContainerUnhealthyInFailedVolume() throws IOException {
+    KeyValueHandler handler = getDummyHandler();
+    KeyValueContainerData mockContainerData = mock(KeyValueContainerData.class);
+    HddsVolume mockVolume = mock(HddsVolume.class);
+    Mockito.when(mockContainerData.getVolume()).thenReturn(mockVolume);
+    KeyValueContainer container = new KeyValueContainer(
+        mockContainerData, new OzoneConfiguration());
+
+    // When volume is failed, the call to mark the container unhealthy should
+    // be ignored.
+    Mockito.when(mockVolume.isFailed()).thenReturn(true);
+    handler.markContainerUnhealthy(container);
+    Mockito.verify(mockIcrSender, Mockito.never()).send(Mockito.any());
+
+    // When volume is healthy, ICR should be sent when container is marked
+    // unhealthy.
+    Mockito.when(mockVolume.isFailed()).thenReturn(false);
+    handler.markContainerUnhealthy(container);
+    Mockito.verify(mockIcrSender, Mockito.atMostOnce()).send(Mockito.any());
+  }
+
   // -- Helper methods below.
 
-  private KeyValueHandler getDummyHandler() throws IOException {
+  private KeyValueHandler getDummyHandler() {
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
@@ -153,7 +186,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(MutableVolumeSet.class),
-        mock(ContainerMetrics.class), TestHddsDispatcher.NO_OP_ICR_SENDER);
+        mock(ContainerMetrics.class), mockIcrSender);
   }
 
   private KeyValueContainer getMockUnhealthyContainer() {
@@ -165,5 +198,4 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .ContainerDataProto.newBuilder().setContainerID(1).build());
     return new KeyValueContainer(containerData, new OzoneConfiguration());
   }
-
 }

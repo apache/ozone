@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -55,6 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 
 /**
  * Class which defines utility methods for KeyValueContainer.
@@ -114,13 +116,13 @@ public final class KeyValueContainerUtil {
     }
 
     DatanodeStore store;
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreSchemaOneImpl(conf, dbFile.getAbsolutePath(),
           false);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath(),
           false);
-    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    } else if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       // We don't create per-container store for schema v3 containers,
       // they should use per-volume db store.
       return;
@@ -153,7 +155,7 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // DB failure is catastrophic, the disk needs to be replaced.
       // In case of an exception, LOG the message and rethrow the exception.
       try {
@@ -180,22 +182,37 @@ public final class KeyValueContainerUtil {
 
   /**
    * Returns if there are no blocks in the container.
+   * @param store DBStore
    * @param containerData Container to check
-   * @param conf configuration
+   * @param bCheckChunksFilePath Whether to check chunksfilepath has any blocks
    * @return true if the directory containing blocks is empty
    * @throws IOException
    */
-  public static boolean noBlocksInContainer(KeyValueContainerData
-                                                containerData)
+  public static boolean noBlocksInContainer(DatanodeStore store,
+                                            KeyValueContainerData
+                                            containerData,
+                                            boolean bCheckChunksFilePath)
       throws IOException {
+    Preconditions.checkNotNull(store);
     Preconditions.checkNotNull(containerData);
-    File chunksPath = new File(containerData.getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
-
-    try (DirectoryStream<Path> dir
-             = Files.newDirectoryStream(chunksPath.toPath())) {
-      return !dir.iterator().hasNext();
+    if (containerData.isOpen()) {
+      return false;
     }
+    try (BlockIterator<BlockData> blockIterator =
+             store.getBlockIterator(containerData.getContainerID())) {
+      if (blockIterator.hasNext()) {
+        return false;
+      }
+    }
+    if (bCheckChunksFilePath) {
+      File chunksPath = new File(containerData.getChunksPath());
+      Preconditions.checkArgument(chunksPath.isDirectory());
+      try (DirectoryStream<Path> dir
+               = Files.newDirectoryStream(chunksPath.toPath())) {
+        return !dir.iterator().hasNext();
+      }
+    }
+    return true;
   }
 
   /**
@@ -230,9 +247,16 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    if (kvContainerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    boolean bCheckChunksFilePath =
+        config.getBoolean(
+            DatanodeConfiguration.
+              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
+            DatanodeConfiguration.
+              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+    if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
-        populateContainerMetadata(kvContainerData, db.getStore());
+        populateContainerMetadata(kvContainerData,
+            db.getStore(), bCheckChunksFilePath);
       }
       return;
     }
@@ -255,7 +279,7 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      populateContainerMetadata(kvContainerData, store);
+      populateContainerMetadata(kvContainerData, store, bCheckChunksFilePath);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -277,7 +301,8 @@ public final class KeyValueContainerUtil {
   }
 
   private static void populateContainerMetadata(
-      KeyValueContainerData kvContainerData, DatanodeStore store)
+      KeyValueContainerData kvContainerData, DatanodeStore store,
+      boolean bCheckChunksFilePath)
       throws IOException {
     boolean isBlockMetadataSet = false;
     Table<String, Long> metadataTable = store.getMetadataTable();
@@ -342,6 +367,11 @@ public final class KeyValueContainerUtil {
     if (!chunksDir.exists()) {
       Files.createDirectories(chunksDir.toPath());
     }
+
+    if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
+      kvContainerData.markAsEmpty();
+    }
+
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
@@ -368,8 +398,8 @@ public final class KeyValueContainerUtil {
         blockCount++;
         try {
           usedBytes += getBlockLength(blockIter.nextBlock());
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
+        } catch (Exception ex) {
+          LOG.error(errorMessage, ex);
         }
       }
     }
@@ -433,6 +463,12 @@ public final class KeyValueContainerUtil {
 
     return Paths.get(metadataPath);
 
+  }
+
+  public static boolean isSameSchemaVersion(String schema, String other) {
+    String effective1 = schema != null ? schema : SCHEMA_V1;
+    String effective2 = other != null ? other : SCHEMA_V1;
+    return effective1.equals(effective2);
   }
 
   /**
@@ -502,8 +538,7 @@ public final class KeyValueContainerUtil {
         KeyValueContainerData keyValueContainerData =
             (KeyValueContainerData) containerData;
 
-        if (keyValueContainerData.getSchemaVersion()
-            .equals(OzoneConsts.SCHEMA_V3)) {
+        if (keyValueContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           // Container file doesn't include the volume
           // so we need to set it here in order to get the db file.
           keyValueContainerData.setVolume(hddsVolume);

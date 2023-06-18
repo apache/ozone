@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.InetAddress;
 import java.security.KeyPair;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -29,15 +30,17 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -59,6 +62,8 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * A Self Signed Certificate with CertificateServer basic constraint can be used
@@ -215,6 +220,34 @@ public final class SelfSignedCertificate {
       return this;
     }
 
+    public Builder addInetAddresses() throws CertificateException {
+      try {
+        DomainValidator validator = DomainValidator.getInstance();
+        // Add all valid ips.
+        List<InetAddress> inetAddresses =
+            OzoneSecurityUtil.getValidInetsForCurrentHost();
+        this.addInetAddresses(inetAddresses, validator);
+      } catch (IOException e) {
+        throw new CertificateException("Error while getting Inet addresses " +
+            "for the CSR builder", e, CSR_ERROR);
+      }
+      return this;
+    }
+
+    public Builder addInetAddresses(List<InetAddress> addresses,
+        DomainValidator validator) {
+      addresses.forEach(
+          ip -> {
+            this.addIpAddress(ip.getHostAddress());
+            if (validator.isValid(ip.getCanonicalHostName())) {
+              this.addDnsName(ip.getCanonicalHostName());
+            } else {
+              LOG.error("Invalid domain {}", ip.getCanonicalHostName());
+            }
+          });
+      return this;
+    }
+
     // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public Builder addDnsName(String dnsName) {
@@ -274,12 +307,12 @@ public final class SelfSignedCertificate {
     public X509CertificateHolder build()
         throws SCMSecurityException, IOException {
       Preconditions.checkNotNull(key, "Key cannot be null");
-      Preconditions.checkArgument(Strings.isNotBlank(subject), "Subject " +
-          "cannot be blank");
-      Preconditions.checkArgument(Strings.isNotBlank(clusterID), "Cluster ID " +
-          "cannot be blank");
-      Preconditions.checkArgument(Strings.isNotBlank(scmID), "SCM ID cannot " +
-          "be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(subject),
+          "Subject " + "cannot be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(clusterID),
+          "Cluster ID " + "cannot be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(scmID),
+          "SCM ID cannot " + "be blank");
 
       Preconditions.checkArgument(beginDate.isBefore(endDate), "Certificate " +
           "begin date should be before end date");

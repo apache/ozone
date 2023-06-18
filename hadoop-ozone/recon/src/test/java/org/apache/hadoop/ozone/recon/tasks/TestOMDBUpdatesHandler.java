@@ -302,20 +302,31 @@ public class TestOMDBUpdatesHandler {
 
   @Test
   public void testGetKeyType() throws IOException {
-    assertEquals(String.class, omdbDefinition.getKeyType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OzoneTokenIdentifier.class, omdbDefinition.getKeyType(
-        omMetadataManager.getDelegationTokenTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(String.class,
+        omdbDefinition.getColumnFamily(keyTable).getKeyType());
+
+    final String delegationTokenTable = omMetadataManager
+        .getDelegationTokenTable().getName();
+    assertEquals(OzoneTokenIdentifier.class,
+        omdbDefinition.getColumnFamily(delegationTokenTable).getKeyType());
   }
 
   @Test
   public void testGetValueType() throws IOException {
-    assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OmVolumeArgs.class, omdbDefinition.getValueType(
-        omMetadataManager.getVolumeTable().getName()).get());
-    assertEquals(OmBucketInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getBucketTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(OmKeyInfo.class,
+        omdbDefinition.getColumnFamily(keyTable).getValueType());
+
+    final String volumeTable = omMetadataManager.getVolumeTable().getName();
+    assertEquals(OmVolumeArgs.class,
+        omdbDefinition.getColumnFamily(volumeTable).getValueType());
+
+    final String bucketTable = omMetadataManager.getBucketTable().getName();
+    assertEquals(OmBucketInfo.class,
+        omdbDefinition.getColumnFamily(bucketTable).getValueType());
   }
 
   @NotNull

@@ -150,7 +150,7 @@ public class TestOMSnapshotDAG {
 
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
-    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
+    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
         getTablePrefixes(omMetadataManager, volumeName, bucketName));
   }
@@ -200,7 +200,7 @@ public class TestOMSnapshotDAG {
         !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
         .collect(Collectors.toList()).get(0).getVolume();
     List<OmBucketInfo> bucketList =
-        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10);
+        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10, false);
     LOG.debug("List of all buckets under the first volume: {}", bucketList);
     final String bucketName = bucketList.get(0).getBucketName();
 
