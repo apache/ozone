@@ -43,7 +43,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
-import static org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition.NODES;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.SCM_TABLE_COUNT_TABLE_NAME;
 
 
@@ -79,23 +78,23 @@ public class ScmTableCountTask extends ReconScmTask {
       while (canRun()) {
         wait(interval);
         long startTime, endTime, duration, durationMilliseconds;
-          try {
-            int execute =
-                dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
-            LOG.info("Deleted {} records from {}", execute,
-                SCM_TABLE_COUNT_TABLE_NAME);
-          } catch (Exception e) {
-            LOG.error("An error occurred while truncating the table {}: {}",
-                SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
-            return;
-          }
+        try {
+          int execute =
+              dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
+          LOG.info("Deleted {} records from {}", execute,
+              SCM_TABLE_COUNT_TABLE_NAME);
+        } catch (Exception e) {
+          LOG.error("An error occurred while truncating the table {}: {}",
+              SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
+          return;
+        }
         startTime = System.nanoTime();
         processTableCount();
         endTime = System.nanoTime();
         duration = endTime - startTime;
         durationMilliseconds = duration / 1_000_000;
         LOG.info("Elapsed Time in milliseconds for processTableCount() " +
-                "execution: {}", durationMilliseconds);
+            "execution: {}", durationMilliseconds);
       }
     } catch (Throwable t) {
       LOG.error("Error while running ScmTableCountTask: {}", t);
@@ -208,7 +207,7 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   /**
-   * Each row in the table would correspond to tableName+Count
+   * Each row in the table would correspond to tableName+Count.
    *  eg:- DeletedBlocksCount
    * @param tableName the name of the table.
    * @return the generated row key for the table count.

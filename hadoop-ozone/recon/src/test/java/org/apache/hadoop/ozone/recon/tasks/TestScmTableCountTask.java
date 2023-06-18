@@ -49,6 +49,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 
+/**
+ * Test class to verify the ScmTableCountTask.
+ */
 public class TestScmTableCountTask extends AbstractReconSqlDBTest {
 
   private DBStore scmDBStore;
@@ -147,7 +150,8 @@ public class TestScmTableCountTask extends AbstractReconSqlDBTest {
 
     for (long i = 1; i <= totalRecords; i++) {
       StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
-          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+          StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
+              .newBuilder()
               .setTxID(i)
               .setContainerID(100L)
               .addAllLocalID(localIdList)
