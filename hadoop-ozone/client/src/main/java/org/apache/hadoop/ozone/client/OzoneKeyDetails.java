@@ -22,8 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,11 +37,11 @@ public class OzoneKeyDetails extends OzoneKey {
   /**
    * A list of block location information to specify replica locations.
    */
-  private List<OzoneKeyLocation> ozoneKeyLocations;
+  private final List<OzoneKeyLocation> ozoneKeyLocations;
 
-  private FileEncryptionInfo feInfo;
+  private final FileEncryptionInfo feInfo;
 
-  private SupplierWithIOException<OzoneInputStream> contentSupplier;
+  private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
 
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
@@ -57,6 +57,7 @@ public class OzoneKeyDetails extends OzoneKey {
         modificationTime, type, replicationFactor);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
+    contentSupplier = null;
     this.setMetadata(metadata);
   }
 
@@ -71,7 +72,7 @@ public class OzoneKeyDetails extends OzoneKey {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
-      SupplierWithIOException<OzoneInputStream> contentSupplier) {
+      CheckedSupplier<OzoneInputStream, IOException> contentSupplier) {
     super(volumeName, bucketName, keyName, size, creationTime,
             modificationTime, replicationConfig, metadata);
     this.ozoneKeyLocations = ozoneKeyLocations;
@@ -89,18 +90,9 @@ public class OzoneKeyDetails extends OzoneKey {
   public FileEncryptionInfo getFileEncryptionInfo() {
     return feInfo;
   }
-  /**
-   * Set details of key location.
-   * @param ozoneKeyLocations - details of key location
-   */
-  public void setOzoneKeyLocations(List<OzoneKeyLocation> ozoneKeyLocations) {
-    this.ozoneKeyLocations = ozoneKeyLocations;
-  }
 
   /**
    * Get OzoneInputStream to read the content of the key.
-   * @return OzoneInputStream
-   * @throws IOException
    */
   @JsonIgnore
   public OzoneInputStream getContent() throws IOException {
