@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -341,13 +340,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
     return TracingUtil.executeInNewSpan(spanName,
-        (SupplierWithIOException<XceiverClientReply>) () -> {
-
+        () -> {
           ContainerCommandRequestProto finalPayload =
               ContainerCommandRequestProto.newBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan()).build();
           return sendCommandWithRetry(finalPayload, validators);
-
         });
   }
 

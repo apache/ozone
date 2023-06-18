@@ -64,6 +64,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final ReplicationManagerMetrics metrics;
 
   ECUnderReplicationHandler(final PlacementPolicy containerPlacement,
       final ConfigurationSource conf, ReplicationManager replicationManager) {
@@ -72,6 +73,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
+    this.metrics = replicationManager.getMetrics();
   }
 
   private boolean validatePlacement(List<DatanodeDetails> replicaNodes,
@@ -281,6 +283,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         (ECReplicationConfig)container.getReplicationConfig();
     List<Integer> missingIndexes = replicaCount.unavailableIndexes(true);
     final int expectedTargetCount = missingIndexes.size();
+    boolean recoveryIsCritical = expectedTargetCount == repConfig.getParity();
     if (expectedTargetCount == 0) {
       return 0;
     }
@@ -307,7 +310,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           // selection allows partial recovery
           0 < targetCount && targetCount < expectedTargetCount &&
           // recovery is not yet critical
-          expectedTargetCount < repConfig.getParity()) {
+          !recoveryIsCritical) {
 
         // check if placement exists when overloaded nodes are not excluded
         final List<DatanodeDetails> targetsMaybeOverloaded = getTargetDatanodes(
@@ -319,7 +322,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                   + " target nodes to be fully reconstructed, but {} selected"
                   + " nodes are currently overloaded.",
               container.getContainerID(), expectedTargetCount, overloadedCount);
-
+          metrics.incrECPartialReconstructionSkippedTotal();
           throw new InsufficientDatanodesException(expectedTargetCount,
               targetCount);
         }
@@ -369,6 +372,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         LOG.debug("Insufficient nodes were returned from the placement policy" +
             " to fully reconstruct container {}. Requested {} received {}",
             container.getContainerID(), expectedTargetCount, targetCount);
+        if (hasOverloaded && recoveryIsCritical) {
+          metrics.incrECPartialReconstructionCriticalTotal();
+        } else {
+          metrics.incrEcPartialReconstructionNoneOverloadedTotal();
+        }
         throw new InsufficientDatanodesException(expectedTargetCount,
             targetCount);
       }
@@ -454,6 +462,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             " to fully replicate the decommission indexes for container {}." +
             " Requested {} received {}", container.getContainerID(),
             decomIndexes.size(), selectedDatanodes.size());
+        metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
         throw new InsufficientDatanodesException(decomIndexes.size(),
             selectedDatanodes.size());
       }
@@ -538,6 +547,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               " to fully replicate the maintenance indexes for container {}." +
               " Requested {} received {}", container.getContainerID(),
           maintIndexes.size(), targets.size());
+      metrics.incrEcPartialReplicationForOutOfServiceReplicasTotal();
       throw new InsufficientDatanodesException(maintIndexes.size(),
           targets.size());
     }

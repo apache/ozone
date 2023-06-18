@@ -22,7 +22,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -51,6 +50,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,7 +116,6 @@ public final class HAUtils {
    * @param selfId - Node Id of the SCM which is submitting the request to
    * add SCM.
    * @return true - if SCM node is added successfully, else false.
-   * @throws IOException
    */
   public static boolean addSCM(OzoneConfiguration conf, AddSCMRequest request,
       String selfId) throws IOException {
@@ -132,9 +131,6 @@ public final class HAUtils {
 
   /**
    * Create a scm block client.
-   *
-   * @return {@link ScmBlockLocationProtocol}
-   * @throws IOException
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
@@ -177,7 +173,6 @@ public final class HAUtils {
    * @param lastAppliedIndex the last applied index in the current SCM DB.
    * @param checkpointPath   path to the new DB checkpoint
    * @return location of backup of the original DB
-   * @throws Exception
    */
   public static File replaceDBWithCheckpoint(long lastAppliedIndex,
       File oldDB, Path checkpointPath, String dbPrefix) throws IOException {
@@ -250,10 +245,7 @@ public final class HAUtils {
 
   /**
    * Obtain Transaction info from DB.
-   * @param tempConfig
    * @param dbDir path to DB
-   * @return TransactionInfo
-   * @throws IOException
    */
   private static TransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir, String dbName,
@@ -296,11 +288,6 @@ public final class HAUtils {
    *
    * If transaction info transaction Index is less than or equal to
    * lastAppliedIndex, return false, else return true.
-   * @param transactionInfo
-   * @param lastAppliedIndex
-   * @param leaderId
-   * @param newDBlocation
-   * @return boolean
    */
   public static boolean verifyTransactionInfo(TransactionInfo transactionInfo,
       long lastAppliedIndex, String leaderId, Path newDBlocation,
@@ -391,10 +378,7 @@ public final class HAUtils {
    *
    * If certificate client is null, obtain the list of CA using SCM security
    * client, else it uses certificate client.
-   * @param certClient
-   * @param configuration
    * @return list of CA
-   * @throws IOException
    */
   public static List<String> buildCAList(CertificateClient certClient,
       ConfigurationSource configuration) throws IOException {
@@ -483,13 +467,13 @@ public final class HAUtils {
   }
 
   private static List<String> waitForCACerts(
-      final SupplierWithIOException<List<String>> applyFunction,
+      final CheckedSupplier<List<String>, IOException> caCertListSupplier,
       int expectedCount) throws IOException {
     // TODO: If SCMs are bootstrapped later, then listCA need to be
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
-    List<String> caCertPemList = applyFunction.get();
+    List<String> caCertPemList = caCertListSupplier.get();
     boolean caListUpToDate = caCertPemList.size() >= expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
@@ -504,10 +488,7 @@ public final class HAUtils {
    * Build CA List in the format of X509Certificate.
    * If certificate client is null, obtain the list of CA using SCM
    * security client, else it uses certificate client.
-   * @param certClient
-   * @param conf
    * @return list of CA X509Certificates.
-   * @throws IOException
    */
   public static List<X509Certificate> buildCAX509List(
       CertificateClient certClient,

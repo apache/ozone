@@ -386,6 +386,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();
+    reconfigurationHandler =
+        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     initializeSystemManagers(conf, configurator);
 
@@ -411,10 +414,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
-
-    reconfigurationHandler =
-        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
-            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
@@ -790,6 +789,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           systemClock,
           legacyRM,
           containerReplicaPendingOps);
+      reconfigurationHandler.register(replicationManager.getConfig());
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
