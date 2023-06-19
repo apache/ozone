@@ -99,6 +99,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -2574,6 +2575,6 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(ReplicationType.EC.name(),
         key.getReplicationConfig().getReplicationType().name());
     Assert.assertEquals(key.getReplicationConfig().getReplication(),
-        "RS-3-2-1024k");
+        "RS-3-2-1024k".toLowerCase(Locale.ROOT));
   }
 }
