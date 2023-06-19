@@ -43,6 +43,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -380,6 +381,21 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public OzoneFSOutputStream createFile(String pathStr, short replication,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFileCommon(pathStr, replication,
+        overWrite, recursive, null);
+  }
+
+  @Override
+  public OzoneFSOutputStream createFile(String pathStr, short replication,
+        boolean overWrite, boolean recursive,
+        String ecPolicyName) throws IOException {
+    return createFileCommon(pathStr, replication,
+        overWrite, recursive, ecPolicyName);
+  }
+
+  public OzoneFSOutputStream createFileCommon(String pathStr,
+        short replication, boolean overWrite,
+        boolean recursive, String ecPolicyName) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
@@ -389,10 +405,18 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
+      ReplicationConfig replicationConfig;
+      if (ecPolicyName != null) {
+        replicationConfig = new ECReplicationConfig(ecPolicyName);
+      } else {
+        replicationConfig = OzoneClientUtils.
+            resolveClientSideReplicationConfig(
+            replication,
+            this.clientConfiguredReplicationConfig,
+            bucket.getReplicationConfig(), config);
+      }
       OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
-          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
-              this.clientConfiguredReplicationConfig,
-              bucket.getReplicationConfig(), config), overWrite, recursive);
+          replicationConfig, overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -409,6 +433,21 @@ public class BasicRootedOzoneClientAdapterImpl
   public OzoneFSDataStreamOutput createStreamFile(String pathStr,
       short replication, boolean overWrite, boolean recursive)
       throws IOException {
+    return createStreamFileCommon(pathStr, replication,
+        overWrite, recursive, null);
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String pathStr,
+      short replication, boolean overWrite,
+      boolean recursive, String ecPolicyName) throws IOException {
+    return createStreamFileCommon(pathStr, replication,
+        overWrite, recursive, ecPolicyName);
+  }
+
+  public OzoneFSDataStreamOutput createStreamFileCommon(String pathStr,
+      short replication, boolean overWrite, boolean recursive,
+      String ecPolicyName) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
@@ -418,10 +457,15 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       // Hadoop CopyCommands class always sets recursive to true
       final OzoneBucket bucket = getBucket(ofsPath, recursive);
-      final ReplicationConfig replicationConfig
-          = OzoneClientUtils.resolveClientSideReplicationConfig(
-          replication, clientConfiguredReplicationConfig,
-          bucket.getReplicationConfig(), config);
+      ReplicationConfig replicationConfig;
+      if (ecPolicyName != null) {
+        replicationConfig = new ECReplicationConfig(ecPolicyName);
+      } else {
+        replicationConfig = OzoneClientUtils.
+            resolveClientSideReplicationConfig(
+            replication, clientConfiguredReplicationConfig,
+            bucket.getReplicationConfig(), config);
+      }
       final OzoneDataStreamOutput out = bucket.createStreamFile(
           key, 0, replicationConfig, overWrite, recursive);
       return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());
@@ -1370,6 +1414,7 @@ public class BasicRootedOzoneClientAdapterImpl
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
   }
 
+  @Override
   public void setTimes(String key, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     OFSPath ofsPath = new OFSPath(key, config);

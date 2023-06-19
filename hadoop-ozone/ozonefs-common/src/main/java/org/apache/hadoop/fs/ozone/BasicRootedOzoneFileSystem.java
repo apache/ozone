@@ -253,11 +253,33 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       boolean overwrite, int bufferSize,
       short replication, long blockSize,
       Progressable progress) throws IOException {
+    return createCommon(f, permission, overwrite,
+        bufferSize, replication, blockSize, progress, null);
+  }
+
+  public FSDataOutputStream create(Path f, FsPermission permission,
+      boolean overwrite, int bufferSize,
+      short replication, long blockSize,
+      Progressable progress, String ecPolicyName) throws IOException {
+    return createCommon(f, permission, overwrite,
+        bufferSize, replication, blockSize, progress, ecPolicyName);
+  }
+
+  private FSDataOutputStream createCommon(Path f, FsPermission permission,
+       boolean overwrite, int bufferSize,
+       short replication, long blockSize,
+       Progressable progress, String ecPolicyName) throws IOException {
     LOG.trace("create() path:{}", f);
     incrementCounter(Statistic.INVOCATION_CREATE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
-    return createOutputStream(key, replication, overwrite, true);
+    if (ecPolicyName != null) {
+      return createOutputStream(key, replication,
+          overwrite, true, ecPolicyName);
+    } else {
+      return createOutputStream(key, replication,
+          overwrite, true);
+    }
   }
 
   @Override
@@ -275,13 +297,34 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         replication, flags.contains(CreateFlag.OVERWRITE), false);
   }
 
-  private OutputStream selectOutputStream(String key, short replication,
-      boolean overwrite, boolean recursive, int byteWritten)
-      throws IOException {
-    return isRatisStreamingEnabled && byteWritten > streamingAutoThreshold ?
-        adapter.createStreamFile(key, replication, overwrite, recursive)
-        : createFSOutputStream(adapter.createFile(
-        key, replication, overwrite, recursive));
+  private OutputStream selectOutputStream(String key,
+      short replication, boolean overwrite, boolean recursive,
+      int byteWritten) throws IOException {
+    return selectOutputStreamCommon(key, replication,
+        overwrite, recursive, byteWritten, null);
+  }
+
+  private OutputStream selectOutputStream(String key,
+      short replication, boolean overwrite, boolean recursive,
+      int byteWritten, String ecPolicyName) throws IOException {
+    return selectOutputStreamCommon(key, replication,
+        overwrite, recursive, byteWritten, ecPolicyName);
+  }
+
+  private OutputStream selectOutputStreamCommon(String key,
+      short replication, boolean overwrite, boolean recursive,
+      int byteWritten, String ecPolicyName) throws IOException {
+    if (ecPolicyName != null) {
+      return isRatisStreamingEnabled && byteWritten > streamingAutoThreshold ?
+          adapter.createStreamFile(key, replication, overwrite, recursive)
+          : createFSOutputStream(adapter.createFile(
+          key, replication, overwrite, recursive, ecPolicyName));
+    } else {
+      return isRatisStreamingEnabled && byteWritten > streamingAutoThreshold ?
+          adapter.createStreamFile(key, replication, overwrite, recursive)
+          : createFSOutputStream(adapter.createFile(
+          key, replication, overwrite, recursive));
+    }
   }
 
   private FSDataOutputStream createOutputStream(String key, short replication,
@@ -297,6 +340,22 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return new FSDataOutputStream(createFSOutputStream(
             adapter.createFile(key,
         replication, overwrite, recursive)), statistics);
+  }
+
+  private FSDataOutputStream createOutputStream(String key,
+      short replication, boolean overwrite, boolean recursive,
+      String ecPolicyName) throws IOException {
+    if (isRatisStreamingEnabled) {
+      // select OutputStream type based on byteWritten
+      final CheckedFunction<Integer, OutputStream, IOException> selector
+          = byteWritten -> selectOutputStream(
+          key, replication, overwrite, recursive, byteWritten, ecPolicyName);
+      return new FSDataOutputStream(new SelectorOutputStream<>(
+          streamingAutoThreshold, selector), statistics);
+    }
+    return new FSDataOutputStream(createFSOutputStream(
+        adapter.createFile(key,
+            replication, overwrite, recursive, ecPolicyName)), statistics);
   }
 
   protected OzoneFSOutputStream createFSOutputStream(

@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -244,12 +245,32 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public OzoneFSOutputStream createFile(String key, short replication,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFileCommon(key, replication, overWrite, recursive, null);
+  }
+
+  @Override
+  public OzoneFSOutputStream createFile(String key,
+      short replication, boolean overWrite, boolean recursive,
+      String ecPolicyName) throws IOException {
+    return createFileCommon(key, replication,
+        overWrite, recursive, ecPolicyName);
+  }
+
+  private OzoneFSOutputStream createFileCommon(String key,
+     short replication, boolean overWrite, boolean recursive,
+     String ecPolicyName) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
+      ReplicationConfig replicationConfig;
+      if (ecPolicyName != null) {
+        replicationConfig = new ECReplicationConfig(ecPolicyName);
+      } else {
+        replicationConfig = OzoneClientUtils.resolveClientSideReplicationConfig(
+            replication, this.clientConfiguredReplicationConfig,
+            getReplicationConfigWithRefreshCheck(), config);
+      }
       OzoneOutputStream ozoneOutputStream = bucket.createFile(key, 0,
-          OzoneClientUtils.resolveClientSideReplicationConfig(replication,
-              this.clientConfiguredReplicationConfig,
-              getReplicationConfigWithRefreshCheck(), config), overWrite,
+          replicationConfig, overWrite,
           recursive);
       return new OzoneFSOutputStream(ozoneOutputStream);
     } catch (OMException ex) {
@@ -275,14 +296,35 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OzoneFSDataStreamOutput createStreamFile(String key, short replication,
-      boolean overWrite, boolean recursive) throws IOException {
+  public OzoneFSDataStreamOutput createStreamFile(String key,
+      short replication, boolean overWrite, boolean recursive)
+      throws IOException {
+    return createStreamFileCommon(key, replication,
+        overWrite, recursive, null);
+  }
+
+  @Override
+  public OzoneFSDataStreamOutput createStreamFile(String key,
+      short replication, boolean overWrite, boolean recursive,
+      String ecPolicyName) throws IOException {
+    return createStreamFileCommon(key, replication,
+        overWrite, recursive, ecPolicyName);
+  }
+
+  private OzoneFSDataStreamOutput createStreamFileCommon(String key,
+     short replication, boolean overWrite, boolean recursive,
+     String ecPolicyName) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
-      final ReplicationConfig replicationConfig
-          = OzoneClientUtils.resolveClientSideReplicationConfig(
-          replication, clientConfiguredReplicationConfig,
-          getReplicationConfigWithRefreshCheck(), config);
+      ReplicationConfig replicationConfig;
+      if (ecPolicyName != null) {
+        replicationConfig = new ECReplicationConfig(ecPolicyName);
+      } else {
+        replicationConfig
+            = OzoneClientUtils.resolveClientSideReplicationConfig(
+            replication, clientConfiguredReplicationConfig,
+            getReplicationConfigWithRefreshCheck(), config);
+      }
       final OzoneDataStreamOutput out = bucket.createStreamFile(
           key, 0, replicationConfig, overWrite, recursive);
       return new OzoneFSDataStreamOutput(out.getByteBufStreamOutput());

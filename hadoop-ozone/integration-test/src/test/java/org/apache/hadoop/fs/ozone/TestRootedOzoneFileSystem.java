@@ -2543,4 +2543,37 @@ public class TestRootedOzoneFileSystem {
     // verify that mtime is NOT updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
+
+  @Test
+  public void testCarryECPolicyName() throws Exception {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(BucketLayout.LEGACY);
+    builder.setDefaultReplicationConfig(
+        new DefaultReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE)));
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket100 = TestDataUtil
+        .createVolumeAndBucket(client, vol, buck,
+            omBucketArgs);
+    Assert.assertEquals(ReplicationType.STAND_ALONE.name(),
+        bucket100.getReplicationConfig().getReplicationType().name());
+
+    // Bucket has default STAND_ALONE and client has carry ECPolicyName.
+    // In this case, it should not inherit from bucket
+    try (OzoneFSOutputStream file = adapter
+        .createFile(vol + "/" + buck + "/test", (short) 3,
+            true, false, "RS-3-2-1024k")) {
+      file.write(new byte[1024]);
+    }
+    OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
+    final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
+    final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
+    Assert.assertEquals(ReplicationType.EC.name(),
+        key.getReplicationConfig().getReplicationType().name());
+    Assert.assertEquals(key.getReplicationConfig().getReplication(),
+        "RS-3-2-1024k");
+  }
 }
