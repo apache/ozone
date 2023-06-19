@@ -72,7 +72,7 @@ public class ListVolumeHandler extends Handler {
     }
 
     Iterator<? extends OzoneVolume> volumeIterator;
-    if (userName != null && (Integer.MAX_VALUE != listOptions.getLimit())) {
+    if (userName != null && !listOptions.isAll()) {
       volumeIterator = client.getObjectStore().listVolumesByUser(userName,
           listOptions.getPrefix(), listOptions.getStartItem());
     } else {
