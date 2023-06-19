@@ -52,7 +52,7 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of blocks pending for processing.")
   private MutableGaugeLong totalPendingBlockCount;
 
-  @Metric(about = "The total number of transactions witch was failed " +
+  @Metric(about = "The total number of transactions which was failed " +
       "cause by wait Container lock timeout.")
   private MutableGaugeLong totalLockTimeoutTransactionCount;
 

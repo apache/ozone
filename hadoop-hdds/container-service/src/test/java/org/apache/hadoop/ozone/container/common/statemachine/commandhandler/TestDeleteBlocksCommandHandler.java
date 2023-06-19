@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetr
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -33,8 +34,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -72,8 +74,10 @@ import static org.mockito.Mockito.when;
  * Test cases for TestDeleteBlocksCommandHandler.
  */
 @RunWith(Parameterized.class)
-@Timeout(300)
 public class TestDeleteBlocksCommandHandler {
+
+  @Rule
+  public Timeout testTimeout = Timeout.seconds(300);
 
   private OzoneConfiguration conf;
   private StateContext context;
@@ -127,9 +131,11 @@ public class TestDeleteBlocksCommandHandler {
       containerSet.addContainer(container);
     }
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
 
     handler = spy(new DeleteBlocksCommandHandler(
-        ozoneContainer, conf, 1, 1, 25));
+        ozoneContainer, conf, dnConf));
     blockDeleteMetrics = handler.getBlockDeleteMetrics();
     TestSchemaHandler testSchemaHandler1 = Mockito.spy(new TestSchemaHandler());
     TestSchemaHandler testSchemaHandler2 = Mockito.spy(new TestSchemaHandler());
@@ -170,7 +176,6 @@ public class TestDeleteBlocksCommandHandler {
   }
 
   @Test
-  @Timeout(60)
   public void testDeleteBlocksCommandHandlerWithTimeoutFailed()
       throws IOException {
     Assert.assertTrue(containerSet.containerCount() >= 2);

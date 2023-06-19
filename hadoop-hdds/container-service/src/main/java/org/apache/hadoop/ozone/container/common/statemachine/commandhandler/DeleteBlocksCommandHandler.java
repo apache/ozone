@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -98,24 +99,23 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final long tryLockTimeoutMs;
   private final Map<String, SchemaHandler> schemaHandlers;
 
-
   public DeleteBlocksCommandHandler(OzoneContainer container,
-      ConfigurationSource conf, int threadPoolSize, int queueLimit,
-      long tryLockTimeoutMs) {
+      ConfigurationSource conf, DatanodeConfiguration dnConf) {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
-    this.tryLockTimeoutMs = tryLockTimeoutMs;
+    this.tryLockTimeoutMs = dnConf.getBlockDeleteCommandHandleLockTimeoutMs();
     schemaHandlers = new HashMap<>();
     schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
     schemaHandlers.put(SCHEMA_V3, this::markBlocksForDeletionSchemaV3);
 
     this.executor = Executors.newFixedThreadPool(
-        threadPoolSize, new ThreadFactoryBuilder()
+        dnConf.getBlockDeleteThreads(), new ThreadFactoryBuilder()
             .setNameFormat("DeleteBlocksCommandHandlerThread-%d").build());
-    this.deleteCommandQueues = new LinkedBlockingQueue<>(queueLimit);
+    this.deleteCommandQueues =
+        new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
     handlerThread = new Daemon(new DeleteCmdWorker());
     handlerThread.start();
   }
