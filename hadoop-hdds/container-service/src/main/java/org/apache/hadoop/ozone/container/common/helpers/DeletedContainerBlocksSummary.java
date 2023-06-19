@@ -51,7 +51,7 @@ public final class DeletedContainerBlocksSummary {
     blocks.forEach(entry -> {
       txSummary.put(entry.getTxID(), entry.getCount());
       if (entry.getCount() > 0) {
-        numOfRetryTxs += entry.getCount();
+        numOfRetryTxs++;
       }
       if (blockSummary.containsKey(entry.getContainerID())) {
         blockSummary.put(entry.getContainerID(),
