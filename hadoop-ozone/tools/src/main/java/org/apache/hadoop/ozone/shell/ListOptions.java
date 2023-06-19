@@ -39,7 +39,14 @@ public class ListOptions {
       description = "Prefix to filter the items")
   private String prefix;
 
+  @CommandLine.Option(names = {"--all", "-a"},
+      description = "List all results")
+  private boolean bListAll;
+
   public int getLimit() {
+    if (bListAll) {
+      return Integer.MAX_VALUE;
+    }
     if (limit < 1) {
       throw new IllegalArgumentException(
           "List length should be a positive number");
