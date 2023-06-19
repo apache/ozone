@@ -47,6 +47,7 @@ import org.apache.hadoop.util.ServicePlugin;
 
 import org.apache.commons.io.FileUtils;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.HddsDatanodeService.getLogger;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -55,6 +56,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
@@ -99,6 +101,7 @@ public class TestHddsSecureDatanodeInit {
         TestHddsDatanodeService.MockService.class,
         ServicePlugin.class);
     conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT5S"); // 5s
+    conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S"); // 1s
     securityConfig = new SecurityConfig(conf);
 
     service = HddsDatanodeService.createHddsDatanodeService(args);
@@ -356,6 +359,7 @@ public class TestHddsSecureDatanodeInit {
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
+  @Flaky("HDDS-8873")
   public void testCertificateRotationRecoverableFailure() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);

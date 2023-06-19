@@ -107,14 +107,26 @@ public final class ConfigurationReflectionUtil {
 
   public static <T> void reconfigureProperty(T configuration, Field field,
       String key, String value) {
+    Class<?> klass = field.getDeclaringClass();
     if (!field.isAnnotationPresent(Config.class)) {
       throw new ConfigurationException("Not configurable field: "
-          + field.getDeclaringClass() + "." + field.getName());
+          + klass + "." + field.getName());
     }
     Config configAnnotation = field.getAnnotation(Config.class);
 
-    setField(field.getDeclaringClass(), configuration, field, configAnnotation,
-        key, value);
+    try {
+      final Object oldValue = forcedFieldGet(field, configuration);
+      setField(klass, configuration, field, configAnnotation, key, value);
+      try {
+        callPostConstruct(configuration);
+      } catch (Exception e) {
+        forcedFieldSet(field, configuration, oldValue);
+        throw e;
+      }
+    } catch (IllegalAccessException e) {
+      throw new ConfigurationException("Failed to inject configuration to "
+          + klass.getSimpleName() + "." + field.getName(), e);
+    }
   }
 
   private static <T> void setField(
@@ -135,19 +147,45 @@ public final class ConfigurationReflectionUtil {
   }
 
   /**
-   * Set the value of one field even if it's private.
+   * Set possibly private {@code field} to {@code value} in {@code object}.
    */
   private static <T> void forcedFieldSet(Field field, T object, Object value)
       throws IllegalAccessException {
-    boolean accessChanged = false;
+    final boolean accessChanged = setAccessible(field);
+    try {
+      field.set(object, value);
+    } finally {
+      if (accessChanged) {
+        field.setAccessible(false);
+      }
+    }
+  }
+
+  /**
+   * @return the value of possibly private {@code field} in {@code object}
+   */
+  private static <T> Object forcedFieldGet(Field field, T object)
+      throws IllegalAccessException {
+    final boolean accessChanged = setAccessible(field);
+    try {
+      return field.get(object);
+    } finally {
+      if (accessChanged) {
+        field.setAccessible(false);
+      }
+    }
+  }
+
+  /**
+   * Make {@code field} accessible.
+   * @return true if access changed
+   */
+  private static boolean setAccessible(Field field) {
     if (!field.isAccessible()) {
       field.setAccessible(true);
-      accessChanged = true;
+      return true;
     }
-    field.set(object, value);
-    if (accessChanged) {
-      field.setAccessible(false);
-    }
+    return false;
   }
 
   private static ConfigType detectConfigType(Field field) {
@@ -174,8 +212,8 @@ public final class ConfigurationReflectionUtil {
     return type;
   }
 
-  public static <T> void callPostConstruct(Class<T> configurationClass,
-      T configObject) {
+  static <T> void callPostConstruct(T configObject) {
+    Class<?> configurationClass = configObject.getClass();
     for (Method method : configurationClass.getMethods()) {
       if (method.isAnnotationPresent(PostConstruct.class)) {
         try {

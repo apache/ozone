@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -40,7 +41,6 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -307,12 +307,12 @@ public final class SelfSignedCertificate {
     public X509CertificateHolder build()
         throws SCMSecurityException, IOException {
       Preconditions.checkNotNull(key, "Key cannot be null");
-      Preconditions.checkArgument(Strings.isNotBlank(subject), "Subject " +
-          "cannot be blank");
-      Preconditions.checkArgument(Strings.isNotBlank(clusterID), "Cluster ID " +
-          "cannot be blank");
-      Preconditions.checkArgument(Strings.isNotBlank(scmID), "SCM ID cannot " +
-          "be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(subject),
+          "Subject " + "cannot be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(clusterID),
+          "Cluster ID " + "cannot be blank");
+      Preconditions.checkArgument(StringUtils.isNotBlank(scmID),
+          "SCM ID cannot " + "be blank");
 
       Preconditions.checkArgument(beginDate.isBefore(endDate), "Certificate " +
           "begin date should be before end date");

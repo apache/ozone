@@ -2033,7 +2033,7 @@
   </property>
   <property>
     <name>ozone.om.snapshot.provider.request.timeout</name>
-    <value>5000ms</value>
+    <value>300000ms</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
     <description>
       Connection request timeout for HTTP call made by OM Snapshot Provider to
@@ -2232,6 +2232,24 @@
       external certificate. Note that this is only used for Ozone's internal
       communication, and it does not affect the HTTPS protocol at WebUIs as
       they can be configured separately.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.check.interval</name>
+    <value>P1D</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Check interval of whether internal root certificate is going
+      to expire and needs to start rotation or not. Default is 1 day. The property
+      value should be less than the value of property hdds.x509.renew.grace.duration.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.time-of-day</name>
+    <value>02:00:00</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
+      daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
+      and second.
     </description>
   </property>
   <property>
@@ -4042,6 +4060,16 @@
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at
       https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.upgrade.quota.recalculate.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      quota recalculation trigger when upgrade to the layout version QUOTA.
+      while upgrade, re-calculation of quota used will block write operation
+      to existing buckets till this operation is completed.
     </description>
   </property>
 </configuration>

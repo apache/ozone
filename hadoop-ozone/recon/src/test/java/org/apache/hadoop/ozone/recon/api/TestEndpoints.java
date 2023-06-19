@@ -76,7 +76,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -141,7 +141,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
   private ContainerSizeCountTask containerSizeCountTask;
-  private TableCountTask tableCountTask;
+  private OmTableInsightTask omTableInsightTask;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
@@ -254,7 +254,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
-    tableCountTask = new TableCountTask(
+    omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, sqlConfiguration, reconOMMetadataManager);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
@@ -635,7 +635,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // check volume, bucket and key count after running table count task
     Pair<String, Boolean> result =
-        tableCountTask.reprocess(reconOMMetadataManager);
+        omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
