@@ -1524,22 +1524,10 @@ public class TestOzoneShellHA {
     Assert.assertEquals(client.getObjectStore().getVolume(volume1)
         .getName(), volume1);
 
+    // Delete volume1(containing OBS, FSO and Legacy buckets) recursively
     args =
-        new String[] {"volume", "delete", volume1, "-r",
-            "-yes", "-id", omServiceId};
-    // Try recursive delete without skipTrash, volume should not be deleted.
-    execute(ozoneShell, args);
-    out.reset();
-
-    // volume1 should still exist
-    Assert.assertEquals(client.getObjectStore().getVolume(volume1)
-        .getName(), volume1);
-
-    // Delete volume1(containing OBS, FSO and Legacy buckets)
-    // recursively with skipTrash
-    args =
-        new String[] {"volume", "delete", volume1, "-r",
-            "-skipTrash", "-yes",  "-id", omServiceId};
+        new String[] {"volume", "delete", volume1, "-r=yes",
+            "-id", omServiceId};
 
     execute(ozoneShell, args);
     out.reset();

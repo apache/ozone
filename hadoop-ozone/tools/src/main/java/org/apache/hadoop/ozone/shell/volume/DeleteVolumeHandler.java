@@ -33,12 +33,9 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -56,29 +53,23 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
     description = "deletes a volume")
 public class DeleteVolumeHandler extends VolumeHandler {
   @CommandLine.Option(
-      names = {"-skipTrash"},
-      description = "Delete volume without trash"
-  )
-  private boolean bSkipTrash = false;
-  @CommandLine.Option(
       names = {"-r"},
-      description = "Delete volume recursively"
+      description = "This command will delete volume recursively." +
+          "\nThere is no trash recovery for FSO buckets using this command." +
+          "\nDelay is expected running this command." +
+          "\nEnter 'yes' to proceed",
+      interactive = true
   )
-  private boolean bRecursive = false;
+  private String isRecursive;
   @CommandLine.Option(
       names = {"-id", "--om-service-id"},
       description = "Ozone Manager Service ID"
   )
   private String omServiceId;
-  
+
   @CommandLine.Option(names = {"-t", "--threads", "--thread"},
       description = "Number of threads used to execute")
   private int threadNo = 10;
-  
-  @CommandLine.Option(names = "-yes",
-      description = "Continue without interactive user confirmation")
-  private boolean yes;
-  
   private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
@@ -95,11 +86,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
 
     String volumeName = address.getVolumeName();
     try {
-      if (bRecursive) {
-        if (!bSkipTrash) {
-          out().printf("Use -skipTrash for recursive volume delete%n");
-          return;
-        }
+      if (!Strings.isNullOrEmpty(isRecursive) && isRecursive.equals("yes")) {
         if (OmUtils.isServiceIdsDefined(getConf()) &&
             Strings.isNullOrEmpty(omServiceId)) {
           out().printf("OmServiceID not provided, provide using " +
@@ -107,19 +94,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
           return;
         }
         vol = client.getObjectStore().getVolume(volumeName);
-        if (!yes) {
-          // Ask for user confirmation
-          out().print("Enter 'yes' to confirm recursive volume delete '" +
-              volumeName + "': ");
-          out().flush();
-          Scanner scanner = new Scanner(new InputStreamReader(
-              System.in, StandardCharsets.UTF_8));
-          String confirmation = scanner.next().trim().toLowerCase();
-          if (!confirmation.equals("yes")) {
-            out().println("Operation cancelled.");
-            return;
-          }
-        }
         deleteVolumeRecursive();
       }
     } catch (InterruptedException e) {
