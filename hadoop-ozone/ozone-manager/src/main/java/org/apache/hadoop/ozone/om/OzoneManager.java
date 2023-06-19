@@ -1813,9 +1813,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     if (remoteOMConfig.getCurrentPeerList().contains(this.getOMNodeId())) {
-      LOG.warn("Remote OM " + remoteNodeId + " already contains " +
-          "bootstrapping OM(" + getOMNodeId() + ") as part of its Raft group " +
-          "peers.");
+      LOG.warn(
+          "Remote OM {} already contains bootstrapping OM({}) as part of "
+              + "its Raft group peers.",
+          remoteNodeId, getOMNodeId());
     }
 
     OMNodeDetails omNodeDetailsInRemoteConfig = remoteOMConfig
