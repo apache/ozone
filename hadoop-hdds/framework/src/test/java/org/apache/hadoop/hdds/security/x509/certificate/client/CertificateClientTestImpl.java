@@ -78,6 +78,8 @@ public class CertificateClientTestImpl implements CertificateClient {
   private X509Certificate x509Certificate;
   private KeyPair rootKeyPair;
   private X509Certificate rootCert;
+  private Set<X509Certificate> rootCerts;
+
   private HDDSKeyGenerator keyGen;
   private DefaultApprover approver;
   private KeyStoresFactory serverKeyStoresFactory;
@@ -95,6 +97,7 @@ public class CertificateClientTestImpl implements CertificateClient {
       throws Exception {
     certificateMap = new ConcurrentHashMap<>();
     securityConfig = new SecurityConfig(conf);
+    rootCerts = new HashSet<>();
     keyGen = new HDDSKeyGenerator(securityConfig.getConfiguration());
     keyPair = keyGen.generateKey();
     rootKeyPair = keyGen.generateKey();
@@ -118,6 +121,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     rootCert = new JcaX509CertificateConverter().getCertificate(
         builder.build());
     certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
+    rootCerts.add(rootCert);
 
     // Generate normal certificate, signed by RootCA certificate
     approver = new DefaultApprover(new DefaultProfile(), securityConfig);
@@ -270,11 +274,22 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
+  public Set<X509Certificate> getAllRootCaCerts() {
+    return rootCerts;
+  }
+
+  @Override
+  public Set<X509Certificate> getAllCaCerts() {
+    return rootCerts;
+  }
+
+  @Override
   public List<String> getCAList() {
     return null;
   }
+
   @Override
-  public List<String> listCA() throws IOException  {
+  public List<String> listCA() throws IOException {
     return null;
   }
 
@@ -302,6 +317,7 @@ public class CertificateClientTestImpl implements CertificateClient {
     rootCert = new JcaX509CertificateConverter().getCertificate(
         builder.build());
     certificateMap.put(rootCert.getSerialNumber().toString(), rootCert);
+    rootCerts.add(rootCert);
   }
 
   public void renewKey() throws Exception {

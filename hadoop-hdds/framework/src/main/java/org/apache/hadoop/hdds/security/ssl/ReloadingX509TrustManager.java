@@ -29,8 +29,10 @@ import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -125,8 +127,8 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     // SCM certificate client sets root CA as CA cert instead of root CA cert
-    X509Certificate rootCACert = caClient.getRootCACertificate() != null ?
-        caClient.getRootCACertificate() : caClient.getCACertificate();
+    X509Certificate rootCACert = caClient.getRootCACertificate() == null ?
+        caClient.getCACertificate() : caClient.getRootCACertificate();
 
     String rootCACertId = rootCACert.getSerialNumber().toString();
     // Certificate keeps the same.
@@ -138,7 +140,10 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    ks.setCertificateEntry(rootCACertId, rootCACert);
+    Set<X509Certificate> caCertsToInsert =
+        caClient.getRootCACertificate() == null ? caClient.getAllCaCerts() :
+            caClient.getAllRootCaCerts();
+    insertCertsToKeystore(caCertsToInsert, ks);
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -152,5 +157,13 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
     }
     currentRootCACertId = rootCACertId;
     return trustManager;
+  }
+
+  private void insertCertsToKeystore(Iterable<X509Certificate> certs,
+      KeyStore ks) throws KeyStoreException {
+    for (X509Certificate certToInsert : certs) {
+      String certId = certToInsert.getSerialNumber().toString();
+      ks.setCertificateEntry(certId, certToInsert);
+    }
   }
 }

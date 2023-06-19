@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
@@ -1034,7 +1035,8 @@ public class ReplicationManager implements SCMService {
    * Configuration used by the Replication Manager.
    */
   @ConfigGroup(prefix = "hdds.scm.replication")
-  public static class ReplicationManagerConfiguration {
+  public static class ReplicationManagerConfiguration
+      extends ReconfigurableConfig {
     /**
      * True if LegacyReplicationManager should be used for RATIS containers.
      */
@@ -1063,6 +1065,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "thread.interval",
         type = ConfigType.TIME,
         defaultValue = "300s",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "There is a replication monitor thread running inside " +
             "SCM which takes care of replicating the containers in the " +
@@ -1077,6 +1080,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "under.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "How frequently to check if there are work to process " +
             " on the under replicated queue"
@@ -1089,6 +1093,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "over.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "How frequently to check if there are work to process " +
             " on the over replicated queue"
@@ -1102,6 +1107,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
         defaultValue = "10m",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent to datanodes. After this timeout the command will be "
@@ -1123,6 +1129,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "event.timeout.datanode.offset",
         type = ConfigType.TIME,
         defaultValue = "30s",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "The amount of time to subtract from "
             + "hdds.scm.replication.event.timeout to give a deadline on the "
@@ -1145,6 +1152,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "maintenance.replica.minimum",
         type = ConfigType.INT,
         defaultValue = "2",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "The minimum number of container replicas which must " +
             " be available for a node to enter maintenance. If putting a " +
@@ -1166,6 +1174,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "maintenance.remaining.redundancy",
         type = ConfigType.INT,
         defaultValue = "1",
+        reconfigurable = true,
         tags = {SCM, OZONE},
         description = "The number of redundant containers in a group which" +
             " must be available for a node to enter maintenance. If putting" +
@@ -1197,6 +1206,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "datanode.replication.limit",
         type = ConfigType.INT,
         defaultValue = "20",
+        reconfigurable = true,
         tags = { SCM, DATANODE },
         description = "A limit to restrict the total number of replication " +
             "and reconstruction commands queued on a datanode. Note this is " +
@@ -1212,6 +1222,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
+        reconfigurable = true,
         tags = { SCM, DATANODE },
         description = "When counting the number of replication commands on a " +
             "datanode, the number of reconstruction commands is multiplied " +
@@ -1227,6 +1238,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
+        reconfigurable = true,
         tags = { SCM, DATANODE },
         description = "A limit to restrict the total number of delete " +
             "container commands queued on a datanode. Note this is intended " +
@@ -1242,6 +1254,7 @@ public class ReplicationManager implements SCMService {
     @Config(key = "inflight.limit.factor",
         type = ConfigType.DOUBLE,
         defaultValue = "0.75",
+        reconfigurable = true,
         tags = { SCM },
         description = "The overall replication task limit on a cluster is the" +
             " number healthy nodes, times the datanode.replication.limit." +

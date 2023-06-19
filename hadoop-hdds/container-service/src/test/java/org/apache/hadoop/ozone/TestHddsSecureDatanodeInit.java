@@ -56,6 +56,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
@@ -358,6 +359,7 @@ public class TestHddsSecureDatanodeInit {
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
+  @Flaky("HDDS-8873")
   public void testCertificateRotationRecoverableFailure() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);

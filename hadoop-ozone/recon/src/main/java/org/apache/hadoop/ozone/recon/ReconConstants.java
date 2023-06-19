@@ -36,10 +36,14 @@ public final class ReconConstants {
   public static final String RECON_SCM_SNAPSHOT_DB = "scm.snapshot.db";
 
   // By default, limit the number of results returned
+  public static final String DEFAULT_OPEN_KEY_INCLUDE_NON_FSO = "false";
+  public static final String DEFAULT_OPEN_KEY_INCLUDE_FSO = "false";
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
+  public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
+  public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =
       "0";
