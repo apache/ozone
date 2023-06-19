@@ -25,15 +25,23 @@ public class TestOnDemandContainerDataScannerIntegration
 
   private final ContainerCorruption corruption;
 
+  /**
+   The on-demand container scanner is triggered by errors on the block read
+   path. Since this may not touch all parts of the container, the scanner is
+   limited in what errors it can detect:
+   - The container file is not on the read path, so any errors in this file
+   will not trigger an on-demand scan.
+   - With container schema v3 (one RocksDB per volume), RocksDB is not in
+   the container metadata directory, therefore nothing in this entire
+   directory is on the read path.
+   - Block checksums are verified on the client side. If there is a checksum
+   error during read, the datanode will not learn about it.
+   */
   @Parameterized.Parameters
   public static Collection<Object[]> supportedCorruptionTypes() {
     return Arrays.asList(new Object[][] {
         {MISSING_CHUNKS_DIR},
-        {MISSING_METADATA_DIR},
         {MISSING_CONTAINER_DIR},
-        {MISSING_CONTAINER_FILE},
-        {CORRUPT_CONTAINER_FILE},
-        {CORRUPT_BLOCK},
         {MISSING_BLOCK},
     });
   }
@@ -70,16 +78,16 @@ public class TestOnDemandContainerDataScannerIntegration
     long containerID = writeDataThenCloseContainer(keyName);
     // Container corruption has not yet been introduced.
     Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
-        getContainer(containerID).getContainerState());
+        getDnContainer(containerID).getContainerState());
     // Corrupt the container.
-    corruption.applyTo(getContainer(containerID));
+    corruption.applyTo(getDnContainer(containerID));
     // This method will check that reading from the corrupted key returns an
     // error to the client.
     readFromCorruptedKey(keyName);
     // Reading from the corrupted key should have triggered an on-demand scan
     // of the container, which will detect the corruption.
     GenericTestUtils.waitFor(() ->
-            getContainer(containerID).getContainerState() ==
+            getDnContainer(containerID).getContainerState() ==
                 ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         1000, 5000);
 

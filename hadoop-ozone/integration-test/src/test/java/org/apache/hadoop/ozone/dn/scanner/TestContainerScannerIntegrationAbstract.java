@@ -40,7 +40,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -58,6 +60,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -77,7 +80,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
   private static MiniOzoneCluster cluster;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
-  protected static final Duration SCAN_INTERVAL = Duration.ofSeconds(3);
+  protected static final Duration SCAN_INTERVAL = Duration.ofSeconds(1);
   private static String volumeName;
   private static String bucketName;
   private static OzoneBucket bucket;
@@ -86,6 +89,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
       throws Exception {
     // Allow SCM to quickly learn about the unhealthy container.
     ozoneConfig.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
+    // Speed up corruption detection by allowing scans of the same container to
+    // run back to back.
+    ozoneConfig.setTimeDuration(
+        ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP, 0, TimeUnit.SECONDS);
 
     // Build a one datanode cluster.
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
@@ -125,7 +132,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
             .getState() == State.UNHEALTHY);
   }
 
-  protected Container<?> getContainer(long containerID) {
+  protected Container<?> getDnContainer(long containerID) {
     Assert.assertEquals(1, cluster.getHddsDatanodes().size());
     HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
@@ -140,11 +147,22 @@ public abstract class TestContainerScannerIntegrationAbstract {
     OzoneOutputStream key = createKey(keyName);
     key.write(getTestData());
     key.flush();
-    TestHelper.waitForContainerClose(key, cluster);
+//    TestHelper.waitForContainerClose(key, cluster);
     key.close();
 
-    return bucket.getKey(keyName).getOzoneKeyLocations().stream()
+    long containerID = bucket.getKey(keyName).getOzoneKeyLocations().stream()
         .findFirst().get().getContainerID();
+    closeContainerAndWait(containerID);
+    return containerID;
+  }
+
+  protected void closeContainerAndWait(long containerID) throws Exception {
+    cluster.getStorageContainerLocationClient().closeContainer(containerID);
+
+    GenericTestUtils.waitFor(
+        () -> TestHelper.isContainerClosed(cluster, containerID,
+            cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
+        1000, 5000);
   }
 
   protected long writeDataToOpenContainer() throws Exception {
@@ -232,7 +250,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
             container.getContainerData().getContainerPath(), "chunks");
         for (File blockFile:
             chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
-          corruptFile(blockFile);
+          Files.delete(blockFile.toPath());
         }
       };
 
