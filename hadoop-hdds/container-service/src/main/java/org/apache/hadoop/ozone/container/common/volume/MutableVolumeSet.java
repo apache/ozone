@@ -85,7 +85,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final String datanodeUuid;
   private String clusterID;
 
-  private Runnable shutdownHook;
   private final StorageVolumeChecker volumeChecker;
   private Runnable failedVolumeListener;
   private StateContext context;
@@ -197,13 +196,6 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     checkAllVolumes();
-
-    // Ensure volume threads are stopped and scm df is saved during shutdown.
-    shutdownHook = () -> {
-      saveVolumeSetUsed();
-    };
-    ShutdownHookManager.get().addShutdownHook(shutdownHook,
-        SHUTDOWN_HOOK_PRIORITY);
   }
 
   /**
