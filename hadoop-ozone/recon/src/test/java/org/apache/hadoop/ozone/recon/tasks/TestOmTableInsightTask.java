@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
@@ -213,8 +214,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(4L, getCountForTable(KEY_TABLE));
     assertEquals(4L, getCountForTable(VOLUME_TABLE));
     assertEquals(4L, getCountForTable(BUCKET_TABLE));
-    assertEquals(4L, getCountForTable(OPEN_KEY_TABLE));
-    assertEquals(4L, getCountForTable(DELETED_TABLE));
+    assertEquals(4L, getCountForTable(FILE_TABLE));
 
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
@@ -231,8 +231,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(5L, getCountForTable(KEY_TABLE));
     assertEquals(5L, getCountForTable(VOLUME_TABLE));
     assertEquals(5L, getCountForTable(BUCKET_TABLE));
-    assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
-    assertEquals(5L, getCountForTable(DELETED_TABLE));
+    assertEquals(5L, getCountForTable(FILE_TABLE));
   }
 
   @Test
