@@ -759,6 +759,14 @@ public class ContainerEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return Response.ok(containerDiscrepancyInfoList).build();
+    Map<String, Object> response = new HashMap<>();
+    if (!containerDiscrepancyInfoList.isEmpty()) {
+      response.put("prevKey", containerDiscrepancyInfoList.get(
+          containerDiscrepancyInfoList.size() - 1).getContainerID());
+    } else {
+      response.put("prevKey", null);
+    }
+    response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
+    return Response.ok(response).build();
   }
 }

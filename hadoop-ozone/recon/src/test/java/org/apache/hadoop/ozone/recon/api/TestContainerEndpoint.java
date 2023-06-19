@@ -1529,9 +1529,21 @@ public class TestContainerEndpoint {
     Response omContainersDeletedInSCMResponse =
         containerEndpoint.getOmContainersDeletedInSCM(-1, 0);
     assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>)
-            omContainersDeletedInSCMResponse.getEntity();
+        (List<ContainerDiscrepancyInfo>) responseMap.get(
+            "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+
     assertEquals(3, containerDiscrepancyInfoList.get(0)
         .getNumberOfKeys());
     assertEquals(1, containerDiscrepancyInfoList.size());
@@ -1559,9 +1571,21 @@ public class TestContainerEndpoint {
     Response omContainersDeletedInSCMResponse =
         containerEndpoint.getOmContainersDeletedInSCM(1, 0);
     assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>)
-            omContainersDeletedInSCMResponse.getEntity();
+        (List<ContainerDiscrepancyInfo>) responseMap.get(
+            "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+
     assertEquals(3, containerDiscrepancyInfoList.get(0)
         .getNumberOfKeys());
     assertEquals(1, containerDiscrepancyInfoList.size());
@@ -1591,10 +1615,21 @@ public class TestContainerEndpoint {
     Response omContainersDeletedInSCMResponse =
         containerEndpoint.getOmContainersDeletedInSCM(2,
             1);
-    assertNotNull(omContainersDeletedInSCMResponse);
+
+    Map<String, Object> responseMap =
+        (Map<String, Object>) omContainersDeletedInSCMResponse.getEntity();
+
+    // Fetch the ContainerDiscrepancyInfo list from the response
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
-        (List<ContainerDiscrepancyInfo>)
-            omContainersDeletedInSCMResponse.getEntity();
+        (List<ContainerDiscrepancyInfo>) responseMap.get(
+            "containerDiscrepancyInfo");
+
+    // Check the prevKey is set correct in the response
+    long responsePrevKey = (long) responseMap.get("prevKey");
+    assertEquals(containerDiscrepancyInfoList.get(
+            containerDiscrepancyInfoList.size() - 1).getContainerID(),
+        responsePrevKey);
+
     assertEquals(2, containerDiscrepancyInfoList.get(0)
         .getNumberOfKeys());
     assertEquals(1, containerDiscrepancyInfoList.size());
