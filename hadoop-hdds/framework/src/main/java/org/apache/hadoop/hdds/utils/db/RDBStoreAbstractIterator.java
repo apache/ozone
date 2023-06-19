@@ -14,13 +14,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
@@ -29,42 +26,61 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * RocksDB store iterator.
+ * An abstract {@link TableIterator} to iterate raw {@link Table.KeyValue}s.
+ *
+ * @param <RAW> the raw type.
  */
-public class RDBStoreIterator
-    implements TableIterator<byte[], Table.KeyValue<byte[], byte[]>> {
+public abstract class RDBStoreAbstractIterator<RAW>
+    implements TableIterator<RAW, Table.KeyValue<RAW, RAW>> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(RDBStoreIterator.class);
+      LoggerFactory.getLogger(RDBStoreAbstractIterator.class);
 
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
-  private ByteArrayKeyValue currentEntry;
+  private Table.KeyValue<RAW, RAW> currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
-  private byte[] prefix;
+  private final RAW prefix;
 
-  public RDBStoreIterator(ManagedRocksIterator iterator) {
-    this(iterator, null);
-  }
-
-  public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table) {
-    this(iterator, table, null);
-  }
-
-  public RDBStoreIterator(ManagedRocksIterator iterator, RDBTable table,
-      byte[] prefix) {
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table,
+      RAW prefix) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
-    if (prefix != null) {
-      this.prefix = Arrays.copyOf(prefix, prefix.length);
-    }
+    this.prefix = prefix;
     seekToFirst();
   }
 
+  /** @return the key for the current entry. */
+  abstract RAW key();
+
+  /** @return the {@link Table.KeyValue} for the current entry. */
+  abstract Table.KeyValue<RAW, RAW> getKeyValue();
+
+  /** Seek to the given key. */
+  abstract void seek0(RAW key);
+
+  /** Delete the given key. */
+  abstract void delete(RAW key) throws IOException;
+
+  /** Does the given key start with the prefix? */
+  abstract boolean startsWithPrefix(RAW key);
+
+  final ManagedRocksIterator getRocksDBIterator() {
+    return rocksDBIterator;
+  }
+
+  final RDBTable getRocksDBTable() {
+    return rocksDBTable;
+  }
+
+  final RAW getPrefix() {
+    return prefix;
+  }
+
   @Override
-  public void forEachRemaining(
-      Consumer<? super Table.KeyValue<byte[], byte[]>> action) {
+  public final void forEachRemaining(
+      Consumer<? super Table.KeyValue<RAW, RAW>> action) {
     while (hasNext()) {
       action.accept(next());
     }
@@ -72,21 +88,20 @@ public class RDBStoreIterator
 
   private void setCurrentEntry() {
     if (rocksDBIterator.get().isValid()) {
-      currentEntry = ByteArrayKeyValue.create(rocksDBIterator.get().key(),
-          rocksDBIterator.get().value());
+      currentEntry = getKeyValue();
     } else {
       currentEntry = null;
     }
   }
 
   @Override
-  public boolean hasNext() {
+  public final boolean hasNext() {
     return rocksDBIterator.get().isValid() &&
-        (prefix == null || startsWith(prefix, rocksDBIterator.get().key()));
+        (prefix == null || startsWithPrefix(key()));
   }
 
   @Override
-  public ByteArrayKeyValue next() {
+  public final Table.KeyValue<RAW, RAW> next() {
     setCurrentEntry();
     if (currentEntry != null) {
       rocksDBIterator.get().next();
@@ -96,67 +111,46 @@ public class RDBStoreIterator
   }
 
   @Override
-  public void seekToFirst() {
+  public final void seekToFirst() {
     if (prefix == null) {
       rocksDBIterator.get().seekToFirst();
     } else {
-      rocksDBIterator.get().seek(prefix);
+      seek0(prefix);
     }
     setCurrentEntry();
   }
 
   @Override
-  public void seekToLast() {
+  public final void seekToLast() {
     if (prefix == null) {
       rocksDBIterator.get().seekToLast();
     } else {
-      throw new UnsupportedOperationException("seekToLast");
+      throw new UnsupportedOperationException("seekToLast: prefix != null");
     }
     setCurrentEntry();
   }
 
   @Override
-  public ByteArrayKeyValue seek(byte[] key) {
-    rocksDBIterator.get().seek(key);
+  public final Table.KeyValue<RAW, RAW> seek(RAW key) {
+    seek0(key);
     setCurrentEntry();
     return currentEntry;
   }
 
   @Override
-  public void removeFromDB() throws IOException {
+  public final void removeFromDB() throws IOException {
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
     if (currentEntry != null) {
-      rocksDBTable.delete(currentEntry.getKey());
+      delete(currentEntry.getKey());
     } else {
-      LOG.info("Unable to delete currentEntry as it does not exist.");
+      LOG.info("Failed to removeFromDB: currentEntry == null");
     }
   }
 
   @Override
   public void close() throws IOException {
     rocksDBIterator.close();
-  }
-
-  private static boolean startsWith(byte[] prefix, byte[] value) {
-    if (prefix == null) {
-      return true;
-    }
-    if (value == null) {
-      return false;
-    }
-
-    int length = prefix.length;
-    if (value.length < length) {
-      return false;
-    }
-
-    for (int i = 0; i < length; i++) {
-      if (value[i] != prefix[i]) {
-        return false;
-      }
-    }
-    return true;
   }
 }

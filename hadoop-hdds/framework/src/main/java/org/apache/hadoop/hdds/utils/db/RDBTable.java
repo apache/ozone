@@ -217,13 +217,13 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
-    return new RDBStoreIterator(db.newIterator(family, false), this);
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this);
   }
 
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreIterator(db.newIterator(family, false), this,
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
         prefix);
   }
 
