@@ -640,26 +640,34 @@ public class ContainerEndpoint {
 
         List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(nonOMContainerId -> {
-          ContainerDiscrepancyInfo containerDiscrepancyInfo =
-              new ContainerDiscrepancyInfo();
-          containerDiscrepancyInfo.setContainerID(nonOMContainerId);
-          containerDiscrepancyInfo.setNumberOfKeys(0);
-          PipelineID pipelineID = null;
-          try {
-            pipelineID = containerManager.getContainer(
-                ContainerID.valueOf(nonOMContainerId)).getPipelineID();
-            if (pipelineID != null) {
-              pipelines.add(pipelineManager.getPipeline(pipelineID));
+            boolean containerExistsInScm = true;
+            ContainerDiscrepancyInfo containerDiscrepancyInfo =
+                new ContainerDiscrepancyInfo();
+            containerDiscrepancyInfo.setContainerID(nonOMContainerId);
+            containerDiscrepancyInfo.setNumberOfKeys(0);
+            PipelineID pipelineID = null;
+            try {
+              pipelineID = containerManager.getContainer(
+                  ContainerID.valueOf(nonOMContainerId)).getPipelineID();
+              if (pipelineID != null) {
+                pipelines.add(pipelineManager.getPipeline(pipelineID));
+              }
+            } catch (ContainerNotFoundException e) {
+              containerExistsInScm = false;
+              LOG.warn("Container {} not found in SCM: {}", nonOMContainerId,
+                  e);
+            } catch (PipelineNotFoundException e) {
+              LOG.debug(
+                  "Pipeline not found for container: {} and pipelineId: {}",
+                  nonOMContainerId, pipelineID, e);
             }
-          } catch (ContainerNotFoundException e) {
-            LOG.warn("Container {} not found in SCM: {}", nonOMContainerId, e);
-          } catch (PipelineNotFoundException e) {
-            LOG.debug("Pipeline not found for container: {} and pipelineId: {}",
-                nonOMContainerId, pipelineID, e);
+          // The container might have been deleted in SCM after the call to
+          // get the list of containers
+          if (containerExistsInScm) {
+            containerDiscrepancyInfo.setPipelines(pipelines);
+            containerDiscrepancyInfo.setExistsAt("SCM");
+            containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
           }
-          containerDiscrepancyInfo.setPipelines(pipelines);
-          containerDiscrepancyInfo.setExistsAt("SCM");
-          containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
         });
         break;
 
