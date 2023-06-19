@@ -93,22 +93,29 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
                                                     Optional<K> upperBound) {
     final ManagedReadOptions readOptions = new ManagedReadOptions();
     ManagedRocksIterator iterator;
-    if (lowerBound.isPresent() || upperBound.isPresent()) {
-      try {
-        if (lowerBound.isPresent()) {
-          readOptions.setIterateLowerBound(new ManagedSlice(
-              codecRegistry.asRawData(lowerBound.get())));
-        }
-
-        if (upperBound.isPresent()) {
-          readOptions.setIterateUpperBound(new ManagedSlice(
-              codecRegistry.asRawData(upperBound.get())));
-        }
-      } catch (IOException exception) {
-        // TODO: [SNAPSHOT] Fail gracefully.
-        throw new RuntimeException(exception);
+    final ManagedSlice lowerBoundSlice;
+    final ManagedSlice upperBoundSlice;
+    try {
+      if (lowerBound.isPresent()) {
+        lowerBoundSlice = new ManagedSlice(
+            codecRegistry.asRawData(lowerBound.get()));
+        readOptions.setIterateLowerBound(lowerBoundSlice);
+      } else {
+        lowerBoundSlice = null;
       }
+
+      if (upperBound.isPresent()) {
+        upperBoundSlice = new ManagedSlice(
+            codecRegistry.asRawData(upperBound.get()));
+        readOptions.setIterateUpperBound(upperBoundSlice);
+      } else {
+        upperBoundSlice = null;
+      }
+    } catch (IOException exception) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
     }
+
     iterator = ManagedRocksIterator.managed(
         db.get().newIterator(columnFamilyHandle, readOptions));
 
@@ -159,6 +166,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
         iterator.close();
         if (readOptions != null) {
           readOptions.close();
+        }
+        if (upperBound.isPresent()) {
+          upperBoundSlice.close();
+        }
+        if (lowerBound.isPresent()) {
+          lowerBoundSlice.close();
         }
       }
     };
