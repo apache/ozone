@@ -269,7 +269,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // recycling thread.
       List<DeletedBlocksTransaction> containerBlocks =
           cmd.getCmd().blocksTobeDeleted();
-      blockDeleteMetrics.incrReceiveTransactionCount(containerBlocks.size());
+      blockDeleteMetrics.incrReceivedTransactionCount(containerBlocks.size());
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
@@ -278,8 +278,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           summary.getTxIDSummary(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
-      blockDeleteMetrics.incrContainerCount(summary.getNumOfContainers());
-      blockDeleteMetrics.incrReceiveRetryTransactionCount(
+      blockDeleteMetrics.incrReceivedContainerCount(summary.getNumOfContainers());
+      blockDeleteMetrics.incrReceivedRetryTransactionCount(
           summary.getNumOfRetryTxs());
       blockDeleteMetrics.incrReceivedBlockCount(summary.getNumOfBlocks());
 

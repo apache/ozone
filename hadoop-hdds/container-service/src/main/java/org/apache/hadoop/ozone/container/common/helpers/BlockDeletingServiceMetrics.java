@@ -108,15 +108,15 @@ public final class BlockDeletingServiceMetrics {
     this.failureCount.incr();
   }
 
-  public void incrReceiveTransactionCount(long count) {
+  public void incrReceivedTransactionCount(long count) {
     receivedTransactionCount.incr(count);
   }
 
-  public void incrReceiveRetryTransactionCount(long count) {
+  public void incrReceivedRetryTransactionCount(long count) {
     receivedRetryTransactionCount.incr(count);
   }
 
-  public void incrContainerCount(long count) {
+  public void incrReceivedContainerCount(long count) {
     receivedContainerCount.incr(count);
   }
 
