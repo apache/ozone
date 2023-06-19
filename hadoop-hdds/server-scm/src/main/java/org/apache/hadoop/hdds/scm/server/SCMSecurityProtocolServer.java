@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -416,11 +415,19 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
 
   @Override
   public String getRootCACertificate() throws IOException {
-    ArrayList<String> pemEncodedRootCaList = new ArrayList<>();
+    Date lastCertDate = new Date(0);
+    X509Certificate lastCert = null;
     for (X509Certificate cert : rootCACertificate) {
-      pemEncodedRootCaList.add(CertificateCodec.getPEMEncodedString(cert));
+      if (cert.getNotAfter().after(lastCertDate)) {
+        lastCertDate = cert.getNotAfter();
+        lastCert = cert;
+      }
     }
-    return StringUtils.join(pemEncodedRootCaList, "\n");
+    return CertificateCodec.getPEMEncodedString(lastCert);
+  }
+
+  public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {
+    rootCACertificate.add(rootCaCertToAdd);
   }
 
   @Override

@@ -151,8 +151,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .build();
       case GetAllRootCaCertificates:
         return scmSecurityResponse.setAllRootCaCertificatesResponseProto(
-            getAllRootCa()
-        ).build();
+                getAllRootCa())
+            .build();
 
       default:
         throw new IllegalArgumentException(
