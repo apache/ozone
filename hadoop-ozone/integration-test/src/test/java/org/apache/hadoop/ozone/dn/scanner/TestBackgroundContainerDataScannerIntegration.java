@@ -79,6 +79,6 @@ public class TestBackgroundContainerDataScannerIntegration
         (int)SCAN_INTERVAL.toMillis(), (int)SCAN_INTERVAL.toMillis() * 5);
 
     // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthy(containerID);
+    waitForScmToSeeUnhealthyReplica(containerID);
   }
 }

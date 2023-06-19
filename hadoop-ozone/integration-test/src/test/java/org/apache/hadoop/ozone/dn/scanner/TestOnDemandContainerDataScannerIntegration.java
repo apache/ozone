@@ -92,6 +92,6 @@ public class TestOnDemandContainerDataScannerIntegration
         1000, 5000);
 
     // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthy(containerID);
+    waitForScmToSeeUnhealthyReplica(containerID);
   }
 }

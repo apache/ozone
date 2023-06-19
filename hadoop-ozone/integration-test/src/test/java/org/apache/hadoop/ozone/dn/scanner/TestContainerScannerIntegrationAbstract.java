@@ -124,12 +124,20 @@ public abstract class TestContainerScannerIntegrationAbstract {
     return bucket;
   }
 
-  protected void waitForScmToSeeUnhealthy(long containerID) throws Exception {
+  protected void waitForScmToSeeUnhealthyReplica(long containerID) throws Exception {
     ContainerManager scmContainerManager = cluster.getStorageContainerManager()
         .getContainerManager();
-    LambdaTestUtils.await(1, 1,
+    LambdaTestUtils.await(5000, 500,
         () -> getContainerReplica(scmContainerManager, containerID)
             .getState() == State.UNHEALTHY);
+  }
+
+  protected void waitForScmToCloseContainer(long containerID) throws Exception {
+    ContainerManager cm = cluster.getStorageContainerManager()
+        .getContainerManager();
+    LambdaTestUtils.await(5000, 500,
+        () -> cm.getContainer(new ContainerID(containerID)).getState()
+            != HddsProtos.LifeCycleState.OPEN);
   }
 
   protected Container<?> getDnContainer(long containerID) {
@@ -147,7 +155,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
     OzoneOutputStream key = createKey(keyName);
     key.write(getTestData());
     key.flush();
-//    TestHelper.waitForContainerClose(key, cluster);
     key.close();
 
     long containerID = bucket.getKey(keyName).getOzoneKeyLocations().stream()

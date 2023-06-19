@@ -2,6 +2,7 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -11,8 +12,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,10 +44,17 @@ public class TestBackgroundContainerMetadataScannerIntegration
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
+    // Speed up SCM closing of open container when an unhealthy replica is
+    // reported.
+    ReplicationManager.ReplicationManagerConfiguration rmConf = ozoneConfig
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConf.setInterval(Duration.ofSeconds(1));
+    ozoneConfig.setFromObject(rmConf);
+
     ozoneConfig.setBoolean(
         ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, true);
     // Make sure the background data scanner does not detect failures
-    // before the data scanner under test does.
+    // before the metadata scanner under test does.
     ozoneConfig.setBoolean(
         ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_DEV_DATA_ENABLED,
         false);
@@ -77,21 +88,20 @@ public class TestBackgroundContainerMetadataScannerIntegration
     corruption.applyTo(getDnContainer(closedContainerID));
     corruption.applyTo(getDnContainer(openContainerID));
     // Wait for the scanner to detect corruption.
-    System.err.println("Waiting for DN to see corruption in closed " + closedContainerID);
     GenericTestUtils.waitFor(() ->
             getDnContainer(closedContainerID).getContainerState() ==
                 ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         1000, (int)SCAN_INTERVAL.toMillis() * 2);
-    System.err.println("Waiting for DN to see corruption in open " + openContainerID);
     GenericTestUtils.waitFor(() ->
             getDnContainer(openContainerID).getContainerState() ==
                 ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         1000, (int)SCAN_INTERVAL.toMillis() * 2);
 
     // Wait for SCM to get reports of the unhealthy replicas.
-    System.err.println("Waiting for SCM to see corruption in closed " + closedContainerID);
-    waitForScmToSeeUnhealthy(closedContainerID);
-    System.err.println("Waiting for SCM to see corruption in open " + openContainerID);
-    waitForScmToSeeUnhealthy(openContainerID);
+    waitForScmToSeeUnhealthyReplica(closedContainerID);
+    waitForScmToSeeUnhealthyReplica(openContainerID);
+    // Once the unhealthy replica is reported, the open container's lifecycle
+    // state in SCM should move to closed.
+    waitForScmToCloseContainer(openContainerID);
   }
 }
