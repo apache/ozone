@@ -155,6 +155,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       " due to the configured limit.")
   private MutableCounterLong inflightDeletionSkippedTotal;
 
+  @Metric("Number of times under replication processing has paused due to" +
+      " reaching the cluster inflight replication limit.")
+  private MutableCounterLong pendingReplicationLimitReachedTotal;
+
   private MetricsRegistry registry;
 
   private final ReplicationManager replicationManager;
@@ -182,6 +186,34 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   @Metric("Number of EC replicas scheduled for delete which timed out.")
   private MutableCounterLong ecReplicaDeleteTimeoutTotal;
+
+  @Metric("Number of times partial EC reconstruction was needed due to " +
+      "overloaded nodes, but skipped as there was still sufficient redundancy.")
+  private MutableCounterLong ecPartialReconstructionSkippedTotal;
+
+  @Metric("Number of times partial EC reconstruction was used due to " +
+      "insufficient nodes available and reconstruction was critical.")
+  private MutableCounterLong ecPartialReconstructionCriticalTotal;
+
+  @Metric("Number of times partial EC reconstruction was used due to " +
+      "insufficient nodes available and with no overloaded nodes.")
+  private MutableCounterLong ecPartialReconstructionNoneOverloadedTotal;
+
+  @Metric("Number of times EC decommissioning or entering maintenance mode " +
+      "replicas were not all replicated due to insufficient nodes available.")
+  private MutableCounterLong ecPartialReplicationForOutOfServiceReplicasTotal;
+
+  @Metric("Number of times partial Ratis replication occurred due to " +
+      "insufficient nodes available.")
+  private MutableCounterLong partialReplicationTotal;
+
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated ratis container due to insufficient nodes available.")
+  private MutableCounterLong partialReplicationForMisReplicationTotal;
+
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated EC container due to insufficient nodes available.")
+  private MutableCounterLong ecPartialReplicationForMisReplicationTotal;
 
   @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
       + "due to the pending commands on the target datanode")
@@ -272,6 +304,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecReconstructionCmdsDeferredTotal.snapshot(builder, all);
     deleteContainerCmdsDeferredTotal.snapshot(builder, all);
     replicateContainerCmdsDeferredTotal.snapshot(builder, all);
+    pendingReplicationLimitReachedTotal.snapshot(builder, all);
+    ecPartialReconstructionSkippedTotal.snapshot(builder, all);
+    ecPartialReconstructionCriticalTotal.snapshot(builder, all);
+    ecPartialReconstructionNoneOverloadedTotal.snapshot(builder, all);
+    ecPartialReplicationForOutOfServiceReplicasTotal.snapshot(builder, all);
+    partialReplicationTotal.snapshot(builder, all);
+    ecPartialReplicationForMisReplicationTotal.snapshot(builder, all);
+    partialReplicationForMisReplicationTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
@@ -503,6 +543,70 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   public long getReplicateContainerCmdsDeferredTotal() {
     return replicateContainerCmdsDeferredTotal.value();
+  }
+
+  public void incrPendingReplicationLimitReachedTotal() {
+    this.pendingReplicationLimitReachedTotal.incr();
+  }
+
+  public long getPendingReplicationLimitReachedTotal() {
+    return pendingReplicationLimitReachedTotal.value();
+  }
+
+  public long getECPartialReconstructionSkippedTotal() {
+    return ecPartialReconstructionSkippedTotal.value();
+  }
+
+  public void incrECPartialReconstructionSkippedTotal() {
+    this.ecPartialReconstructionSkippedTotal.incr();
+  }
+
+  public long getECPartialReconstructionCriticalTotal() {
+    return ecPartialReconstructionCriticalTotal.value();
+  }
+
+  public void incrECPartialReconstructionCriticalTotal() {
+    this.ecPartialReconstructionCriticalTotal.incr();
+  }
+
+  public long getEcPartialReconstructionNoneOverloadedTotal() {
+    return ecPartialReconstructionNoneOverloadedTotal.value();
+  }
+
+  public void incrEcPartialReconstructionNoneOverloadedTotal() {
+    this.ecPartialReconstructionNoneOverloadedTotal.incr();
+  }
+
+  public long getEcPartialReplicationForOutOfServiceReplicasTotal() {
+    return ecPartialReplicationForOutOfServiceReplicasTotal.value();
+  }
+
+  public void incrEcPartialReplicationForOutOfServiceReplicasTotal() {
+    this.ecPartialReplicationForOutOfServiceReplicasTotal.incr();
+  }
+
+  public long getPartialReplicationTotal() {
+    return partialReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationTotal() {
+    this.partialReplicationTotal.incr();
+  }
+
+  public void incrEcPartialReplicationForMisReplicationTotal() {
+    this.ecPartialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getEcPartialReplicationForMisReplicationTotal() {
+    return this.ecPartialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationForMisReplicationTotal() {
+    this.partialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getPartialReplicationForMisReplicationTotal() {
+    return this.partialReplicationForMisReplicationTotal.value();
   }
 
 }

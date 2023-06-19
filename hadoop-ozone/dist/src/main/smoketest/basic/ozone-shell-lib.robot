@@ -207,6 +207,44 @@ Test prefix Acls
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
 
+Test native authorizer
+    [arguments]     ${protocol}         ${server}       ${volume}
+
+    Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
+
+    Execute         ozone sh volume removeacl ${protocol}${server}/${volume} -a group:root:a
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
+                    Should contain      ${result}    PERMISSION_DENIED
+    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
+                    Should contain      ${result}    PERMISSION_DENIED
+    ${result} =     Execute And Ignore Error         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xy
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser     testuser.keytab
+    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xyrw
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have LIST permission to access volume
+    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:l
+    Execute         ozone sh bucket list ${protocol}${server}/${volume}
+    Execute         ozone sh volume getacl ${protocol}${server}/${volume}
+
+    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
+    Should contain      ${result}    PERMISSION_DENIED
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser     testuser.keytab
+    Execute         ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:testuser2:a
+    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    Execute         ozone sh key list ${protocol}${server}/${volume}/bb1
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser    testuser.keytab
+
 Test Delete key with and without Trash
     [arguments]    ${protocol}         ${server}       ${volume}
                    Execute               ozone sh volume create ${protocol}${server}/${volume}

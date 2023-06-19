@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Deleted
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -53,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -86,8 +88,9 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   protected int processKeyDeletes(List<BlockGroup> keyBlocksList,
-                                  KeyManager manager,
-                                  String snapTableKey) throws IOException {
+      KeyManager manager,
+      HashMap<String, RepeatedOmKeyInfo> keysToModify,
+      String snapTableKey) throws IOException {
 
     long startTime = Time.monotonicNow();
     int delCount = 0;
@@ -95,7 +98,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         scmClient.deleteKeyBlocks(keyBlocksList);
     if (blockDeletionResults != null) {
       if (isRatisEnabled()) {
-        delCount = submitPurgeKeysRequest(blockDeletionResults, snapTableKey);
+        delCount = submitPurgeKeysRequest(blockDeletionResults,
+            keysToModify, snapTableKey);
       } else {
         // TODO: Once HA and non-HA paths are merged, we should have
         //  only one code path here. Purge keys should go through an
@@ -147,9 +151,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
    * Submits PurgeKeys request for the keys whose blocks have been deleted
    * by SCM.
    * @param results DeleteBlockGroups returned by SCM.
+   * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   private int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-                                     String snapTableKey) {
+      HashMap<String, RepeatedOmKeyInfo> keysToModify, String snapTableKey) {
     Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
         new HashMap<>();
 
@@ -159,10 +164,18 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       if (result.isSuccess()) {
         // Add key to PurgeKeys list.
         String deletedKey = result.getObjectKey();
-        // Parse Volume and BucketName
-        addToMap(purgeKeysMapPerBucket, deletedKey);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+        if (keysToModify != null && !keysToModify.containsKey(deletedKey)) {
+          // Parse Volume and BucketName
+          addToMap(purgeKeysMapPerBucket, deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be updated in OM DB, Other versions " +
+                "of the key that are reclaimable are reclaimed.", deletedKey);
+          }
+        } else if (keysToModify == null) {
+          addToMap(purgeKeysMapPerBucket, deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+          }
         }
         deletedCount++;
       }
@@ -183,6 +196,27 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           .addAllKeys(entry.getValue())
           .build();
       purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
+    }
+
+    List<SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
+    if (keysToModify != null) {
+      for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
+          keysToModify.entrySet()) {
+
+        SnapshotMoveKeyInfos.Builder keyToUpdate =
+            SnapshotMoveKeyInfos.newBuilder();
+        keyToUpdate.setKey(keyToModify.getKey());
+        List<OzoneManagerProtocolProtos.KeyInfo> keyInfos =
+            keyToModify.getValue().getOmKeyInfoList().stream()
+                .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .collect(Collectors.toList());
+        keyToUpdate.addAllKeyInfos(keyInfos);
+        keysToUpdateList.add(keyToUpdate.build());
+      }
+
+      if (keysToUpdateList.size() > 0) {
+        purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
+      }
     }
 
     OMRequest omRequest = OMRequest.newBuilder()
