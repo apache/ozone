@@ -536,4 +536,7 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
 }
