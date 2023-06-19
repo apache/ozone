@@ -83,6 +83,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -385,7 +386,8 @@ public class TestSnapshotDiffManager {
       snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
           fromSnapshotTable, Sets.newHashSet("dummy.sst"),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
-          objectIdsToCheck, oldParentIds, newParentIds,
+          objectIdsToCheck, Optional.ofNullable(oldParentIds),
+          Optional.ofNullable(newParentIds),
           ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "",
               OmMetadataManagerImpl.KEY_TABLE, "",
               OmMetadataManagerImpl.FILE_TABLE, ""));

@@ -659,7 +659,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     // It is required to prevent that SST files get deleted for in_progress
     // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
-
     try {
       validateSnapshotsAreActive(volumeName, bucketName, fromSnapshotName,
           toSnapshotName);
@@ -718,12 +717,14 @@ public class SnapshotDiffManager implements AutoCloseable {
           .getKeyTable(bucketLayout);
       Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
           .getKeyTable(bucketLayout);
-      Set<Long> oldParentIds = null;
-      Set<Long> newParentIds = null;
+
+      Optional<Set<Long>> oldParentIds = Optional.empty();
+      Optional<Set<Long>> newParentIds = Optional.empty();
       if (bucketLayout.isFileSystemOptimized()) {
-        oldParentIds = new HashSet<>();
-        newParentIds = new HashSet<>();
+        oldParentIds = Optional.of(new HashSet<>());
+        newParentIds = Optional.of(new HashSet<>());
       }
+
       getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
           fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
           tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
@@ -805,7 +806,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final PersistentSet<byte[]> objectIDsToCheck,
-      final Set<Long> oldParentIds, final Set<Long> newParentIds,
+      final Optional<Set<Long>> oldParentIds,
+      final Optional<Set<Long>> newParentIds,
       final String diffDir) throws IOException, RocksDBException {
 
     List<String> tablesToLookUp = Collections.singletonList(fsTable.getName());
@@ -849,7 +851,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                         PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
                         PersistentMap<byte[], byte[]> newObjIdToKeyMap,
                         PersistentSet<byte[]> objectIDsToCheck,
-                        Set<Long> oldParentIds, Set<Long> newParentIds,
+                        Optional<Set<Long>> oldParentIds,
+                        Optional<Set<Long>> newParentIds,
                         Map<String, String> tablePrefixes) throws IOException,
       NativeLibraryNotLoadedException, RocksDBException {
     if (deltaFiles.isEmpty()) {
@@ -884,10 +887,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                 key.substring(tablePrefix.length()));
             oldObjIdToKeyMap.put(rawObjId, rawValue);
             objectIDsToCheck.add(rawObjId);
-            if (oldParentIds != null) {
-              oldParentIds.add(oldKey.getParentObjectID());
-            }
-
+            oldParentIds.ifPresent(set -> set.add(oldKey.getParentObjectID()));
           }
           if (newKey != null) {
             byte[] rawObjId = codecRegistry.asRawData(newKey.getObjectID());
@@ -895,9 +895,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                 key.substring(tablePrefix.length()));
             newObjIdToKeyMap.put(rawObjId, rawValue);
             objectIDsToCheck.add(rawObjId);
-            if (newParentIds != null) {
-              newParentIds.add(newKey.getParentObjectID());
-            }
+            newParentIds.ifPresent(set -> set.add(newKey.getParentObjectID()));
           }
         } catch (IOException e) {
           throw new RuntimeException(e);
