@@ -75,7 +75,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -105,7 +105,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotAct
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
@@ -390,10 +390,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     SnapshotDiffJob diffJob = snapDiffJobTable.get(snapDiffJobKey);
 
     JobStatus jobStatus;
-    CancelStatus cancelStatus;
+    JobCancelResult jobCancelResult;
 
     if (diffJob == null) {
-      cancelStatus = CancelStatus.NEW_JOB;
+      jobCancelResult = JobCancelResult.NEW_JOB;
       // JobStatus is needed to send a response back to the client.
       // JobStatus can't be null, so set it to QUEUED.
       // This won't be printed as part of the response
@@ -402,17 +402,17 @@ public class SnapshotDiffManager implements AutoCloseable {
       jobStatus = QUEUED;
     } else {
       if (Objects.equals(diffJob.getStatus(), IN_PROGRESS)) {
-        updateJobStatus(snapDiffJobKey, IN_PROGRESS, CANCELED);
-        cancelStatus = CancelStatus.CANCEL_SUCCESS;
-      } else if (Objects.equals(diffJob.getStatus(), CANCELED)) {
-        cancelStatus = CancelStatus.JOB_ALREADY_CANCELED;
+        updateJobStatus(snapDiffJobKey, IN_PROGRESS, CANCELLED);
+        jobCancelResult = JobCancelResult.CANCELLATION_SUCCESS;
+      } else if (Objects.equals(diffJob.getStatus(), CANCELLED)) {
+        jobCancelResult = JobCancelResult.JOB_ALREADY_CANCELLED;
       } else if (Objects.equals(diffJob.getStatus(), DONE)) {
-        cancelStatus = CancelStatus.JOB_DONE;
+        jobCancelResult = JobCancelResult.JOB_DONE;
       } else {
-        cancelStatus = CancelStatus.INVALID_STATUS_TRANSITION;
+        jobCancelResult = JobCancelResult.INVALID_STATUS_TRANSITION;
       }
       // Get again the status from the table
-      // in case it's updated to CANCELED.
+      // in case it's updated to CANCELLED.
       jobStatus = snapDiffJobTable.get(snapDiffJobKey).getStatus();
     }
 
@@ -422,9 +422,9 @@ public class SnapshotDiffManager implements AutoCloseable {
         fromSnapshotName, toSnapshotName, new ArrayList<>(), null);
 
     // If cancel is a success then return SnapshotDiffReport.
-    // It will check the table and get that the job is canceled,
+    // It will check the table and get that the job is cancelled,
     // and return the appropriate response.
-    return new SnapshotDiffResponse(report, jobStatus, 0L, cancelStatus);
+    return new SnapshotDiffResponse(report, jobStatus, 0L, jobCancelResult);
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(
@@ -478,12 +478,12 @@ public class SnapshotDiffManager implements AutoCloseable {
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
               null),
           REJECTED, defaultWaitTime);
-    case CANCELED:
+    case CANCELLED:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
               null),
-          CANCELED, 0L, CancelStatus.CANCEL_SUCCESS);
+          CANCELLED, 0L, JobCancelResult.CANCELLATION_SUCCESS);
     default:
       throw new IllegalStateException("Unknown snapshot job status: " +
           snapDiffJob.getStatus());
@@ -689,7 +689,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     return snapDiffJob;
   }
 
-  private boolean validateDiffJobAndSnapshotsAreActive(
+  private boolean areDiffJobAndSnapshotsActive(
       final String volumeName, final String bucketName,
       final String fromSnapshotName, final String toSnapshotName)
       throws IOException {
@@ -702,7 +702,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         DELIMITER + toSnapInfo.getSnapshotId();
 
     if (snapDiffJobTable.get(jobKey).getStatus()
-        .equals(CANCELED)) {
+        .equals(CANCELLED)) {
       return false;
     }
     checkSnapshotActive(fromSnapInfo, false);
@@ -734,8 +734,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
     try {
-      if (!validateDiffJobAndSnapshotsAreActive(volumeName,
-          bucketName, fromSnapshotName, toSnapshotName)) {
+      if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+          fromSnapshotName, toSnapshotName)) {
         return;
       }
 
@@ -787,8 +787,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
 
-      if (!validateDiffJobAndSnapshotsAreActive(volumeName,
-          bucketName, fromSnapshotName, toSnapshotName)) {
+      if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+          fromSnapshotName, toSnapshotName)) {
         return;
       }
       Table<String, OmKeyInfo> fsKeyTable = fromSnapshot.getMetadataManager()
@@ -830,10 +830,10 @@ public class SnapshotDiffManager implements AutoCloseable {
                 objectIdToKeyNameMapForToSnapshot,
                 volumeName, bucketName,
                 fromSnapshotName, toSnapshotName);
-            // If job is canceled, totalDiffEntries will be equal to -1.
+            // If job is cancelled, totalDiffEntries will be equal to -1.
             if (totalDiffEntries >= 0 &&
-                validateDiffJobAndSnapshotsAreActive(volumeName,
-                    bucketName, fromSnapshotName, toSnapshotName)) {
+                areDiffJobAndSnapshotsActive(volumeName, bucketName,
+                    fromSnapshotName, toSnapshotName)) {
               updateJobStatusToDone(jobKey, totalDiffEntries);
             }
             return null;
@@ -842,8 +842,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       // Check if the job is cancelled, before every method call.
       for (Callable<Void> methodCall : methodCalls) {
-        if (!validateDiffJobAndSnapshotsAreActive(volumeName,
-            bucketName, fromSnapshotName, toSnapshotName)) {
+        if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+            fromSnapshotName, toSnapshotName)) {
           return;
         }
         methodCall.call();
@@ -1105,13 +1105,13 @@ public class SnapshotDiffManager implements AutoCloseable {
       try (ClosableIterator<byte[]>
                objectIdsIterator = objectIDsToCheck.iterator()) {
         // This counter is used, so that we can check every 100 elements
-        // if the job is canceled and snapshots are still active.
+        // if the job is cancelled and snapshots are still active.
         int counter = 0;
 
         while (objectIdsIterator.hasNext()) {
           if (counter % 100 == 0 &&
-              !validateDiffJobAndSnapshotsAreActive(volumeName,
-              bucketName, fromSnapshotName, toSnapshotName)) {
+              !areDiffJobAndSnapshotsActive(volumeName, bucketName,
+                  fromSnapshotName, toSnapshotName)) {
             return -1L;
           }
 

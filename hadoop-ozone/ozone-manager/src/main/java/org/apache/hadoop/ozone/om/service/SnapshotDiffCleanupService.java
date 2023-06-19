@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 
@@ -131,6 +131,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
       return db.get().get(snapDiffPurgedJobCfh,
           codecRegistry.asRawData(jobId));
     } catch (IOException | RocksDBException e) {
+      // TODO: [SNAPSHOT] Fail gracefully.
       throw new RuntimeException(e);
     }
   }
@@ -166,7 +167,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
         if (currentTimeMillis - snapDiffJob.getCreationTime() > maxAllowedTime
             || snapDiffJob.getStatus() == FAILED
             || snapDiffJob.getStatus() == REJECTED
-            || snapDiffJob.getStatus() == CANCELED) {
+            || snapDiffJob.getStatus() == CANCELLED) {
 
           writeBatch.put(snapDiffPurgedJobCfh,
               codecRegistry.asRawData(snapDiffJob.getJobId()),

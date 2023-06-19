@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.snapshot;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.CancelStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobCancelResultProto;
 
 /**
  * POJO for Snapshot Diff Response.
@@ -34,7 +34,7 @@ public class SnapshotDiffResponse {
     DONE,
     REJECTED,
     FAILED,
-    CANCELED;
+    CANCELLED;
 
     public JobStatusProto toProtobuf() {
       return JobStatusProto.valueOf(this.name());
@@ -46,19 +46,19 @@ public class SnapshotDiffResponse {
   }
 
   /**
-   * Snapshot diff cancel status enum.
+   * Snapshot diff cancel result enum.
    */
-  public enum CancelStatus {
-    JOB_NOT_CANCELED("Job is not canceled"),
+  public enum JobCancelResult {
+    JOB_NOT_CANCELLED("Job hasn't been cancelled"),
     NEW_JOB("Cannot cancel a newly submitted job"),
-    JOB_DONE("Job is DONE, cancel failed"),
+    JOB_DONE("Job is already DONE"),
     INVALID_STATUS_TRANSITION("Job is not IN_PROGRESS, cancel failed"),
-    JOB_ALREADY_CANCELED("Job has already been canceled"),
-    CANCEL_SUCCESS("Job has successfully been canceled");
+    JOB_ALREADY_CANCELLED("Job has already been cancelled"),
+    CANCELLATION_SUCCESS("Job has successfully been cancelled");
 
     private final String description;
 
-    CancelStatus(String description) {
+    JobCancelResult(String description) {
       this.description = description;
     }
 
@@ -66,20 +66,20 @@ public class SnapshotDiffResponse {
       return description;
     }
 
-    public CancelStatusProto toProtobuf() {
-      return CancelStatusProto.valueOf(this.name());
+    public JobCancelResultProto toProtobuf() {
+      return JobCancelResultProto.valueOf(this.name());
     }
 
-    public static CancelStatus fromProtobuf(
-        CancelStatusProto cancelStatusProto) {
-      return CancelStatus.valueOf(cancelStatusProto.name());
+    public static JobCancelResult fromProtobuf(
+        JobCancelResultProto jobCancelResultProto) {
+      return JobCancelResult.valueOf(jobCancelResultProto.name());
     }
   }
 
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
-  private final CancelStatus cancelStatus;
+  private final JobCancelResult jobCancelResult;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -87,17 +87,17 @@ public class SnapshotDiffResponse {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
-    this.cancelStatus = CancelStatus.JOB_NOT_CANCELED;
+    this.jobCancelResult = JobCancelResult.JOB_NOT_CANCELLED;
   }
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
                               final long waitTimeInMs,
-                              final CancelStatus cancelStatus) {
+                              final JobCancelResult jobCancelResult) {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
-    this.cancelStatus = cancelStatus;
+    this.jobCancelResult = jobCancelResult;
   }
 
   public SnapshotDiffReportOzone getSnapshotDiffReport() {
@@ -112,27 +112,26 @@ public class SnapshotDiffResponse {
     return waitTimeInMs;
   }
 
-  public CancelStatus getCancelStatus() {
-    return cancelStatus;
+  public JobCancelResult getJobCancelResult() {
+    return jobCancelResult;
   }
 
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
-    if (cancelStatus == CancelStatus.JOB_NOT_CANCELED ||
-        cancelStatus == CancelStatus.CANCEL_SUCCESS) {
+    if (jobCancelResult == JobCancelResult.JOB_NOT_CANCELLED ||
+        jobCancelResult == JobCancelResult.CANCELLATION_SUCCESS) {
       if (jobStatus == JobStatus.DONE) {
         str.append(snapshotDiffReport.toString());
       } else {
         str.append("Snapshot diff job is ");
         str.append(jobStatus);
-        str.append("\n");
-        str.append("Please retry after ");
+        str.append(". Please retry after ");
         str.append(waitTimeInMs);
         str.append(" ms.\n");
       }
     } else {
-      str.append(cancelStatus.getDescription());
+      str.append(jobCancelResult.getDescription());
       str.append("\n");
     }
     return str.toString();

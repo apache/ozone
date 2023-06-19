@@ -667,6 +667,7 @@ public class ObjectStore {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param cancel request to cancel a running snapshot diff job.
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */

@@ -498,6 +498,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
     return snapshotDiffCleanupService;
   }
+
   /**
    * Helper method to locate the end key with the given prefix and iterator.
    * @param keyIter TableIterator

@@ -62,8 +62,8 @@ public class SnapshotDiffHandler extends Handler {
 
 
   @CommandLine.Option(names = {"-c", "--cancel"},
-      description = "Cancel a running snapshotDiff job. " +
-          "If the job is not IN_PROGRESS then the option will fail.",
+      description = "Request to cancel a running SnapshotDiff job. " +
+          "If the job is not IN_PROGRESS, the request will fail.",
       defaultValue = "false")
   private boolean cancel;
 

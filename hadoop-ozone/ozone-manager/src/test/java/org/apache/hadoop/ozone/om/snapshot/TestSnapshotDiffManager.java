@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.CancelStatus;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -653,13 +653,13 @@ public class TestSnapshotDiffManager {
   }
 
   /**
-   * Once a job is canceled, it stays in the table until
+   * Once a job is cancelled, it stays in the table until
    * SnapshotDiffCleanupService removes it.
    *
-   * Job response until that happens, is CANCELED.
+   * Job response until that happens, is CANCELLED.
    */
   @Test
-  public void testGetSnapshotDiffReportForCanceledJob()
+  public void testGetSnapshotDiffReportForCancelledJob()
       throws IOException {
     SnapshotDiffManager snapshotDiffManager =
         getMockedSnapshotDiffManager(10);
@@ -698,60 +698,60 @@ public class TestSnapshotDiffManager {
     snapshotDiffManager.cancelSnapshotDiff(volumeName, bucketName,
         fromSnapshotName, toSnapshotName);
 
-    // Job status should be canceled until the cleanup
+    // Job status should be cancelled until the cleanup
     // service removes the job from the table.
     snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
             0, 0, false);
 
-    Assertions.assertEquals(JobStatus.CANCELED,
+    Assertions.assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
 
     // Check snapDiffJobTable.
     diffJob = snapDiffJobTable.get(diffJobKey);
     Assertions.assertNotNull(diffJob);
-    Assertions.assertEquals(JobStatus.CANCELED,
+    Assertions.assertEquals(JobStatus.CANCELLED,
         diffJob.getStatus());
 
-    // Response should still be canceled.
+    // Response should still be cancelled.
     snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
             0, 0, false);
 
-    Assertions.assertEquals(JobStatus.CANCELED,
+    Assertions.assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
 
     // Check snapDiffJobTable.
     diffJob = snapDiffJobTable.get(diffJobKey);
     Assertions.assertNotNull(diffJob);
-    Assertions.assertEquals(JobStatus.CANCELED,
+    Assertions.assertEquals(JobStatus.CANCELLED,
         diffJob.getStatus());
   }
 
   private static Stream<Arguments> snapDiffCancelFailureScenarios() {
     return Stream.of(
         Arguments.of(JobStatus.IN_PROGRESS,
-            CancelStatus.CANCEL_SUCCESS, true),
-        Arguments.of(JobStatus.CANCELED,
-            CancelStatus.JOB_ALREADY_CANCELED, true),
+            JobCancelResult.CANCELLATION_SUCCESS, true),
+        Arguments.of(JobStatus.CANCELLED,
+            JobCancelResult.JOB_ALREADY_CANCELLED, true),
         Arguments.of(JobStatus.DONE,
-            CancelStatus.JOB_DONE, false),
+            JobCancelResult.JOB_DONE, false),
         Arguments.of(JobStatus.QUEUED,
-            CancelStatus.INVALID_STATUS_TRANSITION, false),
+            JobCancelResult.INVALID_STATUS_TRANSITION, false),
         Arguments.of(JobStatus.FAILED,
-            CancelStatus.INVALID_STATUS_TRANSITION, false),
+            JobCancelResult.INVALID_STATUS_TRANSITION, false),
         Arguments.of(JobStatus.REJECTED,
-            CancelStatus.INVALID_STATUS_TRANSITION, false)
+            JobCancelResult.INVALID_STATUS_TRANSITION, false)
     );
   }
 
   @ParameterizedTest
   @MethodSource("snapDiffCancelFailureScenarios")
   public void testSnapshotDiffCancelFailure(JobStatus jobStatus,
-                                            CancelStatus cancelStatus,
-                                            boolean jobIsCanceled)
+                                            JobCancelResult cancelResult,
+                                            boolean jobIsCancelled)
       throws IOException {
     SnapshotDiffManager snapshotDiffManager =
         getMockedSnapshotDiffManager(10);
@@ -785,11 +785,11 @@ public class TestSnapshotDiffManager {
         .cancelSnapshotDiff(volumeName, bucketName,
             fromSnapshotName, toSnapshotName);
 
-    Assertions.assertEquals(cancelStatus,
-        snapshotDiffResponse.getCancelStatus());
+    Assertions.assertEquals(cancelResult,
+        snapshotDiffResponse.getJobCancelResult());
 
-    if (jobIsCanceled) {
-      Assertions.assertEquals(JobStatus.CANCELED,
+    if (jobIsCancelled) {
+      Assertions.assertEquals(JobStatus.CANCELLED,
           snapshotDiffResponse.getJobStatus());
     }
   }
@@ -819,9 +819,9 @@ public class TestSnapshotDiffManager {
             fromSnapshotName, toSnapshotName);
 
     // The job doesn't exist on the SnapDiffJob table and
-    // trying to cancel it should lead to NEW_JOB cancel status.
-    Assertions.assertEquals(CancelStatus.NEW_JOB,
-        snapshotDiffResponse.getCancelStatus());
+    // trying to cancel it should lead to NEW_JOB cancel result.
+    Assertions.assertEquals(JobCancelResult.NEW_JOB,
+        snapshotDiffResponse.getJobCancelResult());
   }
 
   private void setUpSnapshots(String volumeName, String bucketName,
