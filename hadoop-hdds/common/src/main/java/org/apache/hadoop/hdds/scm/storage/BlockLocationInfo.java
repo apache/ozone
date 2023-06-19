@@ -176,6 +176,20 @@ public class BlockLocationInfo {
         + '}';
   }
 
+  public boolean hasSameBlockAs(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    BlockLocationInfo that = (BlockLocationInfo) o;
+    return length == that.length &&
+        offset == that.offset &&
+        createVersion == that.createVersion &&
+        Objects.equals(blockID, that.blockID);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

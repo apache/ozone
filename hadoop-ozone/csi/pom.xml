@@ -42,6 +42,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
           <groupId>com.google.protobuf</groupId>
           <artifactId>protobuf-java</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.google.j2objc</groupId>
+          <artifactId>j2objc-annotations</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>

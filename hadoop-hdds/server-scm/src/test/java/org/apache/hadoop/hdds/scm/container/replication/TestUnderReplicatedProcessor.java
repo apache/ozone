@@ -44,6 +44,7 @@ public class TestUnderReplicatedProcessor {
   private ECReplicationConfig repConfig;
   private UnderReplicatedProcessor underReplicatedProcessor;
   private ReplicationQueue queue;
+  private ReplicationManagerMetrics rmMetrics;
 
   @Before
   public void setup() {
@@ -55,13 +56,15 @@ public class TestUnderReplicatedProcessor {
     // use real queue
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
-    underReplicatedProcessor = new UnderReplicatedProcessor(
-        replicationManager, rmConf::getUnderReplicatedInterval);
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    rmMetrics = ReplicationManagerMetrics.create(replicationManager);
     Mockito.when(replicationManager.getMetrics())
-        .thenReturn(ReplicationManagerMetrics.create(replicationManager));
+        .thenReturn(rmMetrics);
     Mockito.when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(0L);
+    underReplicatedProcessor = new UnderReplicatedProcessor(
+        replicationManager, rmConf::getUnderReplicatedInterval);
   }
 
   @Test
@@ -129,6 +132,7 @@ public class TestUnderReplicatedProcessor {
     // We should have processed the message now
     Mockito.verify(replicationManager, Mockito.times(1))
         .processUnderReplicatedContainer(any());
+    assertEquals(1, rmMetrics.getPendingReplicationLimitReachedTotal());
   }
 
 }

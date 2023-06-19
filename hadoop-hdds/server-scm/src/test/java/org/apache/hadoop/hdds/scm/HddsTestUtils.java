@@ -742,7 +742,8 @@ public final class HddsTestUtils {
             .setDatanodeDetails(datanodeDetails)
             .setOriginNodeId(originNodeId).setSequenceId(sequenceId)
             .setBytesUsed(usedBytes)
-            .setKeyCount(keyCount);
+            .setKeyCount(keyCount)
+            .setEmpty(keyCount == 0);
   }
 
   public static ContainerReplica getReplicas(

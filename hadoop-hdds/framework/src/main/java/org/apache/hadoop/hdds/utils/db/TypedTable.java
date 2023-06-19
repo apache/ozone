@@ -403,7 +403,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void delete(KEY key) throws IOException {
-    rawTable.delete(encodeKey(key));
+    if (keyCodec.supportCodecBuffer()) {
+      try (CodecBuffer buffer = keyCodec.toDirectCodecBuffer(key)) {
+        rawTable.delete(buffer.asReadOnlyByteBuffer());
+      }
+    } else {
+      rawTable.delete(encodeKey(key));
+    }
   }
 
   @Override

@@ -48,7 +48,8 @@ import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
-import org.apache.hadoop.hdds.scm.crl.CRLStatusReportHandler;
+import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
+import org.apache.hadoop.hdds.scm.security.CRLStatusReportHandler;
 import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -66,6 +67,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
+import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
@@ -272,6 +274,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private SCMSafeModeManager scmSafeModeManager;
   private CertificateClient scmCertificateClient;
+  private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
   private final JvmPauseMonitor jvmPauseMonitor;
@@ -381,6 +384,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     eventQueue = new EventQueue();
     serviceManager = new SCMServiceManager();
+    reconfigurationHandler =
+        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     initializeSystemManagers(conf, configurator);
 
@@ -406,10 +412,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
-
-    reconfigurationHandler =
-        new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
-            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
@@ -782,6 +784,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           systemClock,
           legacyRM,
           containerReplicaPendingOps);
+      reconfigurationHandler.register(replicationManager.getConfig());
     }
     serviceManager.register(replicationManager);
     if (configurator.getScmSafeModeManager() != null) {
@@ -888,6 +891,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager(configuration);
     }
+    rootCARotationManager = new RootCARotationManager(this);
   }
 
   /**
@@ -1503,6 +1507,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       persistSCMCertificates();
     }
 
+    if (rootCARotationManager != null) {
+      try {
+        rootCARotationManager.start();
+      } catch (SCMServiceException e) {
+        throw new IOException("Failed to start root CA rotation manager", e);
+      }
+    }
+
     scmBlockManager.start();
     leaseManager.start();
 
@@ -1620,6 +1632,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().stop();
+    }
+
+    if (rootCARotationManager != null) {
+      rootCARotationManager.stop();
     }
 
     try {
@@ -1835,6 +1851,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public MoveManager getMoveManager() {
     return moveManager;
+  }
+
+  /**
+   * Returns SCM root CA rotation manager.
+   */
+  public RootCARotationManager getRootCARotationManager() {
+    return rootCARotationManager;
   }
 
   /**

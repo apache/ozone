@@ -26,7 +26,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -54,7 +56,7 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 /**
  * ManagedSstFileReader tests.
  */
-public class TestManagedSstFileReader {
+class TestManagedSstFileReader {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestManagedSstFileReader.class);
@@ -129,13 +131,14 @@ public class TestManagedSstFileReader {
     }
   }
 
-  @Disabled
+  @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
+  @Disabled("HDDS-8818")
   public void testGetKeyStreamWithTombstone(int numberOfFiles)
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
-    NativeLibraryLoader.getInstance()
-        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
+    Assumptions.assumeTrue(NativeLibraryLoader.getInstance()
+        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
     Pair<Map<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();

@@ -103,6 +103,8 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           inflightOperationLimitReached(replicationManager, inflightLimit)) {
         LOG.info("The maximum number of pending replicas ({}) are scheduled. " +
             "Ending the iteration.", inflightLimit);
+        replicationManager
+            .getMetrics().incrPendingReplicationLimitReachedTotal();
         break;
       }
       HealthResult healthResult =

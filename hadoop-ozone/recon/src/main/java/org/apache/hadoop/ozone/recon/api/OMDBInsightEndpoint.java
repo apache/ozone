@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -30,6 +31,11 @@ import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -42,11 +48,20 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+
 
 /**
  * Endpoint to get following key level info under OM DB Insight page of Recon.
@@ -69,84 +84,112 @@ public class OMDBInsightEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final ReconContainerManager containerManager;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMDBInsightEndpoint.class);
+  private final GlobalStatsDao globalStatsDao;
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
-                             ReconOMMetadataManager omMetadataManager) {
+                             ReconOMMetadataManager omMetadataManager,
+                             GlobalStatsDao globalStatsDao) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
+    this.globalStatsDao = globalStatsDao;
   }
 
   /**
    * This method retrieves set of keys/files which are open.
    *
    * @return the http json response wrapped in below format:
+   *
    * {
-   *     replicatedTotal: 13824,
-   *     unreplicatedTotal: 4608,
-   *     entities: [
+   *   "keysSummary": {
+   *     "totalUnreplicatedDataSize": 2147483648,
+   *     "totalReplicatedDataSize": 2147483648,
+   *     "totalOpenKeys": 8
+   *   },
+   *   "lastKey": "/-4611686018427388160/-9223372036854775552/-922777620354",
+   *   "replicatedTotal": 2147483648,
+   *   "unreplicatedTotal": 2147483648,
+   *   "fso": [
    *     {
-   *         path: “/vol1/bucket1/key1”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 1024,
-   *         replicatedSize: 3072,
-   *         unreplicatedSize: 1024,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
-   *    {
-   *         path: “/vol1/bucket1/key2”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 512,
-   *         replicatedSize: 1536,
-   *         unreplicatedSize: 512,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
+   *       "key": "/-4611686018427388160/-9223372036/-922337203977722380527",
+   *       "path": "239",
+   *       "inStateSince": 1686156886632,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
+   *     },
    *     {
-   *         path: “/vol1/fso-bucket/dir1/file1”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 1024,
-   *         replicatedSize: 3072,
-   *         unreplicatedSize: 1024,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
-   *     }.
-   *     {
-   *         path: “/vol1/fso-bucket/dir1/dir2/file2”,
-   *         keyState: “Open”,
-   *         inStateSince: 1667564193026,
-   *         size: 2048,
-   *         replicatedSize: 6144,
-   *         unreplicatedSize: 2048,
-   *         replicationType: RATIS,
-   *         replicationFactor: THREE
+   *       "key": "/-4611686018427388160/-9223372036854775552/0397777586240",
+   *       "path": "244",
+   *       "inStateSince": 1686156887186,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
    *     }
-   *   ]
+   *   ],
+   *   "nonFSO": [
+   *     {
+   *       "key": "/vol1/bucket1/object1",
+   *       "path": "239",
+   *       "inStateSince": 1686156886632,
+   *       "size": 268435456,
+   *       "replicatedSize": 268435456,
+   *       "replicationInfo": {
+   *         "replicationFactor": "ONE",
+   *         "requiredNodes": 1,
+   *         "replicationType": "RATIS"
+   *       }
+   *     }
+   *   ],
+   *   "status": "OK"
    * }
    */
+
   @GET
   @Path("/open")
   public Response getOpenKeyInfo(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-      int limit,
+          int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-      String prevKey) {
+          String prevKey,
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_FSO)
+      @QueryParam(RECON_OPEN_KEY_INCLUDE_FSO)
+          boolean includeFso,
+      @DefaultValue(DEFAULT_OPEN_KEY_INCLUDE_NON_FSO)
+      @QueryParam(RECON_OPEN_KEY_INCLUDE_NON_FSO)
+          boolean includeNonFso) {
     KeyInsightInfoResponse openKeyInsightInfo = new KeyInsightInfoResponse();
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
+
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
+
     String lastKey = "";
     List<KeyEntityInfo> fsoKeyInfoList = openKeyInsightInfo.getFsoKeyInfoList();
-    for (BucketLayout layout : Arrays.asList(BucketLayout.LEGACY,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+    for (BucketLayout layout : Arrays.asList(
+        BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       isLegacyBucketLayout = (layout == BucketLayout.LEGACY);
+      // Skip bucket iteration based on parameters includeFso and includeNonFso
+      if ((!includeFso && !isLegacyBucketLayout) ||
+          (!includeNonFso && isLegacyBucketLayout)) {
+        continue;
+      }
+
       Table<String, OmKeyInfo> openKeyTable =
           omMetadataManager.getOpenKeyTable(layout);
       try (
@@ -184,11 +227,11 @@ public class OMDBInsightEndpoint {
           keyEntityInfo.setSize(omKeyInfo.getDataSize());
           keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
           keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-          openKeyInsightInfo.setUnreplicatedTotal(
-              openKeyInsightInfo.getUnreplicatedTotal() +
+          openKeyInsightInfo.setUnreplicatedDataSize(
+              openKeyInsightInfo.getUnreplicatedDataSize() +
                   keyEntityInfo.getSize());
-          openKeyInsightInfo.setReplicatedTotal(
-              openKeyInsightInfo.getReplicatedTotal() +
+          openKeyInsightInfo.setReplicatedDataSize(
+              openKeyInsightInfo.getReplicatedDataSize() +
                   keyEntityInfo.getReplicatedSize());
           boolean added =
               isLegacyBucketLayout ? nonFSOKeyInfoList.add(keyEntityInfo) :
@@ -211,8 +254,51 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
+    // Populate the keysSummary map
+    createKeysSummaryForOpenKey(keysSummary);
+
+    openKeyInsightInfo.setKeysSummary(keysSummary);
+
     openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
+  }
+
+  /**
+   * Creates a keys summary for open keys and updates the provided
+   * keysSummary map. Calculates the total number of open keys, replicated
+   * data size, and unreplicated data size.
+   *
+   * @param keysSummary A map to store the keys summary information.
+   */
+  private void createKeysSummaryForOpenKey(
+      Map<String, Long> keysSummary) {
+    Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
+    Long replicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
+    Long unreplicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
+    Long unreplicatedSizeOpenFile = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(OPEN_FILE_TABLE)));
+    Long openKeyCountForKeyTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(OPEN_KEY_TABLE)));
+    Long openKeyCountForFileTable = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(OPEN_FILE_TABLE)));
+
+    // Calculate the total number of open keys
+    keysSummary.put("totalOpenKeys",
+        openKeyCountForKeyTable + openKeyCountForFileTable);
+    // Calculate the total replicated and unreplicated sizes
+    keysSummary.put("totalReplicatedDataSize",
+        replicatedSizeOpenKey + replicatedSizeOpenFile);
+    keysSummary.put("totalUnreplicatedDataSize",
+        unreplicatedSizeOpenKey + unreplicatedSizeOpenFile);
+
+  }
+
+  private Long getValueFromId(GlobalStats record) {
+    // If the record is null, return 0
+    return record != null ? record.getValue() : 0L;
   }
 
   private void getPendingForDeletionKeyInfo(
@@ -271,8 +357,9 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  /** This method retrieves set of keys/files pending for deletion.
-   *
+  /**
+   * This method retrieves set of keys/files pending for deletion.
+   * <p>
    * limit - limits the number of key/files returned.
    * prevKey - E.g. /vol1/bucket1/key1, this will skip keys till it
    * seeks correctly to the given prevKey.
@@ -379,11 +466,11 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setSize(omKeyInfo.getDataSize());
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
-        pendingForDeletionKeyInfo.setUnreplicatedTotal(
-            pendingForDeletionKeyInfo.getUnreplicatedTotal() +
+        pendingForDeletionKeyInfo.setUnreplicatedDataSize(
+            pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
                 keyEntityInfo.getSize());
-        pendingForDeletionKeyInfo.setReplicatedTotal(
-            pendingForDeletionKeyInfo.getReplicatedTotal() +
+        pendingForDeletionKeyInfo.setReplicatedDataSize(
+            pendingForDeletionKeyInfo.getReplicatedDataSize() +
                 keyEntityInfo.getReplicatedSize());
         deletedDirInfoList.add(keyEntityInfo);
         if (deletedDirInfoList.size() == limit) {
@@ -470,12 +557,18 @@ public class OMDBInsightEndpoint {
       KeyInsightInfoResponse deletedKeyAndDirInsightInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo) {
     repeatedOmKeyInfo.getOmKeyInfoList().forEach(omKeyInfo -> {
-      deletedKeyAndDirInsightInfo.setUnreplicatedTotal(
-          deletedKeyAndDirInsightInfo.getUnreplicatedTotal() +
+      deletedKeyAndDirInsightInfo.setUnreplicatedDataSize(
+          deletedKeyAndDirInsightInfo.getUnreplicatedDataSize() +
               omKeyInfo.getDataSize());
-      deletedKeyAndDirInsightInfo.setReplicatedTotal(
-          deletedKeyAndDirInsightInfo.getReplicatedTotal() +
+      deletedKeyAndDirInsightInfo.setReplicatedDataSize(
+          deletedKeyAndDirInsightInfo.getReplicatedDataSize() +
               omKeyInfo.getReplicatedSize());
     });
   }
+
+  @VisibleForTesting
+  public GlobalStatsDao getDao() {
+    return this.globalStatsDao;
+  }
+
 }

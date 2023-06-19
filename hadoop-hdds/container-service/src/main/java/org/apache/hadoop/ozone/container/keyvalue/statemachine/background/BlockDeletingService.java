@@ -396,6 +396,12 @@ public class BlockDeletingService extends BackgroundService {
           int deletedBlocksCount = succeedBlocks.size();
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status.
@@ -530,6 +536,12 @@ public class BlockDeletingService extends BackgroundService {
           // batched together while committing to DB.
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status and used space in volume.

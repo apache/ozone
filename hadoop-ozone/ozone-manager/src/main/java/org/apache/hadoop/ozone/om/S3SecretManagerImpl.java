@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.security.OzoneSecurityException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +52,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
 
   @Override
   public S3SecretValue getSecret(String kerberosID) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
+    Preconditions.checkArgument(StringUtils.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
     S3SecretValue cacheValue = s3SecretCache.get(kerberosID);
     if (cacheValue != null) {
@@ -69,7 +69,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
   @Override
   public String getSecretString(String awsAccessKey)
       throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(awsAccessKey),
+    Preconditions.checkArgument(StringUtils.isNotBlank(awsAccessKey),
         "awsAccessKeyId cannot be null or empty.");
     LOG.trace("Get secret for awsAccessKey:{}", awsAccessKey);
 
