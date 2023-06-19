@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.OrphanKeyMetaData;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_ORPHANKEYS_METADATA_FLUSH_TO_DB_MAX_THRESHOLD;
@@ -130,6 +132,9 @@ public class NSSummaryTaskDbEventHandler {
           OrphanKeyMetaData orphanKeyMetaData =
               orphanKeyMetaDataMap.get(key);
           if (orphanKeyMetaData.getObjectIds().size() > 0) {
+            orphanKeyMetaData.setStatus(
+                NODESTATUS.ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE
+                    .getValue());
             reconNamespaceSummaryManager.batchStoreOrphanKeyMetaData(
                 rdbBatchOperation, key, orphanKeyMetaData);
           } else {
@@ -167,7 +172,7 @@ public class NSSummaryTaskDbEventHandler {
       // If we don't have it in this batch we try to get it from the DB
       nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
-    removeFromOrphanIfExists(keyInfo, orphanKeyMetaDataMap);
+    removeFromOrphanIfExists(keyInfo, orphanKeyMetaDataMap, status);
     if (nsSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
@@ -216,7 +221,7 @@ public class NSSummaryTaskDbEventHandler {
     }
     curNSSummary.setDirName(dirName);
     nsSummaryMap.put(objectId, curNSSummary);
-    removeFromOrphanIfExists(omDirectoryInfo, orphanKeyMetaDataMap);
+    removeFromOrphanIfExists(omDirectoryInfo, orphanKeyMetaDataMap, status);
     // Write the child dir list to the parent directory
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
@@ -240,7 +245,8 @@ public class NSSummaryTaskDbEventHandler {
 
   private <T extends WithParentObjectId> void removeFromOrphanIfExists(
       T fileDirInfo,
-      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap, long status)
+      throws IOException {
     // If object as parent has come, then its child are not orphan and can
     // remove parent from orphan map.
     if (null != orphanKeyMetaDataMap) {
@@ -251,6 +257,7 @@ public class NSSummaryTaskDbEventHandler {
             reconNamespaceSummaryManager.getOrphanKeyMetaData(objectID);
       }
       if (null != orphanKeyMetaData) {
+        orphanKeyMetaData.setStatus(status);
         orphanKeyMetaData.getObjectIds().clear();
       }
     }
@@ -289,15 +296,15 @@ public class NSSummaryTaskDbEventHandler {
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
-    removeOrphanChild(keyInfo, orphanKeyMetaDataMap);
+    removeOrphanChild(keyInfo.getObjectID(), keyInfo.getParentObjectID(),
+        orphanKeyMetaDataMap);
   }
 
   private <T extends WithParentObjectId> void removeOrphanChild(
-      T fileDirObjInfo,
+      long objectID,
+      long parentObjectID,
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap) throws IOException {
     if (null != orphanKeyMetaDataMap) {
-      long objectID = fileDirObjInfo.getObjectID();
-      long parentObjectID = fileDirObjInfo.getParentObjectID();
       OrphanKeyMetaData orphanKeyMetaData =
           orphanKeyMetaDataMap.get(parentObjectID);
       if (null == orphanKeyMetaData) {
@@ -308,9 +315,7 @@ public class NSSummaryTaskDbEventHandler {
       if (null != orphanKeyMetaData) {
         Set<Long> objectIds = orphanKeyMetaData.getObjectIds();
         objectIds.remove(objectID);
-        if (objectIds.size() > 0) {
-          orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
-        }
+        orphanKeyMetaDataMap.put(parentObjectID, orphanKeyMetaData);
       }
     }
   }
@@ -337,7 +342,8 @@ public class NSSummaryTaskDbEventHandler {
 
     nsSummary.removeChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
-    removeOrphanChild(directoryInfo, orphanKeyMetaDataMap);
+    removeOrphanChild(directoryInfo.getObjectID(),
+        directoryInfo.getParentObjectID(), orphanKeyMetaDataMap);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
@@ -499,14 +505,14 @@ public class NSSummaryTaskDbEventHandler {
     ORPHAN_PARENT_NODE_UPDATE_STATUS_IN_PROGRESS(1),
     ORPHAN_PARENT_NODE_UPDATE_STATUS_COMPLETE(2);
 
-    private final int value;
+    private final long value;
 
     /**
      * Constructs states.
      *
      * @param value  Enum Value
      */
-    NODESTATUS(int value) {
+    NODESTATUS(long value) {
       this.value = value;
     }
 
@@ -533,8 +539,91 @@ public class NSSummaryTaskDbEventHandler {
      *
      * @return int.
      */
-    public int getValue() {
+    public long getValue() {
       return value;
     }
+  }
+
+  protected void handlePutDeleteDirEvent(
+      OmKeyInfo updatedKeyInfo,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status)
+      throws IOException {
+    removeFromOrphanIfExists(updatedKeyInfo, orphanKeyMetaDataMap, status);
+  }
+
+  protected void handleDeleteEvent(
+      long objectID,
+      long parentObjectID,
+      String volBucketId,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status) throws IOException {
+    try {
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectID);
+      if (null != nsSummary) {
+        if (nsSummary.getChildDir().size() != 0 ||
+            nsSummary.getNumOfFiles() != 0) {
+          addToOrphanMetaData(objectID, volBucketId, nsSummary,
+              orphanKeyMetaDataMap, status);
+        }
+      }
+      removeOrphanChild(objectID, parentObjectID, orphanKeyMetaDataMap);
+    } catch (IOException e) {
+      LOG.info("ObjectId {} may not be found in orphan metadata table or " +
+          "namespaceSummaryTable.", objectID);
+      throw e;
+    }
+  }
+
+  protected void addToOrphanMetaData(
+      long objectID, String volBucketId,
+      NSSummary nsSummary,
+      Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
+      long status) throws IOException {
+    try {
+      final String[] keys = volBucketId.split(OM_KEY_PREFIX);
+      final long volumeId = Long.parseLong(keys[1]);
+      final long bucketId = Long.parseLong(keys[2]);
+      List<Long> deletedFileObjectIds =
+          getPendingDeletionSubFilesObjectIds(volumeId, bucketId, objectID);
+      Set<Long> objectIds = new HashSet<>();
+      objectIds.addAll(nsSummary.getChildDir());
+      objectIds.addAll(deletedFileObjectIds);
+      OrphanKeyMetaData orphanKeyMetaData =
+          new OrphanKeyMetaData(objectIds, status);
+      orphanKeyMetaDataMap.put(objectID, orphanKeyMetaData);
+    } catch (IOException e) {
+      LOG.error(
+          "Error while fetching pending for delete sub files object ids : {}",
+          e);
+      throw e;
+    }
+  }
+
+  private List<Long> getPendingDeletionSubFilesObjectIds(
+      long volumeId, long bucketId, long objectID)
+      throws IOException {
+    List<Long> fileObjectIds = new ArrayList<>();
+    String seekFileInDB =
+        reconOMMetadataManager.getOzonePathKey(volumeId, bucketId, objectID,
+            "");
+
+    Table fileTable = reconOMMetadataManager.getFileTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = fileTable.iterator()) {
+
+      iterator.seek(seekFileInDB);
+
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        OmKeyInfo fileInfo = entry.getValue();
+        if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
+            objectID)) {
+          break;
+        }
+        fileObjectIds.add(fileInfo.getObjectID());
+      }
+    }
+    return fileObjectIds;
   }
 }
