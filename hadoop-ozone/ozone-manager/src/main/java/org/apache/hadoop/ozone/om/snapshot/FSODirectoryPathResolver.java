@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.collect.Sets;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -66,6 +67,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
    * @param dirObjIds
    * @return Map of Path corresponding to provided directory object IDs
    */
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Override
   public Map<Long, Path> getAbsolutePathForObjectIDs(
       Optional<Set<Long>> dirObjIds) throws IOException {

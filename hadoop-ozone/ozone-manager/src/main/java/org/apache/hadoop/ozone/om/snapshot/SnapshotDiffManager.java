@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
@@ -985,6 +986,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   private String resolveAbsolutePath(boolean isFSOBucket,
           final Map<Long, Path> parentIdMap, byte[] keyVal) throws IOException {
     String key = codecRegistry.asObject(keyVal, String.class);

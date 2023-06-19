@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -110,6 +111,7 @@ public class TestFSODirectoryPathResolver {
     return dirInfos;
   }
 
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testGetAbsolutePathForValidObjectIDs() throws IOException {
     Map<Integer, List<Integer>> dirMap = ImmutableMap.of(
@@ -139,7 +141,6 @@ public class TestFSODirectoryPathResolver {
     ), absolutePathMap);
     Assertions.assertEquals(objIds.size(), absolutePathMap.size());
     // Invalid Obj Id 19 with dirInfo dir19 which is not present in the bucket.
-    objIds = Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L, 19L);
     Assertions.assertThrows(IllegalArgumentException.class,
         () -> fsoDirectoryPathResolver.getAbsolutePathForObjectIDs(
             Optional.of(Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L, 19L))),
