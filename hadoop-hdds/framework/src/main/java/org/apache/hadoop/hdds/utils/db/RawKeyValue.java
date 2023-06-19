@@ -20,18 +20,14 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
+import java.util.Arrays;
+
 /**
- * Key value for raw Table implementations.
+ * {@link KeyValue} for a raw type.
+ *
+ * @param <RAW> The raw type.
  */
-public final class ByteArrayKeyValue implements KeyValue<byte[], byte[]> {
-  private byte[] key;
-  private byte[] value;
-
-  private ByteArrayKeyValue(byte[] key, byte[] value) {
-    this.key = key;
-    this.value = value;
-  }
-
+public abstract class RawKeyValue<RAW> implements KeyValue<RAW, RAW> {
   /**
    * Create a KeyValue pair.
    *
@@ -39,31 +35,52 @@ public final class ByteArrayKeyValue implements KeyValue<byte[], byte[]> {
    * @param value - Value bytes
    * @return KeyValue object.
    */
-  public static ByteArrayKeyValue create(byte[] key, byte[] value) {
-    return new ByteArrayKeyValue(key, value);
+  public static ByteArray create(byte[] key, byte[] value) {
+    return new ByteArray(key, value);
+  }
+
+  /** Implement {@link RawKeyValue} with byte[]. */
+  public static final class ByteArray extends RawKeyValue<byte[]> {
+    static byte[] copy(byte[] bytes) {
+      return Arrays.copyOf(bytes, bytes.length);
+    }
+
+    private ByteArray(byte[] key, byte[] value) {
+      super(key, value);
+    }
+
+    @Override
+    public byte[] getKey() {
+      return copy(super.getKey());
+    }
+
+    @Override
+    public byte[] getValue() {
+      return copy(super.getValue());
+    }
+  }
+
+  private final RAW key;
+  private final RAW value;
+
+  private RawKeyValue(RAW key, RAW value) {
+    this.key = key;
+    this.value = value;
   }
 
   /**
    * Return key.
-   *
-   * @return byte[]
    */
   @Override
-  public byte[] getKey() {
-    byte[] result = new byte[key.length];
-    System.arraycopy(key, 0, result, 0, key.length);
-    return result;
+  public RAW getKey() {
+    return key;
   }
 
   /**
    * Return value.
-   *
-   * @return byte[]
    */
   @Override
-  public byte[] getValue() {
-    byte[] result = new byte[value.length];
-    System.arraycopy(value, 0, result, 0, value.length);
-    return result;
+  public RAW getValue() {
+    return value;
   }
 }
