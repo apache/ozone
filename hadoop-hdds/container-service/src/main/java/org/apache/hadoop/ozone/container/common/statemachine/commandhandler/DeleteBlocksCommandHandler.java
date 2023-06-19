@@ -278,7 +278,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           summary.getTxIDSummary(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
-      blockDeleteMetrics.incrReceivedContainerCount(summary.getNumOfContainers());
+      blockDeleteMetrics.incrReceivedContainerCount(
+          summary.getNumOfContainers());
       blockDeleteMetrics.incrReceivedRetryTransactionCount(
           summary.getNumOfRetryTxs());
       blockDeleteMetrics.incrReceivedBlockCount(summary.getNumOfBlocks());
