@@ -129,7 +129,14 @@ public enum ConfigType {
     @Override
     void set(ConfigurationTarget target, String key, Object value,
         Config config) {
-      target.setStorageSize(key, (long) value, StorageUnit.BYTES);
+      if (value instanceof Long) {
+        target.setStorageSize(key, (long) value, StorageUnit.BYTES);
+      } else if (value instanceof Integer) {
+        target.setStorageSize(key, (int) value, StorageUnit.BYTES);
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
+      }
     }
   },
   CLASS {
@@ -144,6 +151,9 @@ public enum ConfigType {
         Config config) {
       if (value instanceof Class<?>) {
         target.set(key, ((Class<?>) value).getName());
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
       }
     }
   },
