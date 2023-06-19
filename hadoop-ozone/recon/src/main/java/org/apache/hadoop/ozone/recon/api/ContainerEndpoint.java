@@ -678,10 +678,10 @@ public class ContainerEndpoint {
     }
     Map<String, Object> response = new HashMap<>();
     if (!containerDiscrepancyInfoList.isEmpty()) {
-      response.put("prevKey", containerDiscrepancyInfoList.get(
+      response.put("lastKey", containerDiscrepancyInfoList.get(
           containerDiscrepancyInfoList.size() - 1).getContainerID());
     } else {
-      response.put("prevKey", null);
+      response.put("lastKey", null);
     }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
 
@@ -761,10 +761,10 @@ public class ContainerEndpoint {
     }
     Map<String, Object> response = new HashMap<>();
     if (!containerDiscrepancyInfoList.isEmpty()) {
-      response.put("prevKey", containerDiscrepancyInfoList.get(
+      response.put("lastKey", containerDiscrepancyInfoList.get(
           containerDiscrepancyInfoList.size() - 1).getContainerID());
     } else {
-      response.put("prevKey", null);
+      response.put("lastKey", null);
     }
     response.put("containerDiscrepancyInfo", containerDiscrepancyInfoList);
     return Response.ok(response).build();

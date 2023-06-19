@@ -1278,7 +1278,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) response.get("prevKey");
+    long responsePrevKey = (long) response.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
@@ -1334,7 +1334,7 @@ public class TestContainerEndpoint {
           containerEndpoint.getContainerMisMatchInsights(limit, prevKey, "SCM");
       Map<String, Object> response =
           (Map<String, Object>) containerInsights.getEntity();
-      long responsePrevKey = (long) response.get("prevKey");
+      long responsePrevKey = (long) response.get("lastKey");
       List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
           (List<ContainerDiscrepancyInfo>) response.get(
               "containerDiscrepancyInfo");
@@ -1380,7 +1380,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) response.get("prevKey");
+    long responsePrevKey = (long) response.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
@@ -1422,7 +1422,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) response.get("prevKey");
+    long responsePrevKey = (long) response.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
@@ -1539,7 +1539,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) responseMap.get("prevKey");
+    long responsePrevKey = (long) responseMap.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
@@ -1581,7 +1581,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) responseMap.get("prevKey");
+    long responsePrevKey = (long) responseMap.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
@@ -1625,7 +1625,7 @@ public class TestContainerEndpoint {
             "containerDiscrepancyInfo");
 
     // Check the prevKey is set correct in the response
-    long responsePrevKey = (long) responseMap.get("prevKey");
+    long responsePrevKey = (long) responseMap.get("lastKey");
     assertEquals(containerDiscrepancyInfoList.get(
             containerDiscrepancyInfoList.size() - 1).getContainerID(),
         responsePrevKey);
