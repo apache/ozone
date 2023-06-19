@@ -25,9 +25,13 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +39,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -91,5 +97,23 @@ public class TestSCMClientProtocolServer {
     assertTrue(resp.hasErrorMsg());
     assertTrue(resp.getErrorMsg()
         .equals(err));
+  }
+
+  @Test
+  public void testReadOnlyAdmins() throws IOException {
+    UserGroupInformation testUser = UserGroupInformation.createUserForTesting("testUser",
+        new String[] {"testGroup"});
+
+    try {
+      server.getScm().setScmReadOnlyAdmins(
+          new OzoneAdmins(Collections.singleton("testUser")));
+      // read operator
+      server.getScm().checkAdminAccess(testUser, true);
+      // write operator
+      Assert.assertThrows(AccessControlException.class,
+          () -> server.getScm().checkAdminAccess(testUser, false));
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 }

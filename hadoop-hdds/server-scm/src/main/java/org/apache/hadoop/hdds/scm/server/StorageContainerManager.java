@@ -265,6 +265,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private final String scmStarterUser;
   private final OzoneAdmins scmAdmins;
+  private OzoneAdmins scmReadOnlyAdmins;
+
   /**
    * SCM mxbean.
    */
@@ -408,6 +410,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
+    scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
     reconfigurationHandler =
@@ -1876,16 +1879,31 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private void checkAdminAccess(String op) throws IOException {
-    checkAdminAccess(getRemoteUser());
+  public void setScmReadOnlyAdmins(OzoneAdmins scmReadOnlyAdmins) {
+    this.scmReadOnlyAdmins = scmReadOnlyAdmins;
   }
 
-  public void checkAdminAccess(UserGroupInformation remoteUser)
+  private void checkAdminAccess(String op) throws IOException {
+    switch (op) {
+      case "startReconfiguration":
+        checkAdminAccess(getRemoteUser(), false);
+        break;
+      case "getReconfigurationStatus":
+      case "listReconfigurableProperties":
+        checkAdminAccess(getRemoteUser(), true);
+        break;
+      default:
+    }
+  }
+
+  public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)
       throws IOException {
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
-      throw new AccessControlException(
-          "Access denied for user " + remoteUser.getUserName() +
-              ". SCM superuser privilege is required.");
+      if (!isRead || !scmReadOnlyAdmins.isAdmin(remoteUser)) {
+        throw new AccessControlException(
+            "Access denied for user " + remoteUser.getUserName() +
+                ". SCM superuser privilege is required.");
+      }
     }
   }
 
