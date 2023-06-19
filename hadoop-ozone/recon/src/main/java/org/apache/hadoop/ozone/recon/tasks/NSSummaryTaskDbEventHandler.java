@@ -549,6 +549,9 @@ public class NSSummaryTaskDbEventHandler {
       Map<Long, OrphanKeyMetaData> orphanKeyMetaDataMap,
       long status)
       throws IOException {
+    // for cases where parent is not present and moved to deleted table,
+    // still sub-files and sub-directory can not be marked as orphans,
+    // so its removed from orphan map.
     removeFromOrphanIfExists(updatedKeyInfo, orphanKeyMetaDataMap, status);
   }
 
