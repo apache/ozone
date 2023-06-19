@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.rocksdb.RocksIterator;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -46,8 +45,8 @@ public class RDBStoreByteArrayIterator
 
   @Override
   Table.KeyValue<byte[], byte[]> getKeyValue() {
-    final RocksIterator i = getRocksDBIterator().get();
-    return RawKeyValue.create(i.key(), i.value());
+    final ManagedRocksIterator i = getRocksDBIterator();
+    return RawKeyValue.create(i.get().key(), i.get().value());
   }
 
   @Override
