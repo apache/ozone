@@ -1417,7 +1417,8 @@ public class TestOzoneShellHA {
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
 
     // Create OBS bucket in volx
-    String[] args = new String[]{"bucket", "create", volume1 + "/bucketobs"};
+    String[] args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1433,7 +1434,8 @@ public class TestOzoneShellHA {
     out.reset();
 
     // Create Legacy bucket in volx
-    args = new String[]{"bucket", "create", volume1 + "/bucketlegacy"};
+    args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1482,7 +1484,8 @@ public class TestOzoneShellHA {
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
 
     // Create OBS bucket in volume1
-    String[] args = new String[] {"bucket", "create", volume1 + "/bucketobs"};
+    String[] args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1498,7 +1501,8 @@ public class TestOzoneShellHA {
     out.reset();
 
     // Create Legacy bucket in volume1
-    args = new String[] {"bucket", "create", volume1 + "/bucketlegacy"};
+    args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
     execute(ozoneShell, args);
     out.reset();
 
