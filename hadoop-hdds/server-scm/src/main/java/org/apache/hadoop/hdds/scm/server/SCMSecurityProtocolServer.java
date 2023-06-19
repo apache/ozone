@@ -234,7 +234,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public List<String> getAllRootCaCertificates() throws IOException {
+  public synchronized List<String> getAllRootCaCertificates()
+      throws IOException {
     ArrayList<String> pemEncodedList =
         new ArrayList<>(rootCACertificate.size());
     for (X509Certificate cert : rootCACertificate) {
@@ -414,7 +415,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getRootCACertificate() throws IOException {
+  public synchronized String getRootCACertificate() throws IOException {
     Date lastCertDate = new Date(0);
     X509Certificate lastCert = null;
     for (X509Certificate cert : rootCACertificate) {
