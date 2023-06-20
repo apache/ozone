@@ -425,7 +425,8 @@ public class TestKeyValueHandler {
         kvHandler.deleteContainer(containerSet.getContainer(container2ID),
             true);
       } catch (StorageContainerException sce) {
-        Assert.assertTrue(sce.getMessage().contains("Moving container failed"));
+        Assert.assertTrue(
+            sce.getMessage().contains("Failed to move container"));
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
 
