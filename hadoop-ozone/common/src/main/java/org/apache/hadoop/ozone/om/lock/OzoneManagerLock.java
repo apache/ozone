@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.lock;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -265,52 +266,21 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
-      // When acquiring multiple user locks, the reason for doing lexical
-      // order comparison is to avoid deadlock scenario.
-
-      // Example: 1st thread acquire lock(ozone, hdfs)
-      // 2nd thread acquire lock(hdfs, ozone).
-      // If we don't acquire user locks in an order, there can be a deadlock.
-      // 1st thread acquired lock on ozone, waiting for lock on hdfs, 2nd
-      // thread acquired lock on hdfs, waiting for lock on ozone.
-      // To avoid this when we acquire lock on multiple users, we acquire
-      // locks in lexical order, which can help us to avoid dead locks.
-      // Now if first thread acquires lock on hdfs, 2nd thread wait for lock
-      // on hdfs, and first thread acquires lock on ozone. Once after first
-      // thread releases user locks, 2nd thread acquires them.
-
-      int compare = firstUser.compareTo(secondUser);
-      String temp;
-
-      // Order the user names in sorted order. Swap them.
-      if (compare > 0) {
-        temp = secondUser;
-        secondUser = firstUser;
-        firstUser = temp;
+      Striped<ReadWriteLock> stripedLocks =
+          stripedLockByResource.get(Resource.USER_LOCK);
+      // The result of bulkGet is always sorted in a consistent order.
+      // This prevents deadlocks.
+      Iterable<ReadWriteLock> locks =
+          stripedLocks.bulkGet(Arrays.asList(firstUser, secondUser));
+      for (ReadWriteLock lock : locks) {
+        lock.writeLock().lock();
       }
 
-      if (compare == 0) {
-        // both users are equal.
-        acquireUserLock(firstUser);
-      } else {
-        acquireUserLock(firstUser);
-        try {
-          acquireUserLock(secondUser);
-        } catch (Exception ex) {
-          // We got an exception acquiring 2nd user lock. Release already
-          // acquired user lock, and throw exception to the user.
-          releaseUserLock(firstUser);
-          throw ex;
-        }
-      }
       lockSet.set(resource.setLock(lockSet.get()));
       return true;
     }
   }
 
-  private void acquireUserLock(String user) {
-    getLock(Resource.USER_LOCK, user).writeLock().lock();
-  }
 
   /**
    * Release lock on multiple users.
@@ -319,33 +289,17 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    int compare = firstUser.compareTo(secondUser);
-
-    String temp;
-    // Order the user names in sorted order. Swap them.
-    if (compare > 0) {
-      temp = secondUser;
-      secondUser = firstUser;
-      firstUser = temp;
+    Striped<ReadWriteLock> stripedLocks =
+        stripedLockByResource.get(Resource.USER_LOCK);
+    Iterable<ReadWriteLock> locks =
+        stripedLocks.bulkGet(Arrays.asList(firstUser, secondUser));
+    for (ReadWriteLock lock : locks) {
+      lock.writeLock().unlock();
     }
 
-    if (compare == 0) {
-      // both users are equal.
-      releaseUserLock(firstUser);
-    } else {
-      releaseUserLock(firstUser);
-      releaseUserLock(secondUser);
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Release Write {} lock on resource {} and {}",
-          Resource.USER_LOCK, firstUser, secondUser);
-    }
     lockSet.set(Resource.USER_LOCK.clearLock(lockSet.get()));
   }
 
-  private void releaseUserLock(String user) {
-    getLock(Resource.USER_LOCK, user).writeLock().unlock();
-  }
 
   /**
    * Release write lock on resource.
