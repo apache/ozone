@@ -102,8 +102,8 @@ public class TestSCMClientProtocolServer {
 
   @Test
   public void testReadOnlyAdmins() throws IOException {
-    UserGroupInformation testUser = UserGroupInformation.createUserForTesting("testUser",
-        new String[] {"testGroup"});
+    UserGroupInformation testUser = UserGroupInformation.
+        createUserForTesting("testUser", new String[] {"testGroup"});
 
     try {
       // read operator

@@ -305,7 +305,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
+    getScm().checkAdminAccess(null, true);
 
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
@@ -349,7 +349,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
+    getScm().checkAdminAccess(null, true);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
