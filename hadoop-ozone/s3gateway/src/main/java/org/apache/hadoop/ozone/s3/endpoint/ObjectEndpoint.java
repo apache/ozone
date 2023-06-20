@@ -238,6 +238,17 @@ public class ObjectEndpoint extends EndpointBase {
           keyPath, length, replicationConfig, customMetadata);
       getMetrics().updatePutKeyMetadataStats(startNanos);
       long putLength = IOUtils.copyLarge(body, output);
+
+      if (length != putLength) {
+        delete(bucketName,keyPath,uploadID);
+        OS3Exception os3Exception = newError(S3ErrorTable.INVALID_LENGTH,
+            keyPath);
+        os3Exception.setErrorMessage("An error occurred (InvalidLength) " +
+            "when calling the PutObject/MPU PartUpload operation: " +
+            " Body size does not match the expected length");
+        throw os3Exception;
+      }
+
       getMetrics().incPutKeySuccessLength(putLength);
       return Response.ok().status(HttpStatus.SC_OK)
           .build();
