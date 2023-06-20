@@ -1301,15 +1301,7 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        boolean containerHasBlocks = false;
-        try {
-          containerHasBlocks = container.hasBlocks();
-        } catch (IOException ioe){
-          LOG.error("Failed to check if container has blocks", ioe);
-          triggerVolumeScanAndThrowException(container,
-              "Failed to read chunks directory");
-        }
-        if (containerHasBlocks) {
+        if (container.hasBlocks()) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty with blockCount {}",
@@ -1339,8 +1331,11 @@ public class KeyValueHandler extends Handler {
         if (!success) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeleteServiceDirPath());
-          triggerVolumeScanAndThrowException(container,
-              "Failed to move container");
+          String errorMsg =
+              "Failed to move container" + container.getContainerData()
+                  .getContainerID();
+          triggerVolumeScanAndThrowException(container, errorMsg,
+              CONTAINER_INTERNAL_ERROR);
         }
 
         if (LOG.isDebugEnabled()) {
@@ -1361,9 +1356,11 @@ public class KeyValueHandler extends Handler {
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
           container.getContainerData().getContainerID(), e);
-      throw new StorageContainerException("Could not determine if container "
-          + container.getContainerData().getContainerID() +
-          " is empty", DELETE_ON_NON_EMPTY_CONTAINER);
+      String errorMsg =
+          "Could not determine if the container " + container.getContainerData()
+              .getContainerID() + "is empty";
+      triggerVolumeScanAndThrowException(container, errorMsg,
+          DELETE_ON_NON_EMPTY_CONTAINER);
     } finally {
       container.writeUnlock();
     }
@@ -1374,10 +1371,10 @@ public class KeyValueHandler extends Handler {
   }
 
   private void triggerVolumeScanAndThrowException(Container container,
-      String msg) throws StorageContainerException {
+      String msg, ContainerProtos.Result result)
+      throws StorageContainerException {
     // Trigger a volume scan as exception occurred.
     StorageVolumeUtil.onFailure(container.getContainerData().getVolume());
-    throw new StorageContainerException(msg,
-        CONTAINER_INTERNAL_ERROR);
+    throw new StorageContainerException(msg, result);
   }
 }
