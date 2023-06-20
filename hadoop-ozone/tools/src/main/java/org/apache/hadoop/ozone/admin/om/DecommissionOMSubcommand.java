@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
@@ -115,6 +116,8 @@ public class DecommissionOMSubcommand implements Callable<Void> {
           .setHostAddress(hostInetAddress.getHostAddress())
           .build();
       omAdminProtocolClient.decommission(decommNodeDetails);
+      OMStorage omStorage = new OMStorage(ozoneConf);
+      omStorage.unsetOmNodeId();
 
       System.out.println("Successfully decommissioned OM " + decommNodeId);
     } catch (IOException e) {

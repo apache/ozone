@@ -107,6 +107,14 @@ public class OMStorage extends Storage {
   }
 
   /**
+   * Removes the OM Node id from the VERSION file.
+   */
+  public void unsetOmNodeId() throws IOException {
+    getStorageInfo().unsetProperty(OM_NODE_ID);
+    persistCurrentState();
+  }
+
+  /**
    * Set's the Ozone Manager ID to be stored in the VERSION file representation.
    * Note that, to change the VERSION file itself,
    * {@link #persistCurrentState()} has to be called after this method.
