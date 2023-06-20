@@ -27,6 +27,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 
 import java.io.IOException;
 import java.security.KeyPair;
@@ -35,19 +38,24 @@ import java.util.ArrayList;
 
 /**
  * Test class for {@link SCMSecurityProtocolServer}.
- * */
+ */
 @Timeout(20)
 public class TestSCMSecurityProtocolServer {
   private SCMSecurityProtocolServer securityProtocolServer;
   private OzoneConfiguration config;
+  @Mock
+  private StorageContainerManager mockScm;
+  @Mock
+  private SCMStorageConfig storageConfigMock;
 
   @BeforeEach
   public void setUp() throws Exception {
+    MockitoAnnotations.openMocks(this);
     config = new OzoneConfiguration();
     config.set(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
         OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT + ":0");
     securityProtocolServer = new SCMSecurityProtocolServer(config, null,
-        null, new ArrayList<>(), null, null);
+        null, new ArrayList<>(), mockScm, null);
   }
 
   @AfterEach
@@ -82,6 +90,9 @@ public class TestSCMSecurityProtocolServer {
     securityProtocolServer.addNewRootCa(latestRootCa);
     String pemEncodedLatestRootCa =
         CertificateCodec.getPEMEncodedString(latestRootCa);
+    Mockito.when(mockScm.getScmStorageConfig()).thenReturn(storageConfigMock);
+    Mockito.when(
+        storageConfigMock.checkPrimarySCMIdInitialized()).thenReturn(true);
     Assertions.assertEquals(securityProtocolServer.getRootCACertificate(),
         pemEncodedLatestRootCa);
   }
