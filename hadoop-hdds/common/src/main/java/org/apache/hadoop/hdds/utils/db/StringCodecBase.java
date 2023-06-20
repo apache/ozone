@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.util.Preconditions;
-import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

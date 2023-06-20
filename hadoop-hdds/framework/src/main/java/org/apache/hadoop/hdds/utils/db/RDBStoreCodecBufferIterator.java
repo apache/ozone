@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
 
@@ -94,7 +93,7 @@ class RDBStoreCodecBufferIterator
       CodecBuffer prefix) {
     super(iterator, table, prefix);
 
-    final String name = table != null? table.getName(): null;
+    final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
         buffer -> getRocksDBIterator().get().key(buffer));
@@ -141,8 +140,6 @@ class RDBStoreCodecBufferIterator
     if (key == null) {
       return false;
     }
-    System.out.println("key " + StringUtils.bytes2Hex(key.asReadOnlyByteBuffer())
-        + " startsWithPrefix " + StringUtils.bytes2Hex(prefix.asReadOnlyByteBuffer()));
     return key.startsWith(prefix);
   }
 

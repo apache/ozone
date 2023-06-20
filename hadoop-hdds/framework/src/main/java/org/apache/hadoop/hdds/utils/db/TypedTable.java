@@ -339,7 +339,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
       for (; ;) {
         final Integer required;
-        final int initial = -bufferCapacity.get(); // allocate a resizable buffer
+        final int initial = -bufferCapacity.get(); // resizable
         try (CodecBuffer outValue = CodecBuffer.allocateDirect(initial)) {
           required = get.apply(inKey, outValue);
           if (required == null) {
@@ -414,7 +414,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       throws IOException {
     if (supportCodecBuffer) {
       final CodecBuffer prefixBuffer = encodeKeyCodecBuffer(prefix);
-      return new CodecBufferTableIterator(rawTable.iterator(prefixBuffer));
+      return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer));
     } else {
       final byte[] prefixBytes = encodeKey(prefix);
       return new TypedTableIterator(rawTable.iterator(prefixBytes));
@@ -570,30 +570,25 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     };
   }
 
-  /**
-   * Table Iterator implementation for strongly typed tables.
-   */
-  class CodecBufferTableIterator extends AbstractIterator<CodecBuffer> {
-    CodecBufferTableIterator(
-        TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
-      super(i);
-    }
+  RawIterator<CodecBuffer> newCodecBufferTableIterator(
+      TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
+    return new RawIterator<CodecBuffer>(i) {
+      @Override
+      CodecBuffer convert(KEY key) throws IOException {
+        return encodeKeyCodecBuffer(key);
+      }
 
-    @Override
-    CodecBuffer convert(KEY key) throws IOException {
-      return encodeKeyCodecBuffer(key);
-    }
-
-    @Override
-    KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) {
-      return newKeyValue(raw);
-    }
+      @Override
+      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) {
+        return newKeyValue(raw);
+      }
+    };
   }
 
   /**
    * Table Iterator implementation for strongly typed tables.
    */
-  class TypedTableIterator extends AbstractIterator<byte[]> {
+  public class TypedTableIterator extends RawIterator<byte[]> {
     TypedTableIterator(
         TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
       super(rawIterator);
@@ -611,15 +606,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
-   * An abstract {@link Table.KeyValueIterator} backed by a raw iterator.
+   * A {@link Table.KeyValueIterator} backed by a raw iterator.
    *
    * @param <RAW> The raw type.
    */
-  abstract class AbstractIterator<RAW>
+  abstract class RawIterator<RAW>
       implements Table.KeyValueIterator<KEY, VALUE> {
     private final TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator;
 
-    AbstractIterator(TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator) {
+    RawIterator(TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator) {
       this.rawIterator = rawIterator;
     }
 

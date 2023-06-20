@@ -51,7 +51,7 @@ public final class CodecBuffer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
   /** The size of a buffer. */
-  static class Capacity {
+  public static class Capacity {
     private final Object name;
     private final AtomicInteger value;
 

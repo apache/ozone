@@ -14,7 +14,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 package org.apache.hadoop.hdds.utils.db;
 
@@ -83,14 +82,14 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {
-    return newAnswer(name, (byte)b);
+    return newAnswer(name, (byte) b);
   }
 
   Answer<Integer> newAnswer(String name, byte... b) {
     return invocation -> {
       System.out.printf("answer %s: %s%n", name, StringUtils.bytes2Hex(b));
       Object[] args = invocation.getArguments();
-      final ByteBuffer buffer = (ByteBuffer)args[0];
+      final ByteBuffer buffer = (ByteBuffer) args[0];
       buffer.clear();
       buffer.put(b);
       buffer.flip();
@@ -99,7 +98,7 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   @Test
-  public void testForeachRemainingCallsConsumerWithAllElements() throws Exception {
+  public void testForEachRemaining() throws Exception {
     when(rocksIteratorMock.isValid())
         .thenReturn(true, true, true, true, true, true, true, false);
     when(rocksIteratorMock.key(any()))
@@ -118,7 +117,6 @@ public class TestRDBStoreCodecBufferIterator {
     List<Table.KeyValue<byte[], byte[]>> remaining = new ArrayList<>();
     try (RDBStoreCodecBufferIterator i = newIterator()) {
       i.forEachRemaining(kv -> {
-        System.out.println("add " + kv);
         try {
           remaining.add(RawKeyValue.create(
               kv.getKey().getArray(), kv.getValue().getArray()));
@@ -341,7 +339,8 @@ public class TestRDBStoreCodecBufferIterator {
   @Test
   public void testNormalPrefixedIterator() throws Exception {
     final byte[] prefixBytes = "sample".getBytes(StandardCharsets.UTF_8);
-    try(RDBStoreCodecBufferIterator i = newIterator(CodecBuffer.wrap(prefixBytes))) {
+    try (RDBStoreCodecBufferIterator i = newIterator(
+        CodecBuffer.wrap(prefixBytes))) {
       final ByteBuffer prefix = ByteBuffer.wrap(prefixBytes);
       verify(rocksIteratorMock, times(1)).seek(prefix);
       clearInvocations(rocksIteratorMock);
@@ -363,33 +362,6 @@ public class TestRDBStoreCodecBufferIterator {
       } catch (Exception e) {
         assertTrue(e instanceof UnsupportedOperationException);
       }
-    }
-
-    CodecTestUtil.gc();
-  }
-
-  @Test
-  public void testGetStackTrace() throws Exception {
-    try (ManagedRocksIterator iterator = mock(ManagedRocksIterator.class)) {
-      RocksIterator mock = mock(RocksIterator.class);
-      when(iterator.get()).thenReturn(mock);
-      when(mock.isOwningHandle()).thenReturn(true);
-      ManagedRocksObjectUtils.assertClosed(iterator);
-      verify(iterator, times(1)).getStackTrace();
-    }
-
-    try (ManagedRocksIterator iterator = newManagedRocksIterator()) {
-
-      // construct the expected trace.
-      StackTraceElement[] traces = Thread.currentThread().getStackTrace();
-      StringBuilder sb = new StringBuilder();
-      // first 2 lines will differ.
-      for (int i = 2; i < traces.length; i++) {
-        sb.append(traces[i]).append("\n");
-      }
-      String expectedTrace = sb.toString();
-      String fromObjectInit = iterator.getStackTrace();
-      assertTrue(fromObjectInit.contains(expectedTrace));
     }
 
     CodecTestUtil.gc();
