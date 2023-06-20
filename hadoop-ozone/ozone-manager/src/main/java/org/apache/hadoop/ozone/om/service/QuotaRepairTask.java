@@ -91,13 +91,13 @@ public class QuotaRepairTask {
       nameBucketInfoMap.values().stream().forEach(e -> lock.acquireReadLock(
           BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
       repairCount();
-      updateOldVolumeQuotaSupport();
     } finally {
       nameBucketInfoMap.values().stream().forEach(e -> lock.releaseReadLock(
           BUCKET_LOCK, e.getVolumeName(), e.getBucketName()));
       executor.shutdown();
       LOG.info("Completed quota repair task");
     }
+    updateOldVolumeQuotaSupport();
   }
   
   private void prepareAllVolumeBucketInfo() throws IOException {
@@ -257,9 +257,15 @@ public class QuotaRepairTask {
         entry.setValue(bucketInfo);
         
         // there is a new value to be updated in bucket cache
+        String bucketKey = metadataManager.getBucketKey(
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName());
         metadataManager.getBucketTable().addCacheEntry(
-            new CacheKey<>(entry.getKey()),
+            new CacheKey<>(bucketKey),
             CacheValue.get(EPOCH_DEFAULT, bucketInfo));
+        // cleanup epoch added to avoid extra epoch id in cache
+        ArrayList<Long> epochs = new ArrayList<>();
+        epochs.add(EPOCH_DEFAULT);
+        metadataManager.getBucketTable().cleanupCache(epochs);
       }
     }
   }

@@ -112,15 +112,24 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
         omMetadataManager, -2);
 
+    // pre check for quota flag
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
     Assert.assertTrue(bucketInfo.getQuotaInBytes() == -2);
+    
+    omVolumeArgs = omMetadataManager.getVolumeTable().get(
+        omMetadataManager.getVolumeKey(volumeName));
+    Assert.assertTrue(omVolumeArgs.getQuotaInBytes() == -2);
+    Assert.assertTrue(omVolumeArgs.getQuotaInNamespace() == -2);
 
     QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
     quotaRepairTask.repair();
 
-    OmBucketInfo obsBucketInfo = omMetadataManager.getBucketTable().get(
+    bucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    Assert.assertTrue(obsBucketInfo.getQuotaInBytes() == -2);
+    Assert.assertTrue(bucketInfo.getQuotaInBytes() == -1);
+    OmVolumeArgs volArgsVerify = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName));
+    Assert.assertTrue(volArgsVerify.getQuotaInBytes() == -1);
+    Assert.assertTrue(volArgsVerify.getQuotaInNamespace() == -1);
   }
 }
