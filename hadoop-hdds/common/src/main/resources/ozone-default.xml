@@ -2261,6 +2261,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.ca.rotation.ack.timeout</name>
+    <value>PT15M</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Max time that SCM leader will wait for the rotation preparation acks before it believes the rotation
+      is failed. Default is 15 minutes.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.handler.count.key</name>
     <value>2</value>
     <tag>OZONE, HDDS, SECURITY</tag>

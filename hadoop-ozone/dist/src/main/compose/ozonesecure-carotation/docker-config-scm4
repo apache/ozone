@@ -14,24 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.4"
-
-x-cert-rotation-config:
-  &cert-rotation-config
-  environment:
-    - OZONE-SITE.XML_hdds.x509.default.duration=PT40s
-    - OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT30s
-    - OZONE-SITE.XML_hdds.x509.ca.rotation.check.interval=PT1S
-    - OZONE-SITE.XML_hdds.x509.grace.duration.token.checks.enabled=false
-    - OZONE-SITE.XML_hdds.x509.ca.rotation.ack.timeout=PT20S
-services:
-  datanode:
-    <<: *cert-rotation-config
-  om:
-    <<: *cert-rotation-config
-  scm:
-    <<: *cert-rotation-config
-  s3g:
-    <<: *cert-rotation-config
-  recon:
-    <<: *cert-rotation-config
+OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3,scm4
+OZONE-SITE.XML_ozone.scm.address.scmservice.scm4=scm4.org

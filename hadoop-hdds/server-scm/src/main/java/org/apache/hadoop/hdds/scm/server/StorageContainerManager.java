@@ -572,8 +572,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       scmCertificateClient = new SCMCertificateClient(
-          securityConfig, scmSecurityClient,
-          scmStorageConfig.getScmCertSerialId());
+          securityConfig, scmSecurityClient, scmStorageConfig.getScmId(),
+          scmStorageConfig.getClusterID(),
+          scmStorageConfig.getScmCertSerialId(),
+          getScmAddress(scmHANodeDetails, configuration).getHostName());
     }
   }
 
@@ -854,14 +856,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final CertificateServer rootCertificateServer;
 
     // Start specific instance SCM CA server.
-    String subject = SCM_SUB_CA_PREFIX +
+    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime()) +
         InetAddress.getLocalHost().getHostName();
     if (configurator.getCertificateServer() != null) {
       scmCertificateServer = configurator.getCertificateServer();
     } else {
       scmCertificateServer = new DefaultCAServer(subject,
           scmStorageConfig.getClusterID(), scmStorageConfig.getScmId(),
-          certificateStore, new DefaultCAProfile(),
+          certificateStore, null, new DefaultCAProfile(),
           scmCertificateClient.getComponentName());
       // INTERMEDIARY_CA which issues certs to DN and OM.
       scmCertificateServer.init(new SecurityConfig(configuration),
@@ -1160,8 +1162,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.getScmId());
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(
-          conf, scmhaNodeDetails, scmStorageConfig, false);
+      initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, false);
 
       return true;
     }
@@ -1185,9 +1186,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(
-          conf, scmhaNodeDetails, scmStorageConfig, false);
-
+      initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, false);
     } else {
       try {
         scmStorageConfig.setClusterId(fetchedId);
@@ -1200,7 +1199,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, config,
-              getScmAddress(scmhaNodeDetails, conf), false);
+              selfHostName, false);
         }
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
         scmStorageConfig.setSCMHAFlag(true);
@@ -1222,14 +1221,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * ScmStorageConfig does not have certificate serial id.
    */
   private static void initializeSecurityIfNeeded(
-      OzoneConfiguration conf, SCMHANodeDetails scmhaNodeDetails,
-      SCMStorageConfig scmStorageConfig, boolean isPrimordial)
-      throws IOException {
+      OzoneConfiguration conf, SCMStorageConfig scmStorageConfig,
+      String scmHostname, boolean isPrimordial) throws IOException {
     // Initialize security if security is enabled later.
     if (OzoneSecurityUtil.isSecurityEnabled(conf)
         && scmStorageConfig.getScmCertSerialId() == null) {
       HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-          getScmAddress(scmhaNodeDetails, conf), isPrimordial);
+          scmHostname, isPrimordial);
       scmStorageConfig.forceInitialize();
       LOG.info("SCM unsecure cluster is converted to secure cluster. " +
               "Persisted SCM Certificate SerialID {}",
@@ -1272,7 +1270,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
         if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
           HASecurityUtils.initializeSecurity(scmStorageConfig, conf,
-              getScmAddress(haDetails, conf), true);
+              getScmAddress(haDetails, conf).getHostName(), true);
         }
 
         // Ensure scmRatisServer#initialize() is called post scm storage
@@ -1319,7 +1317,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
 
       // Initialize security if security is enabled later.
-      initializeSecurityIfNeeded(conf, haDetails, scmStorageConfig, true);
+      initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
       if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
@@ -1482,6 +1480,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getDatanodeRpcPort() {
     InetSocketAddress addr = getDatanodeRpcAddress();
     return addr == null ? "0" : Integer.toString(addr.getPort());
+  }
+
+  public CertificateStore getCertificateStore() {
+    return certificateStore;
   }
 
   /**

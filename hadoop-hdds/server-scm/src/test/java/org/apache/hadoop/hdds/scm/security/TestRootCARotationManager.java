@@ -22,10 +22,15 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.server.SCMSecurityProtocolServer;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -38,6 +43,7 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
@@ -63,12 +69,21 @@ import static org.slf4j.event.Level.INFO;
 public class TestRootCARotationManager {
 
   private OzoneConfiguration ozoneConfig;
+  private SecurityConfig securityConfig;
   private RootCARotationManager rootCARotationManager;
   private StorageContainerManager scm;
-  private CertificateClient scmCertClient;
+  private SCMCertificateClient scmCertClient;
   private SCMServiceManager scmServiceManager;
+  private SCMHAManager scmhaManager;
   private SCMContext scmContext;
+  private SequenceIdGenerator sequenceIdGenerator;
+  private SCMStorageConfig scmStorageConfig;
+  private SCMSecurityProtocolServer scmSecurityProtocolServer;
+  private RootCARotationHandlerImpl handler;
   private File testDir;
+  private String cID = UUID.randomUUID().toString();
+  private String scmID = UUID.randomUUID().toString();
+  private BigInteger certID = new BigInteger("1");
 
   @BeforeEach
   public void init() throws IOException, TimeoutException {
@@ -80,14 +95,33 @@ public class TestRootCARotationManager {
     ozoneConfig
         .setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     scm = Mockito.mock(StorageContainerManager.class);
-    scmCertClient = Mockito.mock(CertificateClient.class);
+    securityConfig = new SecurityConfig(ozoneConfig);
+    scmCertClient = new SCMCertificateClient(securityConfig, null, scmID, cID,
+        certID.toString(), "localhost");
     scmServiceManager = new SCMServiceManager();
     scmContext = Mockito.mock(SCMContext.class);
+    scmhaManager = Mockito.mock(SCMHAManager.class);
+    sequenceIdGenerator = Mockito.mock(SequenceIdGenerator.class);
+    scmStorageConfig = new SCMStorageConfig(ozoneConfig);
+    scmStorageConfig.setScmId(scmID);
+    scmStorageConfig.setClusterId(cID);
+    scmSecurityProtocolServer = Mockito.mock(SCMSecurityProtocolServer.class);
+    handler = Mockito.mock(RootCARotationHandlerImpl.class);
     when(scmContext.isLeader()).thenReturn(true);
     when(scm.getConfiguration()).thenReturn(ozoneConfig);
     when(scm.getScmCertificateClient()).thenReturn(scmCertClient);
     when(scm.getScmContext()).thenReturn(scmContext);
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
+    when(scm.getScmHAManager()).thenReturn(scmhaManager);
+    when(scmhaManager.getRatisServer())
+        .thenReturn(Mockito.mock(SCMRatisServerImpl.class));
+    when(scm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
+    when(sequenceIdGenerator.getNextId(Mockito.anyString())).thenReturn(2L);
+    when(scm.getScmStorageConfig()).thenReturn(scmStorageConfig);
+    when(scm.getSecurityProtocolServer()).thenReturn(scmSecurityProtocolServer);
+    Mockito.doNothing().when(scmSecurityProtocolServer)
+        .setRootCertificateServer(Mockito.anyObject());
+    Mockito.doNothing().when(handler).rotationPrepare(Mockito.anyString());
   }
 
   @AfterEach
@@ -156,9 +190,10 @@ public class TestRootCARotationManager {
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
         LocalDateTime.now(), Duration.ofSeconds(35));
-    when(scmCertClient.getCACertificate()).thenReturn(cert);
+    scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
+    rootCARotationManager.setRootCARotationHandler(handler);
     GenericTestUtils.LogCapturer logs =
         GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
     GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
@@ -187,9 +222,10 @@ public class TestRootCARotationManager {
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
         LocalDateTime.now(), Duration.ofSeconds(35));
-    when(scmCertClient.getCACertificate()).thenReturn(cert);
+    scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
+    rootCARotationManager.setRootCARotationHandler(handler);
     GenericTestUtils.LogCapturer logs =
         GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
     GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
@@ -213,11 +249,12 @@ public class TestRootCARotationManager {
         SelfSignedCertificate.newBuilder()
             .setBeginDate(start)
             .setEndDate(end)
-            .setClusterID("cluster")
-            .setKey(keyPair)
+            .setScmID(scmID)
+            .setClusterID(cID)
             .setSubject("localhost")
             .setConfiguration(new SecurityConfig(conf))
-            .setScmID("test")
+            .setKey(keyPair)
+            .makeCA(certID)
             .build());
   }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -34,6 +35,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.math.BigInteger;
+import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -66,6 +69,7 @@ public class SequenceIdGenerator {
   public static final String LOCAL_ID = "localId";
   public static final String DEL_TXN_ID = "delTxnId";
   public static final String CONTAINER_ID = "containerId";
+  public static final String ROOT_CERTIFICATE_ID = "rootCertificateId";
 
   private static final long INVALID_SEQUENCE_ID = 0;
 
@@ -121,7 +125,8 @@ public class SequenceIdGenerator {
         batch.nextId = prevLastId + 1;
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
-        batch.lastId += batchSize;
+        batch.lastId += sequenceIdName.equals(ROOT_CERTIFICATE_ID) ?
+            1 : batchSize;
 
         if (stateManager.allocateBatch(sequenceIdName,
             prevLastId, batch.lastId)) {
@@ -364,7 +369,7 @@ public class SequenceIdGenerator {
       long largestContainerId = 0;
       try (TableIterator<ContainerID,
           ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
-          scmMetadataStore.getContainerTable().iterator()) {
+               scmMetadataStore.getContainerTable().iterator()) {
         while (iterator.hasNext()) {
           ContainerInfo containerInfo = iterator.next().getValue();
           largestContainerId =
@@ -375,6 +380,42 @@ public class SequenceIdGenerator {
       sequenceIdTable.put(CONTAINER_ID, largestContainerId);
       LOG.info("upgrade {} to {}",
           CONTAINER_ID, sequenceIdTable.get(CONTAINER_ID));
+    }
+
+    // upgrade root certificate ID
+    if (sequenceIdTable.get(ROOT_CERTIFICATE_ID) == null) {
+      long largestRootCertId = BigInteger.ONE.longValueExact();
+      try (TableIterator<BigInteger,
+          ? extends KeyValue<BigInteger, X509Certificate>> iterator =
+               scmMetadataStore.getValidSCMCertsTable().iterator()) {
+        while (iterator.hasNext()) {
+          X509Certificate cert = iterator.next().getValue();
+          if (HASecurityUtils.isSelfSignedCertificate(cert) &&
+              HASecurityUtils.isCACertificate(cert)) {
+            largestRootCertId =
+                Long.max(cert.getSerialNumber().longValueExact(),
+                    largestRootCertId);
+          }
+        }
+      }
+
+      try (TableIterator<BigInteger,
+          ? extends KeyValue<BigInteger, CertInfo>> iterator =
+               scmMetadataStore.getRevokedCertsV2Table().iterator()) {
+        while (iterator.hasNext()) {
+          X509Certificate cert =
+              iterator.next().getValue().getX509Certificate();
+          if (HASecurityUtils.isSelfSignedCertificate(cert) &&
+              HASecurityUtils.isCACertificate(cert)) {
+            largestRootCertId =
+                Long.max(cert.getSerialNumber().longValueExact(),
+                    largestRootCertId);
+          }
+        }
+      }
+      sequenceIdTable.put(ROOT_CERTIFICATE_ID, largestRootCertId);
+      LOG.info("upgrade {} to {}",
+          ROOT_CERTIFICATE_ID, sequenceIdTable.get(ROOT_CERTIFICATE_ID));
     }
   }
 }

@@ -44,6 +44,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_ALGORITHM;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_KEY_LEN;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_SECURITY_PROVIDER;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
@@ -127,6 +129,7 @@ public class SecurityConfig {
   private final String caRotationTimeOfDay;
   private final Pattern caRotationTimeOfDayPattern =
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
+  private final Duration caAckTimeout;
   private final SslProvider grpcSSLProvider;
 
   /**
@@ -218,6 +221,11 @@ public class SecurityConfig {
     }
     caRotationTimeOfDay = "1970-01-01T" + timeOfDayString;
 
+    String ackTimeString = configuration.get(
+        HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
+        HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT);
+    caAckTimeout = Duration.parse(ackTimeString);
+
     validateCertificateValidityConfig();
 
     this.externalRootCaCert = configuration.get(
@@ -287,9 +295,29 @@ public class SecurityConfig {
       throw new IllegalArgumentException(msg);
     }
 
+    if (caCheckInterval.isNegative() || caCheckInterval.isZero()) {
+      String msg = "Property " + HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+          " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+
     if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
       throw new IllegalArgumentException("Property value of " +
           HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+    }
+
+    if (caAckTimeout.isNegative() || caAckTimeout.isZero()) {
+      String msg = "Property " + HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
+          " should not be zero or negative";
+      LOG.error(msg);
+      throw new IllegalArgumentException(msg);
+    }
+
+    if (caAckTimeout.compareTo(renewalGracePeriod) >= 0) {
+      throw new IllegalArgumentException("Property value of " +
+          HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
           " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
     }
 
@@ -394,6 +422,18 @@ public class SecurityConfig {
     Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
         + " null. Please check configs.");
     return Paths.get(metadataDir, component, certificateDir);
+  }
+
+  /**
+   * Returns the File path to where this component store key and certificates.
+   *
+   * @param component - Component Name - String.
+   * @return Path location.
+   */
+  public Path getLocation(String component) {
+    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
+        + " null. Please check configs.");
+    return Paths.get(metadataDir, component);
   }
 
   /**
@@ -506,6 +546,10 @@ public class SecurityConfig {
 
   public String getCaRotationTimeOfDay() {
     return caRotationTimeOfDay;
+  }
+
+  public Duration getCaAckTimeout() {
+    return caAckTimeout;
   }
 
   /**

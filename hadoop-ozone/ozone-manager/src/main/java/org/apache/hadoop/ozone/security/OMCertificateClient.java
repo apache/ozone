@@ -122,7 +122,7 @@ public class OMCertificateClient extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certificatePath) throws CertificateException {
+      Path certificatePath, boolean renew) throws CertificateException {
     try {
       SCMGetCertResponseProto response = getScmSecureClient()
           .getOMCertChain(omInfo, getEncodedString(request));
@@ -135,14 +135,13 @@ public class OMCertificateClient extends CommonCertificateClient {
       if (response.hasX509CACertificate()) {
         String pemEncodedRootCert = response.getX509CACertificate();
         storeCertificate(pemEncodedRootCert,
-            CAType.SUBORDINATE, certCodec, false);
-        storeCertificate(pemEncodedCert, CAType.NONE, certCodec,
-            false);
+            CAType.SUBORDINATE, certCodec, false, !renew);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec, false, !renew);
 
         // Store Root CA certificate if available.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
+              CAType.ROOT, certCodec, false, !renew);
         }
         return CertificateCodec.getX509Certificate(pemEncodedCert)
             .getSerialNumber().toString();

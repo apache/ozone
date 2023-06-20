@@ -35,9 +35,11 @@ import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * An implementation of <code>X509KeyManager</code> that exposes a method,
@@ -60,6 +62,11 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    */
   static final char[] EMPTY_PASSWORD = new char[0];
   private final AtomicReference<X509ExtendedKeyManager> keyManagerRef;
+  // Keep the old key managers, for currently we find that the netty
+  // tc-native component always query the first root certificate through
+  // chooseEngineClientAlias after the key manager is reloaded with a new one.
+  private final List<X509ExtendedKeyManager> oldKeyManagerRef;
+
   /**
    * Current private key and cert used in keyManager. Used to detect if these
    * materials are changed.
@@ -80,20 +87,53 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     this.type = type;
     keyManagerRef = new AtomicReference<>();
     keyManagerRef.set(loadKeyManager(caClient));
+    oldKeyManagerRef = new ArrayList<>();
   }
 
   @Override
   public String chooseEngineClientAlias(String[] strings,
       Principal[] principals, SSLEngine sslEngine) {
-    return keyManagerRef.get()
+    String ret = keyManagerRef.get()
         .chooseEngineClientAlias(strings, principals, sslEngine);
+    if (ret == null && oldKeyManagerRef.size() != 0) {
+      for (X509ExtendedKeyManager manager: oldKeyManagerRef) {
+        ret = manager.chooseEngineClientAlias(strings, principals, sslEngine);
+        if (ret != null) {
+          break;
+        }
+      }
+    }
+    if (ret == null) {
+      LOG.info("Engine client aliases for {}, {}, {} is null",
+          strings == null ? "" : Arrays.stream(strings).map(Object::toString)
+              .collect(Collectors.joining(", ")),
+          principals == null ? "" : Arrays.stream(principals)
+              .map(Object::toString).collect(Collectors.joining(", ")),
+          sslEngine == null ? "" : sslEngine.toString());
+    }
+    return ret;
   }
 
   @Override
   public String chooseEngineServerAlias(String s, Principal[] principals,
       SSLEngine sslEngine) {
-    return keyManagerRef.get()
+    String ret = keyManagerRef.get()
         .chooseEngineServerAlias(s, principals, sslEngine);
+    if (ret == null && oldKeyManagerRef.size() != 0) {
+      for (X509ExtendedKeyManager manager: oldKeyManagerRef) {
+        ret = manager.chooseEngineServerAlias(s, principals, sslEngine);
+        if (ret != null) {
+          break;
+        }
+      }
+    }
+    if (ret == null) {
+      LOG.info("Engine server aliases for {}, {}, {} is null", s,
+          principals == null ? "" : Arrays.stream(principals)
+              .map(Object::toString).collect(Collectors.joining(", ")),
+          sslEngine == null ? "" : sslEngine.toString());
+    }
+    return ret;
   }
 
   @Override
@@ -138,7 +178,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     try {
       X509ExtendedKeyManager manager = loadKeyManager(caClient);
       if (manager != null) {
-        this.keyManagerRef.set(manager);
+        oldKeyManagerRef.add(keyManagerRef.get());
+        keyManagerRef.set(manager);
         LOG.info("ReloadingX509KeyManager is reloaded");
       }
     } catch (Exception ex) {
@@ -169,6 +210,11 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     keystore.setKeyEntry(caClient.getComponentName() + "_key",
         privateKey, EMPTY_PASSWORD,
         newCertList.toArray(new X509Certificate[0]));
+
+    LOG.info("New key manager is loaded with certificate chain");
+    for (int i = 0; i < newCertList.size(); i++) {
+      LOG.info(newCertList.get(i).toString());
+    }
 
     KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
         KeyManagerFactory.getDefaultAlgorithm());
