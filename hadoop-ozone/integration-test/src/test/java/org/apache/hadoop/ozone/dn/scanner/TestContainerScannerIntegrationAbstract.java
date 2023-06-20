@@ -308,6 +308,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
     });
 
     private final Consumer<Container<?>> corruption;
+    private static final Random RANDOM = new Random();
 
     ContainerCorruptions(Consumer<Container<?>> corruption) {
       this.corruption = corruption;
@@ -341,7 +342,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
      */
     private static void corruptFile(File file) {
       byte[] corruptedBytes = new byte[(int)file.length()];
-      new Random().nextBytes(corruptedBytes);
+      RANDOM.nextBytes(corruptedBytes);
       try {
         Files.write(file.toPath(), corruptedBytes,
             StandardOpenOption.TRUNCATE_EXISTING);
