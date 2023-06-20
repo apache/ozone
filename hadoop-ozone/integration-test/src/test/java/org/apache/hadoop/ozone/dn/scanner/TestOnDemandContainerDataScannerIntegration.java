@@ -11,7 +11,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.util.Arrays;
 import java.util.Collection;
 
 /**
@@ -37,7 +36,7 @@ public class TestOnDemandContainerDataScannerIntegration
    - Block checksums are verified on the client side. If there is a checksum
    error during read, the datanode will not learn about it.
    */
-  @Parameterized.Parameters(name="{0}")
+  @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     return ContainerCorruptions.getAllParamsExcept(
         ContainerCorruptions.MISSING_METADATA_DIR,

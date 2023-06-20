@@ -170,9 +170,9 @@ public final class ContainerDataYaml {
 
     try {
       containerData = yaml.load(input);
-    } catch(YAMLException ex) {
+    } catch (YAMLException ex) {
       // Unchecked exception. Convert to IOException since an error with one
-      // container file is not fatal for the whole thread/datanode.
+      // container file is not fatal for the whole thread or datanode.
       throw new IOException(ex);
     }
 

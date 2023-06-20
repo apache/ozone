@@ -13,7 +13,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
@@ -28,7 +27,7 @@ public class TestBackgroundContainerMetadataScannerIntegration
 
   private final ContainerCorruptions corruption;
 
-  @Parameterized.Parameters(name="{0}")
+  @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     return ContainerCorruptions.getAllParamsExcept(
         ContainerCorruptions.MISSING_BLOCK,

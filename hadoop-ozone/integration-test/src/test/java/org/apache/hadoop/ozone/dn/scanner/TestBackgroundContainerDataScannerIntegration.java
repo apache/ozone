@@ -11,7 +11,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +24,7 @@ public class TestBackgroundContainerDataScannerIntegration
 
   private final ContainerCorruptions corruption;
 
-  @Parameterized.Parameters(name="{0}")
+  @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     // Background container data scanner should be able to detect all errors.
     return ContainerCorruptions.getAllParamsExcept();

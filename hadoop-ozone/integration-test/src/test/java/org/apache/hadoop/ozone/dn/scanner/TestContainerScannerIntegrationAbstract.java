@@ -97,7 +97,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
     // Speed up corruption detection by allowing scans of the same container to
     // run back to back.
     ozoneConfig.setTimeDuration(
-        ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP, 0, TimeUnit.SECONDS);
+        ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP,
+        0, TimeUnit.SECONDS);
 
     // Build a one datanode cluster.
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
@@ -125,11 +126,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
   }
 
-  protected OzoneBucket getTestBucket() {
-    return bucket;
-  }
-
-  protected void waitForScmToSeeUnhealthyReplica(long containerID) throws Exception {
+  protected void waitForScmToSeeUnhealthyReplica(long containerID)
+      throws Exception {
     ContainerManager scmContainerManager = cluster.getStorageContainerManager()
         .getContainerManager();
     LambdaTestUtils.await(5000, 500,
@@ -223,16 +221,16 @@ public abstract class TestContainerScannerIntegrationAbstract {
    */
   protected enum ContainerCorruptions {
     MISSING_CHUNKS_DIR(container -> {
-          File chunksDir = new File(container.getContainerData().getContainerPath(),
-              "chunks");
-          try {
-            FileUtils.deleteDirectory(chunksDir);
-          } catch (IOException ex) {
-            // Fail the test.
-            throw new UncheckedIOException(ex);
-          }
-          Assert.assertFalse(chunksDir.exists());
-        }),
+      File chunksDir = new File(container.getContainerData().getContainerPath(),
+          "chunks");
+      try {
+        FileUtils.deleteDirectory(chunksDir);
+      } catch (IOException ex) {
+        // Fail the test.
+        throw new UncheckedIOException(ex);
+      }
+      Assert.assertFalse(chunksDir.exists());
+    }),
 
     MISSING_METADATA_DIR(container -> {
       File metadataDir =
@@ -248,41 +246,41 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }),
 
     MISSING_CONTAINER_FILE(container -> {
-          File containerFile = container.getContainerFile();
-          Assert.assertTrue(containerFile.delete());
-          Assert.assertFalse(containerFile.exists());
-        }),
+      File containerFile = container.getContainerFile();
+      Assert.assertTrue(containerFile.delete());
+      Assert.assertFalse(containerFile.exists());
+    }),
 
     MISSING_CONTAINER_DIR(container -> {
-          File containerDir =
-              new File(container.getContainerData().getContainerPath());
+      File containerDir =
+          new File(container.getContainerData().getContainerPath());
       try {
         FileUtils.deleteDirectory(containerDir);
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-          Assert.assertFalse(containerDir.exists());
-        }),
+      Assert.assertFalse(containerDir.exists());
+    }),
 
     MISSING_BLOCK(container -> {
-          File chunksDir = new File(
-              container.getContainerData().getContainerPath(), "chunks");
-          for (File blockFile:
-              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
-            try {
-              Files.delete(blockFile.toPath());
-            } catch (IOException ex) {
-              // Fail the test.
-              throw new UncheckedIOException(ex);
-            }
-          }
-        }),
+      File chunksDir = new File(
+          container.getContainerData().getContainerPath(), "chunks");
+      for (File blockFile:
+          chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
+        try {
+          Files.delete(blockFile.toPath());
+        } catch (IOException ex) {
+          // Fail the test.
+          throw new UncheckedIOException(ex);
+        }
+      }
+    }),
 
     CORRUPT_CONTAINER_FILE(container -> {
-          File containerFile = container.getContainerFile();
-          corruptFile(containerFile);
-        }),
+      File containerFile = container.getContainerFile();
+      corruptFile(containerFile);
+    }),
 
     CORRUPT_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -308,7 +306,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
      * Get all container corruption types as parameters for junit 4
      * parameterized tests, except the ones specified.
      */
-    public static Collection<Object[]> getAllParamsExcept(ContainerCorruptions... exclude) {
+    public static Collection<Object[]> getAllParamsExcept(
+        ContainerCorruptions... exclude) {
       Collection<Object[]> params = new ArrayList<>();
       Set<ContainerCorruptions> includeSet =
           EnumSet.allOf(ContainerCorruptions.class);
