@@ -150,8 +150,8 @@ public class SCMSecurityProtocolServerSideTranslatorPB
                 getCertificate(request.getGetCertRequest()))
             .build();
       case GetAllRootCaCertificates:
-        return scmSecurityResponse.setAllRootCaCertificatesResponseProto(
-                getAllRootCa())
+        return scmSecurityResponse
+            .setAllRootCaCertificatesResponseProto(getAllRootCa())
             .build();
 
       default:
@@ -403,8 +403,6 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   public SCMGetAllRootCaCertificatesResponseProto getAllRootCa()
       throws IOException {
     return SCMGetAllRootCaCertificatesResponseProto.newBuilder()
-        .setResponseCode(SCMGetAllRootCaCertificatesResponseProto
-            .ResponseCode.success)
         .addAllAllX509RootCaCertificates(impl.getAllRootCaCertificates())
         .build();
   }

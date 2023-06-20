@@ -201,12 +201,7 @@ message SCMListCertificateResponseProto {
 }
 
 message SCMGetAllRootCaCertificatesResponseProto {
-    enum ResponseCode {
-        success = 1;
-        authenticationFailed = 2;
-    }
-    required ResponseCode responseCode = 1;
-    repeated string allX509RootCaCertificates = 2;
+    repeated string allX509RootCaCertificates = 1;
 }
 
 message SCMGetRootCACertificateRequestProto {
