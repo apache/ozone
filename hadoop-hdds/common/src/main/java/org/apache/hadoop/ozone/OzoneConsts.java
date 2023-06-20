@@ -53,8 +53,6 @@ public final class OzoneConsts {
   public static final String CLUSTER_ID = "clusterID";
   public static final String LAYOUTVERSION = "layOutVersion";
   public static final String CTIME = "ctime";
-
-  public static final String PATH_DELIMITER = "/";
   /*
    * BucketName length is used for both buckets and volume lengths
    */

@@ -81,7 +81,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -596,10 +596,10 @@ public class TestOmSnapshot {
     Assert.assertEquals(
         Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.DELETE,
-                PATH_DELIMITER + key1),
+                OZONE_URI_DELIMITER + key1),
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.CREATE,
-                PATH_DELIMITER + key2)),
+                OZONE_URI_DELIMITER + key2)),
         diff2.getDiffList());
 
     // Rename Key2

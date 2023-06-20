@@ -64,7 +64,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
-import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -690,8 +690,8 @@ public final class OmUtils {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
-      if (preserveTrailingSlash && keyName.endsWith(PATH_DELIMITER)) {
-        return normalizedKeyName.substring(1) + PATH_DELIMITER;
+      if (preserveTrailingSlash && keyName.endsWith(OZONE_URI_DELIMITER)) {
+        return normalizedKeyName.substring(1) + OZONE_URI_DELIMITER;
       }
       return normalizedKeyName.substring(1);
     }

@@ -35,7 +35,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Class to resolve absolute paths for FSO DirectoryInfo Objects.
@@ -78,7 +78,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
     Set<Long> objIds = Sets.newHashSet(dirObjIds.get());
     Map<Long, Path> objectIdPathMap = new HashMap<>();
     Queue<Pair<Long, Path>> objectIdPathVals = new LinkedList<>();
-    Pair<Long, Path> root = Pair.of(bucketId, Paths.get(PATH_DELIMITER));
+    Pair<Long, Path> root = Pair.of(bucketId, Paths.get(OZONE_URI_DELIMITER));
     objectIdPathVals.add(root);
     addToPathMap(root, objIds, objectIdPathMap);
 
