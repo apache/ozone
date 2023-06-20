@@ -40,7 +40,7 @@ import java.util.Arrays;
  * }</pre>
  *
  */
-public class CompositeKey {
+public final class CompositeKey {
   private final int hashCode;
   private final Object[] components;
 
