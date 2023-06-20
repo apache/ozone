@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -102,13 +103,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
-  private final List<X509Certificate> rootCACertificate;
+  private final List<X509Certificate> rootCACertificateList;
   private final RPC.Server rpcServer; // HADOOP RPC SERVER
   private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final ProtocolMessageMetrics secretKeyMetrics;
   private final StorageContainerManager storageContainerManager;
+  private final ReentrantReadWriteLock rootCaListLock;
 
   // SecretKey may not be enabled when neither block token nor container
   // token is enabled.
@@ -123,8 +125,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
-    this.rootCACertificate = rootCACertList;
+    this.rootCACertificateList = rootCACertList;
     this.secretKeyManager = secretKeyManager;
+    this.rootCaListLock = new ReentrantReadWriteLock();
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -234,13 +237,19 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public synchronized List<String> getAllRootCaCertificates()
+  public List<String> getAllRootCaCertificates()
       throws IOException {
-    List<String> pemEncodedList = new ArrayList<>(rootCACertificate.size());
-    for (X509Certificate cert : rootCACertificate) {
-      pemEncodedList.add(getPEMEncodedString(cert));
+    try {
+      rootCaListLock.readLock().lock();
+      List<String> pemEncodedList =
+          new ArrayList<>(rootCACertificateList.size());
+      for (X509Certificate cert : rootCACertificateList) {
+        pemEncodedList.add(getPEMEncodedString(cert));
+      }
+      return pemEncodedList;
+    } finally {
+      rootCaListLock.readLock().unlock();
     }
-    return pemEncodedList;
   }
 
   /**
@@ -414,17 +423,22 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public synchronized String getRootCACertificate() throws IOException {
+  public String getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
     X509Certificate lastExpiringRootCa = null;
     if (storageContainerManager.getScmStorageConfig()
         .checkPrimarySCMIdInitialized()) {
       Date lastCertDate = new Date(0);
-      for (X509Certificate cert : rootCACertificate) {
-        if (cert.getNotAfter().after(lastCertDate)) {
-          lastCertDate = cert.getNotAfter();
-          lastExpiringRootCa = cert;
+      try {
+        rootCaListLock.readLock().lock();
+        for (X509Certificate cert : rootCACertificateList) {
+          if (cert.getNotAfter().after(lastCertDate)) {
+            lastCertDate = cert.getNotAfter();
+            lastExpiringRootCa = cert;
+          }
         }
+      } finally {
+        rootCaListLock.readLock().unlock();
       }
     }
     if (lastExpiringRootCa == null) {
@@ -433,8 +447,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     return CertificateCodec.getPEMEncodedString(lastExpiringRootCa);
   }
 
-  public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {
-    rootCACertificate.add(rootCaCertToAdd);
+  public void addNewRootCa(X509Certificate rootCaCertToAdd) {
+    try {
+      rootCaListLock.writeLock().lock();
+      rootCACertificateList.add(rootCaCertToAdd);
+    } finally {
+      rootCaListLock.writeLock().unlock();
+    }
   }
 
   @Override
