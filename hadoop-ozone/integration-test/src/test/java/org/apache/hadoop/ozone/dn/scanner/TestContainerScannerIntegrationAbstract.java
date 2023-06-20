@@ -55,7 +55,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
@@ -218,7 +221,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
    * Represents a type of container corruption that can be injected into the
    * test.
    */
-  protected enum ContainerCorruption {
+  protected enum ContainerCorruptions {
     MISSING_CHUNKS_DIR(container -> {
           File chunksDir = new File(container.getContainerData().getContainerPath(),
               "chunks");
@@ -293,12 +296,30 @@ public abstract class TestContainerScannerIntegrationAbstract {
 
     private final Consumer<Container<?>> corruption;
 
-    ContainerCorruption(Consumer<Container<?>> corruption) {
+    ContainerCorruptions(Consumer<Container<?>> corruption) {
       this.corruption = corruption;
     }
 
     public void applyTo(Container<?> container) {
       corruption.accept(container);
+    }
+
+    /**
+     * Get all container corruption types as parameters for junit 4
+     * parameterized tests, except the ones specified.
+     */
+    public static Collection<Object[]> getAllParamsExcept(ContainerCorruptions... exclude) {
+      Collection<Object[]> params = new ArrayList<>();
+      Set<ContainerCorruptions> includeSet =
+          EnumSet.allOf(ContainerCorruptions.class);
+      Arrays.asList(exclude).forEach(includeSet::remove);
+
+      for (ContainerCorruptions c: values()) {
+        if (includeSet.contains(c)) {
+          params.add(new Object[]{c});
+        }
+      }
+      return params;
     }
 
     private static void corruptFile(File file) {

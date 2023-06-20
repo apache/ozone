@@ -23,7 +23,7 @@ import java.util.Collection;
 public class TestOnDemandContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
-  private final ContainerCorruption corruption;
+  private final ContainerCorruptions corruption;
 
   /**
    The on-demand container scanner is triggered by errors on the block read
@@ -32,18 +32,18 @@ public class TestOnDemandContainerDataScannerIntegration
    - The container file is not on the read path, so any errors in this file
    will not trigger an on-demand scan.
    - With container schema v3 (one RocksDB per volume), RocksDB is not in
-   the container metadata directory, therefore nothing in this entire
-   directory is on the read path.
+   the container metadata directory, therefore nothing in this directory is on
+   the read path.
    - Block checksums are verified on the client side. If there is a checksum
    error during read, the datanode will not learn about it.
    */
   @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
-    return Arrays.asList(new Object[][] {
-        {ContainerCorruption.MISSING_CHUNKS_DIR},
-        {ContainerCorruption.MISSING_CONTAINER_DIR},
-        {ContainerCorruption.MISSING_BLOCK},
-    });
+    return ContainerCorruptions.getAllParamsExcept(
+        ContainerCorruptions.MISSING_METADATA_DIR,
+        ContainerCorruptions.MISSING_CONTAINER_FILE,
+        ContainerCorruptions.CORRUPT_CONTAINER_FILE,
+        ContainerCorruptions.CORRUPT_BLOCK);
   }
 
   @BeforeClass
@@ -64,7 +64,7 @@ public class TestOnDemandContainerDataScannerIntegration
   }
 
   public TestOnDemandContainerDataScannerIntegration(
-      ContainerCorruption corruption) {
+      ContainerCorruptions corruption) {
     this.corruption = corruption;
   }
 
@@ -89,7 +89,7 @@ public class TestOnDemandContainerDataScannerIntegration
     GenericTestUtils.waitFor(() ->
             getDnContainer(containerID).getContainerState() ==
                 ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        1000, 5000);
+        500, 5000);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);

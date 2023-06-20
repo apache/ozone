@@ -11,7 +11,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
@@ -23,19 +23,12 @@ import java.util.concurrent.TimeUnit;
 public class TestBackgroundContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
-  private final ContainerCorruption corruption;
+  private final ContainerCorruptions corruption;
 
   @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
-    return Arrays.asList(new Object[][] {
-        {ContainerCorruption.MISSING_CHUNKS_DIR},
-        {ContainerCorruption.MISSING_METADATA_DIR},
-        {ContainerCorruption.MISSING_CONTAINER_DIR},
-        {ContainerCorruption.MISSING_CONTAINER_FILE},
-        {ContainerCorruption.CORRUPT_CONTAINER_FILE},
-        {ContainerCorruption.CORRUPT_BLOCK},
-        {ContainerCorruption.MISSING_BLOCK},
-    });
+    // Background container data scanner should be able to detect all errors.
+    return ContainerCorruptions.getAllParamsExcept();
   }
 
   @BeforeClass
@@ -56,7 +49,7 @@ public class TestBackgroundContainerDataScannerIntegration
   }
 
   public TestBackgroundContainerDataScannerIntegration(
-      ContainerCorruption corruption) {
+      ContainerCorruptions corruption) {
     this.corruption = corruption;
   }
 
@@ -76,7 +69,7 @@ public class TestBackgroundContainerDataScannerIntegration
     GenericTestUtils.waitFor(() ->
             getDnContainer(containerID).getContainerState() ==
                 ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        (int)SCAN_INTERVAL.toMillis(), (int)SCAN_INTERVAL.toMillis() * 5);
+        500, 5000);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
