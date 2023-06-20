@@ -78,7 +78,7 @@ allows the user to overwrite an existing ozone key.
 6. **Read_ACL** – Allows a user to read the ACL on a specific object.
 7. **Write_ACL** – Allows a user to write the ACL on a specific object.
 
-There are 2 types of ACLs based on their scope - **Access** and **Default**.
+There are 2 types of ACLs based on their scope - **Access** and **Default**.<br>
 Access ACLs are limited only to the specific object and not inherited. They control the access to the object itself.
 Only Default ACLs support inheritance. This inheritance is limited to only one level. For example,
 Any bucket created under a volume which has a Default ACL inherits that Default ACL as an Access ACLs. 
@@ -118,11 +118,14 @@ i.e., /volume/bucket/some/key/prefix/
 The Following are the operation on ACLs that can be performed using the CLI.
 
 <h3>setacl</h3>
+
 ```shell
 $ ozone sh bucket setacl /vol1/bucket1 -a user:testuser2:a
  ACLs set successfully.
 ```
+
 <h3>getacl</h3>
+
 ```shell
 $ ozone sh bucket getacl /vol1/bucket2 
 [ {
@@ -137,7 +140,9 @@ $ ozone sh bucket getacl /vol1/bucket2
   "aclList" : [ "ALL" ]
 } ]
 ```
+
 <h3>addacl</h3>
+
 ```shell
 $ ozone sh bucket addacl vol1/bucket2 -a user:testuser2:a
 ACL user:testuser2:a[ACCESS] added successfully.
@@ -148,7 +153,9 @@ ACL user:testuser:rxy[DEFAULT] added successfully.
 $ ozone sh prefix addacl vol1/buck3/dir1/ -a user:testuser2:a[DEFAULT]
 ACL user:testuser2:a[DEFAULT] added successfully.
 ```
+
 <h3>removeacl</h3>
+
 ```shell
 $ ozone sh bucket removeacl vol1/bucket2 -a user:testuser:r[DEFAULT]
 ACL user:testuser:r[DEFAULT] removed successfully.
