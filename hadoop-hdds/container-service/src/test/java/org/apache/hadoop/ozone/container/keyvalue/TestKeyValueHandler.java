@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Collections;
@@ -419,6 +420,7 @@ public class TestKeyValueHandler {
 
       Assert.assertEquals(3, icrReceived.get());
       Assert.assertNotNull(containerSet.getContainer(container2ID));
+      Path tmpDirPath = hddsVolume.getTmpDirPath();
       // to simulate failed move
       hddsVolume.setTmpDirPath(Paths.get(DUMMY_PATH));
       try {
@@ -429,7 +431,8 @@ public class TestKeyValueHandler {
             sce.getMessage().contains("Failed to move container"));
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
-
+      // cleanup
+      hddsVolume.setTmpDirPath(tmpDirPath);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
