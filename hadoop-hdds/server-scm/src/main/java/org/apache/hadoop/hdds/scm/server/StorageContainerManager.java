@@ -1879,21 +1879,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public void setScmReadOnlyAdmins(OzoneAdmins scmReadOnlyAdmins) {
-    this.scmReadOnlyAdmins = scmReadOnlyAdmins;
-  }
-
   private void checkAdminAccess(String op) throws IOException {
-    switch (op) {
-      case "startReconfiguration":
-        checkAdminAccess(getRemoteUser(), false);
-        break;
-      case "getReconfigurationStatus":
-      case "listReconfigurableProperties":
-        checkAdminAccess(getRemoteUser(), true);
-        break;
-      default:
-    }
+    checkAdminAccess(getRemoteUser(), false);
   }
 
   public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)
