@@ -257,7 +257,17 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT =
       "ozone.block.deleting.service.timeout";
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
-      = "300s"; // 300s for default
+      = "300s"; // 300s for default deleteBlocksCommandLimit
+
+  /**
+   * A limit to restrict the total number of delete block commands queued on a
+   * datanode. Note this is intended to be a temporary config until we have a
+   * more dynamic way of limiting load.
+   */
+  public static final String OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT =
+      "ozone.block.deleting.pending.command.limit";
+  public static final int OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT_DEFAULT
+      = 5; // same with hdds.datanode.block.delete.queue.limit
 
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT =
       "ozone.sst.filtering.service.timeout";
