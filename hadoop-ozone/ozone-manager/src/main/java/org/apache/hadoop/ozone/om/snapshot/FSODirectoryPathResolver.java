@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -36,6 +35,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
 
 /**
  * Class to resolve absolute paths for FSO DirectoryInfo Objects.
@@ -64,10 +64,9 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
   /**
    * Assuming all dirObjIds belong to a bucket this function resolves absolute
    * path for a given FSO bucket.
-   * @param dirObjIds
+   * @param dirObjIds Object Ids corresponding to which absolute path is needed.
    * @return Map of Path corresponding to provided directory object IDs
    */
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Override
   public Map<Long, Path> getAbsolutePathForObjectIDs(
       Optional<Set<Long>> dirObjIds) throws IOException {
@@ -77,11 +76,11 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
       return Collections.emptyMap();
     }
     Set<Long> objIds = Sets.newHashSet(dirObjIds.get());
-    Map<Long, Path> pathMap = new HashMap<>();
+    Map<Long, Path> objectIdPathMap = new HashMap<>();
     Queue<Pair<Long, Path>> objectIdPathVals = new LinkedList<>();
-    Pair<Long, Path> root = Pair.of(bucketId, Paths.get("/"));
+    Pair<Long, Path> root = Pair.of(bucketId, Paths.get(PATH_DELIMITER));
     objectIdPathVals.add(root);
-    addToPathMap(root, objIds, pathMap);
+    addToPathMap(root, objIds, objectIdPathMap);
 
     while (!objectIdPathVals.isEmpty() && objIds.size() > 0) {
       Pair<Long, Path> parent = objectIdPathVals.poll();
@@ -93,7 +92,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
           OmDirectoryInfo childDir = subDirIter.next().getValue();
           Pair<Long, Path> pathVal = Pair.of(childDir.getObjectID(),
               parent.getValue().resolve(childDir.getName()));
-          addToPathMap(pathVal, objIds, pathMap);
+          addToPathMap(pathVal, objIds, objectIdPathMap);
           objectIdPathVals.add(pathVal);
         }
       }
@@ -103,6 +102,6 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
       throw new IllegalArgumentException(
           "Dir object Ids required but not found in bucket: " + objIds);
     }
-    return pathMap;
+    return objectIdPathMap;
   }
 }

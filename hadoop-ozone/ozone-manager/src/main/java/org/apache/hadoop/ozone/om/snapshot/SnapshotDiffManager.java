@@ -41,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
@@ -91,6 +90,7 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.SynchronousQueue;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
@@ -654,7 +654,6 @@ public class SnapshotDiffManager implements AutoCloseable {
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
     ColumnFamilyHandle objectIDsColumnFamily = null;
-
     // Creates temporary unique dir for the snapDiff job to keep SST files
     // hardlinks. JobId is used as dir name for uniqueness.
     // It is required to prevent that SST files get deleted for in_progress
@@ -673,7 +672,6 @@ public class SnapshotDiffManager implements AutoCloseable {
           volumeName, bucketName, fromSnapshotName);
       SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
           volumeName, bucketName, toSnapshotName);
-
       Files.createDirectories(path);
       // JobId is prepended to column families name to make them unique
       // for request.
@@ -750,20 +748,22 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       validateSnapshotsAreActive(volumeName, bucketName, fromSnapshotName,
           toSnapshotName);
-      Map<Long, Path> oldParentIdPathMap = null;
-      Map<Long, Path> newParentIdPathMap = null;
+      Optional<Map<Long, Path>> oldParentIdPathMap = Optional.empty();
+      Optional<Map<Long, Path>> newParentIdPathMap = Optional.empty();
 
       if (bucketLayout.isFileSystemOptimized()) {
         long bucketId = toSnapshot.getMetadataManager()
             .getBucketId(volumeName, bucketName);
         String tablePrefix = getTablePrefix(tablePrefixes,
             fromSnapshot.getMetadataManager().getDirectoryTable().getName());
-        oldParentIdPathMap = new FSODirectoryPathResolver(tablePrefix, bucketId,
+        oldParentIdPathMap = Optional.of(new FSODirectoryPathResolver(
+            tablePrefix, bucketId,
             fromSnapshot.getMetadataManager().getDirectoryTable())
-            .getAbsolutePathForObjectIDs(oldParentIds);
-        newParentIdPathMap = new FSODirectoryPathResolver(tablePrefix, bucketId,
+            .getAbsolutePathForObjectIDs(oldParentIds));
+        newParentIdPathMap = Optional.of(new FSODirectoryPathResolver(
+            tablePrefix, bucketId,
             toSnapshot.getMetadataManager().getDirectoryTable())
-            .getAbsolutePathForObjectIDs(newParentIds);
+            .getAbsolutePathForObjectIDs(newParentIds));
       }
 
       long totalDiffEntries = generateDiffReport(jobId, objectIDsToCheckMap,
@@ -986,21 +986,22 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   private String resolveAbsolutePath(boolean isFSOBucket,
-          final Map<Long, Path> parentIdMap, byte[] keyVal) throws IOException {
+          final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal)
+      throws IOException {
     String key = codecRegistry.asObject(keyVal, String.class);
     if (isFSOBucket) {
       String[] splitKey = key.split(OM_KEY_PREFIX, 2);
       Long parentId = Long.valueOf(splitKey[0]);
-      if (parentIdMap == null || !parentIdMap.containsKey(parentId)) {
+      if (parentIdMap.map(m -> !m.containsKey(parentId)).orElse(true)) {
         throw new IllegalStateException(String.format(
             "Cannot resolve path for key: %s with parent Id: %d", key,
             parentId));
       }
-      return parentIdMap.get(parentId).resolve(splitKey[1]).toString();
+      return parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1]))
+          .get().toString();
     }
-    return Paths.get("/").resolve(key).toString();
+    return Paths.get(PATH_DELIMITER).resolve(key).toString();
   }
 
   long generateDiffReport(final String jobId,
@@ -1008,8 +1009,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                           final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
                           final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
                           final boolean isFSOBucket,
-                          final Map<Long, Path> oldParentIdPathMap,
-                          final Map<Long, Path> newParentIdPathMap) {
+                          final Optional<Map<Long, Path>> oldParentIdPathMap,
+                          final Optional<Map<Long, Path>> newParentIdPathMap) {
 
     LOG.debug("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
@@ -1244,8 +1245,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    * Get table prefix given a tableName.
    */
   private String getTablePrefix(Map<String, String> tablePrefixes,
-                                 String tableName) {
-    String volumeBucketDbPrefix;
+                                String tableName) {
     // In case of FSO - either File/Directory table
     // the key Prefix would be volumeId/bucketId and
     // in case of non-fso - volumeName/bucketName

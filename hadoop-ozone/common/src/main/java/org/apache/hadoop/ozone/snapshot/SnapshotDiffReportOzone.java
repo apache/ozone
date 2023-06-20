@@ -249,6 +249,4 @@ public class SnapshotDiffReportOzone
       return str;
     }
   }
-
-
 }

@@ -81,6 +81,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.PATH_DELIMITER;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -132,7 +133,7 @@ public class TestOmSnapshot {
   private static AtomicInteger counter;
 
   @Rule
-  public Timeout timeout = new Timeout(180, TimeUnit.HOURS);
+  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -209,7 +210,7 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-//    preFinalizationChecks();
+    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -592,11 +593,14 @@ public class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
-    Assert.assertEquals(diff2.getDiffList(),
+    Assert.assertEquals(
         Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, "/" + key1),
+            SnapshotDiffReport.DiffType.DELETE,
+                PATH_DELIMITER + key1),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.CREATE, "/" + key2)));
+                SnapshotDiffReport.DiffType.CREATE,
+                PATH_DELIMITER + key2)),
+        diff2.getDiffList());
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
