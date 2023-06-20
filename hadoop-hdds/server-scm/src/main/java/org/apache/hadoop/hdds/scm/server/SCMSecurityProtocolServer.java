@@ -236,8 +236,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   @Override
   public synchronized List<String> getAllRootCaCertificates()
       throws IOException {
-    ArrayList<String> pemEncodedList =
-        new ArrayList<>(rootCACertificate.size());
+    List<String> pemEncodedList = new ArrayList<>(rootCACertificate.size());
     for (X509Certificate cert : rootCACertificate) {
       pemEncodedList.add(getPEMEncodedString(cert));
     }
@@ -416,15 +415,22 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
 
   @Override
   public synchronized String getRootCACertificate() throws IOException {
-    Date lastCertDate = new Date(0);
-    X509Certificate lastCert = null;
-    for (X509Certificate cert : rootCACertificate) {
-      if (cert.getNotAfter().after(lastCertDate)) {
-        lastCertDate = cert.getNotAfter();
-        lastCert = cert;
+    LOGGER.debug("Getting Root CA certificate.");
+    X509Certificate lastExpiringRootCa = null;
+    if (storageContainerManager.getScmStorageConfig()
+        .checkPrimarySCMIdInitialized()) {
+      Date lastCertDate = new Date(0);
+      for (X509Certificate cert : rootCACertificate) {
+        if (cert.getNotAfter().after(lastCertDate)) {
+          lastCertDate = cert.getNotAfter();
+          lastExpiringRootCa = cert;
+        }
       }
     }
-    return CertificateCodec.getPEMEncodedString(lastCert);
+    if (lastExpiringRootCa == null) {
+      return null;
+    }
+    return CertificateCodec.getPEMEncodedString(lastExpiringRootCa);
   }
 
   public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {

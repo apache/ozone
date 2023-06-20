@@ -174,8 +174,7 @@ public interface SCMSecurityProtocol {
   /**
    * Get all root CA certificates known to SCM.
    *
-   * @return String     - pem encoded concatanation of root CA certificates
-   * @return
+   * @return String     - pem encoded list of root CA certificates
    */
   List<String> getAllRootCaCertificates() throws IOException;
 
