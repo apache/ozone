@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.collect.Iterators;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -59,6 +60,7 @@ public class ScmTableCountTask extends ReconScmTask {
   private final DSLContext dslContext;
   private final long interval;
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+  private static final long NANOSECONDS_IN_MILLISECOND = 1_000_000;
 
   public ScmTableCountTask(ReconStorageContainerManagerFacade reconSCM,
                            ReconTaskStatusDao reconTaskStatusDao,
@@ -77,30 +79,38 @@ public class ScmTableCountTask extends ReconScmTask {
     try {
       while (canRun()) {
         wait(interval);
-        long startTime, endTime, duration, durationMilliseconds;
-        try {
-          int execute =
-              dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
-          LOG.info("Deleted {} records from {}", execute,
-              SCM_TABLE_COUNT_TABLE_NAME);
-        } catch (Exception e) {
-          LOG.error("An error occurred while truncating the table {}: {}",
-              SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
-          return;
-        }
-        startTime = System.nanoTime();
-        processTableCount();
-        endTime = System.nanoTime();
-        duration = endTime - startTime;
-        durationMilliseconds = duration / 1_000_000;
-        LOG.info("Elapsed Time in milliseconds for processTableCount() " +
-            "execution: {}", durationMilliseconds);
+        runTableCountProcess();
       }
     } catch (Throwable t) {
       LOG.error("Error while running ScmTableCountTask: {}", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+    }
+  }
+
+  private void runTableCountProcess() {
+    try {
+      long startTime, endTime, duration, durationMilliseconds;
+      try {
+        int execute = dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
+        LOG.info("Deleted {} records from {}", execute,
+            SCM_TABLE_COUNT_TABLE_NAME);
+      } catch (Exception e) {
+        LOG.error("An error occurred while truncating the table {}: {}",
+            SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
+        return;
+      }
+      startTime = System.nanoTime();
+      processTableCount();
+      endTime = System.nanoTime();
+      duration = endTime - startTime;
+      durationMilliseconds = duration / NANOSECONDS_IN_MILLISECOND;
+      LOG.info(
+          "Elapsed Time in milliseconds for processTableCount() execution: {}",
+          durationMilliseconds);
+    } catch (Throwable t) {
+      LOG.error("Error while performing table count: {}", t);
     }
   }
 
@@ -116,7 +126,7 @@ public class ScmTableCountTask extends ReconScmTask {
     lock.writeLock().lock();
     try {
       // Initialize the object count map
-      HashMap<String, Long> objectCountMap = initializeCountMap();
+      Map<String, Long> objectCountMap = initializeCountMap();
 
       // Iterate over SCM tables
       for (String tableName : getTaskTables()) {
@@ -124,15 +134,17 @@ public class ScmTableCountTask extends ReconScmTask {
 
         try (TableIterator keyIter = table.iterator()) {
           // Retrieve the count of objects in the table
-          long count = getCount(keyIter);
+          long count = Iterators.size(keyIter);
           objectCountMap.put(getRowKeyFromTable(tableName), count);
         } catch (IOException ioEx) {
           LOG.error("Unable to populate SCM Table Count in Recon DB.", ioEx);
         }
       }
 
-      // Write the counts to the Recon database
-      writeCountsToDB(objectCountMap);
+      // Write the counts to the Recon db if the object count map is not empty
+      if (!objectCountMap.isEmpty()) {
+        writeCountsToDB(objectCountMap);
+      }
 
       objectCountMap.clear();
       LOG.info("Completed writing SCM table counts to DB.");
@@ -166,30 +178,16 @@ public class ScmTableCountTask extends ReconScmTask {
     scmTableCountDao.insert(insertToDb);
   }
 
-  /**
-   * Returns the count of items in the iterator.
-   *
-   * @param iterator the iterator to count the items from.
-   * @return the count of items in the iterator.
-   */
-  private long getCount(Iterator iterator) {
-    long count = 0L;
-    while (iterator.hasNext()) {
-      count++;
-      iterator.next();
-    }
-    return count;
-  }
-
-  private HashMap<String, Long> initializeCountMap() throws IOException {
+  private Map<String, Long> initializeCountMap() throws IOException {
     Collection<String> tables = getTaskTables();
-    HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
+    Map<String, Long> objectCountMap = new HashMap<>(tables.size());
     for (String tableName: tables) {
       String key = getRowKeyFromTable(tableName);
       objectCountMap.put(key, 0L);
     }
     return objectCountMap;
   }
+
 
   /**
    * Returns the list of SCM tables to be processed by the task.

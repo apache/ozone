@@ -116,8 +116,4 @@ public class ReconTaskConfig {
     return Duration.ofMillis(scmTableCountTaskInterval);
   }
 
-  public void setScmTableCountTaskInterval(Duration interval) {
-    this.scmTableCountTaskInterval = interval.toMillis();
-  }
-
 }
