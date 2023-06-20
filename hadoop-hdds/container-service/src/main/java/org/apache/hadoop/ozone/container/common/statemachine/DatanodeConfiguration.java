@@ -89,10 +89,10 @@ public class DatanodeConfiguration {
 
   public static final String
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE =
-      "hdds.datanode.check.empty.container.delete";
+      "hdds.datanode.check.empty.container.on-disk.on.delete";
   public static final Boolean
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT =
-      true;
+      false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.

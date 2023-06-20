@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -166,6 +167,10 @@ public class TestDeleteContainerHandler {
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
 
+    KeyValueContainer kv = (KeyValueContainer) getContainerfromDN(
+        hddsDatanodeService, containerId.getId());
+    kv.setCheckChunksFilePath(true);
+
     NodeManager nodeManager =
         cluster.getStorageContainerManager().getScmNodeManager();
     //send the order to close the container
@@ -256,6 +261,90 @@ public class TestDeleteContainerHandler {
         containerId.getId()));
     Assert.assertTrue(beforeForceCount <
         metrics.getContainerForceDelete());
+
+    kv.setCheckChunksFilePath(false);
+  }
+
+  @Test(timeout = 60000)
+  public void testDeleteEmptyContainerWithNonEmptyContainerDir()
+      throws Exception {
+    //the easiest way to create an open container is creating a key
+    String keyName = UUID.randomUUID().toString();
+
+    // create key
+    createKey(keyName);
+
+    // get containerID of the key
+    ContainerID containerId = getContainerID(keyName);
+
+    // We need to close the container because delete container only happens
+    // on closed containers when force flag is set to false.
+
+    HddsDatanodeService hddsDatanodeService =
+        cluster.getHddsDatanodes().get(0);
+
+    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+        containerId.getId()));
+
+    DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
+
+    NodeManager nodeManager =
+        cluster.getStorageContainerManager().getScmNodeManager();
+    //send the order to close the container
+    OzoneTestUtils.closeAllContainers(cluster.getStorageContainerManager()
+        .getEventQueue(), cluster.getStorageContainerManager());
+
+    GenericTestUtils.waitFor(() ->
+            isContainerClosed(hddsDatanodeService, containerId.getId()),
+        500, 5 * 1000);
+
+    //double check if it's really closed (waitFor also throws an exception)
+    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+        containerId.getId()));
+
+    // Delete key, which will make isEmpty flag to true in containerData
+    objectStore.getVolume(volumeName)
+        .getBucket(bucketName).deleteKey(keyName);
+
+    // Ensure isEmpty flag is true when key is deleted and container is empty
+    GenericTestUtils.waitFor(() -> getContainerfromDN(
+            hddsDatanodeService, containerId.getId())
+            .getContainerData().isEmpty(),
+        500,
+        5 * 2000);
+
+    Container containerInternalObj =
+        hddsDatanodeService.
+            getDatanodeStateMachine().
+            getContainer().getContainerSet().getContainer(containerId.getId());
+
+    // Write a file to the container chunks directory indicating that there
+    // might be a discrepancy between block count as recorded in RocksDB and
+    // what is actually on disk.
+    File lingeringBlock =
+        new File(containerInternalObj.
+            getContainerData().getChunksPath() + "/1.block");
+    lingeringBlock.createNewFile();
+
+    // Check container exists before sending delete container command
+    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+        containerId.getId()));
+
+    // send delete container to the datanode
+    SCMCommand<?> command = new DeleteContainerCommand(containerId.getId(),
+        false);
+
+    // Send the delete command. It should succeed as even though
+    // there is a lingering block on disk but isEmpty container flag is true.
+    command.setTerm(
+        cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
+    nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
+
+    GenericTestUtils.waitFor(() ->
+            isContainerDeleted(hddsDatanodeService, containerId.getId()),
+        500, 5 * 1000);
+    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+        containerId.getId()));
   }
 
   @Test(timeout = 60000)
