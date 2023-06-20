@@ -33,7 +33,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -110,7 +109,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   private final ProtocolMessageMetrics metrics;
   private final ProtocolMessageMetrics secretKeyMetrics;
   private final StorageContainerManager storageContainerManager;
-  private final ReentrantReadWriteLock rootCaListLock;
 
   // SecretKey may not be enabled when neither block token nor container
   // token is enabled.
@@ -127,7 +125,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     this.scmCertificateServer = scmCertificateServer;
     this.rootCACertificateList = rootCACertList;
     this.secretKeyManager = secretKeyManager;
-    this.rootCaListLock = new ReentrantReadWriteLock();
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
             ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_DEFAULT);
@@ -237,19 +234,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public List<String> getAllRootCaCertificates()
-      throws IOException {
-    try {
-      rootCaListLock.readLock().lock();
-      List<String> pemEncodedList =
-          new ArrayList<>(rootCACertificateList.size());
-      for (X509Certificate cert : rootCACertificateList) {
-        pemEncodedList.add(getPEMEncodedString(cert));
-      }
-      return pemEncodedList;
-    } finally {
-      rootCaListLock.readLock().unlock();
+  public List<String> getAllRootCaCertificates() throws IOException {
+    List<String> pemEncodedList =
+        new ArrayList<>(rootCACertificateList.size());
+    for (X509Certificate cert : rootCACertificateList) {
+      pemEncodedList.add(getPEMEncodedString(cert));
     }
+    return pemEncodedList;
   }
 
   /**
@@ -429,16 +420,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     if (storageContainerManager.getScmStorageConfig()
         .checkPrimarySCMIdInitialized()) {
       Date lastCertDate = new Date(0);
-      try {
-        rootCaListLock.readLock().lock();
-        for (X509Certificate cert : rootCACertificateList) {
-          if (cert.getNotAfter().after(lastCertDate)) {
-            lastCertDate = cert.getNotAfter();
-            lastExpiringRootCa = cert;
-          }
+      for (X509Certificate cert : rootCACertificateList) {
+        if (cert.getNotAfter().after(lastCertDate)) {
+          lastCertDate = cert.getNotAfter();
+          lastExpiringRootCa = cert;
         }
-      } finally {
-        rootCaListLock.readLock().unlock();
       }
     }
     if (lastExpiringRootCa == null) {
@@ -447,13 +433,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     return CertificateCodec.getPEMEncodedString(lastExpiringRootCa);
   }
 
-  public void addNewRootCa(X509Certificate rootCaCertToAdd) {
-    try {
-      rootCaListLock.writeLock().lock();
-      rootCACertificateList.add(rootCaCertToAdd);
-    } finally {
-      rootCaListLock.writeLock().unlock();
-    }
+  public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {
+    rootCACertificateList.add(rootCaCertToAdd);
   }
 
   @Override
