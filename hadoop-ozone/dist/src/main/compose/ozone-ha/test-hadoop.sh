@@ -20,6 +20,8 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export HADOOP_VERSION=3.1.2
+export SECURITY_ENABLED=false
+export SCM=scm1
+export OM_SERVICE_ID=omservice
 
-source ${COMPOSE_DIR}/hadoop-test.sh
+source "$COMPOSE_DIR/../common/hadoop-test.sh"
