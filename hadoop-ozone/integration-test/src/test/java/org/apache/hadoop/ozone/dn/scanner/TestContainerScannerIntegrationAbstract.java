@@ -51,6 +51,7 @@ import org.junit.rules.Timeout;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
@@ -61,6 +62,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -216,71 +218,99 @@ public abstract class TestContainerScannerIntegrationAbstract {
    * Represents a type of container corruption that can be injected into the
    * test.
    */
-  protected interface ContainerCorruption {
-    void applyTo(Container<?> container) throws IOException;
-  }
+  protected enum ContainerCorruption {
+    MISSING_CHUNKS_DIR(container -> {
+          File chunksDir = new File(container.getContainerData().getContainerPath(),
+              "chunks");
+          try {
+            FileUtils.deleteDirectory(chunksDir);
+          } catch (IOException ex) {
+            // Fail the test.
+            throw new UncheckedIOException(ex);
+          }
+          Assert.assertFalse(chunksDir.exists());
+        }),
 
-  protected static final ContainerCorruption MISSING_CHUNKS_DIR = container -> {
-    File chunksDir = new File(container.getContainerData().getContainerPath(),
-        "chunks");
-    FileUtils.deleteDirectory(chunksDir);
-    Assert.assertFalse(chunksDir.exists());
-  };
-
-  protected static final ContainerCorruption MISSING_METADATA_DIR =
-          container -> {
-        File metadataDir =
-            new File(container.getContainerData().getContainerPath(),
-                "metadata");
+    MISSING_METADATA_DIR(container -> {
+      File metadataDir =
+          new File(container.getContainerData().getContainerPath(),
+              "metadata");
+      try {
         FileUtils.deleteDirectory(metadataDir);
-        Assert.assertFalse(metadataDir.exists());
-      };
+      } catch (IOException ex) {
+        // Fail the test.
+        throw new UncheckedIOException(ex);
+      }
+      Assert.assertFalse(metadataDir.exists());
+    }),
 
-  protected static final ContainerCorruption MISSING_CONTAINER_FILE =
-      container -> {
-        File containerFile = container.getContainerFile();
-        Assert.assertTrue(containerFile.delete());
-        Assert.assertFalse(containerFile.exists());
-      };
+    MISSING_CONTAINER_FILE(container -> {
+          File containerFile = container.getContainerFile();
+          Assert.assertTrue(containerFile.delete());
+          Assert.assertFalse(containerFile.exists());
+        }),
 
-  protected static final ContainerCorruption MISSING_CONTAINER_DIR =
-      container -> {
-        File containerDir =
-            new File(container.getContainerData().getContainerPath());
+    MISSING_CONTAINER_DIR(container -> {
+          File containerDir =
+              new File(container.getContainerData().getContainerPath());
+      try {
         FileUtils.deleteDirectory(containerDir);
-        Assert.assertFalse(containerDir.exists());
-      };
+      } catch (IOException ex) {
+        // Fail the test.
+        throw new UncheckedIOException(ex);
+      }
+          Assert.assertFalse(containerDir.exists());
+        }),
 
-  protected static final ContainerCorruption MISSING_BLOCK =
-      container -> {
-        File chunksDir = new File(
-            container.getContainerData().getContainerPath(), "chunks");
-        for (File blockFile:
-            chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
-          Files.delete(blockFile.toPath());
-        }
-      };
+    MISSING_BLOCK(container -> {
+          File chunksDir = new File(
+              container.getContainerData().getContainerPath(), "chunks");
+          for (File blockFile:
+              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))) {
+            try {
+              Files.delete(blockFile.toPath());
+            } catch (IOException ex) {
+              // Fail the test.
+              throw new UncheckedIOException(ex);
+            }
+          }
+        }),
 
-  protected static final ContainerCorruption CORRUPT_CONTAINER_FILE =
-      container -> {
-        File containerFile = container.getContainerFile();
-        corruptFile(containerFile);
-      };
+    CORRUPT_CONTAINER_FILE(container -> {
+          File containerFile = container.getContainerFile();
+          corruptFile(containerFile);
+        }),
 
-  protected static final ContainerCorruption CORRUPT_BLOCK = container -> {
-    File chunksDir = new File(container.getContainerData().getContainerPath(),
-        "chunks");
-    Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
-        chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
-        .findFirst();
-    Assert.assertTrue(blockFile.isPresent());
-    corruptFile(blockFile.get());
-  };
+    CORRUPT_BLOCK(container -> {
+      File chunksDir = new File(container.getContainerData().getContainerPath(),
+          "chunks");
+      Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
+              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
+          .findFirst();
+      Assert.assertTrue(blockFile.isPresent());
+      corruptFile(blockFile.get());
+    });
 
-  private static void corruptFile(File file) throws IOException {
-    byte[] corruptedBytes = new byte[(int)file.length()];
-    new Random().nextBytes(corruptedBytes);
-    Files.write(file.toPath(), corruptedBytes,
-        StandardOpenOption.TRUNCATE_EXISTING);
+    private final Consumer<Container<?>> corruption;
+
+    ContainerCorruption(Consumer<Container<?>> corruption) {
+      this.corruption = corruption;
+    }
+
+    public void applyTo(Container<?> container) {
+      corruption.accept(container);
+    }
+
+    private static void corruptFile(File file) {
+      byte[] corruptedBytes = new byte[(int)file.length()];
+      new Random().nextBytes(corruptedBytes);
+      try {
+        Files.write(file.toPath(), corruptedBytes,
+            StandardOpenOption.TRUNCATE_EXISTING);
+      } catch (IOException ex) {
+        // Fail the test.
+        throw new UncheckedIOException(ex);
+      }
+    }
   }
 }

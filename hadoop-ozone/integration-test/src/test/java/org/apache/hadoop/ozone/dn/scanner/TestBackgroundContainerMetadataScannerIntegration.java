@@ -15,8 +15,6 @@ import org.junit.runners.Parameterized;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,14 +28,14 @@ public class TestBackgroundContainerMetadataScannerIntegration
 
   private final ContainerCorruption corruption;
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     return Arrays.asList(new Object[][] {
-        {MISSING_CHUNKS_DIR},
-        {MISSING_METADATA_DIR},
-        {MISSING_CONTAINER_DIR},
-        {MISSING_CONTAINER_FILE},
-//        {CORRUPT_CONTAINER_FILE}, TODO
+        {ContainerCorruption.MISSING_CHUNKS_DIR},
+        {ContainerCorruption.MISSING_METADATA_DIR},
+        {ContainerCorruption.MISSING_CONTAINER_DIR},
+        {ContainerCorruption.MISSING_CONTAINER_FILE},
+        {ContainerCorruption.CORRUPT_CONTAINER_FILE},
     });
   }
 

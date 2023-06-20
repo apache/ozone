@@ -37,12 +37,12 @@ public class TestOnDemandContainerDataScannerIntegration
    - Block checksums are verified on the client side. If there is a checksum
    error during read, the datanode will not learn about it.
    */
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     return Arrays.asList(new Object[][] {
-        {MISSING_CHUNKS_DIR},
-        {MISSING_CONTAINER_DIR},
-        {MISSING_BLOCK},
+        {ContainerCorruption.MISSING_CHUNKS_DIR},
+        {ContainerCorruption.MISSING_CONTAINER_DIR},
+        {ContainerCorruption.MISSING_BLOCK},
     });
   }
 

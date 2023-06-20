@@ -25,16 +25,16 @@ public class TestBackgroundContainerDataScannerIntegration
 
   private final ContainerCorruption corruption;
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
     return Arrays.asList(new Object[][] {
-        {MISSING_CHUNKS_DIR},
-        {MISSING_METADATA_DIR},
-        {MISSING_CONTAINER_DIR},
-        {MISSING_CONTAINER_FILE},
-//        {CORRUPT_CONTAINER_FILE}, // TODO
-        {CORRUPT_BLOCK},
-        {MISSING_BLOCK},
+        {ContainerCorruption.MISSING_CHUNKS_DIR},
+        {ContainerCorruption.MISSING_METADATA_DIR},
+        {ContainerCorruption.MISSING_CONTAINER_DIR},
+        {ContainerCorruption.MISSING_CONTAINER_FILE},
+        {ContainerCorruption.CORRUPT_CONTAINER_FILE},
+        {ContainerCorruption.CORRUPT_BLOCK},
+        {ContainerCorruption.MISSING_BLOCK},
     });
   }
 
