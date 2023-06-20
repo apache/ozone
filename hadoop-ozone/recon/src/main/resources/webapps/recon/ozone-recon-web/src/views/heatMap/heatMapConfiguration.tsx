@@ -123,7 +123,7 @@ export default class HeatMapConfiguration extends Component {
       ${params.datum.accessCount }
     `;
       }
-      if(params.datum.maxAccessCount!==undefined ){
+    else{
         tooltipContent += `<br/>
         Max Access Count:
       ${params.datum.maxAccessCount}
