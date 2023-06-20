@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.om.lock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -107,7 +107,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     //boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
     //    OZONE_MANAGER_FAIR_LOCK_DEFAULT);
 
-    Map<Resource, Striped<ReadWriteLock>> stripedLockMap = new HashMap<>();
+    Map<Resource, Striped<ReadWriteLock>> stripedLockMap =
+        new EnumMap<>(Resource.class);
     for (Resource r : Resource.values()) {
       stripedLockMap.put(r, createStripeLock(r, conf));
     }
@@ -124,8 +125,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
-    Object key = keys.length == 1 ? keys[0] : combineKeys(keys);
     Striped<ReadWriteLock> lockStriped = stripedLockByResource.get(resource);
+    Object key = combineKeys(keys);
     return (ReentrantReadWriteLock) lockStriped.get(key);
   }
 

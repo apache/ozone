@@ -64,6 +64,7 @@ public final class CompositeKey {
   }
 
   public static Object combineKeys(Object[] components) {
-    return new CompositeKey(components);
+    return components.length == 1 ?
+        components[0] : new CompositeKey(components);
   }
 }
