@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,7 +218,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this);
+    return iterator((byte[])null);
   }
 
   @Override
@@ -225,6 +226,12 @@ class RDBTable implements Table<byte[], byte[]> {
       throws IOException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
         prefix);
+  }
+
+  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+      CodecBuffer prefix) throws IOException {
+    final ManagedRocksIterator i = db.newIterator(family, false);
+    return new RDBStoreCodecBufferIterator(i, this, prefix);
   }
 
   @Override

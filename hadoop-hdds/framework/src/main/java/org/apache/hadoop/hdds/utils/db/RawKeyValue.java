@@ -39,6 +39,26 @@ public abstract class RawKeyValue<RAW> implements KeyValue<RAW, RAW> {
     return new ByteArray(key, value);
   }
 
+  static <T> Table.KeyValue<T, T> create(
+      T key, T value) {
+    return new Table.KeyValue<T, T>() {
+      @Override
+      public T getKey() {
+        return key;
+      }
+
+      @Override
+      public T getValue() {
+        return value;
+      }
+
+      @Override
+      public String toString() {
+        return "(key=" + key + ", value=" + value + ")";
+      }
+    };
+  }
+
   /** Implement {@link RawKeyValue} with byte[]. */
   public static final class ByteArray extends RawKeyValue<byte[]> {
     static byte[] copy(byte[] bytes) {
