@@ -83,7 +83,7 @@ public class ListVolumeHandler extends Handler {
     int counter = printAsJsonArray(volumeIterator, listOptions.getLimit());
 
     if (isVerbose()) {
-      out().printf("Found : %d volumes for user : %s ", counter, userName);
+      err().printf("Found : %d volumes for user : %s ", counter, userName);
     }
   }
 }
