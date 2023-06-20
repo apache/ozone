@@ -56,10 +56,6 @@ public class ListVolumeHandler extends Handler {
           + " if list all volumes option is specified.")
   private String userName;
 
-  @Option(names = {"--all", "-a"},
-      description = "List all volumes.")
-  private boolean listAllVolumes;
-
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
     OzoneAddress address = new OzoneAddress(uri);
@@ -76,7 +72,7 @@ public class ListVolumeHandler extends Handler {
     }
 
     Iterator<? extends OzoneVolume> volumeIterator;
-    if (userName != null && !listAllVolumes) {
+    if (userName != null && !listOptions.isAll()) {
       volumeIterator = client.getObjectStore().listVolumesByUser(userName,
           listOptions.getPrefix(), listOptions.getStartItem());
     } else {
