@@ -140,6 +140,8 @@ to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://pro
      * UnhealthyContainers table
        * Keeps track of all the Unhealthy Containers (MISSING, UNDER_REPLICATED,
        OVER_REPLICATED, MIS_REPLICATED) in the cluster at any given time
+     * ScmTableCount table
+       * Keeps track of the number of records in each SCM table
  
 
 ## Notable configurations
@@ -154,6 +156,7 @@ ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM sn
 ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot / delta updates.
 ozone.recon.task<br>.missingcontainer.interval | 300s | Time interval of the periodic check for Unhealthy Containers in the cluster.
 ozone.recon.task<br>.safemode.wait.threshold | 300s | Max time for Recon to wait before it exit out of safe or warmup mode.
+ozone.recon.task<br>.scmtablecounttask.interval | 60s | Time interval of the periodic check for SCM table record counts.
 ozone.recon.sql.db.jooq.dialect | DERBY | Please refer to [SQL Dialect](https://www.jooq.org/javadoc/latest/org.jooq/org/jooq/SQLDialect.html) to specify a different dialect.
 ozone.recon.sql.db.jdbc.url | jdbc:derby:${ozone.recon.db.dir}<br>/ozone_recon_derby.db | Recon SQL database jdbc url.
 ozone.recon.sql.db.username | none | Recon SQL database username.
