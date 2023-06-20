@@ -117,7 +117,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private Striped<ReadWriteLock> createStripeLock(Resource r,
       ConfigurationSource conf) {
     String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
-        r.name().toLowerCase();
+        r.getName().toLowerCase();
     int size = conf.getInt(stripeSizeKey,
         OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT);
     return Striped.readWriteLock(size);
