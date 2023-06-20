@@ -176,6 +176,13 @@ public final class ContainerDataYaml {
       throw new IOException(ex);
     }
 
+    if (containerData == null) {
+      // If Yaml#load returned null, then the file is empty. This is valid yaml
+      // but considered an error in this case since we have lost data about
+      // the container.
+      throw new IOException("Failed to load container file. File is empty.");
+    }
+
     return containerData;
   }
 

@@ -50,7 +50,8 @@ public class TestBackgroundContainerMetadataScannerIntegration
   public static Collection<Object[]> supportedCorruptionTypes() {
     return ContainerCorruptions.getAllParamsExcept(
         ContainerCorruptions.MISSING_BLOCK,
-        ContainerCorruptions.CORRUPT_BLOCK);
+        ContainerCorruptions.CORRUPT_BLOCK,
+        ContainerCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeClass

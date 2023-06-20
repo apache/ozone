@@ -282,6 +282,11 @@ public abstract class TestContainerScannerIntegrationAbstract {
       corruptFile(containerFile);
     }),
 
+    TRUNCATED_CONTAINER_FILE(container -> {
+      File containerFile = container.getContainerFile();
+      truncateFile(containerFile);
+    }),
+
     CORRUPT_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
           "chunks");
@@ -290,6 +295,16 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       Assert.assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
+    }),
+
+    TRUNCATED_BLOCK(container -> {
+      File chunksDir = new File(container.getContainerData().getContainerPath(),
+          "chunks");
+      Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
+              chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
+          .findFirst();
+      Assert.assertTrue(blockFile.isPresent());
+      truncateFile(blockFile.get());
     });
 
     private final Consumer<Container<?>> corruption;
@@ -321,11 +336,27 @@ public abstract class TestContainerScannerIntegrationAbstract {
       return params;
     }
 
+    /**
+     * Overwrite the file with random bytes.
+     */
     private static void corruptFile(File file) {
       byte[] corruptedBytes = new byte[(int)file.length()];
       new Random().nextBytes(corruptedBytes);
       try {
         Files.write(file.toPath(), corruptedBytes,
+            StandardOpenOption.TRUNCATE_EXISTING);
+      } catch (IOException ex) {
+        // Fail the test.
+        throw new UncheckedIOException(ex);
+      }
+    }
+
+    /**
+     * Truncate the file to 0 bytes in length.
+     */
+    private static void truncateFile(File file) {
+      try {
+        Files.write(file.toPath(), new byte[]{},
             StandardOpenOption.TRUNCATE_EXISTING);
       } catch (IOException ex) {
         // Fail the test.

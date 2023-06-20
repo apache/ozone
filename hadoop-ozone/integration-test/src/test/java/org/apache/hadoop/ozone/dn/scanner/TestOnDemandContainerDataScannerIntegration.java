@@ -61,7 +61,9 @@ public class TestOnDemandContainerDataScannerIntegration
         ContainerCorruptions.MISSING_METADATA_DIR,
         ContainerCorruptions.MISSING_CONTAINER_FILE,
         ContainerCorruptions.CORRUPT_CONTAINER_FILE,
-        ContainerCorruptions.CORRUPT_BLOCK);
+        ContainerCorruptions.TRUNCATED_CONTAINER_FILE,
+        ContainerCorruptions.CORRUPT_BLOCK,
+        ContainerCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeClass
