@@ -112,7 +112,7 @@ export default class HeatMapConfiguration extends Component {
   };
 
     
-  tooltipContent = (params:any) => {
+  tooltipContent = (params: any) => {
     let tooltipContent = `<span>
       Size:
       ${byteToSize(params.datum.size, 1)}
@@ -121,6 +121,12 @@ export default class HeatMapConfiguration extends Component {
         tooltipContent += `<br/>
         Access count:
       ${params.datum.accessCount }
+    `;
+      }
+      if(params.datum.maxAccessCount!==undefined ){
+        tooltipContent += `<br/>
+        Max Access Count:
+      ${params.datum.maxAccessCount}
     `;}
     if (params.datum.label !== "") {
         tooltipContent += `<br/>
