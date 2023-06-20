@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -61,6 +63,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -280,12 +283,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
             // Delete keys From deletedTable
             processKeyDeletes(keysToPurge, omSnapshot.getKeyManager(),
-                snapInfo.getTableKey());
+                null, snapInfo.getTableKey());
             successRunCount.incrementAndGet();
           } catch (IOException ex) {
             LOG.error("Error while running Snapshot Deleting Service for " +
                 "snapshot " + snapInfo.getTableKey() + " with snapshotId " +
-                snapInfo.getSnapshotID() + ". Processed " + deletionCount +
+                snapInfo.getSnapshotId() + ". Processed " + deletionCount +
                 " keys and " + (keyLimitPerSnapshot - remainNum) +
                 " directories and files", ex);
           }
@@ -530,25 +533,28 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       OmKeyInfo prevKeyInfo = renamedKey != null ? previousKeyTable
           .get(renamedKey) : previousKeyTable.get(dbKey);
 
-      if (prevKeyInfo == null) {
+      if (prevKeyInfo == null ||
+          prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID()) {
         return true;
       }
 
-      return prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID();
+      // For key overwrite the objectID will remain the same, In this
+      // case we need to check if OmKeyLocationInfo is also same.
+      return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
     }
 
     private SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo)
         throws IOException {
       SnapshotInfo currSnapInfo = snapInfo;
       while (chainManager.hasPreviousPathSnapshot(
-          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID())) {
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
 
-        String prevPathSnapshot = chainManager.previousPathSnapshot(
-            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotID());
+        UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+            currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
         String tableKey = chainManager.getTableKey(prevPathSnapshot);
         SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
-        if (prevSnapInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+        if (prevSnapInfo.getSnapshotStatus() ==
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
           return prevSnapInfo;
         }
         currSnapInfo = prevSnapInfo;
@@ -610,6 +616,50 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
+  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
+                                                OmKeyInfo deletedKeyInfo) {
+
+    // For hsync, Though the blockLocationInfo of a key may not be same
+    // at the time of snapshot and key deletion as blocks can be appended.
+    // If the objectId is same then the key is same.
+    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
+      return true;
+    }
+
+    if (prevKeyInfo.getKeyLocationVersions().size() !=
+        deletedKeyInfo.getKeyLocationVersions().size()) {
+      return false;
+    }
+
+    OmKeyLocationInfoGroup deletedOmKeyLocation =
+        deletedKeyInfo.getLatestVersionLocations();
+    OmKeyLocationInfoGroup prevOmKeyLocation =
+        prevKeyInfo.getLatestVersionLocations();
+
+    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
+      return false;
+    }
+
+    List<OmKeyLocationInfo> deletedLocationList =
+        deletedOmKeyLocation.getLocationList();
+    List<OmKeyLocationInfo> prevLocationList =
+        prevOmKeyLocation.getLocationList();
+
+    if (deletedLocationList.size() != prevLocationList.size()) {
+      return false;
+    }
+
+    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
+      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
+      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
+      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
@@ -646,4 +696,3 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     successRunCount.getAndSet(num);
   }
 }
-

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,21 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.function;
+package org.apache.ozone.test.tag;
 
-import java.io.IOException;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+import org.junit.jupiter.api.Tag;
 
 /**
- * Functional interface like java.util.function.Supplier but with
- * checked exception.
+ * Annotation to mark test classes that require native libraries.
  */
-@FunctionalInterface
-public interface SupplierWithIOException<T> {
-
+@Target({ ElementType.TYPE, ElementType.METHOD })
+@Retention(RetentionPolicy.RUNTIME)
+@Tag("native")
+public @interface Native {
   /**
-   * Return the given output..
-   *
-   * @return the function result
+   * Native Library being used.
    */
-  T get() throws IOException;
+  String value();
 }

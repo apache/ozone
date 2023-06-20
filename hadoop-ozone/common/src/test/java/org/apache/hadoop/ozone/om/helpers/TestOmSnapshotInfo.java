@@ -29,13 +29,15 @@ import org.junit.Assert;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
+
 /**
  * Tests SnapshotInfo metadata data structure holding state info for
  * object storage snapshots.
  */
 public class TestOmSnapshotInfo {
 
-  private static final String SNAPSHOT_ID = UUID.randomUUID().toString();
+  private static final UUID SNAPSHOT_ID = UUID.randomUUID();
   private static final String NAME = "snapshot1";
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
@@ -43,9 +45,8 @@ public class TestOmSnapshotInfo {
       SnapshotStatus.SNAPSHOT_ACTIVE;
   private static final long CREATION_TIME = Time.now();
   private static final long DELETION_TIME = -1;
-  private static final String PATH_PREVIOUS_SNAPSHOT_ID =
-      UUID.randomUUID().toString();
-  private static final String GLOBAL_PREVIOUS_SNAPSHOT_ID =
+  private static final UUID PATH_PREVIOUS_SNAPSHOT_ID = UUID.randomUUID();
+  private static final UUID GLOBAL_PREVIOUS_SNAPSHOT_ID =
       PATH_PREVIOUS_SNAPSHOT_ID;
   private static final String SNAPSHOT_PATH = "test/path";
   private static final String CHECKPOINT_DIR = "checkpoint.testdir";
@@ -53,15 +54,15 @@ public class TestOmSnapshotInfo {
 
   private SnapshotInfo createSnapshotInfo() {
     return new SnapshotInfo.Builder()
-        .setSnapshotID(SNAPSHOT_ID)
+        .setSnapshotId(SNAPSHOT_ID)
         .setName(NAME)
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SNAPSHOT_STATUS)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
-        .setPathPreviousSnapshotID(PATH_PREVIOUS_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(GLOBAL_PREVIOUS_SNAPSHOT_ID)
+        .setPathPreviousSnapshotId(PATH_PREVIOUS_SNAPSHOT_ID)
+        .setGlobalPreviousSnapshotId(GLOBAL_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
@@ -70,15 +71,15 @@ public class TestOmSnapshotInfo {
 
   private OzoneManagerProtocolProtos.SnapshotInfo createSnapshotInfoProto() {
     return OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
-        .setSnapshotID(SNAPSHOT_ID)
+        .setSnapshotID(toProtobuf(SNAPSHOT_ID))
         .setName(NAME)
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SnapshotStatusProto.SNAPSHOT_ACTIVE)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
-        .setPathPreviousSnapshotID(PATH_PREVIOUS_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(GLOBAL_PREVIOUS_SNAPSHOT_ID)
+        .setPathPreviousSnapshotID(toProtobuf(PATH_PREVIOUS_SNAPSHOT_ID))
+        .setGlobalPreviousSnapshotID(toProtobuf(GLOBAL_PREVIOUS_SNAPSHOT_ID))
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
@@ -124,8 +125,8 @@ public class TestOmSnapshotInfo {
 
     SnapshotInfo snapshotInfoActual = SnapshotInfo
         .getFromProtobuf(snapshotInfoEntry);
-    Assert.assertEquals(snapshotInfoExpected.getSnapshotID(),
-        snapshotInfoActual.getSnapshotID());
+    Assert.assertEquals(snapshotInfoExpected.getSnapshotId(),
+        snapshotInfoActual.getSnapshotId());
     Assert.assertEquals(snapshotInfoExpected.getName(),
         snapshotInfoActual.getName());
     Assert.assertEquals(snapshotInfoExpected.getVolumeName(),

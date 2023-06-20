@@ -250,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -536,4 +536,7 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
 }

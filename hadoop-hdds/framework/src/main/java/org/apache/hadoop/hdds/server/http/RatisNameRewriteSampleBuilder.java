@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 import io.prometheus.client.Collector.MetricFamilySamples.Sample;
 import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
-import org.apache.logging.log4j.util.Strings;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +107,7 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
         }
       }
     }
-    return Strings.join(nameParts, '.');
+    return StringUtils.join(nameParts, '.');
   }
 
 }

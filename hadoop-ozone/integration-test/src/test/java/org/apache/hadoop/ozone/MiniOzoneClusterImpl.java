@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -80,7 +81,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -768,7 +768,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       //TODO: HDDS-6897
       //Disabling Ratis for only of MiniOzoneClusterImpl.
       //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
+      if (StringUtils.isNotEmpty(
+          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
               && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();

@@ -37,6 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 
+import org.apache.hadoop.ozone.om.PendingKeysDeletion;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,11 +135,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           //  OM would have to keep track of which snapshot the key is coming
           //  from if the above would be done inside getPendingDeletionKeys().
 
-          List<BlockGroup> keyBlocksList = manager
+          PendingKeysDeletion pendingKeysDeletion = manager
               .getPendingDeletionKeys(keyLimitPerTask);
+          List<BlockGroup> keyBlocksList = pendingKeysDeletion
+              .getKeyBlocksList();
           if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             int delCount = processKeyDeletes(keyBlocksList,
-                getOzoneManager().getKeyManager(), null);
+                getOzoneManager().getKeyManager(),
+                pendingKeysDeletion.getKeysToModify(), null);
             deletedKeyCount.addAndGet(delCount);
           }
         } catch (IOException e) {

@@ -15,26 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.function;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import org.junit.jupiter.api.Tag;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 /**
- * Annotation to mark test classes or methods with some intermittent failures.
- * These are handled separately from the normal tests.  (Not required to pass,
- * may be repeated automatically, etc.)
+ * Common predicates.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
-@Retention(RetentionPolicy.RUNTIME)
-@Tag("native")
-public @interface Native {
-  /**
-   * Native Library being used.
-   */
-  String value() default "";
+public final class Predicates {
+
+  public static <T> Predicate<T> yes() {
+    return x -> true;
+  }
+
+  public static <T> Predicate<T> no() {
+    return x -> false;
+  }
+
+  public static <T, U> BiPredicate<T, U> yesBi() {
+    return (t, u) -> true;
+  }
+
+  public static <T, U> BiPredicate<T, U> noBi() {
+    return (t, u) -> false;
+  }
+
+  private Predicates() {
+    // no instances
+  }
 }
