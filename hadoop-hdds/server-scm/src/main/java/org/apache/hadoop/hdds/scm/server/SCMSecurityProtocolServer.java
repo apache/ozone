@@ -425,7 +425,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   @Override
   public long revokeCertificates(List<String> certIds, int reason,
       long revocationTime) throws IOException {
-    storageContainerManager.checkAdminAccess(getRpcRemoteUser());
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
 
     Future<Optional<Long>> revoked = scmCertificateServer.revokeCertificates(
         certIds.stream().map(id -> new BigInteger(id))

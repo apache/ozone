@@ -21,7 +21,11 @@ package org.apache.hadoop.ozone.reconfig;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.Set;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -40,7 +44,13 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void reconfigurableProperties() {
-    assertProperties(getSubject(), ImmutableSet.of(OZONE_ADMINISTRATORS));
+    Set<String> expected = ImmutableSet.<String>builder()
+        .add(OZONE_ADMINISTRATORS)
+        .addAll(new ReplicationManagerConfiguration()
+            .reconfigurableProperties())
+        .build();
+
+    assertProperties(getSubject(), expected);
   }
 
   @Test
@@ -52,6 +62,22 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
         getCluster().getStorageContainerManager().getScmAdminUsernames());
+  }
+
+  @Test
+  void replicationInterval() throws ReconfigurationException {
+    ReplicationManagerConfiguration config = replicationManagerConfig();
+
+    getSubject().reconfigurePropertyImpl(
+        "hdds.scm.replication.thread.interval",
+        "120s");
+
+    assertEquals(Duration.ofSeconds(120), config.getInterval());
+  }
+
+  private ReplicationManagerConfiguration replicationManagerConfig() {
+    return getCluster().getStorageContainerManager().getReplicationManager()
+        .getConfig();
   }
 
 }

@@ -219,6 +219,7 @@ public class TestOMSnapshotDeleteRequest {
     // Expected -1 because no snapshot was created before.
     assertEquals(0, omMetrics.getNumSnapshotCreates());
     assertEquals(-1, omMetrics.getNumSnapshotActive());
+    assertEquals(1, omMetrics.getNumSnapshotDeleted());
   }
 
   /**

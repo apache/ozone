@@ -269,6 +269,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // recycling thread.
       List<DeletedBlocksTransaction> containerBlocks =
           cmd.getCmd().blocksTobeDeleted();
+      blockDeleteMetrics.incrReceivedTransactionCount(containerBlocks.size());
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
@@ -277,6 +278,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           summary.getTxIDSummary(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
+      blockDeleteMetrics.incrReceivedContainerCount(
+          summary.getNumOfContainers());
+      blockDeleteMetrics.incrReceivedRetryTransactionCount(
+          summary.getNumOfRetryTxs());
+      blockDeleteMetrics.incrReceivedBlockCount(summary.getNumOfBlocks());
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder();
@@ -386,6 +392,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
+    blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
   }
 
   private void markBlocksForDeletionSchemaV1(
@@ -446,6 +453,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         throw new IOException(
             "Failed to delete blocks for TXID = " + delTX.getTxID(), e);
       }
+      blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
     }
   }
 

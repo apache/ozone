@@ -34,6 +34,7 @@ import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.apache.hadoop.hdds.security.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
@@ -102,19 +103,35 @@ public interface CertificateClient extends Closeable {
    * Return all certificates in this component's trust chain,
    * the last one is the root CA certificate.
    */
-  List<X509Certificate> getTrustChain();
+  List<X509Certificate> getTrustChain() throws IOException;
 
   /**
    * Return the latest Root CA certificate known to the client.
+   *
    * @return latest Root CA certificate known to the client.
    */
   X509Certificate getRootCACertificate();
 
   /**
-   * Return the pem encoded CA certificate list.
+   * Return the root ca certs saved in this client's file system.
    *
+   * @return all the Root CA certificates known to the client
+   */
+  Set<X509Certificate> getAllRootCaCerts();
+
+  /**
+   * Return the subordinate ca certs saved in this client's file system.
+   *
+   * @return all the subordinate CA certificates known to the client
+   */
+  Set<X509Certificate> getAllCaCerts();
+
+  /**
+   * Return the pem encoded CA certificate list.
+   * <p>
    * If initialized return list of pem encoded CA certificates, else return
    * null.
+   *
    * @return list of pem encoded CA certificates.
    */
   List<String> getCAList();

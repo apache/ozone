@@ -42,14 +42,24 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import static org.apache.commons.io.file.PathUtils.copyDirectory;
+import static org.apache.hadoop.hdds.utils.HAUtils.getExistingSstFiles;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
@@ -63,12 +73,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit test om snapshot manager.
+ * Unit test ozone snapshot manager.
  */
 public class TestOmSnapshotManager {
 
   private OzoneManager om;
   private File testDir;
+  private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
+      SNAPSHOT_CANDIDATE_DIR;
+  private File leaderDir;
+  private File leaderSnapDir1;
+  private File leaderSnapDir2;
+  private File followerSnapDir2;
+  private File leaderCheckpointDir;
+  private File candidateDir;
+  private File s1File;
+  private File f1File;
 
   @Before
   public void init() throws Exception {
@@ -86,6 +106,7 @@ public class TestOmSnapshotManager {
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();
+    setupData();
   }
 
   @After
@@ -165,58 +186,204 @@ public class TestOmSnapshotManager {
     verify(firstSnapshotStore, timeout(3000).times(1)).close();
   }
 
+  private void setupData() throws IOException {
+    // Set up the leader with the following files:
+    // leader/db.checkpoints/checkpoint1/f1.sst
+    // leader/db.snapshots/checkpointState/snap1/s1.sst
+    // leader/db.snapshots/checkpointState/snap2/noLink.sst
+    // leader/db.snapshots/checkpointState/snap2/nonSstFile
+
+    // Set up the follower with the following files, (as if they came
+    // from the tarball from the leader)
+
+    // follower/om.db.candidate/f1.sst
+    // follower/om.db.candidate/db.snapshots/checkpointState/snap1/s1.sst
+    // follower/om.db.candidate/db.snapshots/checkpointState/snap2/noLink.sst
+    // follower/om.db.candidate/db.snapshots/checkpointState/snap2/nonSstFile
+
+    // Note that the layout between leader and follower is slightly
+    // different in that the f1.sst on the leader is in the
+    // db.checkpoints/checkpoint1 directory but on the follower is
+    // moved to the om.db.candidate directory; the links must be adjusted
+    // accordingly.
+
+    byte[] dummyData = {0};
+
+    // Create dummy leader files to calculate links.
+    leaderDir = new File(testDir.toString(),
+        "leader");
+    Assert.assertTrue(leaderDir.mkdirs());
+    String pathSnap1 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "snap1";
+    String pathSnap2 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "snap2";
+    leaderSnapDir1 = new File(leaderDir.toString(), pathSnap1);
+    Assert.assertTrue(leaderSnapDir1.mkdirs());
+    Files.write(Paths.get(leaderSnapDir1.toString(), "s1.sst"), dummyData);
+
+    leaderSnapDir2 = new File(leaderDir.toString(), pathSnap2);
+    Assert.assertTrue(leaderSnapDir2.mkdirs());
+    Files.write(Paths.get(leaderSnapDir2.toString(), "noLink.sst"), dummyData);
+    Files.write(Paths.get(leaderSnapDir2.toString(), "nonSstFile"), dummyData);
+
+    // Also create the follower files.
+    candidateDir = new File(testDir.toString(),
+        CANDIDATE_DIR_NAME);
+    File followerSnapDir1 = new File(candidateDir.toString(), pathSnap1);
+    followerSnapDir2 = new File(candidateDir.toString(), pathSnap2);
+    copyDirectory(leaderDir.toPath(), candidateDir.toPath());
+    f1File = new File(candidateDir, "f1.sst");
+    Files.write(f1File.toPath(), dummyData);
+    s1File = new File(followerSnapDir1, "s1.sst");
+    // confirm s1 file got copied over.
+    Assert.assertTrue(s1File.exists());
+
+    // Finish creating leaders files that are not to be copied over, because
+    //  f1.sst belongs in a different directory as explained above.
+    leaderCheckpointDir = new File(leaderDir.toString(),
+        OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "checkpoint1");
+    Assert.assertTrue(leaderCheckpointDir.mkdirs());
+    Files.write(Paths.get(leaderCheckpointDir.toString(), "f1.sst"), dummyData);
+  }
+
+  /*
+   * Create map of links to files on the leader:
+   *     leader/db.snapshots/checkpointState/snap2/<link to f1.sst>
+   *     leader/db.snapshots/checkpointState/snap2/<link to s1.sst>
+   * and test that corresponding links are created on the Follower:
+   *     follower/db.snapshots/checkpointState/snap2/f1.sst
+   *     follower/db.snapshots/checkpointState/snap2/s1.sst
+   */
   @Test
   @SuppressFBWarnings({"NP_NULL_ON_SOME_PATH"})
   public void testHardLinkCreation() throws IOException {
-    byte[] dummyData = {0};
 
-    // Create dummy files to be linked to.
-    File snapDir1 = new File(testDir.toString(),
-        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
-    if (!snapDir1.mkdirs()) {
-      throw new IOException("failed to make directory: " + snapDir1);
-    }
-    Files.write(Paths.get(snapDir1.toString(), "s1"), dummyData);
-
-    File snapDir2 = new File(testDir.toString(),
-        OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir2");
-    if (!snapDir2.mkdirs()) {
-      throw new IOException("failed to make directory: " + snapDir2);
-    }
-
-    File dbDir = new File(testDir.toString(), OM_DB_NAME);
-    Files.write(Paths.get(dbDir.toString(), "f1"), dummyData);
-
-    // Create map of links to dummy files.
-    File checkpointDir1 = new File(testDir.toString(),
-        OM_CHECKPOINT_DIR + OM_KEY_PREFIX + "dir1");
+    // Map of links to files on the leader
     Map<Path, Path> hardLinkFiles = new HashMap<>();
-    hardLinkFiles.put(Paths.get(snapDir2.toString(), "f1"),
-        Paths.get(checkpointDir1.toString(), "f1"));
-    hardLinkFiles.put(Paths.get(snapDir2.toString(), "s1"),
-        Paths.get(snapDir1.toString(), "s1"));
+    hardLinkFiles.put(Paths.get(leaderSnapDir2.toString(), "f1.sst"),
+        Paths.get(leaderCheckpointDir.toString(), "f1.sst"));
+    hardLinkFiles.put(Paths.get(leaderSnapDir2.toString(), "s1.sst"),
+        Paths.get(leaderSnapDir1.toString(), "s1.sst"));
 
-    // Create link list.
+    // Create link list from leader map.
     Path hardLinkList =
         OmSnapshotUtils.createHardLinkList(
-            testDir.toString().length() + 1, hardLinkFiles);
-    Files.move(hardLinkList, Paths.get(dbDir.toString(), OM_HARDLINK_FILE));
+            leaderDir.toString().length() + 1, hardLinkFiles);
 
-    // Create links from list.
-    OmSnapshotUtils.createHardLinks(dbDir.toPath());
+    Files.move(hardLinkList, Paths.get(candidateDir.toString(),
+        OM_HARDLINK_FILE));
 
-    // Confirm expected links.
-    for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
-      Assert.assertTrue(entry.getKey().toFile().exists());
-      Path value = entry.getValue();
-      // Convert checkpoint path to om.db.
-      if (value.toString().contains(OM_CHECKPOINT_DIR)) {
-        value = Paths.get(dbDir.toString(),
-                          value.getFileName().toString());
-      }
-      Assert.assertEquals("link matches original file",
-          getINode(entry.getKey()), getINode(value));
-    }
+    // Pointers to follower links to be created.
+    File f1FileLink = new File(followerSnapDir2, "f1.sst");
+    File s1FileLink = new File(followerSnapDir2, "s1.sst");
+
+    // Create links on the follower from list.
+    OmSnapshotUtils.createHardLinks(candidateDir.toPath());
+
+    // Confirm expected follower links.
+    Assert.assertTrue(s1FileLink.exists());
+    Assert.assertEquals("link matches original file",
+        getINode(s1File.toPath()), getINode(s1FileLink.toPath()));
+
+    Assert.assertTrue(f1FileLink.exists());
+    Assert.assertEquals("link matches original file",
+        getINode(f1File.toPath()), getINode(f1FileLink.toPath()));
+  }
+
+  /*
+   * Test that exclude list is generated correctly.
+   */
+  @Test
+  public void testExcludeUtilities() throws IOException {
+    File noLinkFile = new File(followerSnapDir2, "noLink.sst");
+
+    // Confirm that the list of existing sst files is as expected.
+    List<String> existingSstList = getExistingSstFiles(candidateDir);
+    Set<String> existingSstFiles = new HashSet<>(existingSstList);
+    int truncateLength = candidateDir.toString().length() + 1;
+    Set<String> expectedSstFiles = new HashSet<>(Arrays.asList(
+        s1File.toString().substring(truncateLength),
+        noLinkFile.toString().substring(truncateLength),
+        f1File.toString().substring(truncateLength)));
+    Assert.assertEquals(expectedSstFiles, existingSstFiles);
+
+    // Confirm that the excluded list is normalized as expected.
+    //  (Normalizing means matches the layout on the leader.)
+    Set<Path> normalizedSet =
+        OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
+            leaderCheckpointDir.toString(), leaderDir.toString());
+    Set<Path> expectedNormalizedSet = new HashSet<>(Arrays.asList(
+        Paths.get(leaderSnapDir1.toString(), "s1.sst"),
+        Paths.get(leaderSnapDir2.toString(), "noLink.sst"),
+        Paths.get(leaderCheckpointDir.toString(), "f1.sst")));
+    Assert.assertEquals(expectedNormalizedSet, normalizedSet);
+  }
+
+  /*
+   * Confirm that processFile() correctly determines whether a file
+   * should be copied, linked, or excluded from the tarball entirely.
+   */
+  @Test
+  public void testProcessFile() {
+    Path copyFile = Paths.get(testDir.toString(),
+        "snap1/copyfile.sst");
+    Path excludeFile = Paths.get(testDir.toString(),
+        "snap1/excludeFile.sst");
+    Path linkToExcludedFile = Paths.get(testDir.toString(),
+        "snap2/excludeFile.sst");
+    Path linkToCopiedFile = Paths.get(testDir.toString(),
+        "snap2/copyfile.sst");
+    Path addToCopiedFiles = Paths.get(testDir.toString(),
+        "snap1/copyfile2.sst");
+    Path addNonSstToCopiedFiles = Paths.get(testDir.toString(),
+        "snap1/nonSst");
+
+    Set<Path> toExcludeFiles = new HashSet<>(
+        Collections.singletonList(excludeFile));
+    Set<Path> copyFiles = new HashSet<>(Collections.singletonList(copyFile));
+    List<String> excluded = new ArrayList<>();
+    Map<Path, Path> hardLinkFiles = new HashMap<>();
+
+    // Confirm the exclude file gets added to the excluded list,
+    //  (and thus is excluded.)
+    processFile(excludeFile, copyFiles, hardLinkFiles, toExcludeFiles,
+        excluded);
+    Assert.assertEquals(excluded.size(), 1);
+    Assert.assertEquals((excluded.get(0)), excludeFile.toString());
+    Assert.assertEquals(copyFiles.size(), 1);
+    Assert.assertEquals(hardLinkFiles.size(), 0);
+    excluded = new ArrayList<>();
+
+    // Confirm the linkToExcludedFile gets added as a link.
+    processFile(linkToExcludedFile, copyFiles, hardLinkFiles, toExcludeFiles,
+        excluded);
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 1);
+    Assert.assertEquals(hardLinkFiles.size(), 1);
+    Assert.assertEquals(hardLinkFiles.get(linkToExcludedFile), excludeFile);
+    hardLinkFiles = new HashMap<>();
+
+    // Confirm the linkToCopiedFile gets added as a link.
+    processFile(linkToCopiedFile, copyFiles, hardLinkFiles, toExcludeFiles,
+        excluded);
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 1);
+    Assert.assertEquals(hardLinkFiles.size(), 1);
+    Assert.assertEquals(hardLinkFiles.get(linkToCopiedFile), copyFile);
+    hardLinkFiles = new HashMap<>();
+
+    // Confirm the addToCopiedFiles gets added to list of copied files
+    processFile(addToCopiedFiles, copyFiles, hardLinkFiles, toExcludeFiles,
+        excluded);
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 2);
+    Assert.assertTrue(copyFiles.contains(addToCopiedFiles));
+    copyFiles = new HashSet<>(Collections.singletonList(copyFile));
+
+    // Confirm the addNonSstToCopiedFiles gets added to list of copied files
+    processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 2);
+    Assert.assertTrue(copyFiles.contains(addNonSstToCopiedFiles));
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,

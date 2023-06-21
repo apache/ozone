@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,19 +17,31 @@
  */
 package org.apache.hadoop.hdds.function;
 
-import java.io.IOException;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 /**
- * Functional interface like java.util.function.Supplier but with
- * checked exception.
+ * Common predicates.
  */
-@FunctionalInterface
-public interface SupplierWithIOException<T> {
+public final class Predicates {
 
-  /**
-   * Return the given output..
-   *
-   * @return the function result
-   */
-  T get() throws IOException;
+  public static <T> Predicate<T> yes() {
+    return x -> true;
+  }
+
+  public static <T> Predicate<T> no() {
+    return x -> false;
+  }
+
+  public static <T, U> BiPredicate<T, U> yesBi() {
+    return (t, u) -> true;
+  }
+
+  public static <T, U> BiPredicate<T, U> noBi() {
+    return (t, u) -> false;
+  }
+
+  private Predicates() {
+    // no instances
+  }
 }
