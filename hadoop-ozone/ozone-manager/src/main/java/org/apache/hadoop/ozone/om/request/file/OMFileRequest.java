@@ -26,11 +26,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -47,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ratis.util.Preconditions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -618,6 +618,8 @@ public final class OMFileRequest {
 
   /**
    * Gets OmKeyInfo if exists for the given key name in the DB.
+   * If the key is a directory, its replication config is set from the bucket's
+   * default replication config, if any.
    *
    * @param omMetadataMgr metadata manager
    * @param volumeName    volume name
@@ -675,6 +677,7 @@ public final class OMFileRequest {
     if (omDirInfo != null) {
       OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
               keyName);
+      setDirectoryReplicationFromBucket(omBucketInfo, omKeyInfo);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
 
@@ -682,8 +685,18 @@ public final class OMFileRequest {
     return null;
   }
 
+  private static void setDirectoryReplicationFromBucket(
+      OmBucketInfo bucket,
+      OmKeyInfo dir
+  ) {
+    Preconditions.assertTrue(!dir.isFile(), "expect only directory");
+    Optional.ofNullable(bucket.getDefaultReplicationConfig())
+        .ifPresent(r -> dir.setReplicationIfMissing(r.getReplicationConfig()));
+  }
+
   /**
    * Prepare OmKeyInfo from OmDirectoryInfo.
+   * Replication config is not set, callers have to set it if needed.
    *
    * @param volumeName volume name
    * @param bucketName bucket name
@@ -707,8 +720,6 @@ public final class OMFileRequest {
     builder.setObjectID(dirInfo.getObjectID());
     builder.setUpdateID(dirInfo.getUpdateID());
     builder.setFileName(dirInfo.getName());
-    builder.setReplicationConfig(RatisReplicationConfig
-        .getInstance(HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();
