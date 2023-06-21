@@ -3913,6 +3913,19 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.db.max.open.files</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files for each snapshot db present in the snapshot cache.
+      Essentially sets `max_open_files` config for RocksDB instances opened for Ozone snapshots.
+      This will limit the total number of files opened by a snapshot db thereby limiting the total number of
+      open file handles by snapshot dbs.
+      Max total number of open handles = (snapshot cache size * max open files)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.force.full.diff</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
