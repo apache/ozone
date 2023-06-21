@@ -33,9 +33,12 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,13 +57,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 public class DeleteVolumeHandler extends VolumeHandler {
   @CommandLine.Option(
       names = {"-r"},
-      description = "This command will delete volume recursively." +
-          "\nThere is no trash recovery for FSO buckets using this command." +
-          "\nDelay is expected running this command." +
-          "\nEnter 'yes' to proceed",
-      interactive = true
+      description = "Delete volume recursively"
   )
-  private String isRecursive;
+  private boolean bRecursive;
+
   @CommandLine.Option(
       names = {"-id", "--om-service-id"},
       description = "Ozone Manager Service ID"
@@ -70,6 +70,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
   @CommandLine.Option(names = {"-t", "--threads", "--thread"},
       description = "Number of threads used to execute")
   private int threadNo = 10;
+
+  @CommandLine.Option(names = {"-y", "--yes"},
+      description = "Continue without interactive user confirmation")
+  private boolean yes;
   private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
@@ -86,12 +90,28 @@ public class DeleteVolumeHandler extends VolumeHandler {
 
     String volumeName = address.getVolumeName();
     try {
-      if (!Strings.isNullOrEmpty(isRecursive) && isRecursive.equals("yes")) {
+      if (bRecursive) {
         if (OmUtils.isServiceIdsDefined(getConf()) &&
             Strings.isNullOrEmpty(omServiceId)) {
           out().printf("OmServiceID not provided, provide using " +
               "-id <OM_SERVICE_ID>%n");
           return;
+        }
+        if (!yes) {
+          // Ask for user confirmation
+          out().print("This command will delete volume recursively." +
+              "\nThere is no recovery option after using this command, " +
+              "and no trash for FSO buckets." +
+              "\nDelay is expected running this command." +
+              "\nEnter 'yes' to proceed': ");
+          out().flush();
+          Scanner scanner = new Scanner(new InputStreamReader(
+              System.in, StandardCharsets.UTF_8));
+          String confirmation = scanner.next().trim().toLowerCase();
+          if (!confirmation.equals("yes")) {
+            out().println("Operation cancelled.");
+            return;
+          }
         }
         vol = client.getObjectStore().getVolume(volumeName);
         deleteVolumeRecursive();

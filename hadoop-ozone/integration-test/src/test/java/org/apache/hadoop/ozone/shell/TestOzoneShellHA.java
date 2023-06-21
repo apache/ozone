@@ -1530,7 +1530,7 @@ public class TestOzoneShellHA {
 
     // Delete volume1(containing OBS, FSO and Legacy buckets) recursively
     args =
-        new String[] {"volume", "delete", volume1, "-r=yes",
+        new String[] {"volume", "delete", volume1, "-r", "--yes",
             "-id", omServiceId};
 
     execute(ozoneShell, args);
