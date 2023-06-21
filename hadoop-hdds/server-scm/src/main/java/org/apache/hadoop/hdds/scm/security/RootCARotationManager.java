@@ -387,6 +387,10 @@ public class RootCARotationManager implements SCMService {
           String newRootCertId = "";
           X509CertificateHolder newRootCertificate;
           try {
+            // prevent findbugs false alert
+            if (newRootCAServer == null) {
+              throw new Exception("New root CA server should not be null");
+            }
             newRootCertificate = newRootCAServer.getCACertificate();
             newRootCertId = newRootCertificate.getSerialNumber().toString();
             Preconditions.checkState(newRootCertId.equals(newId.toString()),

@@ -253,7 +253,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       throw createNotHAException();
     }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
-        request.getCSR());
+        request.getCSR(), request.hasRenew() ? request.getRenew() : false);
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()

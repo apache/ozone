@@ -20,16 +20,24 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+<<<<<<< HEAD
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+=======
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
+>>>>>>> 2a37dcefd (fix findbugs)
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+<<<<<<< HEAD
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
+=======
+import org.mockito.Mockito;
+>>>>>>> 2a37dcefd (fix findbugs)
 
 import java.io.IOException;
 import java.security.KeyPair;
@@ -54,8 +62,13 @@ public class TestSCMSecurityProtocolServer {
     config = new OzoneConfiguration();
     config.set(OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
         OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT + ":0");
+<<<<<<< HEAD
     securityProtocolServer = new SCMSecurityProtocolServer(config, null,
         null, new ArrayList<>(), mockScm, null);
+=======
+    securityProtocolServer = new SCMSecurityProtocolServer(config,
+        Mockito.mock(CertificateServer.class), null, null, null, null);
+>>>>>>> 2a37dcefd (fix findbugs)
   }
 
   @AfterEach

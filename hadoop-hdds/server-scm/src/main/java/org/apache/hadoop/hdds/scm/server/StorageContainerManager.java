@@ -2150,6 +2150,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot remove current leader.");
     }
 
+    if (rootCARotationManager != null &&
+        rootCARotationManager.isRotationInProgress()) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          ResultCodes.CA_ROTATION_IN_PROGRESS);
+    }
+
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()
         .getDivision().getGroup());
 

@@ -161,7 +161,7 @@ public final class HASecurityUtils {
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr));
+          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
       String pemEncodedCert = response.getX509Certificate();
 
       // Store SCM sub CA and root CA certificate.

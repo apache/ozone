@@ -190,7 +190,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     Objects.requireNonNull(dnDetails);
     if (storageContainerManager.getRootCARotationManager()
         .isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is inprogress." +
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
     }
@@ -207,7 +207,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     Objects.requireNonNull(nodeDetails);
     if (storageContainerManager.getRootCARotationManager()
         .isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is inprogress." +
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
     }
@@ -272,24 +272,37 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     Objects.requireNonNull(omDetails);
     if (storageContainerManager.getRootCARotationManager()
         .isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is inprogress." +
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
     }
     return getEncodedCertToString(certSignReq, NodeType.OM);
   }
 
+  /**
+   * Get signed certificate for SCM Node.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq      - Certificate signing request.
+   * @return String          - SCM signed pem encoded certificate.
+   */
+  @Override
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq) throws IOException {
+    return getSCMCertificate(scmNodeDetails, certSignReq, false);
+  }
 
   /**
    * Get signed certificate for SCM Node.
    *
    * @param scmNodeDetails   - SCM Node Details.
-   * @param certSignReq - Certificate signing request.
-   * @return String         - SCM signed pem encoded certificate.
+   * @param certSignReq      - Certificate signing request.
+   * @param isRenew          - if SCM is renewing certificate or not.
+   * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq) throws IOException {
+      String certSignReq, boolean isRenew) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
     if (!storageContainerManager.getClusterId().equals(
@@ -297,6 +310,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
           scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
           + storageContainerManager.getClusterId());
+    }
+
+    if (storageContainerManager.getRootCARotationManager()
+        .isRotationInProgress() && !isRenew) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
     }
 
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",

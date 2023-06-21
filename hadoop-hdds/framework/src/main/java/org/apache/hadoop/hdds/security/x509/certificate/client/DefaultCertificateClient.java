@@ -195,7 +195,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       if (readCertSerialId.equals(certSerialId)) {
         this.certPath = allCertificates;
       }
-      certificateMap.putIfAbsent(readCertSerialId, allCertificates);
+      certificateMap.put(readCertSerialId, allCertificates);
       addCertsToSubCaMapIfNeeded(fileName, allCertificates);
       addCertToRootCaMapIfNeeded(fileName, allCertificates);
 
@@ -583,8 +583,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       codec.writeCertificate(certName,
           pemEncodedCert);
       if (addToCertMap) {
-        certificateMap.putIfAbsent(
-            cert.getSerialNumber().toString(), certificatePath);
+        certificateMap.put(cert.getSerialNumber().toString(), certificatePath);
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,

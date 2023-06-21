@@ -206,7 +206,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       // Get SCM sub CA cert.
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
           getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
-              getEncodedString(request));
+              getEncodedString(request), true);
 
       CertificateCodec certCodec = new CertificateCodec(
           getSecurityConfig(), certPath);
