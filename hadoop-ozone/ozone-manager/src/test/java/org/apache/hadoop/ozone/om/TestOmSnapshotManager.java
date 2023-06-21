@@ -24,6 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -384,6 +385,59 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertTrue(copyFiles.contains(addNonSstToCopiedFiles));
+  }
+
+  @Test
+  public void testCreateSnapshotIdempotent() throws Exception {
+    // set up db tables
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(OmSnapshotManager.LOG);
+    Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), VOLUME_TABLE, volumeTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), BUCKET_TABLE, bucketTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+
+    final String volumeName = UUID.randomUUID().toString();
+    final String dbVolumeKey = om.getMetadataManager().getVolumeKey(volumeName);
+    final OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("bilbo")
+        .setOwnerName("bilbo")
+        .build();
+    when(volumeTable.get(dbVolumeKey)).thenReturn(omVolumeArgs);
+
+    String bucketName = UUID.randomUUID().toString();
+    final String dbBucketKey = om.getMetadataManager().getBucketKey(
+        volumeName, bucketName);
+    final OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
+
+    SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
+
+    // Create first checkpoint for the snapshot checkpoint
+    DBCheckpoint omSnapshotCheckpoint =
+        OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+            first);
+    Assert.assertFalse(logCapturer.getOutput().contains(
+        "for snapshot " + first.getName() + " already exists."));
+    logCapturer.clearOutput();
+
+    // Create checkpoint again for the same snapshot.
+    DBCheckpoint omSnapshotCheckpoint1 =
+        OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+            first);
+
+    Assert.assertTrue(logCapturer.getOutput().contains(
+        "for snapshot " + first.getName() + " already exists."));
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,
