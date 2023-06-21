@@ -988,7 +988,8 @@ public class TestSnapshotDiffManager {
           .thenReturn(fromSnapshotInfo);
 
       OmSnapshot omSnapshotFrom = getMockedOmSnapshot(fromSnapKey);
-      snapshotCache.put(fromSnapKey, omSnapshotFrom);
+      snapshotCache.getDbMap().put(fromSnapKey,
+          new ReferenceCounted<>(omSnapshotFrom, false, snapshotCache));
 
       // Create 2nd snapshot.
       SnapshotInfo toSnapshotInfo =
@@ -1012,7 +1013,8 @@ public class TestSnapshotDiffManager {
           .thenReturn(toSnapshotInfo);
 
       OmSnapshot omSnapshotTo = getMockedOmSnapshot(toSnapKey);
-      snapshotCache.put(toSnapKey, omSnapshotTo);
+      snapshotCache.getDbMap().put(toSnapKey,
+          new ReferenceCounted<>(omSnapshotTo, false, snapshotCache));
     }
   }
 
