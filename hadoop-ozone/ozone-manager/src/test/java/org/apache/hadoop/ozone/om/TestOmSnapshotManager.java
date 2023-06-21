@@ -424,17 +424,15 @@ public class TestOmSnapshotManager {
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
-    DBCheckpoint omSnapshotCheckpoint =
-        OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
-            first);
+    OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+        first);
     Assert.assertFalse(logCapturer.getOutput().contains(
         "for snapshot " + first.getName() + " already exists."));
     logCapturer.clearOutput();
 
     // Create checkpoint again for the same snapshot.
-    DBCheckpoint omSnapshotCheckpoint1 =
-        OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
-            first);
+    OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+        first);
 
     Assert.assertTrue(logCapturer.getOutput().contains(
         "for snapshot " + first.getName() + " already exists."));

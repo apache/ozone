@@ -403,16 +403,13 @@ public final class OmSnapshotManager implements AutoCloseable {
         dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
       }
 
-      if (!snapshotDirExist) {
-        // Clean up active DB's deletedTable right after checkpoint is taken,
-        // with table write lock held
-        deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
-            snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-        // Clean up deletedDirectoryTable as well
-        deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
-            snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
-      }
-
+      // Clean up active DB's deletedTable right after checkpoint is taken,
+      // with table write lock held
+      deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
+      // Clean up deletedDirectoryTable as well
+      deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
+          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName());
     } finally {
       // Release deletedTable write lock
       omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
