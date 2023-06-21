@@ -61,6 +61,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String scmId;
   private String cId;
   private String scmHostname;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
@@ -180,6 +181,19 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
+      throws IOException {
+    if (scmSecurityClient == null) {
+      scmSecurityClient =
+          HddsServerUtil.getScmSecurityClientWithFixedDuration(getConfig());
+    }
+    return scmSecurityClient;
+  }
+
+  @Override
+>>>>>>> 898ec9b4d (fix checkstyle and refactor robot test)
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
       Path certPath, boolean renew) throws CertificateException {
     try {

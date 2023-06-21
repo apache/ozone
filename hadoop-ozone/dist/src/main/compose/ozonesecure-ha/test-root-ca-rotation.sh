@@ -23,6 +23,7 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
+export COMPOSE_FILE=docker-compose.yaml:root-ca-rotation.yaml
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
@@ -36,7 +37,7 @@ execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 execute_robot_test s3g kinit.robot
 
 # verify root CA rotation monitor task is active on leader
-wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-MonitorTask-Active'"
+wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-Active'"
 
 # wait and verify root CA is rotated
 wait_for_execute_command scm1.org 90 "ozone admin cert info 2"
@@ -46,7 +47,7 @@ execute_robot_test s3g admincli/pipeline.robot
 
 # transfer leader to another SCM
 execute_robot_test s3g scmha/scm-leader-transfer.robot
-wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-MonitorTask-Inactive'"
+wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-Inactive'"
 
 # wait for second root CA rotation
 wait_for_execute_command scm1.org 90 "ozone admin cert info 3"

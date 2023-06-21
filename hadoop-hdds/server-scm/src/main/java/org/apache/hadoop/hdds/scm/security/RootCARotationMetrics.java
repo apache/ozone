@@ -59,8 +59,8 @@ public final class RootCARotationMetrics {
   }
 
   public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(NAME);
+    MetricsSystem metricsSystem = DefaultMetricsSystem.instance();
+    metricsSystem.unregisterSource(NAME);
   }
 
   private RootCARotationMetrics(MetricsSystem ms) {

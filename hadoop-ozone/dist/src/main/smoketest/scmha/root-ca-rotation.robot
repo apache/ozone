@@ -32,4 +32,4 @@ Verify root CA rotation metrics
     ${temp_3} =                Split String         ${temp_2}                      ,
     ${successRotation} =       Strip String         ${temp_3[0]}
     ${successRotation} =       Convert To Number    ${successRotation}
-                               Should be true       ${successRotation} >= 1
+                               Should be true       ${RootCARotationMetrics} >= 1
