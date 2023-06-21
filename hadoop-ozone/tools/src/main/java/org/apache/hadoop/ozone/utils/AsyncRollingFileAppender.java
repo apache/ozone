@@ -26,10 +26,10 @@ import org.apache.log4j.RollingFileAppender;
 import org.apache.log4j.spi.LoggingEvent;
 
 /**
- * The AsyncRFAAppender shall take the required parameters for supplying
+ * The AsyncRollingFileAppender shall take the required parameters for supplying
  * RollingFileAppender to AsyncAppender.
  */
-public class AsyncRFAAppender extends AsyncAppender {
+public class AsyncRollingFileAppender extends AsyncAppender {
 
   private String maxFileSize = String.valueOf(10 * 1024 * 1024);
 
@@ -38,8 +38,6 @@ public class AsyncRFAAppender extends AsyncAppender {
   private String fileName = null;
 
   private String conversionPattern = null;
-
-  private final Object conversionPatternLock = new Object();
 
   private boolean blocking = true;
 
@@ -52,20 +50,18 @@ public class AsyncRFAAppender extends AsyncAppender {
   @Override
   public void append(LoggingEvent event) {
     if (rollingFileAppender == null) {
-      appendRFAToAsyncAppender();
+      createRollingFileAppender();
     }
     super.append(event);
   }
 
-  private synchronized void appendRFAToAsyncAppender() {
+  private synchronized void createRollingFileAppender() {
     if (!isRollingFileAppenderAssigned) {
       PatternLayout patternLayout;
-      synchronized (conversionPatternLock) {
-        if (conversionPattern != null) {
-          patternLayout = new PatternLayout(conversionPattern);
-        } else {
-          patternLayout = new PatternLayout();
-        }
+      if (conversionPattern != null) {
+        patternLayout = new PatternLayout(conversionPattern);
+      } else {
+        patternLayout = new PatternLayout();
       }
       try {
         rollingFileAppender =
@@ -82,27 +78,27 @@ public class AsyncRFAAppender extends AsyncAppender {
     }
   }
 
-  public String getMaxFileSize() {
+  public synchronized String getMaxFileSize() {
     return maxFileSize;
   }
 
-  public void setMaxFileSize(String maxFileSize) {
+  public synchronized void setMaxFileSize(String maxFileSize) {
     this.maxFileSize = maxFileSize;
   }
 
-  public int getMaxBackupIndex() {
+  public synchronized int getMaxBackupIndex() {
     return maxBackupIndex;
   }
 
-  public void setMaxBackupIndex(int maxBackupIndex) {
+  public synchronized void setMaxBackupIndex(int maxBackupIndex) {
     this.maxBackupIndex = maxBackupIndex;
   }
 
-  public String getFileName() {
+  public synchronized String getFileName() {
     return fileName;
   }
 
-  public void setFileName(String fileName) {
+  public synchronized void setFileName(String fileName) {
     this.fileName = fileName;
   }
 
@@ -118,15 +114,15 @@ public class AsyncRFAAppender extends AsyncAppender {
     return blocking;
   }
 
-  public void setBlocking(boolean blocking) {
+  public synchronized void setBlocking(boolean blocking) {
     this.blocking = blocking;
   }
 
-  public int getBufferSize() {
+  public synchronized int getBufferSize() {
     return bufferSize;
   }
 
-  public void setBufferSize(int bufferSize) {
+  public synchronized void setBufferSize(int bufferSize) {
     this.bufferSize = bufferSize;
   }
 }
