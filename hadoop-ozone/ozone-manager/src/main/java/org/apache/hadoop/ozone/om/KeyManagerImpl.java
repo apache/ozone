@@ -46,9 +46,11 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -1863,7 +1865,9 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
           parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
           dirName);
-      // not setting replication for directories, only used for key deletion
+      // add fake replication config for directories being deleted
+      omKeyInfo.setReplicationIfMissing(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
       directories.add(omKeyInfo);
       countEntries++;
     }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -80,6 +81,9 @@ public class TestOMKeysDeleteResponseWithFSO
 
     OmKeyInfo dirKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
         bucketName, dirInfo, dir);
+    // add fake replication config for directories being deleted
+    dirKeyInfo.setReplicationIfMissing(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
     dirDeleteList.add(dirKeyInfo);
     dirDBKeys.add(dirOzoneDBKey);
     dirDelDBKeys.add(omMetadataManager.getOzoneDeletePathKey(
