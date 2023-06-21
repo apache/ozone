@@ -16,11 +16,9 @@
 # limitations under the License.
 
 export COMPOSE_FILE=docker-compose.yaml:../common/hadoop.yaml
-export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
-
-export SECURITY_ENABLED=false
+export HADOOP_MAJOR_VERSION=3
+export HADOOP_VERSION=unused # will be set for each test version below
 export OZONE_REPLICATION_FACTOR=3
-export SCM=scm
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
@@ -35,9 +33,21 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for scheme in o3fs ofs; do
-  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
-  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-mapreduce-${scheme}" mapreduce.robot
+for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.1; do
+  export HADOOP_VERSION
+  export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
+
+  docker-compose --ansi never --profile hadoop up -d nm rm
+
+  execute_command_in_container rm hadoop version
+
+  for scheme in o3fs ofs; do
+    execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
+    execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoop-${HADOOP_VERSION}-mapreduce-${scheme}" mapreduce.robot
+  done
+
+  save_container_logs nm rm
+  stop_containers nm rm
 done
 
 stop_docker_env
