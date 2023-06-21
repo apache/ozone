@@ -1962,14 +1962,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           // configuration also, throw an exception.
           // This case can also come when we have decommissioned a node and
           // ratis will apply previous transactions to add that node back.
-          throw new IOException("There is no OM configuration for node ID "
-              + newOMNodeId + " in ozone-site.xml.");
+          LOG.error(
+              "There is no OM configuration for node ID {} in ozone-site.xml.",
+              newOMNodeId);
+          return;
         }
       }
     } catch (IOException e) {
       LOG.error("{}: Couldn't add OM {} to peer list.", getOMNodeId(),
           newOMNodeId);
-      return;
     }
 
     if (omRatisSnapshotProvider == null) {
