@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.io.BufferedWriter;
@@ -800,32 +801,28 @@ public class SnapshotDiffManager implements AutoCloseable {
       Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
           .getKeyTable(bucketLayout);
 
-      Optional<Set<Long>> oldParentIds = Optional.empty();
-      Optional<Set<Long>> newParentIds = Optional.empty();
+      final Optional<Set<Long>> oldParentIds;
+      final Optional<Set<Long>> newParentIds;
       if (bucketLayout.isFileSystemOptimized()) {
         oldParentIds = Optional.of(new HashSet<>());
         newParentIds = Optional.of(new HashSet<>());
+      } else {
+        oldParentIds = Optional.empty();
+        newParentIds = Optional.empty();
       }
 
-      getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
-          fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
-          tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
-          objectIdToKeyNameMapForToSnapshot, objectIDsToCheckMap,
-          oldParentIds, newParentIds, path.toString());
-
+      final Optional<Map<Long, Path>> oldParentIdPathMap;
+      final Optional<Map<Long, Path>> newParentIdPathMap;
       if (bucketLayout.isFileSystemOptimized()) {
-        validateSnapshotsAreActive(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName);
-
-        Table<String, OmDirectoryInfo> fsDirTable =
-            fromSnapshot.getMetadataManager().getDirectoryTable();
-        Table<String, OmDirectoryInfo> tsDirTable =
-            toSnapshot.getMetadataManager().getDirectoryTable();
+        oldParentIdPathMap = Optional.of(Maps.newHashMap());
+        newParentIdPathMap = Optional.of(Maps.newHashMap());
+      } else {
+        oldParentIdPathMap = Optional.empty();
+        newParentIdPathMap = Optional.empty();
+      }
       // These are the most time and resource consuming method calls.
       // Split the calls into steps and store them in an array, to avoid
       // repetition while constantly checking if the job is cancelled.
-      Optional<Map<Long, Path>> oldParentIdPathMap = Optional.empty();
-      Optional<Map<Long, Path>> newParentIdPathMap = Optional.empty();
       Callable<Void>[] methodCalls = new Callable[]{
           () -> {
             getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsKeyTable, tsKeyTable,
@@ -856,15 +853,16 @@ public class SnapshotDiffManager implements AutoCloseable {
                   .getBucketId(volumeName, bucketName);
               String tablePrefix = getTablePrefix(tablePrefixes,
                   fromSnapshot.getMetadataManager().getDirectoryTable().getName());
-              oldParentIdPathMap = Optional.of(new FSODirectoryPathResolver(
+              oldParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   fromSnapshot.getMetadataManager().getDirectoryTable())
                   .getAbsolutePathForObjectIDs(oldParentIds));
-              newParentIdPathMap = Optional.of(new FSODirectoryPathResolver(
+              newParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   toSnapshot.getMetadataManager().getDirectoryTable())
                   .getAbsolutePathForObjectIDs(newParentIds));
             }
+            return null;
           },
           () -> {
             long totalDiffEntries = generateDiffReport(jobId,

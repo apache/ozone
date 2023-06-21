@@ -531,9 +531,6 @@ public class TestSnapshotDiffManager {
 
       SnapshotDiffManager snapshotDiffManager =
           getMockedSnapshotDiffManager(10);
-      snapshotDiffManager.generateDiffReport("jobId",
-          objectIdsToCheck, oldObjectIdKeyMap, newObjectIdKeyMap,
-          false, null, null);
 
       setupMocksForRunningASnapDiff(volumeName, bucketName);
       setUpSnapshots(volumeName, bucketName,
@@ -549,7 +546,8 @@ public class TestSnapshotDiffManager {
 
       snapshotDiffManager.generateDiffReport("jobId",
           objectIdsToCheck, oldObjectIdKeyMap, newObjectIdKeyMap,
-          volumeName, bucketName, fromSnapName, toSnapName);
+          volumeName, bucketName, fromSnapName, toSnapName,
+          false, null, null);
 
       snapshotDiffJob.setStatus(JobStatus.DONE);
       snapshotDiffManager.getSnapDiffJobTable().put(jobKey, snapshotDiffJob);
