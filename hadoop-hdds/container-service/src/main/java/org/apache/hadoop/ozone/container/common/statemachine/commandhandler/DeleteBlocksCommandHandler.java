@@ -65,6 +65,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -134,6 +135,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return deleteCommandQueues.size();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return ((ThreadPoolExecutor)executor).getActiveCount();
   }
 
   /**
@@ -521,6 +532,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return totalTime / invocationCount;
     }
     return 0;
+  }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime;
   }
 
   @Override
