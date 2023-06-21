@@ -88,6 +88,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUpload;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -994,6 +995,23 @@ public class RpcClient implements ClientProtocol {
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, cancel);
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus,
+                                                    boolean listAll)
+      throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+
+    return ozoneManagerClient.listSnapshotDiffJobs(
+        volumeName, bucketName, jobStatus, listAll).stream()
+        .map(OzoneSnapshotDiff::fromSnapshotDiffJob)
+        .collect(Collectors.toList());
   }
 
   /**

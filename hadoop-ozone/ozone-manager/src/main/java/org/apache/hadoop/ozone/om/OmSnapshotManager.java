@@ -58,7 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -81,6 +81,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT;
@@ -148,6 +150,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       "snap-diff-purged-job-table";
 
   private final long diffCleanupServiceInterval;
+  private final int maxOpenSstFilesInSnapshotDb;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
@@ -181,7 +184,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
     );
-
+    this.maxOpenSstFilesInSnapshotDb = ozoneManager.getConfiguration().getInt(
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+    );
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
@@ -318,7 +324,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         OMMetadataManager snapshotMetadataManager;
         try {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
+              snapshotInfo.getCheckpointDirName(), isSnapshotInCache,
+              maxOpenSstFilesInSnapshotDb);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
           throw e;
@@ -702,6 +709,38 @@ public final class OmSnapshotManager implements AutoCloseable {
     // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
+                                                   final String bucketName,
+                                                   final String jobStatus,
+                                                   final boolean listAll)
+      throws IOException {
+    String volumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+    String bucketKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+
+    if (!ozoneManager.getMetadataManager()
+            .getVolumeTable().isExist(volumeKey) ||
+        !ozoneManager.getMetadataManager()
+            .getBucketTable().isExist(bucketKey)) {
+      throw new IOException("Provided volume name " + volumeName +
+          " or bucket name " + bucketName + " doesn't exist");
+    }
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
+      // Return an empty ArrayList here to avoid
+      // unnecessarily iterating the SnapshotDiffJob table.
+      return new ArrayList<>();
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(
+        volumeName, bucketName, jobStatus, listAll);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,
