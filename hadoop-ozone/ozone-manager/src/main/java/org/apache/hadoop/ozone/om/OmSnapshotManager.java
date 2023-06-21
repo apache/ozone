@@ -149,7 +149,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       "snap-diff-purged-job-table";
 
   private final long diffCleanupServiceInterval;
-  private final int maxOpenFilesSnapshotDB;
+  private final int maxOpenSstFilesInSnapshotDb;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
@@ -183,7 +183,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
     );
-    this.maxOpenFilesSnapshotDB = ozoneManager.getConfiguration().getInt(
+    this.maxOpenSstFilesInSnapshotDb = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
     );
@@ -324,7 +324,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         try {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
               snapshotInfo.getCheckpointDirName(), isSnapshotInCache,
-              maxOpenFilesSnapshotDB);
+              maxOpenSstFilesInSnapshotDb);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
           throw e;
