@@ -128,7 +128,8 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     bucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
     Assert.assertTrue(bucketInfo.getQuotaInBytes() == -1);
-    OmVolumeArgs volArgsVerify = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName));
+    OmVolumeArgs volArgsVerify = omMetadataManager.getVolumeTable()
+        .get(omMetadataManager.getVolumeKey(volumeName));
     Assert.assertTrue(volArgsVerify.getQuotaInBytes() == -1);
     Assert.assertTrue(volArgsVerify.getQuotaInNamespace() == -1);
   }
