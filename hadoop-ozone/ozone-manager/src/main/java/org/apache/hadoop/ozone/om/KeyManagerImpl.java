@@ -135,7 +135,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -457,12 +456,13 @@ public class KeyManagerImpl implements KeyManager {
       return null;
     }
     // Appended trailing slash to represent directory to the user
-    OmKeyInfo keyInfo = fileStatus.getKeyInfo();
     if (fileStatus.isDirectory()) {
-      keyInfo.setKeyName(addTrailingSlashIfNeeded(keyInfo.getKeyName()));
+      String keyPath = OzoneFSUtils.addTrailingSlashIfNeeded(
+          fileStatus.getKeyInfo().getKeyName());
+      fileStatus.getKeyInfo().setKeyName(keyPath);
     }
-    keyInfo.setFile(fileStatus.isFile());
-    return keyInfo;
+    fileStatus.getKeyInfo().setFile(fileStatus.isFile());
+    return fileStatus.getKeyInfo();
   }
 
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
@@ -1130,7 +1130,7 @@ public class KeyManagerImpl implements KeyManager {
       BucketLayout layout =
           getBucketLayout(metadataManager, volumeName, bucketName);
       fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
-      String dirKey = addTrailingSlashIfNeeded(keyName);
+      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
       // Check if the key is a directory.
       if (fileKeyInfo == null) {
@@ -1200,8 +1200,8 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo createFakeDirIfShould(String volume, String bucket,
       String keyName, BucketLayout layout) throws IOException {
-    String dirKey = addTrailingSlashIfNeeded(keyName);
-    String targetKey = addTrailingSlashIfNeeded(
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    String targetKey = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volume, bucket, keyName));
 
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
@@ -1318,7 +1318,7 @@ public class KeyManagerImpl implements KeyManager {
     OmBucketInfo bucketInfo = getBucketInfo(keyInfo.getVolumeName(),
             keyInfo.getBucketName());
 
-    String dir = addTrailingSlashIfNeeded(keyName);
+    String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
     return new OmKeyInfo.Builder()
         .setVolumeName(keyInfo.getVolumeName())
@@ -1497,11 +1497,11 @@ public class KeyManagerImpl implements KeyManager {
         return Collections.singletonList(fileStatus);
       }
       // keyName is a directory
-      startKey = addTrailingSlashIfNeeded(keyName);
+      startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     }
 
     // Note: eliminating the case where startCacheKey could end with '//'
-    String keyArgs = addTrailingSlashIfNeeded(
+    String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;

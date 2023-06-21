@@ -622,15 +622,12 @@ public final class OMFileRequest {
 
   /**
    * Gets OmKeyInfo if exists for the given key name in the DB.
-   * If the key is a directory, its replication config is set from the bucket's
-   * default replication config, if any.
    *
-   * @param ozoneManager
    * @param omMetadataMgr metadata manager
-   * @param volumeName volume name
-   * @param bucketName bucket name
-   * @param keyName key name
-   * @param scmBlockSize scm block size
+   * @param volumeName    volume name
+   * @param bucketName    bucket name
+   * @param keyName       key name
+   * @param scmBlockSize  scm block size
    * @return OzoneFileStatus
    * @throws IOException DB failure
    */
