@@ -34,8 +34,8 @@ public abstract class S3Handler extends Handler {
 
   @CommandLine.Option(names = {"--om-service-id"},
       required = false,
-      description = "OM Service ID is required to be specified for OM HA" +
-          " cluster")
+      description = "OM Service ID is preferred to be specified for OM HA" +
+          " cluster when there are multiple service IDs")
   private String omServiceID;
 
   public String getOmServiceID() {

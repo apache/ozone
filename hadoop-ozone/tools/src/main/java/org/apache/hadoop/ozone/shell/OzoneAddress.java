@@ -200,12 +200,22 @@ public class OzoneAddress {
     } else {
       // If om service id is not specified, consider it as a non-HA cluster.
       // But before that check if serviceId is defined. If it is defined
-      // throw an error om service ID needs to be specified.
+      // and has length = 1, then take that ID as default.
+      // otherwise throw an error om service ID needs to be specified.
       if (OmUtils.isServiceIdsDefined(conf)) {
-        throw new OzoneClientException("Service ID must not"
-            + " be omitted when " + OZONE_OM_SERVICE_IDS_KEY + " is defined. " +
-            "Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+        Collection<String> serviceIds=conf.
+            getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
+        if (serviceIds.size() == 1) {
+          return OzoneClientFactory.getRpcClient(serviceIds.iterator().next(),
+              conf);
+        }
+        else {
+          throw new OzoneClientException("Service ID must not"
+              + " be omitted when " + OZONE_OM_SERVICE_IDS_KEY + " is defined."
+              + " Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
+              conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+        }
+
       }
       return OzoneClientFactory.getRpcClient(conf);
     }
