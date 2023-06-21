@@ -161,7 +161,7 @@ public class TestBackgroundContainerMetadataScanner extends
   public void testShutdownDuringScan() throws Exception {
     CountDownLatch latch = new CountDownLatch(1);
 
-    // Make the on demand scan block until interrupt.
+    // Make the metadata scan block until interrupt.
     Mockito.when(healthy.scanMetaData()).then(i -> {
       latch.countDown();
       Thread.sleep(Duration.ofDays(1).toMillis());

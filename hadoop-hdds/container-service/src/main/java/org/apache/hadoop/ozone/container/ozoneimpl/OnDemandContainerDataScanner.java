@@ -108,7 +108,6 @@ public final class OnDemandContainerDataScanner {
         removeContainerFromScheduledContainers(containerId);
       });
     }
-
     return Optional.ofNullable(resultFuture);
   }
 
