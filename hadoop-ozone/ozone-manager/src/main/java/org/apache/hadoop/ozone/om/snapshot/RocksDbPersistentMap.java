@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nonnull;
 
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
@@ -41,11 +42,11 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   private final Class<K> keyType;
   private final Class<V> valueType;
 
-  public RocksDbPersistentMap(ManagedRocksDB db,
-                              ColumnFamilyHandle columnFamilyHandle,
-                              CodecRegistry codecRegistry,
-                              Class<K> keyType,
-                              Class<V> valueType) {
+  public RocksDbPersistentMap(@Nonnull ManagedRocksDB db,
+                              @Nonnull ColumnFamilyHandle columnFamilyHandle,
+                              @Nonnull CodecRegistry codecRegistry,
+                              @Nonnull Class<K> keyType,
+                              @Nonnull Class<V> valueType) {
     this.db = db;
     this.columnFamilyHandle = columnFamilyHandle;
     this.codecRegistry = codecRegistry;
@@ -164,13 +165,11 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       @Override
       public void close() {
         iterator.close();
-        if (readOptions != null) {
-          readOptions.close();
-        }
-        if (upperBound.isPresent()) {
+        readOptions.close();
+        if (upperBoundSlice != null) {
           upperBoundSlice.close();
         }
-        if (lowerBound.isPresent()) {
+        if (lowerBoundSlice != null) {
           lowerBoundSlice.close();
         }
       }

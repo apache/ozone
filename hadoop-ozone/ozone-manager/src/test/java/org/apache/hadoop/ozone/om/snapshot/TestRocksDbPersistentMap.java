@@ -151,7 +151,7 @@ public class TestRocksDbPersistentMap {
   /**
    * Test cases for testRocksDBPersistentMapIterator.
    */
-  private static Stream<Arguments> testRocksDBPersistentMapIteratorCases() {
+  private static Stream<Arguments> rocksDBPersistentMapIteratorCases() {
     return Stream.of(
         Arguments.of(
             Optional.empty(),
@@ -194,7 +194,7 @@ public class TestRocksDbPersistentMap {
   }
 
   @ParameterizedTest
-  @MethodSource("testRocksDBPersistentMapIteratorCases")
+  @MethodSource("rocksDBPersistentMapIteratorCases")
   public void testRocksDBPersistentMapIterator(Optional<String> lowerBound,
               Optional<String> upperBound, List<Pair<String, String>> keys,
               List<Pair<String, String>> expectedKeys)
