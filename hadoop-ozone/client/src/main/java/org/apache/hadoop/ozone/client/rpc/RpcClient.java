@@ -1670,14 +1670,9 @@ public class RpcClient implements ClientProtocol {
     return multipartInfo;
   }
 
-  @Override
-  public OzoneOutputStream createMultipartKey(String volumeName,
-                                              String bucketName,
-                                              String keyName,
-                                              long size,
-                                              int partNumber,
-                                              String uploadID)
-      throws IOException {
+  private OpenKeySession newMultipartOpenKey(
+      String volumeName, String bucketName, String keyName,
+      long size, int partNumber, String uploadID) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1698,27 +1693,21 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadPartNumber(partNumber)
         .setAcls(getAclList())
         .build();
+    return ozoneManagerClient.openKey(keyArgs);
+  }
 
-    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+  @Override
+  public OzoneOutputStream createMultipartKey(
+      String volumeName, String bucketName, String keyName,
+      long size, int partNumber, String uploadID) throws IOException {
+    final OpenKeySession openKey = newMultipartOpenKey(
+        volumeName, bucketName, keyName, size, partNumber, uploadID);
     KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(uploadID)
         .setIsMultipartKey(true)
         .build();
-    keyOutputStream.addPreallocateBlocks(
-        openKey.getKeyInfo().getLatestVersionLocations(),
-        openKey.getOpenVersion());
-    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
-    if (feInfo != null) {
-      KeyProvider.KeyVersion decrypted = getDEK(feInfo);
-      final CryptoOutputStream cryptoOut =
-          new CryptoOutputStream(keyOutputStream,
-              OzoneKMSUtil.getCryptoCodec(conf, feInfo),
-              decrypted.getMaterial(), feInfo.getIV());
-      return new OzoneOutputStream(cryptoOut);
-    } else {
-      return new OzoneOutputStream(keyOutputStream);
-    }
+    return createOutputStream(openKey, keyOutputStream);
   }
 
   @Override
@@ -1730,29 +1719,8 @@ public class RpcClient implements ClientProtocol {
       int partNumber,
       String uploadID)
       throws IOException {
-    verifyVolumeName(volumeName);
-    verifyBucketName(bucketName);
-    if (checkKeyNameEnabled) {
-      HddsClientUtils.verifyKeyName(keyName);
-    }
-    HddsClientUtils.checkNotNull(keyName, uploadID);
-    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000, "Part " +
-        "number should be greater than zero and less than or equal to 10000");
-    Preconditions.checkArgument(size >= 0, "size should be greater than or " +
-        "equal to zero");
-
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setDataSize(size)
-        .setIsMultipartKey(true)
-        .setMultipartUploadID(uploadID)
-        .setMultipartUploadPartNumber(partNumber)
-        .setAcls(getAclList())
-        .build();
-
-    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+    final OpenKeySession openKey = newMultipartOpenKey(
+        volumeName, bucketName, keyName, size, partNumber, uploadID);
 
     KeyDataStreamOutput keyOutputStream =
         new KeyDataStreamOutput.Builder()
@@ -1770,17 +1738,9 @@ public class RpcClient implements ClientProtocol {
         .addPreallocateBlocks(
             openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
-
-    FileEncryptionInfo feInfo = openKey.getKeyInfo().getFileEncryptionInfo();
-    if (feInfo != null) {
-      // todo: need to support file encrypt,
-      //  https://issues.apache.org/jira/browse/HDDS-5892
-      throw new UnsupportedOperationException(
-          "FileEncryptionInfo is not yet supported in " +
-              "createMultipartStreamKey");
-    } else {
-      return new OzoneDataStreamOutput(keyOutputStream);
-    }
+    final OzoneOutputStream out = createSecureOutputStream(
+        openKey, keyOutputStream, null);
+    return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
   }
 
   @Override
@@ -2181,12 +2141,16 @@ public class RpcClient implements ClientProtocol {
         openKey, keyOutputStream, null);
     return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
   }
-
   private OzoneOutputStream createOutputStream(OpenKeySession openKey)
       throws IOException {
-
     KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
         .build();
+    return createOutputStream(openKey, keyOutputStream);
+  }
+
+  private OzoneOutputStream createOutputStream(OpenKeySession openKey,
+      KeyOutputStream keyOutputStream)
+      throws IOException {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
