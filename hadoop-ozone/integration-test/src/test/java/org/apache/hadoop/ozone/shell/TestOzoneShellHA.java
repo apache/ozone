@@ -1405,6 +1405,49 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testListAllKeys()
+      throws Exception {
+    String volumeName = "vollst";
+    // Create volume vollst
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[]{"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 120 keys into bucket1
+    String keyName = OZONE_URI_DELIMITER + volumeName + "/bucket1" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 120; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+
+    out.reset();
+    // Number of keys should return less than 120(100 by default)
+    args =
+        new String[]{"key", "list", volumeName};
+    execute(ozoneShell, args);
+    Assert.assertTrue(getNumOfKeys() < 120);
+
+    out.reset();
+    // Use --all option to get all the keys
+    args =
+        new String[]{"key", "list", "--all", volumeName};
+    execute(ozoneShell, args);
+    // Number of keys returned should be 120
+    Assert.assertEquals(120, getNumOfKeys());
+  }
+
+  @Test
   public void testVolumeListKeys()
       throws Exception {
     String volume1 = "volx";

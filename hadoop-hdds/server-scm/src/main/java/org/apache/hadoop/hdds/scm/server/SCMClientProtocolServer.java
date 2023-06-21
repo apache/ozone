@@ -228,7 +228,7 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SafeModePrecheck failed for allocateContainer",
           ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
       final ContainerInfo container = scm.getContainerManager()
           .allocateContainer(
@@ -248,7 +248,7 @@ public class SCMClientProtocolServer implements
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), true);
     try {
       return scm.getContainerManager()
           .getContainer(ContainerID.valueOf(containerID));
@@ -305,7 +305,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(null);
+    getScm().checkAdminAccess(null, true);
 
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
@@ -349,7 +349,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(null);
+    getScm().checkAdminAccess(null, true);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
@@ -583,7 +583,7 @@ public class SCMClientProtocolServer implements
     UserGroupInformation remoteUser = getRemoteUser();
     auditMap.put("remoteUser", remoteUser.getUserName());
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(remoteUser, false);
       scm.getContainerManager().deleteContainer(
           ContainerID.valueOf(containerID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -631,7 +631,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager().decommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to decommission nodes", ex);
@@ -643,7 +643,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager().recommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to recommission nodes", ex);
@@ -655,7 +655,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
       int endInHours) throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager()
           .startMaintenanceNodes(nodes, endInHours);
     } catch (Exception ex) {
@@ -671,7 +671,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", String.valueOf(containerID));
     auditMap.put("remoteUser", remoteUser.getUserName());
     try {
-      scm.checkAdminAccess(remoteUser);
+      scm.checkAdminAccess(remoteUser, false);
       final ContainerID cid = ContainerID.valueOf(containerID);
       final HddsProtos.LifeCycleState state = scm.getContainerManager()
           .getContainer(cid).getState();
@@ -742,7 +742,7 @@ public class SCMClientProtocolServer implements
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       scm.getPipelineManager().deactivatePipeline(
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -760,7 +760,7 @@ public class SCMClientProtocolServer implements
       throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       auditMap.put("pipelineID", pipelineID.getId());
       PipelineManager pipelineManager = scm.getPipelineManager();
       Pipeline pipeline =
@@ -814,7 +814,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void transferLeadership(String newLeaderId)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
@@ -879,7 +879,7 @@ public class SCMClientProtocolServer implements
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
       int count = scm.getScmBlockManager().getDeletedBlockLog().
           resetCount(txIDs);
@@ -922,7 +922,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public boolean forceExitSafeMode() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
     );
@@ -931,7 +931,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void startReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_REPLICATION_MANAGER, null));
     scm.getReplicationManager().start();
@@ -939,7 +939,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_REPLICATION_MANAGER, null));
     scm.getReplicationManager().stop();
@@ -955,7 +955,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ReplicationManagerReport getReplicationManagerReport()
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), true);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
@@ -966,7 +966,7 @@ public class SCMClientProtocolServer implements
       IOException {
     // check admin authorization
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
       LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
@@ -983,7 +983,7 @@ public class SCMClientProtocolServer implements
     if (!readonly) {
       // check admin authorization
       try {
-        getScm().checkAdminAccess(getRemoteUser());
+        getScm().checkAdminAccess(getRemoteUser(), true);
       } catch (IOException e) {
         LOG.error("Authorization failed for query scm upgrade finalization " +
             "progress", e);
@@ -1002,7 +1002,7 @@ public class SCMClientProtocolServer implements
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
       Optional<Long> maxSizeLeavingSource) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
@@ -1072,7 +1072,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopContainerBalancer() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
       scm.getContainerBalancer().stopBalancer();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -1106,7 +1106,7 @@ public class SCMClientProtocolServer implements
 
     // check admin authorisation
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), true);
     } catch (IOException e) {
       LOG.error("Authorization failed", e);
       throw e;
@@ -1164,7 +1164,7 @@ public class SCMClientProtocolServer implements
 
     // check admin authorisation
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), true);
     } catch (IOException e) {
       LOG.error("Authorization failed", e);
       throw e;
@@ -1195,7 +1195,7 @@ public class SCMClientProtocolServer implements
   public Token<?> getContainerToken(ContainerID containerID)
       throws IOException {
     UserGroupInformation remoteUser = getRemoteUser();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(remoteUser, true);
 
     return scm.getContainerTokenGenerator()
         .generateToken(remoteUser.getUserName(), containerID);
