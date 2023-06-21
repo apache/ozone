@@ -1336,6 +1336,11 @@ public class ReplicationManager implements SCMService {
         throw new IllegalArgumentException("reconstructionCommandWeight is"
             + " set to " + reconstructionCommandWeight + " and must be > 0");
       }
+      if (datanodeReplicationLimit < reconstructionCommandWeight) {
+        throw new IllegalArgumentException("replicationLimit should be >= "
+            + "reconstruction weight " + reconstructionCommandWeight + ", but "
+            + "was set to " + datanodeReplicationLimit);
+      }
       if (inflightReplicationLimitFactor < 0) {
         throw new IllegalArgumentException(
             "inflight.limit.factor is set to " + inflightReplicationLimitFactor
