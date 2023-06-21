@@ -941,7 +941,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public void deleteSnapshot(Path path, String snapshotName)
       throws IOException {
-    adapter.createSnapshot(pathToKey(path), snapshotName);
+    adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
   @Override

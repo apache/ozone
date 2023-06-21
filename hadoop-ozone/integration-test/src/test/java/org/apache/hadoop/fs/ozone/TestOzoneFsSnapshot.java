@@ -286,11 +286,14 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testSnapshotDeleteSuccessAndFailure() throws Exception {
+  public void testSnapshotDeleteSuccess() throws Exception {
     String snapshotName = createSnapshot();
     // Delete the created snapshot
     deleteSnapshot(snapshotName);
+  }
 
+  @Test
+  public void testSnapshotDeleteFailure() throws Exception {
     // Delete snapshot that doesn't exist
     String deleteSnapshotOut = execShellCommandAndGetOutput(1,
         new String[]{"-deleteSnapshot", BUCKET_PATH, "testsnap"});
