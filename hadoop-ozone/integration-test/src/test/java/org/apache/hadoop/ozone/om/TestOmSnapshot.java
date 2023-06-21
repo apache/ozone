@@ -613,8 +613,8 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.RENAME, "/" + key2,
-            "/" + key2Renamed)));
+            SnapshotDiffReportOzone.DiffType.RENAME, OZONE_URI_DELIMITER + key2,
+            OZONE_URI_DELIMITER + key2Renamed)));
 
 
     // Create a directory
