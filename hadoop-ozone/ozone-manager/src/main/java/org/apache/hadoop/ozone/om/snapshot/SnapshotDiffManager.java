@@ -1003,7 +1003,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private SnapshotDiffObject createDiffObjectWithOldName(
       long objectId, String oldName, SnapshotDiffObject diffObject) {
     SnapshotDiffObjectBuilder builder = new SnapshotDiffObjectBuilder(objectId)
-            .withOldKeyName(oldName);
+        .withOldKeyName(oldName);
     if (diffObject != null) {
       builder.withNewKeyName(diffObject.getNewKeyName());
     }
@@ -1192,24 +1192,23 @@ public class SnapshotDiffManager implements AutoCloseable {
                 SnapshotDiffReportOzone.getDiffReportEntry(DiffType.MODIFY,
                     key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
-          } else if (!isBlockLocationSame(snapshotDiffObject.getOldKeyName(),
-              snapshotDiffObject.getNewKeyName(), fsTable, tsTable)) {
-            String oldKey = codecRegistry.asObject(oldKeyName, String.class);
-            String newKey = codecRegistry.asObject(newKeyName, String.class);
-            renameDiffs.add(codecRegistry.asRawData(
-                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.RENAME,
-                    oldKey, newKey)));
-            // Here, oldKey name is returned as modified. Modified key name is
-            // based on base snapshot (from snapshot).
-            renameDiffs.add(codecRegistry.asRawData(
-                SnapshotDiffReportOzone.getDiffReportEntry(DiffType.MODIFY,
-                    oldKey)));
           } else {
             String oldKey = codecRegistry.asObject(oldKeyName, String.class);
             String newKey = codecRegistry.asObject(newKeyName, String.class);
             renameDiffs.add(codecRegistry.asRawData(
                 SnapshotDiffReportOzone.getDiffReportEntry(DiffType.RENAME,
                     oldKey, newKey)));
+
+            // Check if block location is same or not. If it is not same,
+            // key must have been overridden as well.
+            if (!isBlockLocationSame(snapshotDiffObject.getOldKeyName(),
+                snapshotDiffObject.getNewKeyName(), fsTable, tsTable)) {
+              // Here, oldKey name is returned as modified. Modified key name is
+              // based on base snapshot (from snapshot).
+              renameDiffs.add(codecRegistry.asRawData(
+                  SnapshotDiffReportOzone.getDiffReportEntry(DiffType.MODIFY,
+                      oldKey)));
+            }
           }
 
           counter++;
@@ -1274,38 +1273,16 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Table<String, ? extends WithObjectID> fromSnapshotTable,
       final Table<String, ? extends WithObjectID> toSnapshotTable
   ) throws IOException {
-
-    if (fromObjectName == null && toObjectName == null) {
-      LOG.debug("fromObjectName and toObjectName are null.");
-      return true;
-    }
-
-    if (fromObjectName == null || toObjectName == null) {
-      LOG.debug("fromObjectName: '{}' or toObjectName: '{}' is null.",
-          fromObjectName, toObjectName);
-      return false;
-    }
+    Objects.requireNonNull(fromObjectName, "fromObjectName is null.");
+    Objects.requireNonNull(toObjectName, "toObjectName is null.");
 
     final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
     final WithObjectID toObject = toSnapshotTable.get(toObjectName);
 
-    if (fromObject == null && toObject == null) {
-      LOG.debug("fromObject and toObject both are null.");
-      return true;
-    }
-
-    if (fromObject == null || toObject == null) {
-      LOG.debug("fromObject: '{}' or toObject: '{}' is null.",
-          fromObject, toObject);
-      return false;
-    }
-
     if (!(fromObject instanceof OmKeyInfo) ||
         !(toObject instanceof OmKeyInfo)) {
-      LOG.debug("fromObject is instance of '{}' and toObject is of '{}'.",
-          fromObject.getClass().getSimpleName(),
-          toObject.getClass().getSimpleName());
-      return false;
+      throw new IllegalStateException("fromObject or toObject is not of " +
+          "OmKeyInfo");
     }
 
     return SnapshotDeletingService.isBlockLocationInfoSame(
