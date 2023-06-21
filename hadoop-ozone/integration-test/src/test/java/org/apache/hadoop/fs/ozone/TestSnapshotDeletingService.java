@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -43,6 +44,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -386,9 +389,10 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    OmSnapshot snap1 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_TWO,
-            getSnapshotPrefix("snap1"), true);
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcSnap1 =
+        om.getOmSnapshotManager().checkForSnapshot(
+            VOLUME_NAME, BUCKET_NAME_TWO, getSnapshotPrefix("snap1"), true);
+    OmSnapshot snap1 = (OmSnapshot) rcSnap1.get();
     Table<String, OmKeyInfo> snap1KeyTable =
         snap1.getMetadataManager().getFileTable();
     try (TableIterator<String, ? extends Table.KeyValue<String,
@@ -420,6 +424,9 @@ public class TestSnapshotDeletingService {
       }
     }
     assertTableRowCount(deletedTable, 15);
+
+    snap1 = null;
+    rcSnap1.close();
   }
 
   /*
