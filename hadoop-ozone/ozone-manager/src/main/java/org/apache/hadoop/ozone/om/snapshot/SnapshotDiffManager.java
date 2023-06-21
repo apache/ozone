@@ -852,7 +852,8 @@ public class SnapshotDiffManager implements AutoCloseable {
               long bucketId = toSnapshot.getMetadataManager()
                   .getBucketId(volumeName, bucketName);
               String tablePrefix = getTablePrefix(tablePrefixes,
-                  fromSnapshot.getMetadataManager().getDirectoryTable().getName());
+                  fromSnapshot.getMetadataManager()
+                      .getDirectoryTable().getName());
               oldParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   fromSnapshot.getMetadataManager().getDirectoryTable())
