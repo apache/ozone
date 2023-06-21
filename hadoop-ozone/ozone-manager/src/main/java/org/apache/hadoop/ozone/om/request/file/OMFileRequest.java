@@ -30,6 +30,10 @@ import java.util.Optional;
 
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -38,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -46,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ratis.util.Preconditions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -621,18 +625,20 @@ public final class OMFileRequest {
    * If the key is a directory, its replication config is set from the bucket's
    * default replication config, if any.
    *
+   * @param ozoneManager
    * @param omMetadataMgr metadata manager
-   * @param volumeName    volume name
-   * @param bucketName    bucket name
-   * @param keyName       key name
-   * @param scmBlockSize  scm block size
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param keyName key name
+   * @param scmBlockSize scm block size
    * @return OzoneFileStatus
    * @throws IOException DB failure
    */
   @Nullable
   public static OzoneFileStatus getOMKeyInfoIfExists(
-      OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
-      String keyName, long scmBlockSize) throws IOException {
+      OzoneManager ozoneManager, OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize) throws IOException {
 
     OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
 
@@ -677,7 +683,11 @@ public final class OMFileRequest {
     if (omDirInfo != null) {
       OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
               keyName);
-      setDirectoryReplicationFromBucket(omBucketInfo, omKeyInfo);
+      ReplicationConfig replicationConfig =
+          Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+              .map(DefaultReplicationConfig::getReplicationConfig)
+              .orElse(ozoneManager.getDefaultReplicationConfig());
+      omKeyInfo.setReplicationConfig(replicationConfig);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
 
@@ -685,18 +695,8 @@ public final class OMFileRequest {
     return null;
   }
 
-  private static void setDirectoryReplicationFromBucket(
-      OmBucketInfo bucket,
-      OmKeyInfo dir
-  ) {
-    Preconditions.assertTrue(!dir.isFile(), "expect only directory");
-    Optional.ofNullable(bucket.getDefaultReplicationConfig())
-        .ifPresent(r -> dir.setReplicationIfMissing(r.getReplicationConfig()));
-  }
-
   /**
    * Prepare OmKeyInfo from OmDirectoryInfo.
-   * Replication config is not set, callers have to set it if needed.
    *
    * @param volumeName volume name
    * @param bucketName bucket name
@@ -720,6 +720,8 @@ public final class OMFileRequest {
     builder.setObjectID(dirInfo.getObjectID());
     builder.setUpdateID(dirInfo.getUpdateID());
     builder.setFileName(dirInfo.getName());
+    builder.setReplicationConfig(RatisReplicationConfig
+        .getInstance(HddsProtos.ReplicationFactor.ONE));
     builder.setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();
@@ -796,24 +798,26 @@ public final class OMFileRequest {
    * Check whether dst parent dir exists or not. If the parent exists, then the
    * source can be renamed to dst path.
    *
-   * @param volumeName  volume name
-   * @param bucketName  bucket name
-   * @param toKeyName   destination path
-   * @param metaMgr     metadata manager
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param toKeyName destination path
+   * @param ozoneManager
+   * @param metaMgr metadata manager
    * @return omDirectoryInfo object of destination path's parent
    * or null if parent is bucket
    * @throws IOException if the destination parent is not a directory.
    */
-  public static OmKeyInfo getKeyParentDir(String volumeName, String bucketName,
-      String toKeyName, OMMetadataManager metaMgr) throws IOException {
+  public static OmKeyInfo getKeyParentDir(
+      String volumeName, String bucketName, String toKeyName,
+      OzoneManager ozoneManager, OMMetadataManager metaMgr) throws IOException {
     int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
     // skip parent is root '/'
     if (totalDirsCount <= 1) {
       return null;
     }
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
-    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
-            volumeName, bucketName, toKeyParentDir, 0);
+    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(
+        ozoneManager, metaMgr, volumeName, bucketName, toKeyParentDir, 0);
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(

@@ -46,11 +46,9 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
@@ -453,7 +451,7 @@ public class KeyManagerImpl implements KeyManager {
   private OmKeyInfo getOmKeyInfoFSO(String volumeName, String bucketName,
                                    String keyName) throws IOException {
     OzoneFileStatus fileStatus =
-            OMFileRequest.getOMKeyInfoIfExists(metadataManager,
+            OMFileRequest.getOMKeyInfoIfExists(ozoneManager, metadataManager,
                     volumeName, bucketName, keyName, scmBlockSize);
     if (fileStatus == null) {
       return null;
@@ -1270,8 +1268,8 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus();
       }
 
-      fileStatus = OMFileRequest.getOMKeyInfoIfExists(metadataManager,
-              volumeName, bucketName, keyName, scmBlockSize);
+      fileStatus = OMFileRequest.getOMKeyInfoIfExists(ozoneManager,
+          metadataManager, volumeName, bucketName, keyName, scmBlockSize);
 
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
@@ -1865,9 +1863,6 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
           parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
           dirName);
-      // add fake replication config for directories being deleted
-      omKeyInfo.setReplicationIfMissing(
-          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
       directories.add(omKeyInfo);
       countEntries++;
     }

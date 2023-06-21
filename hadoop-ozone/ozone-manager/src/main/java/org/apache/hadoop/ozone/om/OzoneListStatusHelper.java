@@ -330,7 +330,7 @@ public class OzoneListStatusHelper {
             dirInfo.getName());
         keyInfo = OMFileRequest.getOmKeyInfo(volumeName,
             bucketName, dirInfo, dirName);
-        keyInfo.setReplicationIfMissing(bucketReplication);
+        keyInfo.setReplicationConfig(bucketReplication); // always overwrite
       } else {
         Preconditions.checkArgument(value instanceof OmKeyInfo);
         keyInfo = (OmKeyInfo) value;
