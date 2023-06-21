@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmNodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAllRootCaCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCACertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -408,5 +409,15 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   @Override
   public Object getUnderlyingProxyObject() {
     return rpcProxy;
+  }
+
+  @Override
+  public List<String> getAllRootCaCertificates() throws IOException {
+    SCMGetAllRootCaCertificatesRequestProto protoIns =
+        SCMGetAllRootCaCertificatesRequestProto.getDefaultInstance();
+    return submitRequest(Type.GetAllRootCaCertificates,
+        builder -> builder.setGetAllRootCaCertificatesRequestProto(protoIns))
+        .getAllRootCaCertificatesResponseProto()
+        .getAllX509RootCaCertificatesList();
   }
 }
