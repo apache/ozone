@@ -564,8 +564,6 @@ public class SnapshotDiffManager implements AutoCloseable {
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
-      // DO NOT decrement snapshot instance ref count, executor is responsible
-      // for it in this case.
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
