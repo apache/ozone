@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * ozone sh snapshot listSnapshotDiff.
+ * ozone sh snapshot listDiff.
  */
 @CommandLine.Command(name = "listDiff",
     aliases = {"listDiffJob", "lsDiff", "lsDiffJob"},
