@@ -32,6 +32,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -215,6 +216,24 @@ public class TestOnDemandContainerDataScanner extends
 
     assertEquals(0, metrics.getNumContainersScanned());
     assertEquals(0, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testShutdownDuringScan() throws Exception {
+    // Make the on demand scan block until interrupt.
+    Mockito.when(healthy.scanData(any(), any())).then(i -> {
+      Thread.sleep(Duration.ofDays(1).toMillis()); return null;
+    });
+
+    // Start the blocking scan.
+    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.scanContainer(healthy);
+    // Shut down the on demand scanner. This will interrupt the blocked scan
+    // on the healthy container.
+    OnDemandContainerDataScanner.shutdown();
+    // Interrupting the healthy container's scan should not mark it unhealthy.
+    verifyContainerMarkedUnhealthy(healthy, never());
   }
 
   private void scanContainer(Container<ContainerData> container)

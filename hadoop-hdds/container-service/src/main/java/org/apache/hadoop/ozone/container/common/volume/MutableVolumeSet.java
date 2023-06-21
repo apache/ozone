@@ -249,11 +249,12 @@ public class MutableVolumeSet implements VolumeSet {
       // check failed volume tolerated
       if (!hasEnoughVolumes()) {
         // on startup, we could not try to stop uninitialized services
-        if (shutdownHook == null) {
-          throw new IOException("Don't have enough good volumes on startup,"
-              + " bad volumes detected: " + failedVolumes.size()
-              + " max tolerated: " + maxVolumeFailuresTolerated);
-        }
+        // TODO
+//        if (shutdownHook == null) {
+//          throw new IOException("Don't have enough good volumes on startup,"
+//              + " bad volumes detected: " + failedVolumes.size()
+//              + " max tolerated: " + maxVolumeFailuresTolerated);
+//        }
         if (context != null) {
           context.getParent().handleFatalVolumeFailures();
         }

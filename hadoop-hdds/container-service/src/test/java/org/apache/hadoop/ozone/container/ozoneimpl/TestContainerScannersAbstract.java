@@ -100,6 +100,9 @@ public abstract class TestContainerScannersAbstract {
   @Test
   public abstract void testWithVolumeFailure() throws Exception;
 
+  @Test
+  public abstract void testShutdownDuringScan() throws Exception;
+
   // HELPER METHODS
 
   protected void setScannedTimestampOld(Container<ContainerData> container) {
