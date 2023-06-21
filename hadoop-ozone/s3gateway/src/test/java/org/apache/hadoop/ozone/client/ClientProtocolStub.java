@@ -639,8 +639,16 @@ public class ClientProtocolStub implements ClientProtocol {
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
     return null;
   }
 
