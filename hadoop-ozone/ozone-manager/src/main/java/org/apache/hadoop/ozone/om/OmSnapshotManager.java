@@ -489,6 +489,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
   }
 
+  @VisibleForTesting
+  public SnapshotDiffManager getSnapshotDiffManager() {
+    return snapshotDiffManager;
+  }
+
+  @VisibleForTesting
+  public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
+    return snapshotDiffCleanupService;
+  }
+
   /**
    * Helper method to locate the end key with the given prefix and iterator.
    * @param keyIter TableIterator
@@ -650,6 +660,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   public static boolean isSnapshotKey(String[] keyParts) {
     return (keyParts.length > 1) &&
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
+  }
+
+  public SnapshotDiffResponse cancelSnapshotDiff(final String volume,
+                                                 final String bucket,
+                                                 final String fromSnapshot,
+                                                 final String toSnapshot)
+      throws IOException {
+    return snapshotDiffManager.cancelSnapshotDiff(volume,
+        bucket, fromSnapshot, toSnapshot);
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
