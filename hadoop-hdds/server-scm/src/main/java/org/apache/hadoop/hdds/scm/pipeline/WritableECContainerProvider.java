@@ -37,12 +37,14 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
@@ -61,6 +63,8 @@ public class WritableECContainerProvider
   private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
+
+  private final AtomicInteger pendingAllocations = new AtomicInteger();
 
   public WritableECContainerProvider(WritableECContainerProviderConfig config,
       long containerSize,
@@ -95,19 +99,17 @@ public class WritableECContainerProvider
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
     int maximumPipelines = getMaximumPipelines(repConfig);
-    int openPipelineCount = 0;
-    synchronized (this) {
-      openPipelineCount = pipelineManager.getPipelineCount(repConfig,
-          Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < maximumPipelines) {
-        try {
-          return allocateContainer(repConfig, size, owner, excludeList);
-        } catch (IOException e) {
-          LOG.warn("Unable to allocate a container for {} with {} existing "
-              + "containers", repConfig, openPipelineCount, e);
-        }
-      }
+    int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
+        Pipeline.PipelineState.OPEN);
+
+    ContainerInfo container = allocateContainerIfWithinLimit(
+        maximumPipelines, openPipelineCount, false,
+        repConfig, size, owner, excludeList);
+
+    if (container != null) {
+      return container;
     }
+
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
@@ -150,21 +152,48 @@ public class WritableECContainerProvider
         }
       }
     }
+
     // If we get here, all the pipelines we tried were no good. So try to
     // allocate a new one.
+    container = allocateContainerIfWithinLimit(
+        maximumPipelines, openPipelineCount, true,
+        repConfig, size, owner, excludeList);
+
+    if (container != null) {
+      return container;
+    }
+
+    throw new IOException("Unable to allocate a pipeline for "
+        + repConfig + " after trying all existing pipelines as the max "
+        + "limit has been reached and no pipelines where closed");
+  }
+
+  @Nullable
+  private ContainerInfo allocateContainerIfWithinLimit(
+      int max, int current, boolean rethrow,
+      ECReplicationConfig repConfig, long size, String owner,
+      ExcludeList excludeList) throws IOException, TimeoutException {
+    String msg = "Unable to allocate a container for {} as {} existing "
+        + "containers and {} pending allocations have reached the limit of {}";
+    final int pending = pendingAllocations.getAndIncrement();
     try {
-      synchronized (this) {
-        if (openPipelineCount < maximumPipelines) {
-          return allocateContainer(repConfig, size, owner, excludeList);
+      if (current + pending < max) {
+        return allocateContainer(repConfig, size, owner, excludeList);
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(msg, repConfig, current, pending, max);
         }
-        throw new IOException("Unable to allocate a pipeline for "
-            + repConfig + " after trying all existing pipelines as the max "
-            + "limit has been reached and no pipelines where closed");
+        return null;
       }
     } catch (IOException e) {
-      LOG.error("Unable to allocate a container for {} after trying all "
-          + "existing containers", repConfig, e);
-      throw e;
+      LOG.warn(msg, repConfig, current, pending, max, e);
+      if (rethrow) {
+        throw e;
+      } else {
+        return null;
+      }
+    } finally {
+      pendingAllocations.decrementAndGet();
     }
   }
 
