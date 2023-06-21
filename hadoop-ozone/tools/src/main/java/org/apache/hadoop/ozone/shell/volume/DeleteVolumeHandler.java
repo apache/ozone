@@ -68,7 +68,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
   private String omServiceId;
 
   @CommandLine.Option(names = {"-t", "--threads", "--thread"},
-      description = "Number of threads used to execute")
+      description = "Number of threads used to execute recursive delete")
   private int threadNo = 10;
 
   @CommandLine.Option(names = {"-y", "--yes"},
