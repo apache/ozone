@@ -139,8 +139,18 @@ public class TestDeleteContainerHandler {
     }
   }
 
+  /**
+   * Delete non-empty container when rocksdb don't have entry about container
+   * but some chunks are left in container directory.
+   * Enable hdds.datanode.check.empty.container.dir.on.delete
+   * Container empty check will return false as some chunks
+   * are left behind in container directory.
+   * Which will ensure container will not be deleted in this case.
+   * @return
+   * @throws IOException
+   */
   @Test(timeout = 60000)
-  public void testDeleteNonEmptyContainerDir()
+  public void testDeleteNonEmptyContainerOnDirEmptyCheckTrue()
       throws Exception {
     // 1. Test if a non force deletion fails if chunks are still present with
     //    block count set to 0
@@ -265,8 +275,19 @@ public class TestDeleteContainerHandler {
     kv.setCheckChunksFilePath(false);
   }
 
+  /**
+   * Delete non-empty container when rocksdb don't have entry about container
+   * but some chunks are left in container directory.
+   * By default, hdds.datanode.check.empty.container.dir.on.delete is false.
+   * Even though chunks are left in container directory,
+   * container empty check will return true
+   * as rocksdb don't have container information.
+   * Container deletion should succeed in this case.
+   * @return
+   * @throws IOException
+   */
   @Test(timeout = 60000)
-  public void testDeleteEmptyContainerWithNonEmptyContainerDir()
+  public void testDeleteNonEmptyContainerOnDirEmptyCheckFalse()
       throws Exception {
     //the easiest way to create an open container is creating a key
     String keyName = UUID.randomUUID().toString();
