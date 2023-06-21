@@ -230,6 +230,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     CacheLoader<String, OmSnapshot> loader = createCacheLoader();
 
+    // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
+    //  pluggable.
     RemovalListener<String, OmSnapshot> removalListener = notification -> {
       try {
         final String snapshotTableKey = notification.getKey();

@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -891,7 +890,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         }
         methodCall.call();
       }
-    } catch (ExecutionException | IOException | RocksDBException exception) {
+    } catch (IOException | RocksDBException exception) {
       updateJobStatus(jobKey, IN_PROGRESS, FAILED);
       LOG.error("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
