@@ -940,7 +940,7 @@ public class TestOmSnapshot {
     String snap2 = "snap-2-" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
 
-    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0, true);
+    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0, true, false);
 
     String invalidStatus = "invalid";
     String statusErrorMessage = "Invalid job status: " + invalidStatus;
