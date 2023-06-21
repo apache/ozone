@@ -48,7 +48,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -69,13 +69,13 @@ public class KeyCodec {
       LoggerFactory.getLogger(KeyCodec.class);
   private final Path location;
   private final SecurityConfig securityConfig;
-  private Set<PosixFilePermission> dirPermissionSet =
+  private final Set<PosixFilePermission> dirPermissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE, OWNER_EXECUTE)
           .collect(Collectors.toSet());
-  private Set<PosixFilePermission> filePermissionSet =
+  private final Set<PosixFilePermission> filePermissionSet =
       Stream.of(OWNER_READ, OWNER_WRITE)
           .collect(Collectors.toSet());
-  private Supplier<Boolean> isPosixFileSystem;
+  private BooleanSupplier isPosixFileSystem;
 
   /**
    * Creates a KeyCodec with component name.
@@ -106,7 +106,7 @@ public class KeyCodec {
    *
    * @return True if it supports posix.
    */
-  private static Boolean isPosix() {
+  private static boolean isPosix() {
     return FileSystems.getDefault().supportedFileAttributeViews()
         .contains("posix");
   }
@@ -123,7 +123,6 @@ public class KeyCodec {
 
   /**
    * Returns the file permission set.
-   * @return
    */
   public Set<PosixFilePermission> getFilePermissionSet() {
     return filePermissionSet;
@@ -145,7 +144,7 @@ public class KeyCodec {
    * systems that are not posix.
    */
   @VisibleForTesting
-  public void setIsPosixFileSystem(Supplier<Boolean> isPosixFileSystem) {
+  public void setIsPosixFileSystem(BooleanSupplier isPosixFileSystem) {
     this.isPosixFileSystem = isPosixFileSystem;
   }
 
@@ -396,7 +395,7 @@ public class KeyCodec {
    */
   private void checkPreconditions(Path basePath) throws IOException {
     Preconditions.checkNotNull(basePath, "Base path cannot be null");
-    if (!isPosixFileSystem.get()) {
+    if (!isPosixFileSystem.getAsBoolean()) {
       LOG.error("Keys cannot be stored securely without POSIX file system "
           + "support for now.");
       throw new IOException("Unsupported File System for pem file.");

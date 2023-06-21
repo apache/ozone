@@ -100,6 +100,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
@@ -1503,13 +1504,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return a list of {@link BlockGroup} represent keys and blocks.
    * @throws IOException
    */
-  public List<BlockGroup> getPendingDeletionKeys(final int keyCount,
-      OmSnapshotManager omSnapshotManager) throws IOException {
+  public PendingKeysDeletion getPendingDeletionKeys(final int keyCount,
+                             OmSnapshotManager omSnapshotManager)
+      throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              keyIter = getDeletedTable().iterator()) {
       int currentCount = 0;
       while (keyIter.hasNext() && currentCount < keyCount) {
+        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
           List<BlockGroup> blockGroupList = Lists.newArrayList();
@@ -1526,18 +1530,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           for (OmKeyInfo info : infoList.cloneOmKeyInfoList()) {
             // Skip the key if it exists in the previous snapshot (of the same
             // scope) as in this case its blocks should not be reclaimed
-
-            // TODO: [SNAPSHOT] HDDS-7968
-            //  1. If previous snapshot keyTable has key info.getObjectID(),
-            //  skip it. Pending HDDS-7740 merge to reuse the util methods to
-            //  check previousSnapshot.
-            //  2. For efficient lookup, the addition in design doc 4.b)1.b
-            //  is critical.
-            //  3. With snapshot it is possible that only some of the keys in
-            //  the DB key's RepeatedOmKeyInfo list can be reclaimed,
-            //  make sure to update deletedTable accordingly in this case.
-            //  4. Further optimization: Skip all snapshotted keys altogether
-            //  e.g. by prefixing all unreclaimable keys, then calling seek
 
             // If the last snapshot is deleted and the keys renamed in between
             // the snapshots will be cleaned up by KDS. So we need to check
@@ -1578,17 +1570,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               // have to check deletedTable of previous snapshot
               RepeatedOmKeyInfo delOmKeyInfo =
                   prevDeletedTable.get(prevDelTableDBKey);
-              if ((omKeyInfo != null &&
-                  info.getObjectID() == omKeyInfo.getObjectID()) ||
-                  delOmKeyInfo != null) {
-                // TODO: [SNAPSHOT] For now, we are not cleaning up a key in
-                //  active DB's deletedTable if any one of the keys in
-                //  RepeatedOmKeyInfo exists in last snapshot's key/fileTable.
-                //  Might need to refactor OMKeyDeleteRequest first to take
-                //  actual reclaimed key objectIDs as input
-                //  in order to avoid any race condition.
-                blockGroupList.clear();
-                break;
+              if (versionExistsInPreviousSnapshot(omKeyInfo,
+                  info, delOmKeyInfo)) {
+                // If the infoList size is 1, there is nothing to split.
+                // We either delete it or skip it.
+                if (!(infoList.getOmKeyInfoList().size() == 1)) {
+                  notReclaimableKeyInfo.addOmKeyInfo(info);
+                }
+                continue;
               }
             }
 
@@ -1606,11 +1595,33 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             }
             currentCount++;
           }
-          keyBlocksList.addAll(blockGroupList);
+
+          List<OmKeyInfo> notReclaimableKeyInfoList =
+              notReclaimableKeyInfo.getOmKeyInfoList();
+
+          // If all the versions are not reclaimable, then do nothing.
+          if (notReclaimableKeyInfoList.size() > 0 &&
+              notReclaimableKeyInfoList.size() !=
+                  infoList.getOmKeyInfoList().size()) {
+            keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
+          }
+
+          if (notReclaimableKeyInfoList.size() !=
+              infoList.getOmKeyInfoList().size()) {
+            keyBlocksList.addAll(blockGroupList);
+          }
         }
       }
     }
-    return keyBlocksList;
+    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+  }
+
+  private boolean versionExistsInPreviousSnapshot(OmKeyInfo omKeyInfo,
+      OmKeyInfo info, RepeatedOmKeyInfo delOmKeyInfo) {
+    return (omKeyInfo != null &&
+        info.getObjectID() == omKeyInfo.getObjectID() &&
+        isBlockLocationInfoSame(omKeyInfo, info)) ||
+        delOmKeyInfo != null;
   }
 
   /**

@@ -265,6 +265,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private final String scmStarterUser;
   private final OzoneAdmins scmAdmins;
+  private OzoneAdmins scmReadOnlyAdmins;
+
   /**
    * SCM mxbean.
    */
@@ -411,6 +413,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
     scmAdmins = OzoneAdmins.getOzoneAdmins(scmStarterUser, conf);
+    scmReadOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     LOG.info("SCM start with adminUsers: {}", scmAdmins.getAdminUsernames());
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
@@ -1877,15 +1880,17 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void checkAdminAccess(String op) throws IOException {
-    checkAdminAccess(getRemoteUser());
+    checkAdminAccess(getRemoteUser(), false);
   }
 
-  public void checkAdminAccess(UserGroupInformation remoteUser)
+  public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)
       throws IOException {
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
-      throw new AccessControlException(
-          "Access denied for user " + remoteUser.getUserName() +
-              ". SCM superuser privilege is required.");
+      if (!isRead || !scmReadOnlyAdmins.isAdmin(remoteUser)) {
+        throw new AccessControlException(
+            "Access denied for user " + remoteUser.getUserName() +
+                ". SCM superuser privilege is required.");
+      }
     }
   }
 

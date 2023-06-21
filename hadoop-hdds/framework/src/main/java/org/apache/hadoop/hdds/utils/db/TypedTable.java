@@ -424,12 +424,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public TableIterator<KEY, TypedKeyValue> iterator() throws IOException {
+  public Table.KeyValueIterator<KEY, VALUE> iterator() throws IOException {
     return new TypedTableIterator(rawTable.iterator());
   }
 
   @Override
-  public TableIterator<KEY, TypedKeyValue> iterator(KEY prefix)
+  public Table.KeyValueIterator<KEY, VALUE> iterator(KEY prefix)
       throws IOException {
     final byte[] prefixBytes = encodeKey(prefix);
     return new TypedTableIterator(rawTable.iterator(prefixBytes));
@@ -551,11 +551,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   /**
    * Key value implementation for strongly typed tables.
    */
-  public class TypedKeyValue implements KeyValue<KEY, VALUE> {
+  public final class TypedKeyValue implements KeyValue<KEY, VALUE> {
 
     private final KeyValue<byte[], byte[]> rawKeyValue;
 
-    public TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue) {
+    private TypedKeyValue(KeyValue<byte[], byte[]> rawKeyValue) {
       this.rawKeyValue = rawKeyValue;
     }
 
@@ -573,14 +573,44 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   /**
    * Table Iterator implementation for strongly typed tables.
    */
-  public class TypedTableIterator implements TableIterator<KEY, TypedKeyValue> {
-
-    private final TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator;
-
+  public class TypedTableIterator extends AbstractIterator<byte[]> {
     public TypedTableIterator(
         TableIterator<byte[], KeyValue<byte[], byte[]>> rawIterator) {
+      super(rawIterator);
+    }
+
+    @Override
+    byte[] convert(KEY key) throws IOException {
+      return encodeKey(key);
+    }
+
+    @Override
+    KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
+      return new TypedKeyValue(raw);
+    }
+  }
+
+  /**
+   * An abstract {@link Table.KeyValueIterator} backed by a raw iterator.
+   *
+   * @param <RAW> The raw type.
+   */
+  abstract class AbstractIterator<RAW>
+      implements Table.KeyValueIterator<KEY, VALUE> {
+    private final TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator;
+
+    AbstractIterator(TableIterator<RAW, KeyValue<RAW, RAW>> rawIterator) {
       this.rawIterator = rawIterator;
     }
+
+    /** Covert the given key to the {@link RAW} type. */
+    abstract RAW convert(KEY key) throws IOException;
+
+    /**
+     * Covert the given {@link Table.KeyValue}
+     * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@link VALUE}).
+     */
+    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw);
 
     @Override
     public void seekToFirst() {
@@ -593,13 +623,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    public TypedKeyValue seek(KEY key) throws IOException {
-      final byte[] keyBytes = encodeKey(key);
-      KeyValue<byte[], byte[]> result = rawIterator.seek(keyBytes);
-      if (result == null) {
-        return null;
-      }
-      return new TypedKeyValue(result);
+    public KeyValue<KEY, VALUE> seek(KEY key) throws IOException {
+      final KeyValue<RAW, RAW> result = rawIterator.seek(convert(key));
+      return result == null ? null : convert(result);
     }
 
     @Override
@@ -613,8 +639,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    public TypedKeyValue next() {
-      return new TypedKeyValue(rawIterator.next());
+    public KeyValue<KEY, VALUE> next() {
+      return convert(rawIterator.next());
     }
 
     @Override
