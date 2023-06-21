@@ -421,12 +421,6 @@ public final class OmKeyInfo extends WithParentObjectId
     this.replicationConfig = repConfig;
   }
 
-  public void setReplicationIfMissing(ReplicationConfig repConfig) {
-    if (replicationConfig == null) {
-      replicationConfig = repConfig;
-    }
-  }
-
   public FileChecksum getFileChecksum() {
     return fileChecksum;
   }

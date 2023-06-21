@@ -460,14 +460,9 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo keyInfo = fileStatus.getKeyInfo();
     if (fileStatus.isDirectory()) {
       keyInfo.setKeyName(addTrailingSlashIfNeeded(keyInfo.getKeyName()));
-      fallbackToGlobalDefaultReplicationIfNeeded(keyInfo);
     }
     keyInfo.setFile(fileStatus.isFile());
     return keyInfo;
-  }
-
-  private void fallbackToGlobalDefaultReplicationIfNeeded(OmKeyInfo keyInfo) {
-    keyInfo.setReplicationIfMissing(ozoneManager.getDefaultReplicationConfig());
   }
 
   private void addBlockToken4Read(OmKeyInfo value) throws IOException {
@@ -1296,7 +1291,6 @@ public class KeyManagerImpl implements KeyManager {
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       } else {
-        fallbackToGlobalDefaultReplicationIfNeeded(fileStatus.getKeyInfo());
         return fileStatus;
       }
     }
