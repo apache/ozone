@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -700,6 +700,38 @@ public final class OmSnapshotManager implements AutoCloseable {
     // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
+                                                   final String bucketName,
+                                                   final String jobStatus,
+                                                   final boolean listAll)
+      throws IOException {
+    String volumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+    String bucketKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+
+    if (!ozoneManager.getMetadataManager()
+            .getVolumeTable().isExist(volumeKey) ||
+        !ozoneManager.getMetadataManager()
+            .getBucketTable().isExist(bucketKey)) {
+      throw new IOException("Provided volume name " + volumeName +
+          " or bucket name " + bucketName + " doesn't exist");
+    }
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
+      // Return an empty ArrayList here to avoid
+      // unnecessarily iterating the SnapshotDiffJob table.
+      return new ArrayList<>();
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(
+        volumeName, bucketName, jobStatus, listAll);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -91,6 +92,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -822,6 +824,112 @@ public class TestSnapshotDiffManager {
     // trying to cancel it should lead to NEW_JOB cancel result.
     Assertions.assertEquals(JobCancelResult.NEW_JOB,
         snapshotDiffResponse.getJobCancelResult());
+  }
+
+  private static Stream<Arguments> listSnapshotDiffJobsScenarios() {
+    return Stream.of(
+        Arguments.of("queued", false, false),
+        Arguments.of("done", false, false),
+        Arguments.of("in_progress", false, true),
+        Arguments.of("queued", true, true),
+        Arguments.of("done", true, true),
+        Arguments.of("in_progress", true, true),
+        Arguments.of("invalid", true, true),
+        Arguments.of("", true, true)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("listSnapshotDiffJobsScenarios")
+  public void testListSnapshotDiffJobs(String jobStatus,
+                                       boolean listAll,
+                                       boolean containsJob)
+      throws IOException {
+    SnapshotDiffManager snapshotDiffManager =
+        getMockedSnapshotDiffManager(10);
+
+    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+
+    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    UUID fromSnapshotUUID = UUID.randomUUID();
+    UUID toSnapshotUUID = UUID.randomUUID();
+
+    setupMocksForRunningASnapDiff(volumeName, bucketName);
+
+    setUpSnapshots(volumeName, bucketName, fromSnapshotName,
+        toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
+
+    PersistentMap<String, SnapshotDiffJob> snapDiffJobTable =
+        snapshotDiffManager.getSnapDiffJobTable();
+    String diffJobKey = fromSnapshotUUID + DELIMITER + toSnapshotUUID;
+
+    SnapshotDiffJob diffJob = snapDiffJobTable.get(diffJobKey);
+    Assertions.assertNull(diffJob);
+
+    // There are no jobs in the table, therefore
+    // the response list should be empty.
+    List<SnapshotDiffJob> jobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+    Assertions.assertTrue(jobList.isEmpty());
+
+    // SnapshotDiffReport
+    SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
+        .getSnapshotDiffReport(volumeName, bucketName,
+            fromSnapshotName, toSnapshotName,
+            0, 0, false);
+
+    Assertions.assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
+        snapshotDiffResponse.getJobStatus());
+
+    diffJob = snapDiffJobTable.get(diffJobKey);
+    Assertions.assertNotNull(diffJob);
+    Assertions.assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
+        diffJob.getStatus());
+
+    jobList = snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
+
+    // When listAll is true, jobStatus is ignored.
+    // If the job is IN_PROGRESS or listAll is used,
+    // there should be a response.
+    // Otherwise, response list should be empty.
+    if (containsJob) {
+      Assertions.assertTrue(jobList.contains(diffJob));
+    } else {
+      Assertions.assertTrue(jobList.isEmpty());
+    }
+  }
+
+  @Test
+  public void testListSnapDiffWithInvalidStatus() throws IOException {
+    SnapshotDiffManager snapshotDiffManager =
+        getMockedSnapshotDiffManager(10);
+
+    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+
+    String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    UUID fromSnapshotUUID = UUID.randomUUID();
+    UUID toSnapshotUUID = UUID.randomUUID();
+
+    setupMocksForRunningASnapDiff(volumeName, bucketName);
+
+    setUpSnapshots(volumeName, bucketName, fromSnapshotName,
+        toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
+
+    // SnapshotDiffReport
+    snapshotDiffManager.getSnapshotDiffReport(volumeName, bucketName,
+        fromSnapshotName, toSnapshotName,
+        0, 0, false);
+
+    // Invalid status, without listAll true, results in an exception.
+    Assertions.assertThrows(IOException.class, () -> snapshotDiffManager
+        .getSnapshotDiffJobList(volumeName, bucketName, "invalid", false));
   }
 
   private void setUpSnapshots(String volumeName, String bucketName,

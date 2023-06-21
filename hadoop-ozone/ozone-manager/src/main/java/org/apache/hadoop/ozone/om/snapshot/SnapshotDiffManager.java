@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -425,6 +426,42 @@ public class SnapshotDiffManager implements AutoCloseable {
     // It will check the table and get that the job is cancelled,
     // and return the appropriate response.
     return new SnapshotDiffResponse(report, jobStatus, 0L, jobCancelResult);
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffJobList(
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) throws IOException {
+    List<SnapshotDiffJob> jobList = new ArrayList<>();
+
+    try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
+             snapDiffJobTable.iterator()) {
+      while (iterator.hasNext()) {
+        SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
+        if (Objects.equals(snapshotDiffJob.getVolume(), volumeName) &&
+            Objects.equals(snapshotDiffJob.getBucket(), bucketName)) {
+          if (listAll) {
+            jobList.add(snapshotDiffJob);
+            continue;
+          }
+
+          if (Objects.equals(snapshotDiffJob.getStatus(),
+              getJobStatus(jobStatus))) {
+            jobList.add(snapshotDiffJob);
+          }
+        }
+      }
+    }
+    return jobList;
+  }
+
+  private JobStatus getJobStatus(String jobStatus)
+      throws IOException {
+    try {
+      return JobStatus.valueOf(jobStatus.toUpperCase());
+    } catch (IllegalArgumentException ex) {
+      LOG.info(ex.toString());
+      throw new IOException("Invalid job status: " + jobStatus);
+    }
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(

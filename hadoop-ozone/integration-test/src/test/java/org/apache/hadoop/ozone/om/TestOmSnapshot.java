@@ -900,6 +900,57 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
 
+  @Test
+  public void testListSnapshotDiffWithInvalidParameters()
+      throws Exception {
+    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
+    String bucket = "buck-" + RandomStringUtils.randomNumeric(5);
+
+    String volBucketErrorMessage = "Provided volume name " + volume +
+        " or bucket name " + bucket + " doesn't exist";
+
+    Exception volBucketEx = Assertions.assertThrows(OMException.class,
+        () -> store.listSnapshotDiffJobs(volume, bucket,
+            "", true));
+    Assertions.assertEquals(volBucketErrorMessage,
+        volBucketEx.getMessage());
+
+    // Create the volume and the bucket.
+    store.createVolume(volume);
+    OzoneVolume ozVolume = store.getVolume(volume);
+    ozVolume.createBucket(bucket);
+
+    Assertions.assertDoesNotThrow(() ->
+        store.listSnapshotDiffJobs(volume, bucket, "", true));
+
+    // There are no snapshots, response should be empty.
+    Assertions.assertTrue(store
+        .listSnapshotDiffJobs(volume, bucket,
+            "", true).isEmpty());
+
+    OzoneBucket ozBucket = ozVolume.getBucket(bucket);
+    // Create keys and take snapshots.
+    String key1 = "key-1-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozBucket, key1);
+    String snap1 = "snap-1-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap1);
+
+    String key2 = "key-2-" + RandomStringUtils.randomNumeric(5);
+    createFileKey(ozBucket, key2);
+    String snap2 = "snap-2-" + RandomStringUtils.randomNumeric(5);
+    createSnapshot(volume, bucket, snap2);
+
+    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0, true, false);
+
+    String invalidStatus = "invalid";
+    String statusErrorMessage = "Invalid job status: " + invalidStatus;
+
+    Exception statusEx = Assertions.assertThrows(OMException.class,
+        () -> store.listSnapshotDiffJobs(volume, bucket,
+            invalidStatus, false));
+    Assertions.assertEquals(statusErrorMessage,
+        statusEx.getMessage());
+  }
 
   /**
    * Tests snapdiff when there are multiple sst files in the from & to
