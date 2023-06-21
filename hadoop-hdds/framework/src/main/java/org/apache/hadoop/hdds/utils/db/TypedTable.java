@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -574,8 +575,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
     return new RawIterator<CodecBuffer>(i) {
       @Override
-      CodecBuffer convert(KEY key) throws IOException {
-        return encodeKeyCodecBuffer(key);
+      AutoCloseSupplier<CodecBuffer> convert(KEY key) throws IOException {
+        final CodecBuffer buffer = encodeKeyCodecBuffer(key);
+        return new AutoCloseSupplier<CodecBuffer>() {
+          @Override
+          public void close() {
+            buffer.release();
+          }
+
+          @Override
+          public CodecBuffer get() {
+            return buffer;
+          }
+        };
       }
 
       @Override
@@ -595,13 +607,21 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    byte[] convert(KEY key) throws IOException {
-      return encodeKey(key);
+    AutoCloseSupplier<byte[]> convert(KEY key) throws IOException {
+      final byte[] keyArray = encodeKey(key);
+      return () -> keyArray;
     }
 
     @Override
     KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
       return new TypedKeyValue(raw);
+    }
+  }
+
+  interface AutoCloseSupplier<RAW> extends AutoCloseable, Supplier<RAW> {
+    @Override
+    default void close() {
+      // no-op
     }
   }
 
@@ -619,7 +639,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     /** Covert the given key to the {@link RAW} type. */
-    abstract RAW convert(KEY key) throws IOException;
+    abstract AutoCloseSupplier<RAW> convert(KEY key) throws IOException;
 
     /**
      * Covert the given {@link Table.KeyValue}
@@ -639,8 +659,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KeyValue<KEY, VALUE> seek(KEY key) throws IOException {
-      final KeyValue<RAW, RAW> result = rawIterator.seek(convert(key));
-      return result == null ? null : convert(result);
+      try (AutoCloseSupplier<RAW> rawKey = convert(key)) {
+        final KeyValue<RAW, RAW> result = rawIterator.seek(rawKey.get());
+        return result == null ? null : convert(result);
+      }
     }
 
     @Override
