@@ -849,7 +849,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean scanMetaData() {
+  public boolean scanMetaData() throws InterruptedException {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
@@ -870,7 +870,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
+  public boolean scanData(DataTransferThrottler throttler, Canceler canceler)
+      throws InterruptedException {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
