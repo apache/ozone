@@ -4506,16 +4506,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getKeyName(), false);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
-    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+    if (cancel) {
+      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+          fromSnapshot, toSnapshot);
+    } else {
+      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+    }
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,

@@ -199,6 +199,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationToke
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1216,7 +1217,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1226,7 +1228,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
-            .setForceFullDiff(forceFullDiff);
+            .setForceFullDiff(forceFullDiff)
+            .setCancel(cancel);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);
@@ -1243,7 +1246,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
-        diffResponse.getWaitTimeInMs());
+        diffResponse.getWaitTimeInMs(),
+        JobCancelResult.fromProtobuf(diffResponse.getJobCancelResult()));
   }
 
   /**
