@@ -589,6 +589,10 @@ public class TestBlockDeletingService {
 
       long deleteSuccessCount =
           deletingServiceMetrics.getSuccessCount();
+      long totalBlockChosenCount =
+          deletingServiceMetrics.getTotalBlockChosenCount();
+      long totalContainerChosenCount =
+          deletingServiceMetrics.getTotalContainerChosenCount();
       Assert.assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
@@ -613,6 +617,12 @@ public class TestBlockDeletingService {
       Assert.assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(1,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
       // The value of the getTotalPendingBlockCount Metrics is obtained
       // before the deletion is processing
       // So the Pending Block count will be 3
@@ -636,6 +646,12 @@ public class TestBlockDeletingService {
       Assert.assertEquals(3,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
 
       // check if blockData get deleted
       assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());

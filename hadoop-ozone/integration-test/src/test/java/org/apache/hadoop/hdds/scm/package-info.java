@@ -15,46 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-.heatmap-container {
-
-  .go-back-button {
-    display: inline-block;
-    margin-left: 20px;
-  }
-
-  .entity-dropdown-button {
-    display: inline-block;
-    margin-left: 30px;
-  }
-
-  .date-dropdown-button {
-    display: inline-block;
-    margin-left: 45px;
-  }
-
-  .input-bar {
-    display: inline-block;
-    margin-left: 25px;
-  }
-
-  .input {
-    padding-left: 5px;
-    margin-right: 10px;
-    display: inline-block;
-    width: 400px;
-  }
-
-  .heatmapinformation {
-    font-size: 14px;
-    fill: rgba(0, 0, 0, 0.65) !important;
-    line-height: 1.5;
-    font-feature-settings: 'tnum', "tnum";
-    height: 800;
-  }
-
-}
-
-.ant-drawer-open .ant-drawer-mask {
-  opacity: 0 !important;
-}
+/**
+ * Package info tests.
+ */
+package org.apache.hadoop.hdds.scm;

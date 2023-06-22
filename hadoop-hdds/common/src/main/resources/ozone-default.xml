@@ -4062,4 +4062,14 @@
       https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
     </description>
   </property>
+  <property>
+    <name>ozone.om.upgrade.quota.recalculate.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      quota recalculation trigger when upgrade to the layout version QUOTA.
+      while upgrade, re-calculation of quota used will block write operation
+      to existing buckets till this operation is completed.
+    </description>
+  </property>
 </configuration>

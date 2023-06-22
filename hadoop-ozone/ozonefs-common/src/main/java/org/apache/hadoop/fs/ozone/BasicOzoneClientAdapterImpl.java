@@ -698,7 +698,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume.getName(), bucket.getName(),
-              fromSnapshot, toSnapshot, token, -1, false);
+              fromSnapshot, toSnapshot, token, -1, false, false);
       if (snapshotDiffResponse.getJobStatus() == DONE) {
         break;
       }
