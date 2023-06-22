@@ -428,7 +428,7 @@ public class NodeStateMap {
    * @param health
    * @return List of DatanodeInfo objects matching the passed state
    */
-  private List<DatanodeInfo> filterNodes(
+  public List<DatanodeInfo> filterNodes(
       NodeOperationalState opState, NodeState health) {
     if (opState != null && health != null) {
       return filterNodes(matching(new NodeStatus(opState, health)));
