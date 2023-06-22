@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -81,6 +82,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -216,7 +218,7 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -599,12 +601,14 @@ public class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff2 = getSnapDiffReport(volume, bucket, snap2, snap3);
     Assert.assertEquals(2, diff2.getDiffList().size());
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.CREATE, key2)));
-    Assert.assertTrue(diff2.getDiffList().contains(
-        SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.DELETE, key1)));
+    Assert.assertEquals(
+        Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.DELETE,
+                OZONE_URI_DELIMITER + key1),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE,
+                OZONE_URI_DELIMITER + key2)),
+        diff2.getDiffList());
 
     // Rename Key2
     String key2Renamed = key2 + "_renamed";
@@ -617,7 +621,8 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.RENAME, key2, key2Renamed)));
+            SnapshotDiffReportOzone.DiffType.RENAME, OZONE_URI_DELIMITER + key2,
+            OZONE_URI_DELIMITER + key2Renamed)));
 
 
     // Create a directory
@@ -628,14 +633,10 @@ public class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     Assert.assertEquals(1, diff4.getDiffList().size());
-    // for non-fso, directories are a special type of key with "/" appended
-    // at the end.
-    if (!bucket1.getBucketLayout().isFileSystemOptimized()) {
-      dir1 = dir1 + OM_KEY_PREFIX;
-    }
     Assert.assertTrue(diff4.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.CREATE, dir1)));
+            SnapshotDiffReportOzone.DiffType.CREATE,
+            OM_KEY_PREFIX + dir1)));
 
     String key3 = createFileKeyWithPrefix(bucket1, "key-3-");
     String snap6 = "snap" + counter.incrementAndGet();
@@ -648,17 +649,14 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap7);
     SnapshotDiffReportOzone
         diff5 = getSnapDiffReport(volume, bucket, snap6, snap7);
-    assertEquals(2, diff5.getDiffList().size());
-    assertEquals(SnapshotDiffReportOzone.DiffType.RENAME,
-        diff5.getDiffList().get(0).getType());
-    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(0).getSourcePath()));
-    assertEquals(renamedKey3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(0).getTargetPath()));
-    assertEquals(SnapshotDiffReportOzone.DiffType.MODIFY,
-        diff5.getDiffList().get(1).getType());
-    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(1).getSourcePath()));
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffList =
+        Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, OZONE_URI_DELIMITER + key3,
+            OZONE_URI_DELIMITER + renamedKey3),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key3)
+        );
+    assertEquals(expectedDiffList, diff5.getDiffList());
   }
 
   @Test

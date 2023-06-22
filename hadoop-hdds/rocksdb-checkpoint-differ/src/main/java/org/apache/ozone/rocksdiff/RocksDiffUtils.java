@@ -89,7 +89,7 @@ public final class RocksDiffUtils {
       TableProperties properties = sstFileReader.get().getTableProperties();
       String tableName = new String(properties.getColumnFamilyName(), UTF_8);
       if (tableToPrefixMap.containsKey(tableName)) {
-        String prefix = tableToPrefixMap.get(tableName) + OM_KEY_PREFIX;
+        String prefix = tableToPrefixMap.get(tableName);
         try (ManagedSstFileReaderIterator iterator =
             ManagedSstFileReaderIterator.managed(sstFileReader.get()
                 .newIterator(new ReadOptions()))) {

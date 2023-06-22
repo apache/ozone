@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -48,8 +48,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject.SnapshotDiffObjectBuilder;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -303,24 +303,26 @@ public class TestSnapshotDiffManager {
     }
   }
 
-  private Table<String, ? extends WithObjectID> getMockedTable(
-      Map<String, WithObjectID> map, String tableName)
+  private Table<String, ? extends WithParentObjectId> getMockedTable(
+      Map<String, WithParentObjectId> map, String tableName)
       throws IOException {
-    Table<String, ? extends WithObjectID> mocked = mock(Table.class);
+    Table<String, ? extends WithParentObjectId> mocked = mock(Table.class);
     Mockito.when(mocked.get(Matchers.any()))
         .thenAnswer(invocation -> map.get(invocation.getArgument(0)));
     Mockito.when(mocked.getName()).thenReturn(tableName);
     return mocked;
   }
 
-  private WithObjectID getObjectID(int objectId, int updateId,
-                                   String snapshotTableName) {
+  private WithParentObjectId getKeyInfo(int objectId, int updateId,
+                                        int parentObjectId,
+                                        String snapshotTableName) {
     String name = "key" + objectId;
     if (snapshotTableName.equals(OmMetadataManagerImpl.DIRECTORY_TABLE)) {
       return OmDirectoryInfo.newBuilder()
           .setObjectID(objectId).setName(name).build();
     }
     return new OmKeyInfo.Builder().setObjectID(objectId)
+        .setParentObjectID(parentObjectId)
         .setVolumeName("vol").setBucketName("bucket").setUpdateID(updateId)
         .setReplicationConfig(new ECReplicationConfig(3, 2))
         .setKeyName(name).build();
@@ -355,10 +357,10 @@ public class TestSnapshotDiffManager {
       throws NativeLibraryNotLoadedException, IOException, RocksDBException {
     // Mocking SST file with keys in SST file including tombstones
     Set<String> keysWithTombstones = IntStream.range(0, 100)
-        .boxed().map(i -> "key" + i).collect(Collectors.toSet());
+        .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SST file with keys in SST file excluding tombstones
     Set<String> keys = IntStream.range(0, 50).boxed()
-        .map(i -> "key" + i).collect(Collectors.toSet());
+        .map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SSTFileReader functions to return the above keys list.
     try (MockedConstruction<ManagedSstFileReader> mockedSSTFileReader =
              Mockito.mockConstruction(ManagedSstFileReader.class,
@@ -374,22 +376,23 @@ public class TestSnapshotDiffManager {
                  })
     ) {
       //
-      Map<String, WithObjectID> toSnapshotTableMap =
+      Map<String, WithParentObjectId> toSnapshotTableMap =
           IntStream.concat(IntStream.range(0, 25), IntStream.range(50, 100))
-              .boxed().collect(Collectors.toMap(i -> "key" + i,
-                  i -> getObjectID(i, i, snapshotTableName)));
+              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+                  i -> getKeyInfo(i, i, i + 100,
+                      snapshotTableName)));
       // Mocking To snapshot table containing list of keys b/w 0-25, 50-100
-      Table<String, ? extends WithObjectID> toSnapshotTable =
+      Table<String, ? extends WithParentObjectId> toSnapshotTable =
           getMockedTable(toSnapshotTableMap, snapshotTableName);
       // Mocking To snapshot table containing list of keys b/w 0-50
-      Map<String, WithObjectID> fromSnapshotTableMap =
+      Map<String, WithParentObjectId> fromSnapshotTableMap =
           IntStream.range(0, 50)
-              .boxed().collect(Collectors.toMap(i -> "key" + i,
-                  i -> getObjectID(i, i, snapshotTableName)));
+              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+                  i -> getKeyInfo(i, i, i + 100, snapshotTableName)));
       // Expected Diff 25-50 are newly created keys & keys b/w are deleted,
       // when reding keys with tombstones the keys would be added to
       // objectIdsToBeChecked otherwise it wouldn't be added
-      Table<String, ? extends WithObjectID> fromSnapshotTable =
+      Table<String, ? extends WithParentObjectId> fromSnapshotTable =
           getMockedTable(fromSnapshotTableMap, snapshotTableName);
       SnapshotDiffManager snapshotDiffManager =
           getMockedSnapshotDiffManager(10);
@@ -397,7 +400,7 @@ public class TestSnapshotDiffManager {
       // Odd keys should be filtered out in the diff.
       Mockito.doAnswer((Answer<Boolean>) invocationOnMock ->
           Integer.parseInt(invocationOnMock.getArgument(0, String.class)
-              .substring(3)) % 2 == 0).when(snapshotDiffManager)
+              .substring(7)) % 2 == 0).when(snapshotDiffManager)
           .isKeyInBucket(Matchers.anyString(), Matchers.anyMap(),
               Matchers.anyString());
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
@@ -406,10 +409,16 @@ public class TestSnapshotDiffManager {
           new SnapshotTestUtils.StubbedPersistentMap<>();
       PersistentMap<byte[], SnapshotDiffObject> objectIdsToCheck =
           new SnapshotTestUtils.StubbedPersistentMap<>();
+      Set<Long> oldParentIds = Sets.newHashSet();
+      Set<Long> newParentIds = Sets.newHashSet();
       snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
           fromSnapshotTable, Sets.newHashSet("dummy.sst"),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
-          objectIdsToCheck, Maps.newHashMap());
+          objectIdsToCheck, Optional.ofNullable(oldParentIds),
+          Optional.ofNullable(newParentIds),
+          ImmutableMap.of(OmMetadataManagerImpl.DIRECTORY_TABLE, "",
+              OmMetadataManagerImpl.KEY_TABLE, "",
+              OmMetadataManagerImpl.FILE_TABLE, ""));
 
       Iterator<Entry<byte[], byte[]>> oldObjectIdIter =
           oldObjectIdKeyMap.iterator();
@@ -574,7 +583,8 @@ public class TestSnapshotDiffManager {
 
       snapshotDiffManager.generateDiffReport("jobId", fromSnapTable,
           toSnapTable, objectIdToDiffObject, oldObjectIdKeyMap,
-          newObjectIdKeyMap, volumeName, bucketName, fromSnapName, toSnapName);
+          newObjectIdKeyMap, volumeName, bucketName, fromSnapName, toSnapName,
+          false, null, null);
 
       snapshotDiffJob.setStatus(JobStatus.DONE);
       snapshotDiffManager.getSnapDiffJobTable().put(jobKey, snapshotDiffJob);
@@ -595,7 +605,7 @@ public class TestSnapshotDiffManager {
         actualOrder.add(entry.getType());
 
         long objectId = Long.parseLong(
-            DFSUtilClient.bytes2String(entry.getSourcePath()).substring(3));
+            DFSUtilClient.bytes2String(entry.getSourcePath()).substring(4));
         Assertions.assertEquals(diffMap.get(objectId), entry.getType());
       }
       Assertions.assertEquals(expectedOrder, actualOrder);

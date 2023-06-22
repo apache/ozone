@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,6 +64,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -675,7 +675,6 @@ public final class OmUtils {
    * does not preserve.
    * @return normalized key name.
    */
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public static String normalizeKey(String keyName,
       boolean preserveTrailingSlash) {
     // For empty strings do nothing, just return the same.
@@ -692,8 +691,8 @@ public final class OmUtils {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
-      if (preserveTrailingSlash && keyName.endsWith("/")) {
-        return normalizedKeyName.substring(1) + "/";
+      if (preserveTrailingSlash && keyName.endsWith(OZONE_URI_DELIMITER)) {
+        return normalizedKeyName.substring(1) + OZONE_URI_DELIMITER;
       }
       return normalizedKeyName.substring(1);
     }
