@@ -39,6 +39,8 @@ for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.5; do
   # Check if $HADOOP_VERSION starts with the prefix "3.3."
   if [[ $HADOOP_VERSION == 3.3.* ]]; then
     export HADOOP_IMAGE=apache/hadoop
+    # Hack. apache/hadoop does not tag the specific image release version.
+    export HADOOP_VERSION=3
   else
     export HADOOP_IMAGE=flokkr/hadoop
   fi
