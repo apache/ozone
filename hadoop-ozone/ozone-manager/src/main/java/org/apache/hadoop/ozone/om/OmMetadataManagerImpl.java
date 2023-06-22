@@ -249,7 +249,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private DBStore store;
 
-  private IOzoneManagerLock lock;
+  private final IOzoneManagerLock lock;
 
   private Table userTable;
   private Table volumeTable;
@@ -293,26 +293,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   // non-ratis OM clusters will be binary 01 (= decimal 1)  and for ratis
   // enabled OM cluster will be binary 10 (= decimal 2). This epoch is added
   // to ensure uniqueness of objectIDs.
-  private long omEpoch;
+  private final long omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
 
-  // A variant of the constructor that sets a pointer back to OzoneManager to
-  // minimize disruption.
+  /**
+   * OmMetadataManagerImpl constructor.
+   * @param conf OzoneConfiguration
+   * @param ozoneManager Points to parent OzoneManager.
+   *                     Can be null if not used (in some tests).
+   * @throws IOException
+   */
   public OmMetadataManagerImpl(OzoneConfiguration conf,
       OzoneManager ozoneManager) throws IOException {
-    init(conf);
     this.ozoneManager = ozoneManager;
-  }
-
-  public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
-    init(conf);
-  }
-
-  private void init(OzoneConfiguration conf) throws IOException {
     this.lock = new OzoneManagerLock(conf);
     // TODO: This is a temporary check. Once fully implemented, all OM state
     //  change should go through Ratis - be it standalone (for non-HA) or

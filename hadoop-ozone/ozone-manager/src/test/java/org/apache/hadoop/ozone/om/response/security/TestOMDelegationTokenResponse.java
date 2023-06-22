@@ -46,7 +46,8 @@ public class TestOMDelegationTokenResponse {
     conf = new OzoneConfiguration();
     ((OzoneConfiguration) conf).set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf);
+    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf,
+        null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
