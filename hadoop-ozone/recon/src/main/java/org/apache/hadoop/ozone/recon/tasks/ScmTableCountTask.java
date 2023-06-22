@@ -115,7 +115,7 @@ public class ScmTableCountTask extends ReconScmTask {
    *
    * @throws IOException if an I/O error occurs during table count processing.
    */
-  public void processTableCount() throws IOException {
+  public void processTableCount() {
     try {
       // Initialize the object count map
       Map<String, Long> objectCountMap = initializeCountMap();
