@@ -318,10 +318,10 @@ public class TestOmSnapshot {
      */
     String keyBaseA = "key-a-";
     for (int i = 0; i < 10; i++) {
-      createFileKey(volAbucketA, keyBaseA + i + "-");
-      createFileKey(volAbucketB, keyBaseA + i + "-");
-      createFileKey(volBbucketA, keyBaseA + i + "-");
-      createFileKey(volBbucketB, keyBaseA + i + "-");
+      createFileKeyWithPrefix(volAbucketA, keyBaseA + i + "-");
+      createFileKeyWithPrefix(volAbucketB, keyBaseA + i + "-");
+      createFileKeyWithPrefix(volBbucketA, keyBaseA + i + "-");
+      createFileKeyWithPrefix(volBbucketB, keyBaseA + i + "-");
     }
     /*
     Create 10 keys in  vol-a-<random>/buc-a-<random>,
@@ -330,10 +330,10 @@ public class TestOmSnapshot {
      */
     String keyBaseB = "key-b-";
     for (int i = 0; i < 10; i++) {
-      createFileKey(volAbucketA, keyBaseB + i + "-");
-      createFileKey(volAbucketB, keyBaseB + i + "-");
-      createFileKey(volBbucketA, keyBaseB + i + "-");
-      createFileKey(volBbucketB, keyBaseB + i + "-");
+      createFileKeyWithPrefix(volAbucketA, keyBaseB + i + "-");
+      createFileKeyWithPrefix(volAbucketB, keyBaseB + i + "-");
+      createFileKeyWithPrefix(volBbucketA, keyBaseB + i + "-");
+      createFileKeyWithPrefix(volBbucketB, keyBaseB + i + "-");
     }
 
     String snapshotKeyPrefix = createSnapshot(volumeA, bucketA);
@@ -454,7 +454,7 @@ public class TestOmSnapshot {
     OzoneBucket volBucket = vol.getBucket(bucket);
 
     String key = "key-";
-    createFileKey(volBucket, key);
+    createFileKeyWithPrefix(volBucket, key);
     String snapshotKeyPrefix = createSnapshot(volume, bucket);
     deleteKeys(volBucket);
 
@@ -480,11 +480,11 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = vol.getBucket(bucket);
 
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snapshotKeyPrefix1 = createSnapshot(volume, bucket);
 
     String key2 = "key-2-";
-    createFileKey(bucket1, key2);
+    createFileKeyWithPrefix(bucket1, key2);
     String snapshotKeyPrefix2 = createSnapshot(volume, bucket);
 
     int volBucketKeyCount = keyCount(bucket1, snapshotKeyPrefix1 + "key-");
@@ -530,7 +530,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
 
@@ -555,8 +555,8 @@ public class TestOmSnapshot {
     OzoneBucket bucketWithSnapshot = volume.getBucket(bucket1);
     OzoneBucket bucketWithoutSnapshot = volume.getBucket(bucket2);
     String key = "key-";
-    createFileKey(bucketWithSnapshot, key);
-    createFileKey(bucketWithoutSnapshot, key);
+    createFileKeyWithPrefix(bucketWithSnapshot, key);
+    createFileKeyWithPrefix(bucketWithoutSnapshot, key);
     createSnapshot(volume1, bucket1);
     deleteKeys(bucketWithSnapshot);
     deleteKeys(bucketWithoutSnapshot);
@@ -578,7 +578,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    key1 = createFileKey(bucket1, key1);
+    key1 = createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     // Do nothing, take another snapshot
@@ -590,7 +590,7 @@ public class TestOmSnapshot {
     Assert.assertTrue(diff1.getDiffList().isEmpty());
     // Create Key2 and delete Key1, take snapshot
     String key2 = "key-2-";
-    key2 = createFileKey(bucket1, key2);
+    key2 = createFileKeyWithPrefix(bucket1, key2);
     bucket1.deleteKey(key1);
     String snap3 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap3);
@@ -637,6 +637,28 @@ public class TestOmSnapshot {
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReportOzone.DiffType.CREATE, dir1)));
 
+    String key3 = createFileKeyWithPrefix(bucket1, "key-3-");
+    String snap6 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap6);
+    createFileKey(bucket1, key3);
+    String renamedKey3 = key3 + "_renamed";
+    bucket1.renameKey(key3, renamedKey3);
+
+    String snap7 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap7);
+    SnapshotDiffReportOzone
+        diff5 = getSnapDiffReport(volume, bucket, snap6, snap7);
+    assertEquals(2, diff5.getDiffList().size());
+    assertEquals(SnapshotDiffReportOzone.DiffType.RENAME,
+        diff5.getDiffList().get(0).getType());
+    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
+        diff5.getDiffList().get(0).getSourcePath()));
+    assertEquals(renamedKey3, org.apache.hadoop.hdds.StringUtils.bytes2String(
+        diff5.getDiffList().get(0).getTargetPath()));
+    assertEquals(SnapshotDiffReportOzone.DiffType.MODIFY,
+        diff5.getDiffList().get(1).getType());
+    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
+        diff5.getDiffList().get(1).getSourcePath()));
   }
 
   @Test
@@ -761,9 +783,9 @@ public class TestOmSnapshot {
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
-                                               String bucket,
-                                               String fromSnapshot,
-                                               String toSnapshot)
+                                                    String bucket,
+                                                    String fromSnapshot,
+                                                    String toSnapshot)
       throws InterruptedException, IOException {
     SnapshotDiffResponse response;
     do {
@@ -785,7 +807,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     String snap2 = "snap" + counter.incrementAndGet();
@@ -815,7 +837,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucketa);
     // Create Key1 and take 2 snapshots
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volumea, bucketa, snap1);
     String snap2 = "snap" + counter.incrementAndGet();
@@ -847,7 +869,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     String snap2 = "snap" + counter.incrementAndGet();
@@ -886,13 +908,13 @@ public class TestOmSnapshot {
     OzoneBucket bucket2 = volume1.getBucket(bucketName2);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    key1 = createFileKey(bucket1, key1);
+    key1 = createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucketName1, snap1);
     // Create key in bucket2 and bucket1 and calculate diff
     // Diff should not contain bucket2's key
-    createFileKey(bucket1, key1);
-    createFileKey(bucket2, key1);
+    createFileKeyWithPrefix(bucket1, key1);
+    createFileKeyWithPrefix(bucket2, key1);
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucketName1, snap2);
     SnapshotDiffReportOzone diff1 =
@@ -973,23 +995,23 @@ public class TestOmSnapshot {
     OzoneBucket bucket2 = volume1.getBucket(bucketName2);
     String keyPrefix = "key-";
     // add file to bucket1 and take snapshot
-    createFileKey(bucket1, keyPrefix);
+    createFileKeyWithPrefix(bucket1, keyPrefix);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volumeName1, bucketName1, snap1); // 1.sst
     Assert.assertEquals(1, getKeyTableSstFiles().size());
     // add files to bucket2 and flush twice to create 2 sst files
     for (int i = 0; i < 5; i++) {
-      createFileKey(bucket2, keyPrefix);
+      createFileKeyWithPrefix(bucket2, keyPrefix);
     }
     flushKeyTable(); // 1.sst 2.sst
     Assert.assertEquals(2, getKeyTableSstFiles().size());
     for (int i = 0; i < 5; i++) {
-      createFileKey(bucket2, keyPrefix);
+      createFileKeyWithPrefix(bucket2, keyPrefix);
     }
     flushKeyTable(); // 1.sst 2.sst 3.sst
     Assert.assertEquals(3, getKeyTableSstFiles().size());
     // add a file to bucket1 and take second snapshot
-    createFileKey(bucket1, keyPrefix);
+    createFileKeyWithPrefix(bucket1, keyPrefix);
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
     Assert.assertEquals(4, getKeyTableSstFiles().size());
@@ -1010,7 +1032,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     store.deleteSnapshot(volume, bucket, snap1);
@@ -1031,7 +1053,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
 
@@ -1056,7 +1078,7 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     // Create Key1 and take snapshot
     String key1 = "key-1-";
-    createFileKey(bucket1, key1);
+    createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     String nullstr = "";
@@ -1121,14 +1143,19 @@ public class TestOmSnapshot {
     }
   }
 
-  private String createFileKey(OzoneBucket bucket, String keyPrefix)
+  private String createFileKeyWithPrefix(OzoneBucket bucket, String keyPrefix)
+      throws IOException {
+    String key = keyPrefix + counter.incrementAndGet();
+    createFileKey(bucket, key);
+    return key;
+  }
+
+  private void createFileKey(OzoneBucket bucket, String key)
       throws IOException {
     byte[] value = RandomStringUtils.randomAscii(10240).getBytes(UTF_8);
-    String key = keyPrefix + counter.incrementAndGet();
     OzoneOutputStream fileKey = bucket.createKey(key, value.length);
     fileKey.write(value);
     fileKey.close();
-    return key;
   }
 
   @Test
@@ -1238,11 +1265,11 @@ public class TestOmSnapshot {
 
   private void createSnapshots(String snapshot1,
                                String snapshot2) throws IOException {
-    createFileKey(ozoneBucket, "key");
+    createFileKeyWithPrefix(ozoneBucket, "key");
     store.createSnapshot(volumeName, bucketName, snapshot1);
 
     for (int i = 0; i < 100; i++) {
-      createFileKey(ozoneBucket, "key-" + i);
+      createFileKeyWithPrefix(ozoneBucket, "key-" + i);
     }
 
     store.createSnapshot(volumeName, bucketName, snapshot2);

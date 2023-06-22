@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.NoSuchElementException;
+
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -98,6 +100,9 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
 
       @Override
       public Map.Entry<K, V> next() {
+        if (!hasNext()) {
+          throw new NoSuchElementException("No more elements in the map.");
+        }
         K key;
         V value;
 
