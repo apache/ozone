@@ -378,6 +378,20 @@ public class SnapshotDiffManager implements AutoCloseable {
         .getPath(), tablesToLookUp);
   }
 
+  /**
+   * Gets the report key for a particular index of snapshot diff job.
+   * @param jobId Snapshot diff jobId
+   * @param index
+   * @return report Key of the snapshot diff job
+   */
+
+  static String getReportKeyForIndex(String jobId, long index) {
+    return new StringBuilder(jobId.length() + 21)
+        .append(jobId).append(DELIMITER)
+        .append(org.apache.commons.lang3.StringUtils.leftPad(
+        String.valueOf(index), 20, '0')).toString();
+  }
+
   public SnapshotDiffResponse cancelSnapshotDiff(
       final String volumeName,
       final String bucketName,
@@ -553,24 +567,34 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     boolean hasMoreEntries = true;
 
-    int idx;
-    for (idx = index; idx - index < pageSize; idx++) {
-      byte[] rawKey =
-          codecRegistry.asRawData(snapDiffJob.getJobId() + DELIMITER + idx);
-      byte[] bytes = snapDiffReportTable.get(rawKey);
-      if (bytes == null) {
-        hasMoreEntries = false;
-        break;
+    byte[] lowerIndex = codecRegistry.asRawData(getReportKeyForIndex(
+        snapDiffJob.getJobId(), index));
+    byte[] upperIndex = codecRegistry.asRawData(getReportKeyForIndex(
+        snapDiffJob.getJobId(), index + pageSize));
+    int idx = index;
+    try (ClosableIterator<Map.Entry<byte[], byte[]>> iterator =
+             snapDiffReportTable.iterator(Optional.of(lowerIndex),
+                 Optional.of(upperIndex))) {
+      int itemsFetched = 0;
+      while (iterator.hasNext() && itemsFetched < pageSize) {
+        Map.Entry<byte[], byte[]> entry = iterator.next();
+        byte[] bytes = entry.getValue();
+        diffReportList.add(codecRegistry.asObject(bytes,
+            DiffReportEntry.class));
+        idx += 1;
+        itemsFetched += 1;
       }
-      diffReportList.add(codecRegistry.asObject(bytes, DiffReportEntry.class));
+      if (diffReportList.size() < pageSize) {
+        hasMoreEntries = false;
+      }
     }
 
-    String tokenString = hasMoreEntries ? String.valueOf(idx) : null;
+    String nextTokenString = hasMoreEntries ? String.valueOf(idx) : null;
 
     checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
 
     return new SnapshotDiffReportOzone(path.toString(), volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, diffReportList, tokenString);
+        fromSnapshotName, toSnapshotName, diffReportList, nextTokenString);
   }
 
   /**
@@ -1349,10 +1373,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     try (ClosableIterator<byte[]>
              diffReportIterator = diffReportEntries.iterator()) {
       while (diffReportIterator.hasNext()) {
-
-        snapDiffReportTable.put(
-            codecRegistry.asRawData(jobId + DELIMITER + index),
-            diffReportIterator.next());
+        snapDiffReportTable.put(codecRegistry.asRawData(
+            getReportKeyForIndex(jobId, index)), diffReportIterator.next());
         index++;
       }
     }

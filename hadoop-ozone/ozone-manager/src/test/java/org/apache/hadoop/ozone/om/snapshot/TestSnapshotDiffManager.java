@@ -80,6 +80,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -96,6 +97,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
@@ -104,11 +106,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
-
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
 
 /**
  * Test class for SnapshotDiffManager Class.
@@ -156,7 +158,7 @@ public class TestSnapshotDiffManager {
 
   private DBStore getMockedDBStore(String dbStorePath) {
     DBStore dbStore = mock(DBStore.class);
-    Mockito.when(dbStore.getDbLocation()).thenReturn(new File(dbStorePath));
+    when(dbStore.getDbLocation()).thenReturn(new File(dbStorePath));
     return dbStore;
   }
 
@@ -172,8 +174,11 @@ public class TestSnapshotDiffManager {
 
   private SnapshotDiffManager getMockedSnapshotDiffManager(int cacheSize)
       throws IOException {
-    Mockito.when(snapdiffDB.get()).thenReturn(rocksDB);
-    Mockito.when(rocksDB.newIterator(snapdiffJobCFH))
+    when(snapdiffDB.get()).thenReturn(rocksDB);
+    when(rocksDB.newIterator(snapdiffJobCFH))
+        .thenReturn(jobTableIterator);
+    when(rocksDB.newIterator(Mockito.eq(snapdiffJobCFH),
+            Mockito.any(ReadOptions.class)))
         .thenReturn(jobTableIterator);
     CacheLoader<String, OmSnapshot> loader =
         new CacheLoader<String, OmSnapshot>() {
@@ -460,8 +465,12 @@ public class TestSnapshotDiffManager {
                 (mock, context) -> {
                   PersistentMap obj =
                       new SnapshotTestUtils.StubbedPersistentMap<>();
-                  Mockito.when(mock.iterator()).thenReturn(obj.iterator());
-                  Mockito.when(mock.get(Matchers.any()))
+                  when(mock.iterator()).thenReturn(obj.iterator());
+                  when(mock.iterator(Mockito.any(Optional.class),
+                      Mockito.any(Optional.class)))
+                      .thenAnswer(i -> obj.iterator(i.getArgument(0),
+                          i.getArgument(1)));
+                  when(mock.get(Matchers.any()))
                       .thenAnswer(i -> obj.get(i.getArgument(0)));
                   Mockito.doAnswer((Answer<Void>) i -> {
                     obj.put(i.getArgument(0), i.getArgument(1));
@@ -624,7 +633,10 @@ public class TestSnapshotDiffManager {
                   cfHandleRocksDbPersistentMap.put(cf, mock);
                   PersistentMap obj =
                       new SnapshotTestUtils.StubbedPersistentMap<>();
-                  Mockito.when(mock.iterator()).thenReturn(obj.iterator());
+                  when(mock.iterator()).thenReturn(obj.iterator());
+                  when(mock.iterator(any(Optional.class),
+                      any(Optional.class))).thenAnswer(i ->
+                      obj.iterator(i.getArgument(0), i.getArgument(1)));
                   Mockito.when(mock.get(Matchers.any()))
                       .thenAnswer(i -> obj.get(i.getArgument(0)));
                   Mockito.doAnswer((Answer<Void>) i -> {
@@ -639,10 +651,12 @@ public class TestSnapshotDiffManager {
       IntStream.range(0, totalNumberOfRecords).boxed().forEach(idx -> {
         try {
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
-              .put(codecRegistry.asRawData(testJobId + DELIMITER + idx),
+              .put(codecRegistry.asRawData(SnapshotDiffManager
+                      .getReportKeyForIndex(testJobId, idx)),
                   codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
           cfHandleRocksDbPersistentMap.get(snapdiffReportCFH)
-              .put(codecRegistry.asRawData(testJobId2 + DELIMITER + idx),
+              .put(codecRegistry.asRawData(SnapshotDiffManager
+                      .getReportKeyForIndex(testJobId2, idx)),
                   codecRegistry.asRawData(getTestDiffEntry(testJobId2, idx)));
         } catch (IOException e) {
           throw new RuntimeException(e);
