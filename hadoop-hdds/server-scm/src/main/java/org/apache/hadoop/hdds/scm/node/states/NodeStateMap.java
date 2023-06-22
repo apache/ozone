@@ -278,7 +278,7 @@ public class NodeStateMap {
    * @return Number of nodes in the specified state
    */
   public int getNodeCount(NodeStatus state) {
-    return getNodes(state).size();
+    return getDatanodeInfos(state).size();
   }
 
   /**
