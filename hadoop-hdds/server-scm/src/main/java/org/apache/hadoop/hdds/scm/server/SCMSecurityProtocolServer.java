@@ -238,7 +238,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   public boolean checkAndRotate(boolean force)
       throws TimeoutException, SCMSecretKeyException {
     validateSecretKeyStatus();
-    return secretKeyManager.checkAndRotate(force);
+    try {
+      return secretKeyManager.checkAndRotate(force);
+    } catch (TimeoutException ex) {
+      LOGGER.error("Timeout rotating secret keys", ex);
+      throw new SCMSecretKeyException(ex.getMessage(), SCMSecretKeyException.ErrorCode.INTERNAL_ERROR);
+    }
   }
 
   @Override
