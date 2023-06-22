@@ -90,29 +90,25 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   private void runTableCountProcess() {
-    try {
-      long startTime, endTime, duration, durationMilliseconds;
       try {
+        long startTime, endTime, duration, durationMilliseconds;
+
         int execute = dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
         LOG.info("Deleted {} records from {}", execute,
             SCM_TABLE_COUNT_TABLE_NAME);
+
+        startTime = System.nanoTime();
+        processTableCount();
+        endTime = System.nanoTime();
+        duration = endTime - startTime;
+        durationMilliseconds = duration / NANOSECONDS_IN_MILLISECOND;
+        LOG.info(
+            "Elapsed Time in milliseconds for processTableCount() execution: {}",
+            durationMilliseconds);
       } catch (Exception e) {
-        LOG.error("An error occurred while truncating the table {}: {}",
-            SCM_TABLE_COUNT_TABLE_NAME, e.getMessage(), e);
-        return;
+        LOG.error("An error occurred while performing table count: {}", e);
       }
-      startTime = System.nanoTime();
-      processTableCount();
-      endTime = System.nanoTime();
-      duration = endTime - startTime;
-      durationMilliseconds = duration / NANOSECONDS_IN_MILLISECOND;
-      LOG.info(
-          "Elapsed Time in milliseconds for processTableCount() execution: {}",
-          durationMilliseconds);
-    } catch (Exception e) {
-      LOG.error("Error while performing table count: {}", e);
     }
-  }
 
   /**
    * Processes the table count by iterating over SCM tables and retrieving the
