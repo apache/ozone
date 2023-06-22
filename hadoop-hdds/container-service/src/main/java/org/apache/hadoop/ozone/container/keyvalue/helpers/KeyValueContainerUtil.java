@@ -247,12 +247,10 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    boolean bCheckChunksFilePath =
-        config.getBoolean(
-            DatanodeConfiguration.
-              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
-            DatanodeConfiguration.
-              OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+    DatanodeConfiguration dnConf =
+        config.getObject(DatanodeConfiguration.class);
+    boolean bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
+
     if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData,
