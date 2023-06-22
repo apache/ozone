@@ -379,7 +379,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               .submitRequest(null, omRequest);
         }
       } catch (ServiceException e) {
-        LOG.error("Snapshot Deleting request failed. " +
+        LOG.error("Snapshot deep cleaning request failed. " +
             "Will retry at next run.", e);
       }
     }

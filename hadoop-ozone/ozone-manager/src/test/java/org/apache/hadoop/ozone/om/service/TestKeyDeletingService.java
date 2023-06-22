@@ -458,17 +458,19 @@ public class TestKeyDeletingService {
   }
 
   /*
-  Create Snap1
-  Create 20 keys
-  Create Snap2
-  Delete 20 keys
-  Create 5 keys
-  Delete 5 keys -> but stop KeyDeletingService so that keys won't be reclaimed.
-  Create snap3
-
-  Now wait for snap3 to be deepCleaned -> Deleted 5 keys should be deep cleaned.
-  Now delete snap2 -> Wait for snap3 to be deep cleaned so deletedTable
-  of Snap3 should be empty.
+   * Create Snap1
+   * Create 10 keys
+   * Create Snap2
+   * Delete 10 keys
+   * Create 5 keys
+   * Delete 5 keys -> but stop KeyDeletingService so
+     that keys won't be reclaimed.
+   * Create snap3
+t
+   * Now wait for snap3 to be deepCleaned -> Deleted 5
+     keys should be deep cleaned.
+   * Now delete snap2 -> Wait for snap3 to be deep cleaned so deletedTable
+     of Snap3 should be empty.
    */
   @Test
   public void testSnapshotDeepClean() throws Exception {
@@ -486,7 +488,7 @@ public class TestKeyDeletingService {
     Table<String, OmKeyInfo> keyTable =
         om.getMetadataManager().getKeyTable(BucketLayout.DEFAULT);
 
-    KeyDeletingService keyDeletingService =  keyManager.getDeletingService();
+    KeyDeletingService keyDeletingService = keyManager.getDeletingService();
     // Suspend KeyDeletingService
     keyDeletingService.suspend();
 

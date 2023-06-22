@@ -141,6 +141,8 @@ public final class SnapshotInfo implements Auditable {
    * @param globalPreviousSnapshotId - Snapshot global previous snapshot id.
    * @param snapshotPath - Snapshot path, bucket .snapshot path.
    * @param checkpointDir - Snapshot checkpoint directory.
+   * @param dbTxSequenceNumber - RDB latest transaction sequence number.
+   * @param deepCleaned - To be deep cleaned status for snapshot.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapshotInfo(UUID snapshotId,
@@ -155,7 +157,7 @@ public final class SnapshotInfo implements Auditable {
                        String snapshotPath,
                        String checkpointDir,
                        long dbTxSequenceNumber,
-                       boolean deepClean) {
+                       boolean deepCleaned) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -168,7 +170,7 @@ public final class SnapshotInfo implements Auditable {
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
     this.dbTxSequenceNumber = dbTxSequenceNumber;
-    this.deepClean = deepClean;
+    this.deepClean = deepCleaned;
   }
 
   public void setName(String name) {
