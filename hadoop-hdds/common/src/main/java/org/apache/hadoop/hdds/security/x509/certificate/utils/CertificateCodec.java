@@ -20,8 +20,8 @@
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;

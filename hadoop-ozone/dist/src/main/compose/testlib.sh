@@ -286,6 +286,16 @@ start_containers() {
   set +e
 }
 
+create_containers() {
+  set -e
+  docker-compose --ansi never up -d $@
+  set +e
+}
+
+save_container_logs() {
+  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+}
+
 
 ## @description wait until the port is available on the given host
 ## @param The host to check for the port
@@ -345,7 +355,7 @@ wait_for_execute_command(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
      docker-compose --ansi never down
   fi

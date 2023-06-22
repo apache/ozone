@@ -667,6 +667,7 @@ public class ObjectStore {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param cancel request to cancel a running snapshot diff job.
    * @param forceNonNativeDiff request to force diff to not use native libs
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
@@ -679,11 +680,28 @@ public class ObjectStore {
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
+                                           boolean cancel,
                                            boolean forceNonNativeDiff)
       throws IOException {
-    SnapshotDiffResponse diffReport = proxy.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
-        forceNonNativeDiff);
-    return diffReport;
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize, forceFullDiff, cancel, forceNonNativeDiff);
+  }
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
+   * @return a list of SnapshotDiffJob objects
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus,
+                                                    boolean listAll)
+      throws IOException {
+    return proxy.listSnapshotDiffJobs(volumeName,
+        bucketName, jobStatus, listAll);
   }
 }

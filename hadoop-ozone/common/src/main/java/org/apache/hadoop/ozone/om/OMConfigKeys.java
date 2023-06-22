@@ -250,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -499,6 +499,11 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
       = "ozone.om.snapshot.diff.max.page.size";
+
+  public static final String OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES
+      = "ozone.om.snapshot.db.max.open.files";
+  public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+      = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
       = 1000;
 
@@ -541,4 +546,7 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
 }

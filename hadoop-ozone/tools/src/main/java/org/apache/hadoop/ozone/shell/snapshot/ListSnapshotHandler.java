@@ -54,7 +54,7 @@ public class ListSnapshotHandler extends Handler {
         .listSnapshot(volumeName, bucketName, null, null);
     int counter = printAsJsonArray(snapshotInfos, Integer.MAX_VALUE);
     if (isVerbose()) {
-      out().printf("Found : %d snapshots for o3://%s/ %s ", counter,
+      err().printf("Found : %d snapshots for o3://%s/ %s ", counter,
           volumeName, bucketName);
     }
   }

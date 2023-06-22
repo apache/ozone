@@ -28,9 +28,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 /**
- * ozone snapshot create.
+ * ozone sh snapshot diff.
  */
-@CommandLine.Command(name = "snapshotDiff",
+@CommandLine.Command(name = "diff", aliases = "snapshotDiff",
     description = "Get the differences between two snapshots")
 public class SnapshotDiffHandler extends Handler {
 
@@ -60,6 +60,13 @@ public class SnapshotDiffHandler extends Handler {
       hidden = true)
   private boolean forceFullDiff;
 
+
+  @CommandLine.Option(names = {"-c", "--cancel"},
+      description = "Request to cancel a running SnapshotDiff job. " +
+          "If the job is not IN_PROGRESS, the request will fail.",
+      defaultValue = "false")
+  private boolean cancel;
+
   @CommandLine.Option(names = {"--fnnd", "--force-non-native-diff"},
       description = "perform diff of snapshot without using" +
           " native libs (optional)",
@@ -83,7 +90,7 @@ public class SnapshotDiffHandler extends Handler {
     try (PrintStream stream = out()) {
       stream.print(client.getObjectStore()
           .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-              token, pageSize, forceFullDiff, forceNonNativeDiff));
+              token, pageSize, forceFullDiff, cancel, forceNonNativeDiff));
     }
   }
 }

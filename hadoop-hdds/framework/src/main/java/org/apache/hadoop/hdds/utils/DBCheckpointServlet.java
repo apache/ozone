@@ -33,6 +33,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.fileupload.util.Streams;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -53,6 +57,8 @@ import org.slf4j.LoggerFactory;
  */
 public class DBCheckpointServlet extends HttpServlet {
 
+  private static final String FIELD_NAME =
+      OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]";
   private static final Logger LOG =
       LoggerFactory.getLogger(DBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
@@ -94,15 +100,13 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
-   * Process a GET request for the DB checkpoint snapshot.
-   *
-   * @param request  The servlet request we are processing
-   * @param response The servlet response we are creating
+   * Generates Snapshot checkpoint as tar ball.
+   * @param request the HTTP servlet request
+   * @param response the HTTP servlet response
+   * @param isFormData indicator whether request is form data
    */
-  @Override
-  public void doGet(HttpServletRequest request, HttpServletResponse response) {
-
-    LOG.info("Received request to obtain DB checkpoint snapshot");
+  private void generateSnapshotCheckpoint(HttpServletRequest request,
+      HttpServletResponse response, boolean isFormData) {
     if (dbStore == null) {
       LOG.error(
           "Unable to process metadata snapshot request. DB Store is null");
@@ -151,7 +155,8 @@ public class DBCheckpointServlet extends HttpServlet {
 
       List<String> receivedSstList = new ArrayList<>();
       List<String> excludedSstList = new ArrayList<>();
-      String[] sstParam = request.getParameterValues(
+      String[] sstParam = isFormData ?
+          parseFormDataParameters(request) : request.getParameterValues(
           OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
       if (sstParam != null) {
         receivedSstList.addAll(
@@ -214,6 +219,63 @@ public class DBCheckpointServlet extends HttpServlet {
         }
       }
     }
+  }
+
+  /**
+   * Parses request form data parameters.
+   * @param request the HTTP servlet request
+   * @return array of parsed sst form data parameters for exclusion
+   */
+  private static String[] parseFormDataParameters(HttpServletRequest request) {
+    ServletFileUpload upload = new ServletFileUpload();
+    List<String> sstParam = new ArrayList<>();
+
+    try {
+      FileItemIterator iter = upload.getItemIterator(request);
+      while (iter.hasNext()) {
+        FileItemStream item = iter.next();
+        if (!item.isFormField() || !FIELD_NAME.equals(item.getFieldName())) {
+          continue;
+        }
+
+        sstParam.add(Streams.asString(item.openStream()));
+      }
+    } catch (Exception e) {
+      LOG.warn("Exception occured during form data parsing {}", e.getMessage());
+    }
+
+    return sstParam.size() == 0 ? null : sstParam.toArray(new String[0]);
+  }
+
+  /**
+   * Process a GET request for the DB checkpoint snapshot.
+   *
+   * @param request  The servlet request we are processing
+   * @param response The servlet response we are creating
+   */
+  @Override
+  public void doGet(HttpServletRequest request, HttpServletResponse response) {
+    LOG.info("Received GET request to obtain DB checkpoint snapshot");
+
+    generateSnapshotCheckpoint(request, response, false);
+  }
+
+  /**
+   * Process a POST request for the DB checkpoint snapshot.
+   *
+   * @param request  The servlet request we are processing
+   * @param response The servlet response we are creating
+   */
+  @Override
+  public void doPost(HttpServletRequest request, HttpServletResponse response) {
+    LOG.info("Received POST request to obtain DB checkpoint snapshot");
+
+    if (!ServletFileUpload.isMultipartContent(request)) {
+      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      return;
+    }
+
+    generateSnapshotCheckpoint(request, response, true);
   }
 
   /**

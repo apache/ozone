@@ -25,9 +25,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the respective ReplicationManager
@@ -41,12 +43,12 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           .getLogger(UnhealthyReplicationProcessor.class);
   private final ReplicationManager replicationManager;
   private volatile boolean runImmediately = false;
-  private final long intervalInMillis;
+  private final Supplier<Duration> interval;
 
   public UnhealthyReplicationProcessor(ReplicationManager replicationManager,
-                                       long intervalInMillis) {
+                                       Supplier<Duration> interval) {
     this.replicationManager = replicationManager;
-    this.intervalInMillis = intervalInMillis;
+    this.interval = interval;
   }
 
   /**
@@ -101,6 +103,8 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           inflightOperationLimitReached(replicationManager, inflightLimit)) {
         LOG.info("The maximum number of pending replicas ({}) are scheduled. " +
             "Ending the iteration.", inflightLimit);
+        replicationManager
+            .getMetrics().incrPendingReplicationLimitReachedTotal();
         break;
       }
       HealthResult healthResult =
@@ -160,9 +164,14 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         if (replicationManager.shouldRun()) {
           processAll(replicationManager.getQueue());
         }
+
+        final Duration duration = interval.get();
+        if (!runImmediately && LOG.isDebugEnabled()) {
+          LOG.debug("May wait {} before next run", duration);
+        }
         synchronized (this) {
           if (!runImmediately) {
-            wait(intervalInMillis);
+            wait(duration.toMillis());
           }
           runImmediately = false;
         }

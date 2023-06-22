@@ -513,6 +513,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
   }
 
+  @Override
+  public void deleteSnapshot(Path path, String snapshotName)
+      throws IOException {
+    adapter.deleteSnapshot(pathToKey(path), snapshotName);
+  }
+
   private class DeleteIterator extends OzoneListingIterator {
     private final boolean recursive;
     private final OzoneBucket bucket;

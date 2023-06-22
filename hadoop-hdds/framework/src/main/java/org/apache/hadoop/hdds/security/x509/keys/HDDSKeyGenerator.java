@@ -23,8 +23,7 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,15 +35,6 @@ public class HDDSKeyGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSKeyGenerator.class);
   private final SecurityConfig securityConfig;
-
-  /**
-   * Constructor for HDDSKeyGenerator.
-   *
-   * @param configuration - config
-   */
-  public HDDSKeyGenerator(ConfigurationSource configuration) {
-    this.securityConfig = new SecurityConfig(configuration);
-  }
 
   /**
    * Constructor that takes a SecurityConfig as the Argument.

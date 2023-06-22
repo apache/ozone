@@ -32,7 +32,7 @@ import java.util.UUID;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -149,7 +149,7 @@ public class TestOzoneDelegationTokenSecretManager {
     when(omStorage.getClusterID()).thenReturn("test");
     when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
     return new OMCertificateClient(
-        securityConfig, omStorage, null, null, null) {
+        securityConfig, null, omStorage, null, "", null, null, null) {
       @Override
       public CertPath getCertPath() {
         return certPath;

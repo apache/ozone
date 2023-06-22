@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -88,7 +89,7 @@ public class SnapshotTestUtils {
   public static class StubbedPersistentMap<K, V> implements
       PersistentMap<K, V>  {
 
-    private final Map<K, V> map;
+    private final TreeMap<K, V> map;
 
     public StubbedPersistentMap(Map<K, V> map) {
       this();
@@ -117,9 +118,16 @@ public class SnapshotTestUtils {
     }
 
     @Override
-    public ClosableIterator<Map.Entry<K, V>> iterator() {
-      return new StubbedCloseableIterator<>(
-          this.map.entrySet().stream().iterator());
+    public ClosableIterator<Map.Entry<K, V>> iterator(
+        Optional<K> lowerBoundKey, Optional<K> upperBoundKey) {
+      return new StubbedCloseableIterator<>(this.map.entrySet().stream().filter(
+          kvEntry ->
+              lowerBoundKey.map(k -> this.map.comparator()
+                      .compare(kvEntry.getKey(), k) >= 0).orElse(Boolean.TRUE)
+                  &&
+              upperBoundKey.map(k -> this.map.comparator()
+                  .compare(kvEntry.getKey(), k) < 0).orElse(true))
+          .iterator());
     }
   }
 

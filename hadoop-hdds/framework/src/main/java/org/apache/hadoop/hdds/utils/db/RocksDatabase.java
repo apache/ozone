@@ -888,6 +888,20 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  public void delete(ColumnFamily family, ByteBuffer key) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().delete(family.getHandle(), writeOptions, key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
       throws IOException {
     assertClose();
