@@ -164,7 +164,7 @@ public class TestScmTableCountTask extends AbstractReconSqlDBTest {
 
 
   private long getCountForTable(String tableName) {
-    String key = TableCountTask.getRowKeyFromTable(tableName);
+    String key = ScmTableCountTask.getRowKeyFromTable(tableName);
     return scmTableCountDao.findById(key).getCount();
   }
 
