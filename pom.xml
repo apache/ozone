@@ -2026,21 +2026,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
 
   <profiles>
-
-   <profile>
-     <id>hadoop336rc0</id>
-      <activation>
-        <activeByDefault>yes</activeByDefault>
-      </activation>
-     <repositories>
-       <repository>
-         <id>hadoop336rc0</id>
-         <name>Hadoop 3.3.6 RC0 repository</name>
-         <url>https://repository.apache.org/content/repositories/orgapachehadoop-1378</url>
-       </repository>
-     </repositories>
-   </profile>
-
     <profile>
       <id>dist</id>
       <build>
