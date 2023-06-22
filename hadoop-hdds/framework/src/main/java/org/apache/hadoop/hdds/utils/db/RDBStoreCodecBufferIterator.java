@@ -115,7 +115,8 @@ class RDBStoreCodecBufferIterator
 
   @Override
   Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
-    return RawKeyValue.create(key(), valueBuffer.getFromDb());
+    assertOpen();
+    return Table.newKeyValue(key(), valueBuffer.getFromDb());
   }
 
   @Override

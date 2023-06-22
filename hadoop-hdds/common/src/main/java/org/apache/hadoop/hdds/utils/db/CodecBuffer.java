@@ -383,7 +383,7 @@ public final class CodecBuffer implements AutoCloseable {
         + "<=" + buf.writerIndex()
         + "<=" + buf.capacity()
         + ": "
-        + StringUtils.bytes2Hex(asReadOnlyByteBuffer())
+        + StringUtils.bytes2Hex(asReadOnlyByteBuffer(), 10)
         + "]";
   }
 }

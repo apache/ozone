@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -557,29 +556,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  KeyValue<KEY, VALUE> newKeyValue(KeyValue<CodecBuffer, CodecBuffer> raw)
-      throws IOException {
-    final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
-    final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
-    return new KeyValue<KEY, VALUE>() {
-      @Override
-      public KEY getKey() {
-        return key;
-      }
-
-      @Override
-      public VALUE getValue() {
-        return value;
-      }
-
-      @Override
-      public String toString() {
-        return getClassSimpleName(
-            getClass()) + "(key=" + getKey() + ", value=" + getValue();
-      }
-    };
-  }
-
   RawIterator<CodecBuffer> newCodecBufferTableIterator(
       TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> i) {
     return new RawIterator<CodecBuffer>(i) {
@@ -602,7 +578,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       @Override
       KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
           throws IOException {
-        return newKeyValue(raw);
+        final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
+        final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
+        return Table.newKeyValue(key, value);
       }
     };
   }
@@ -625,13 +603,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     @Override
     KeyValue<KEY, VALUE> convert(KeyValue<byte[], byte[]> raw) {
       return new TypedKeyValue(raw);
-    }
-  }
-
-  interface AutoCloseSupplier<RAW> extends AutoCloseable, Supplier<RAW> {
-    @Override
-    default void close() {
-      // no-op
     }
   }
 
