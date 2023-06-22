@@ -23,7 +23,6 @@ import java.time.Duration;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.tag.Flaky;
 
@@ -61,11 +60,6 @@ public class TestRandomKeyGenerator {
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
-
-    WritableECContainerProviderConfig containerConfig =
-        conf.getObject(WritableECContainerProviderConfig.class);
-    containerConfig.setMinimumPipelines(10);
-    conf.setFromObject(containerConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();

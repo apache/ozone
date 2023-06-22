@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.ratis.util.AwaitForSignal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,8 +64,8 @@ public class WritableECContainerProvider
   private final ContainerManager containerManager;
   private final long containerSize;
   private final WritableECContainerProviderConfig providerConfig;
-
   private final AtomicInteger pendingAllocations = new AtomicInteger();
+  private final AwaitForSignal allocation = new AwaitForSignal("EC pipeline");
 
   public WritableECContainerProvider(WritableECContainerProviderConfig config,
       long containerSize,
@@ -175,28 +176,43 @@ public class WritableECContainerProvider
 
   @Nullable
   private ContainerInfo allocateContainerIfWithinLimit(
-      int max, int current, boolean rethrow,
+      int max, int current, boolean finalAttempt,
       ECReplicationConfig repConfig, long size, String owner,
       ExcludeList excludeList) throws IOException, TimeoutException {
-    String msg = "Unable to allocate a container for {} as {} existing "
+
+    final String msg = "Unable to allocate a container for {} as {} existing "
         + "containers and {} pending allocations have reached the limit of {}";
+
     final int pending = pendingAllocations.getAndIncrement();
     try {
       if (current + pending < max) {
-        return allocateContainer(repConfig, size, owner, excludeList);
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(msg, repConfig, current, pending, max);
+        ContainerInfo containerInfo =
+            allocateContainer(repConfig, size, owner, excludeList);
+        allocation.signal();
+        return containerInfo;
+      } else if (0 < pending && current < max && !finalAttempt) {
+        // concurrent allocation in progress, wait for it to complete
+        try {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(msg + "; waiting for pending allocations to complete",
+                repConfig, current, pending, max);
+          }
+          allocation.await();
+          return null;
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new IOException("interrupted", e);
         }
+      } else {
+        LOG.info(msg, repConfig, current, pending, max);
         return null;
       }
     } catch (IOException e) {
       LOG.warn(msg, repConfig, current, pending, max, e);
-      if (rethrow) {
+      if (finalAttempt) {
         throw e;
-      } else {
-        return null;
       }
+      return null;
     } finally {
       pendingAllocations.decrementAndGet();
     }
