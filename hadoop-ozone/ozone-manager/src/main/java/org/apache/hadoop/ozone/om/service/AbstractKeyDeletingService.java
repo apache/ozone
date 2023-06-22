@@ -456,8 +456,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
       String tableKey = chainManager.getTableKey(prevPathSnapshot);
       SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
-      if (prevSnapInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+      if (prevSnapInfo.getSnapshotStatus() ==
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         return prevSnapInfo;
       }
       currSnapInfo = prevSnapInfo;
@@ -497,13 +497,13 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           deletedKeyInfo.getKeyName());
     }
 
-      /*
-       snapshotRenamedTable:
-       1) /volumeName/bucketName/objectID ->
-                   /volumeId/bucketId/parentId/fileName (FSO)
-       2) /volumeName/bucketName/objectID ->
-                  /volumeName/bucketName/keyName (non-FSO)
-      */
+    /*
+     snapshotRenamedTable:
+     1) /volumeName/bucketName/objectID ->
+                 /volumeId/bucketId/parentId/fileName (FSO)
+     2) /volumeName/bucketName/objectID ->
+                /volumeName/bucketName/keyName (non-FSO)
+    */
     String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
         deletedKeyInfo.getVolumeName(), deletedKeyInfo.getBucketName(),
         deletedKeyInfo.getObjectID());

@@ -35,7 +35,6 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -50,24 +49,26 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 public class OMSnapshotPurgeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
-  private List<String> snapshotDbKeys;
-  private HashMap<String, SnapshotInfo> updatedSnapInfo;
+  private final List<String> snapshotDbKeys;
+  private final Map<String, SnapshotInfo> updatedSnapInfos;
 
   public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse,
       @Nonnull List<String> snapshotDbKeys,
-      HashMap<String, SnapshotInfo> updatedSnapInfo) {
+      Map<String, SnapshotInfo> updatedSnapInfos) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
-    this.updatedSnapInfo = updatedSnapInfo;
+    this.updatedSnapInfos = updatedSnapInfos;
   }
 
   /**
-   * For when the request is not successful.
-   * For a successful request, the other constructor should be used.
+   * Constructor for failed request.
+   * It should not be used for successful request.
    */
   public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
+    this.snapshotDbKeys = null;
+    this.updatedSnapInfos = null;
   }
 
   @Override
@@ -98,7 +99,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   private void updateSnapInfo(OmMetadataManagerImpl metadataManager,
                               BatchOperation batchOp)
       throws IOException {
-    for (Map.Entry<String, SnapshotInfo> entry : updatedSnapInfo.entrySet()) {
+    for (Map.Entry<String, SnapshotInfo> entry : updatedSnapInfos.entrySet()) {
       metadataManager.getSnapshotInfoTable().putWithBatch(batchOp,
           entry.getKey(), entry.getValue());
     }

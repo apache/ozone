@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles OMSnapshotPurge Request.
@@ -71,7 +72,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           .getSnapshotDBKeysList();
       List<String> snapInfosToUpdate = snapshotPurgeRequest
           .getUpdatedSnapshotDBKeyList();
-      HashMap<String, SnapshotInfo> updatedSnapInfo = new HashMap<>();
+      Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
 
       // Snapshots that are already deepCleaned by the KeyDeletingService
       // can be marked as deepCleaned.
@@ -80,7 +81,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             .get(snapTableKey);
 
         updateSnapshotInfoAndCache(snapInfo, omMetadataManager,
-            trxnLogIndex, updatedSnapInfo, false);
+            trxnLogIndex, updatedSnapInfos, false);
       }
 
       // Snapshots that are purged by the SnapshotDeletingService
@@ -94,11 +95,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             .getNextActiveSnapshot(fromSnapshot,
                 snapshotChainManager, omSnapshotManager);
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager,
-            trxnLogIndex, updatedSnapInfo, true);
+            trxnLogIndex, updatedSnapInfos, true);
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),
-          snapshotDbKeys, updatedSnapInfo);
+          snapshotDbKeys, updatedSnapInfos);
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
@@ -112,7 +113,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
       OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
-      HashMap<String, SnapshotInfo> updatedSnapInfo, boolean deepClean) {
+      Map<String, SnapshotInfo> updatedSnapInfos, boolean deepClean) {
     if (snapInfo != null) {
       snapInfo.setDeepClean(deepClean);
 
@@ -120,7 +121,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapInfo.getTableKey()),
           CacheValue.get(trxnLogIndex, snapInfo));
-      updatedSnapInfo.put(snapInfo.getTableKey(), snapInfo);
+      updatedSnapInfos.put(snapInfo.getTableKey(), snapInfo);
     }
   }
 }
