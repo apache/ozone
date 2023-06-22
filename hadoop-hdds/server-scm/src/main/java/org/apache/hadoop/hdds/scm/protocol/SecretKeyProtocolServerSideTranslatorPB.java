@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -105,19 +104,10 @@ public class SecretKeyProtocolServerSideTranslatorPB
             .build();
 
       case GetCheckAndRotate:
-        try {
-          return scmSecurityResponse
-              .setCheckAndRotateResponseProto(
-                  checkAndRotate(request.getCheckAndRotateRequest().getForce()))
-              .build();
-        } catch (TimeoutException e) {
-          scmSecurityResponse.setSuccess(false);
-          scmSecurityResponse.setStatus(Status.INTERNAL_ERROR);
-          scmSecurityResponse.setMessage(
-              "Timeout occurred while executing checkAndRotate: " +
-                  e.getMessage());
-          return scmSecurityResponse.build();
-        }
+        return scmSecurityResponse
+            .setCheckAndRotateResponseProto(
+                checkAndRotate(request.getCheckAndRotateRequest().getForce()))
+            .build();
 
       default:
         throw new IllegalArgumentException(
@@ -170,8 +160,8 @@ public class SecretKeyProtocolServerSideTranslatorPB
         .build();
   }
 
-  private SCMGetCheckAndRotateResponse checkAndRotate(boolean force) throws
-      TimeoutException, IOException {
+  private SCMGetCheckAndRotateResponse checkAndRotate(boolean force)
+      throws IOException {
     return SCMGetCheckAndRotateResponse.newBuilder()
         .setStatus(impl.checkAndRotate(force)).build();
   }

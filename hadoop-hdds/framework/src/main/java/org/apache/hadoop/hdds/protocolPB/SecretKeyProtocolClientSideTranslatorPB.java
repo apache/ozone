@@ -43,7 +43,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -132,8 +131,7 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public boolean checkAndRotate(boolean force)
-      throws TimeoutException, IOException {
+  public boolean checkAndRotate(boolean force) throws IOException {
     SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest request =
         SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateRequest.newBuilder()
             .setForce(force)

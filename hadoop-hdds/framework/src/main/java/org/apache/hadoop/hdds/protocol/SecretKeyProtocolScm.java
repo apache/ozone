@@ -40,5 +40,5 @@ public interface SecretKeyProtocolScm extends SecretKeyProtocol {
    * @throws TimeoutException
    * @throws IOException
    */
-  boolean checkAndRotate(boolean force) throws TimeoutException, IOException;
+  boolean checkAndRotate(boolean force) throws IOException;
 }
