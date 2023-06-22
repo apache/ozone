@@ -60,7 +60,7 @@ public class RotateKeySubCommand extends ScmSubcommand {
       }
       if (status) {
         System.out.println("Secret key rotation is complete. A new key has " +
-            "been generated. Rotate Status: " + status);
+            "been generated.");
       }
     }
   }
