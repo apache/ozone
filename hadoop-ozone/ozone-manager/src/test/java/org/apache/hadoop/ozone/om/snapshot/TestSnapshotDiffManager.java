@@ -219,9 +219,9 @@ public class TestSnapshotDiffManager {
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
-      (SnapshotInfo fromSnapshotInfo, SnapshotInfo toSnapshotInfo) ->
-          fromSnapshotInfo.getSnapshotId() + DELIMITER +
-              toSnapshotInfo.getSnapshotId();
+          (SnapshotInfo fromSnapshotInfo, SnapshotInfo toSnapshotInfo) ->
+              fromSnapshotInfo.getSnapshotId() + DELIMITER +
+                  toSnapshotInfo.getSnapshotId();
 
   @BeforeAll
   public static void initCodecRegistry() {
@@ -717,7 +717,8 @@ public class TestSnapshotDiffManager {
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     doReturn(true).when(spy)
-        .areDiffJobAndSnapshotsActive(volumeName, bucketName, fromSnapName, toSnapName);
+        .areDiffJobAndSnapshotsActive(volumeName, bucketName, fromSnapName,
+            toSnapName);
 
     long totalDiffEntries = spy.generateDiffReport("jobId",
         fromSnapTable, toSnapTable, objectIdToDiffObject, oldObjectIdKeyMap,
@@ -846,11 +847,11 @@ public class TestSnapshotDiffManager {
     setUpSnapshots(volumeName, bucketName, fromSnapshotName,
         toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
 
-    PersistentMap<String, SnapshotDiffJob> snapDiffJobTable =
+    PersistentMap<String, SnapshotDiffJob> snapDiffJobMap =
         snapshotDiffManager.getSnapDiffJobTable();
     String diffJobKey = fromSnapshotUUID + DELIMITER + toSnapshotUUID;
 
-    SnapshotDiffJob diffJob = snapDiffJobTable.get(diffJobKey);
+    SnapshotDiffJob diffJob = snapDiffJobMap.get(diffJobKey);
     Assertions.assertNull(diffJob);
 
 
@@ -880,7 +881,7 @@ public class TestSnapshotDiffManager {
         snapshotDiffResponse.getJobStatus());
 
     // Check snapDiffJobTable.
-    diffJob = snapDiffJobTable.get(diffJobKey);
+    diffJob = snapDiffJobMap.get(diffJobKey);
     assertNotNull(diffJob);
     assertEquals(JobStatus.CANCELLED,
         diffJob.getStatus());
@@ -893,7 +894,7 @@ public class TestSnapshotDiffManager {
         snapshotDiffResponse.getJobStatus());
 
     // Check snapDiffJobTable.
-    diffJob = snapDiffJobTable.get(diffJobKey);
+    diffJob = snapDiffJobMap.get(diffJobKey);
     assertNotNull(diffJob);
     assertEquals(JobStatus.CANCELLED,
         diffJob.getStatus());
@@ -937,7 +938,7 @@ public class TestSnapshotDiffManager {
     setUpSnapshots(volumeName, bucketName, fromSnapshotName,
         toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
 
-    PersistentMap<String, SnapshotDiffJob> snapDiffJobTable =
+    PersistentMap<String, SnapshotDiffJob> snapDiffJobMap =
         snapshotDiffManager.getSnapDiffJobTable();
     String diffJobKey = fromSnapshotUUID + DELIMITER + toSnapshotUUID;
 
@@ -946,7 +947,7 @@ public class TestSnapshotDiffManager {
         jobId, jobStatus, volumeName, bucketName,
         fromSnapshotName, toSnapshotName, true, 10);
 
-    snapDiffJobTable.put(diffJobKey, snapshotDiffJob);
+    snapDiffJobMap.put(diffJobKey, snapshotDiffJob);
 
     SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
         .cancelSnapshotDiff(volumeName, bucketName,
@@ -1015,11 +1016,11 @@ public class TestSnapshotDiffManager {
     setUpSnapshots(volumeName, bucketName, fromSnapshotName,
         toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
 
-    PersistentMap<String, SnapshotDiffJob> snapDiffJobTable =
+    PersistentMap<String, SnapshotDiffJob> snapDiffJobMap =
         snapshotDiffManager.getSnapDiffJobTable();
     String diffJobKey = fromSnapshotUUID + DELIMITER + toSnapshotUUID;
 
-    SnapshotDiffJob diffJob = snapDiffJobTable.get(diffJobKey);
+    SnapshotDiffJob diffJob = snapDiffJobMap.get(diffJobKey);
     assertNull(diffJob);
 
     // There are no jobs in the table, therefore
@@ -1041,7 +1042,7 @@ public class TestSnapshotDiffManager {
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
 
-    diffJob = snapDiffJobTable.get(diffJobKey);
+    diffJob = snapDiffJobMap.get(diffJobKey);
     assertNotNull(diffJob);
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         diffJob.getStatus());
@@ -1349,16 +1350,14 @@ public class TestSnapshotDiffManager {
     when(snapshotInfoTable.get(toSnapKey)).thenReturn(toSnapshotInfo);
   }
 
-  private SnapshotInfo getSnapshotInfoInstance(
-      String volumeName, String bucketName,
-      String snapshotName, UUID snapshotUUID) {
-    SnapshotInfo snapshotInfo = SnapshotInfo
-        .newInstance(volumeName, bucketName,
-            snapshotName, snapshotUUID,
-            System.currentTimeMillis());
-    snapshotInfo.setSnapshotStatus(SnapshotInfo
-        .SnapshotStatus.SNAPSHOT_ACTIVE);
-    return snapshotInfo;
+  private SnapshotInfo getSnapshotInfoInstance(String volumeName,
+                                               String bucketName,
+                                               String snapshotName,
+                                               UUID snapshotUUID) {
+    SnapshotInfo info = SnapshotInfo.newInstance(volumeName, bucketName,
+        snapshotName, snapshotUUID, System.currentTimeMillis());
+    info.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE);
+    return info;
   }
 
   private void setupMocksForRunningASnapDiff(
