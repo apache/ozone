@@ -289,7 +289,19 @@ public class TestOzoneFsSnapshot {
   public void testSnapshotDeleteSuccess() throws Exception {
     String snapshotName = createSnapshot();
     // Delete the created snapshot
-    deleteSnapshot(snapshotName);
+    int res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
+    // Asserts that delete request succeeded
+    Assertions.assertEquals(0, res);
+
+    // Wait for the snapshot to be marked deleted.
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+
+    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
+        200, 10000);
   }
 
   @Test
@@ -361,23 +373,5 @@ public class TestOzoneFsSnapshot {
         1000, 100000);
 
     return snapshotName;
-  }
-
-  private void deleteSnapshot(String snapshotName) throws Exception {
-
-    // Delete snapshot
-    int res = ToolRunner.run(shell,
-        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
-    // Asserts that delete request succeeded
-    Assertions.assertEquals(0, res);
-
-    // Wait for the snapshot to be marked deleted.
-    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
-
-    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
-        200, 10000);
   }
 }
