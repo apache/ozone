@@ -17,20 +17,26 @@
 Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
+Library             BuiltIn
 Resource            ../commonlib.robot
-Resource            commonawslib.robot
-Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
+Resource            ./commonawslib.robot
+Test Timeout        2 minutes
+Suite Setup         Setup v4 headers
 
-*** Test Cases ***
+*** Keywords ***
 Get-secret without om-service-id
-    Run Keyword   Kinit test user     testuser     testuser.keytab
-    ${output}=             Execute             ozone s3 getsecret -u testuser
+    ${output}=             Execute             ozone s3 getsecret -u testuser2
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
 
 Get-secret with om-service-id
-    Run Keyword   Kinit test user     testuser     testuser.keytab
-    ${output}=             Execute             ozone s3 getsecret -u testuser ${OM_HA_PARAM}
+    ${output}=             Execute             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
+
+*** Test Cases ***
+S3 without om-service-id
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Get-secret without om-service-id
+
+S3 with om-service-id
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Get-secret with om-service-id
