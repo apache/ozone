@@ -27,6 +27,8 @@ import com.google.common.cache.RemovalListener;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -99,7 +102,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamily
  */
 public final class OmSnapshotManager implements AutoCloseable {
   public static final String OM_HARDLINK_FILE = "hardLinkFile";
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
   // Threshold for the table iterator loop in nanoseconds.
@@ -395,9 +398,20 @@ public final class OmSnapshotManager implements AutoCloseable {
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
 
+    boolean snapshotDirExist = false;
+
     try {
       // Create DB checkpoint for snapshot
-      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      String checkpointPrefix = store.getDbLocation().getName();
+      Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
+          checkpointPrefix + snapshotInfo.getCheckpointDir());
+      if (Files.exists(snapshotDirPath)) {
+        snapshotDirExist = true;
+        dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
+      } else {
+        dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      }
+
       // Clean up active DB's deletedTable right after checkpoint is taken,
       // with table write lock held
       deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
@@ -414,7 +428,11 @@ public final class OmSnapshotManager implements AutoCloseable {
           .writeLock().unlock();
     }
 
-    if (dbCheckpoint != null) {
+    if (dbCheckpoint != null && snapshotDirExist) {
+      LOG.info("Checkpoint : {} for snapshot {} already exists.",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+      return dbCheckpoint;
+    } else if (dbCheckpoint != null) {
       LOG.info("Created checkpoint : {} for snapshot {}",
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
     }
