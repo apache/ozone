@@ -557,16 +557,25 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
-  KeyValue<KEY, VALUE> newKeyValue(KeyValue<CodecBuffer, CodecBuffer> raw) {
+  KeyValue<KEY, VALUE> newKeyValue(KeyValue<CodecBuffer, CodecBuffer> raw)
+      throws IOException {
+    final KEY key = keyCodec.fromCodecBuffer(raw.getKey());
+    final VALUE value = valueCodec.fromCodecBuffer(raw.getValue());
     return new KeyValue<KEY, VALUE>() {
       @Override
-      public KEY getKey() throws IOException {
-        return keyCodec.fromCodecBuffer(raw.getKey());
+      public KEY getKey() {
+        return key;
       }
 
       @Override
-      public VALUE getValue() throws IOException {
-        return valueCodec.fromCodecBuffer(raw.getValue());
+      public VALUE getValue() {
+        return value;
+      }
+
+      @Override
+      public String toString() {
+        return getClassSimpleName(
+            getClass()) + "(key=" + getKey() + ", value=" + getValue();
       }
     };
   }
@@ -591,7 +600,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       }
 
       @Override
-      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw) {
+      KeyValue<KEY, VALUE> convert(KeyValue<CodecBuffer, CodecBuffer> raw)
+          throws IOException {
         return newKeyValue(raw);
       }
     };
@@ -645,7 +655,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
      * Covert the given {@link Table.KeyValue}
      * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@link VALUE}).
      */
-    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw);
+    abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw)
+        throws IOException;
 
     @Override
     public void seekToFirst() {
@@ -677,7 +688,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     @Override
     public KeyValue<KEY, VALUE> next() {
-      return convert(rawIterator.next());
+      try {
+        return convert(rawIterator.next());
+      } catch (IOException e) {
+        throw new IllegalStateException("Failed next()", e);
+      }
     }
 
     @Override
