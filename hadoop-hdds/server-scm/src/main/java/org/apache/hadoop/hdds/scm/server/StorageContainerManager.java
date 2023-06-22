@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 
-import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -134,7 +134,7 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolic
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
@@ -195,10 +195,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QU
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -367,7 +369,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     primaryScmNodeId = scmStorageConfig.getPrimaryScmNodeId();
-    initializeCertificateClient();
 
     jvmPauseMonitor = !ratisEnabled ? newJvmPauseMonitor(getScmId()) : null;
 
@@ -380,6 +381,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       loginAsSCMUserIfSecurityEnabled(scmHANodeDetails, conf);
     }
+    initializeCertificateClient();
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
@@ -559,12 +561,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   }
 
-  private void initializeCertificateClient() {
+  private void initializeCertificateClient() throws IOException {
     securityConfig = new SecurityConfig(configuration);
     if (OzoneSecurityUtil.isSecurityEnabled(configuration) &&
         scmStorageConfig.checkPrimarySCMIdInitialized()) {
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       scmCertificateClient = new SCMCertificateClient(
-          securityConfig, scmStorageConfig.getScmCertSerialId());
+          securityConfig, scmSecurityClient,
+          scmStorageConfig.getScmCertSerialId());
     }
   }
 
@@ -863,7 +868,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           rootCertificateServer = configurator.getCertificateServer();
         } else {
           rootCertificateServer =
-              HASecurityUtils.initializeRootCertificateServer(conf,
+              HASecurityUtils.initializeRootCertificateServer(securityConfig,
                   certificateStore, scmStorageConfig, new DefaultCAProfile());
         }
         persistPrimarySCMCerts();
@@ -876,7 +881,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // intermediate CA server which is issuing certificates to DN and OM,
       // we will have one root CA server too.
       rootCertificateServer =
-          HASecurityUtils.initializeRootCertificateServer(conf,
+          HASecurityUtils.initializeRootCertificateServer(securityConfig,
               certificateStore, scmStorageConfig, new DefaultProfile());
     }
 
@@ -901,7 +906,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         secretKeyManager);
 
     if (securityConfig.isContainerTokenEnabled()) {
-      containerTokenMgr = createContainerTokenSecretManager(configuration);
+      containerTokenMgr = createContainerTokenSecretManager();
     }
     rootCARotationManager = new RootCARotationManager(this);
   }
@@ -959,25 +964,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return systemClock;
   }
 
-  private ContainerTokenSecretManager createContainerTokenSecretManager(
-      OzoneConfiguration conf) throws IOException {
+  private ContainerTokenSecretManager createContainerTokenSecretManager()
+      throws IOException {
 
-    long expiryTime = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
-        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    long certificateGracePeriod = Duration.parse(
-        conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
-            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    boolean tokenSanityChecksEnabled = conf.getBoolean(
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
-    if (tokenSanityChecksEnabled && expiryTime > certificateGracePeriod) {
-      throw new IllegalArgumentException(" Certificate grace period " +
-          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-          " should be greater than maximum block/container token lifetime " +
-          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
-    }
+    long expiryTime = securityConfig.getBlockTokenExpiryDurationMs();
 
     // Means this is an upgraded cluster and it has no sub-ca,
     // so SCM Certificate client is not initialized. To make Tokens
@@ -998,8 +988,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         LOG.error("Get CA Certificate failed", ex);
         throw ex;
       }
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+          getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
       scmCertificateClient = new SCMCertificateClient(securityConfig,
-          certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
+          scmSecurityClient, certSerialNumber, SCM_ROOT_CA_COMPONENT_NAME);
     }
     return new ContainerTokenSecretManager(expiryTime,
         secretKeyManagerService.getSecretKeyManager());

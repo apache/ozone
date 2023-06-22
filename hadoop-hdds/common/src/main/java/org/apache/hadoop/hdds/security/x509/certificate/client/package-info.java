@@ -17,6 +17,6 @@
  *
  */
 /**
- * Certificate Utils.
+ * Classes related to creating and using certificates.
  */
-package org.apache.hadoop.hdds.security.x509.certificate.utils;
+package org.apache.hadoop.hdds.security.x509.certificate.client;
