@@ -1161,6 +1161,10 @@ public class TestOzoneShellHA {
     // One key should be present in .Trash
     Assert.assertEquals(1, getNumOfKeys());
 
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/key5"};
+    execute(ozoneShell, args);
+
     args = new String[] {"key", "list", "o3://" + omServiceId +
           "/volumefso1/bucket1/", "-l ", "110"};
     out.reset();
@@ -1169,26 +1173,13 @@ public class TestOzoneShellHA {
     // Total number of keys still 100.
     Assert.assertEquals(100, getNumOfKeys());
 
-    // Skip Trash
-    args = new String[] {trashConfKey, "key", "delete",
-        "/volumefso1/bucket1/key5", "--skipTrash"};
-    execute(ozoneShell, args);
-
-    // .Trash should still contain 1 key
+    // .Trash should contain 2 keys
     prefixKey = "--prefix=.Trash";
     args = new String[] {"key", "list", prefixKey, "o3://" +
           omServiceId + "/volumefso1/bucket1/"};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(1, getNumOfKeys());
-
-    args = new String[] {"key", "list", "o3://" + omServiceId +
-          "/volumefso1/bucket1/", "-l ", "110"};
-    out.reset();
-    execute(ozoneShell, args);
-    // Total number of keys now will be 99 as
-    // 1 key deleted without trash
-    Assert.assertEquals(99, getNumOfKeys());
+    Assert.assertEquals(2, getNumOfKeys());
 
     final String username =
         UserGroupInformation.getCurrentUser().getShortUserName();
@@ -1210,25 +1201,10 @@ public class TestOzoneShellHA {
     out.reset();
     execute(ozoneShell, args);
 
-    // Total number of keys still remain 99 as
-    // delete from trash not allowed without --skipTrash
-    Assert.assertEquals(99, getNumOfKeys());
+    // Total number of keys still remain 100 as
+    // delete from trash not allowed using sh command
+    Assert.assertEquals(100, getNumOfKeys());
 
-    // Now try to delete from trash path with --skipTrash option
-    args = new String[] {trashConfKey, "key", "delete",
-        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
-          + "/key4", "--skipTrash"};
-    out.reset();
-    execute(ozoneShell, args);
-
-    args = new String[] {"key", "list", "o3://" + omServiceId +
-          "/volumefso1/bucket1/", "-l ", "110"};
-    out.reset();
-    execute(ozoneShell, args);
-
-    // Total number of keys now will be 98 as
-    // 1 key deleted without trash and 1 from the trash path
-    Assert.assertEquals(98, getNumOfKeys());
   }
 
   @Test
