@@ -37,8 +37,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Iterator;
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -90,25 +88,25 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   private void runTableCountProcess() {
-      try {
-        long startTime, endTime, duration, durationMilliseconds;
+    try {
+      long startTime, endTime, duration, durationMilliseconds;
 
-        int execute = dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
-        LOG.info("Deleted {} records from {}", execute,
-            SCM_TABLE_COUNT_TABLE_NAME);
+      int execute = dslContext.truncate(SCM_TABLE_COUNT_TABLE_NAME).execute();
+      LOG.info("Deleted {} records from {}", execute,
+          SCM_TABLE_COUNT_TABLE_NAME);
 
-        startTime = System.nanoTime();
-        processTableCount();
-        endTime = System.nanoTime();
-        duration = endTime - startTime;
-        durationMilliseconds = duration / NANOSECONDS_IN_MILLISECOND;
-        LOG.info(
-            "Elapsed Time in milliseconds for processTableCount() execution: {}",
-            durationMilliseconds);
-      } catch (Exception e) {
-        LOG.error("An error occurred while performing table count: {}", e);
-      }
+      startTime = System.nanoTime();
+      processTableCount();
+      endTime = System.nanoTime();
+      duration = endTime - startTime;
+      durationMilliseconds = duration / NANOSECONDS_IN_MILLISECOND;
+      LOG.info(
+          "Elapsed Time in milliseconds for processTableCount() execution: {}",
+          durationMilliseconds);
+    } catch (Exception e) {
+      LOG.error("An error occurred while performing table count: {}", e);
     }
+  }
 
   /**
    * Processes the table count by iterating over SCM tables and retrieving the
@@ -118,8 +116,6 @@ public class ScmTableCountTask extends ReconScmTask {
    * @throws IOException if an I/O error occurs during table count processing.
    */
   public void processTableCount() throws IOException {
-    // Acquire write lock
-    lock.writeLock().lock();
     try {
       // Initialize the object count map
       Map<String, Long> objectCountMap = initializeCountMap();
@@ -133,26 +129,23 @@ public class ScmTableCountTask extends ReconScmTask {
           long count = Iterators.size(keyIter);
           objectCountMap.put(getRowKeyFromTable(tableName), count);
         } catch (IOException ioEx) {
-          LOG.error("Unable to populate SCM Table Count in Recon DB.", ioEx);
+          LOG.error(
+              "Unable to populate SCM Table Count for table '{}' in Recon DB.",
+              tableName, ioEx);
         }
       }
 
-      // Write the counts to the Recon db if the object count map is not empty
-      if (!objectCountMap.isEmpty()) {
-        writeCountsToDB(objectCountMap);
-      }
+      writeCountsToDB(objectCountMap);
 
-      objectCountMap.clear();
       LOG.info("Completed writing SCM table counts to DB.");
-    } finally {
-      // Release write lock
-      lock.writeLock().unlock();
+    } catch (Exception e) {
+      LOG.error("An error occurred while processing table count: {}", e);
     }
   }
 
 
   /**
-   * Writes the object counts from the object count map to the Recon database.
+   * Writes the object counts from the objectCount map to the Recon database.
    *
    * @param objectCountMap a map containing table names as keys and their object
    *                       counts as values.
@@ -174,7 +167,7 @@ public class ScmTableCountTask extends ReconScmTask {
     scmTableCountDao.insert(insertToDb);
   }
 
-  private Map<String, Long> initializeCountMap() throws IOException {
+  private Map<String, Long> initializeCountMap() {
     List<String> tables = getTaskTables();
     Map<String, Long> objectCountMap = new HashMap<>(tables.size());
     for (String tableName : tables) {
@@ -185,10 +178,8 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   /**
-   * Returns the list of SCM tables to be processed by the task.
-   *
-   * @return the list of SCM tables to be processed by the task.
-   * @throws IOException if an I/O error occurs.
+   * Returns the list of SCM tables to be processed by the task. We can add in
+   * more tables to as we go forward.
    */
   public List<String> getTaskTables() {
     List<String> tables = new ArrayList<>();
