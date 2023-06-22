@@ -204,7 +204,9 @@ public class WritableECContainerProvider
           throw new IOException("interrupted", e);
         }
       } else {
-        LOG.info(msg, repConfig, current, pending, max);
+        if (finalAttempt || LOG.isTraceEnabled()) {
+          LOG.info(msg, repConfig, current, pending, max);
+        }
         return null;
       }
     } catch (IOException e) {
