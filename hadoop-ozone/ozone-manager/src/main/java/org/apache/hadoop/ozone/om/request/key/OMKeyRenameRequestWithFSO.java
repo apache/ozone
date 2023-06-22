@@ -136,8 +136,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
       // Check if fromKey exists
       OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
-          ozoneManager, omMetadataManager, volumeName, bucketName, fromKeyName,
-          0);
+          omMetadataManager, volumeName, bucketName, fromKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
@@ -160,8 +160,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
               toKeyName, fromKeyFileStatus.isDirectory());
 
       OzoneFileStatus toKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
-          ozoneManager, omMetadataManager,
-          volumeName, bucketName, toKeyName, 0);
+          omMetadataManager, volumeName, bucketName, toKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       // Check if toKey exists.
       if (toKeyFileStatus != null) {
@@ -186,9 +186,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
                   fromFileName);
           OzoneFileStatus newToOzoneFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(
-                  ozoneManager, omMetadataManager,
-                  volumeName, bucketName, newToKeyName, 0);
+              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+                  volumeName, bucketName, newToKeyName, 0,
+                  ozoneManager.getDefaultReplicationConfig());
 
           if (newToOzoneFileStatus != null) {
             // case-5) If new destin '/dst/source' exists then throws exception

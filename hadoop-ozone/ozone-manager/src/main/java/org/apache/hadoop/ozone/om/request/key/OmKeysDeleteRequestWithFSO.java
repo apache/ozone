@@ -85,8 +85,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   protected OzoneFileStatus getOzoneKeyStatus(
       OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName) throws IOException {
-    return OMFileRequest.getOMKeyInfoIfExists(ozoneManager, omMetadataManager,
-        volumeName, bucketName, keyName, 0);
+    return OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+        volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
   }
 
   @Override

@@ -633,9 +633,10 @@ public final class OMFileRequest {
    */
   @Nullable
   public static OzoneFileStatus getOMKeyInfoIfExists(
-      OzoneManager ozoneManager, OMMetadataManager omMetadataMgr,
+      OMMetadataManager omMetadataMgr,
       String volumeName, String bucketName, String keyName,
-      long scmBlockSize) throws IOException {
+      long scmBlockSize, ReplicationConfig defaultReplication
+  ) throws IOException {
 
     OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
 
@@ -683,7 +684,7 @@ public final class OMFileRequest {
       ReplicationConfig replicationConfig =
           Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
               .map(DefaultReplicationConfig::getReplicationConfig)
-              .orElse(ozoneManager.getDefaultReplicationConfig());
+              .orElse(defaultReplication);
       omKeyInfo.setReplicationConfig(replicationConfig);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
@@ -814,7 +815,8 @@ public final class OMFileRequest {
     }
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
     OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(
-        ozoneManager, metaMgr, volumeName, bucketName, toKeyParentDir, 0);
+        metaMgr, volumeName, bucketName, toKeyParentDir, 0,
+        ozoneManager.getDefaultReplicationConfig());
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(

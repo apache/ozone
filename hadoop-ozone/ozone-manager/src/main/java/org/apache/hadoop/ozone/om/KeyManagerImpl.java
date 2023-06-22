@@ -449,9 +449,9 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo getOmKeyInfoFSO(String volumeName, String bucketName,
                                    String keyName) throws IOException {
-    OzoneFileStatus fileStatus =
-            OMFileRequest.getOMKeyInfoIfExists(ozoneManager, metadataManager,
-                    volumeName, bucketName, keyName, scmBlockSize);
+    OzoneFileStatus fileStatus = OMFileRequest.getOMKeyInfoIfExists(
+        metadataManager, volumeName, bucketName, keyName, scmBlockSize,
+        ozoneManager.getDefaultReplicationConfig());
     if (fileStatus == null) {
       return null;
     }
@@ -1263,8 +1263,9 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus();
       }
 
-      fileStatus = OMFileRequest.getOMKeyInfoIfExists(ozoneManager,
-          metadataManager, volumeName, bucketName, keyName, scmBlockSize);
+      fileStatus = OMFileRequest.getOMKeyInfoIfExists(metadataManager,
+          volumeName, bucketName, keyName, scmBlockSize,
+          ozoneManager.getDefaultReplicationConfig());
 
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
