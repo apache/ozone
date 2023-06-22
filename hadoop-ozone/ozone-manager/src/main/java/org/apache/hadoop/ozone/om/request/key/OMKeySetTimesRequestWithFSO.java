@@ -89,8 +89,9 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       }
       lockAcquired = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volume, bucket);
-      OzoneFileStatus keyStatus = OMFileRequest
-          .getOMKeyInfoIfExists(omMetadataManager, volume, bucket, key, 0);
+      OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volume, bucket, key, 0,
+          ozoneManager.getDefaultReplicationConfig());
       if (keyStatus == null) {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
