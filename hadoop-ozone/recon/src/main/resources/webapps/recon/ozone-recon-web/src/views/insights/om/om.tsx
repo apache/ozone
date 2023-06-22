@@ -199,20 +199,6 @@ const OPEN_KEY_TAB_COLUMNS = [
     )
   },
   {
-    title: 'Required Nodes',
-    dataIndex: 'replicationInfo',
-    key: 'replicationInfo',
-    render: (replicationInfo: any) => (
-      <div>
-        {
-          <div >
-            {Object.values(replicationInfo)[1]}
-          </div>
-        }
-      </div>
-    )
-  },
-  {
     title: 'Replication Type',
     dataIndex: 'replicationInfo',
     key: 'replicationtype',
@@ -232,19 +218,24 @@ const OPEN_KEY_TAB_COLUMNS = [
 const PENDING_TAB_COLUMNS = [
   {
     title: 'Key Name',
-    dataIndex: 'keyName',
-    key: 'keyName'
+    dataIndex: 'fileName',
+    key: 'fileName'
   },
   {
     title: 'Path',
-    dataIndex: 'path',
-    key: 'path',
+    dataIndex: 'keyName',
+    key: 'keyName',
     isSearchable: true,
   },
   {
-    title: 'Amount of data',
+    title: 'Total data size',
     dataIndex: 'dataSize',
     key: 'dataSize',
+  },
+  {
+    title: 'Total Key Count',
+    dataIndex: 'keyCount',
+    key: 'keyCount',
   }
 ];
 
@@ -377,28 +368,30 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   handleExistsAtChange = (e: any) => {
     if (e.key === 'OM') {
-      this.setState(() => ({
+      console.log("OM before setstate handleExistsAtChange if", this.state);
+      this.setState({
         containerState: 'SCM',
         prevKeyMismatch: 0,
         prevKeyOpen: "",
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
-      }), () => {
+      },() => {
         console.log("before If fetchMismatchContainers OM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState)
-      })
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+      });
     }
     else {
-      this.setState(() => ({
+      console.log("before else setstate else SCM", this.state);
+      this.setState({
         containerState: 'OM',
         prevKeyMismatch: 0,
         prevKeyOpen: "",
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
-      }), () => {
-        console.log("before Else fetchMismatchContainers OM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState)
-      })
+      },() => {
+        console.log("before fetchMismatchContainers SCM",this.state);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+      });
     }
   };
 
@@ -442,31 +435,34 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handlefsoNonfsoMenuChange = (e: any) => {
+    console.log("E.keyhandlefsoNonfsoMenuChange", e.key);
     if (e.key === 'fso') {
-      this.setState(() => ({
+      console.log("if handlefsoNonfsoMenuChange--",this.state);
+      this.setState({
         includeFso: true,
         includeNonFso: false,
         prevKeyOpen: "",
         prevKeyMismatch: 0,
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
-      }), () => {
+      },() => {
         console.log("If handlefsoNonfsoMenuChang fso",this.state);
         this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
-      })
+      });
     }
     else {
-      this.setState(() => ({
+      console.log("else handlefsoNonfsoMenuChange nonfso",this.state);
+      this.setState({
         includeFso: false,
         includeNonFso: true,
         prevKeyOpen: "",
         prevKeyMismatch: 0,
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
-      }), () => {
-        console.log("else handlefsoNonfsoMenuChang nonfso",this.state);
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen)
-      })
+      },() => {
+        console.log("else handlefsoNonfsoMenuChang nonfso before fetchOpenkeys--",this.state);
+        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
+      });
     }
   };
 
@@ -574,17 +570,29 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }
     axios.get(deletePendingKeysEndpoint).then(deletePendingKeysResponse => {
       const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
-      // const deletePendingKey = deletePendingKeys && deletePendingKeys.map(item => item.omKeyInfoList);
-      const data = deletePendingKeys && deletePendingKeys.flatMap((info) =>
-        info.omKeyInfoList.map((item:any) => ({
-          dataSize: item.dataSize,
-          keyName: item.keyName,
-          path: item.path
-        })))
+      //const deletePendingKey = deletePendingKeys && deletePendingKeys.map(item => item.omKeyInfoList);
+   
+      const data = deletePendingKeys && deletePendingKeys
+        .flatMap((info: any) => info.omKeyInfoList)
+        .reduce((deletePending, item) => {
+          
+          const existingKey = deletePending.find((key) => key.keyName === item.keyName && key.fileName === item.fileName);
+          if (existingKey) {
+            existingKey.dataSize += item.dataSize;
+           // keyCount+=keyCount
+           existingKey.keyCount++; 
+            }
+           else {
+            deletePending.push({ ...item, keyCount:1 });
+          }
+          return deletePending;
+        }, []);
+
       if (deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey === "") {
         this.setState({
           loading: false,
           clickable: false,
+          pendingDeleteKeyDataSource: data
         })
       }
       else {
@@ -627,7 +635,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           loading: false,
           prevKeyDeleted: deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey,
           deletedContainerKeysDataSource: deletedContainerKeys
-
         })
       };
     }).catch(error => {
@@ -860,7 +867,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       //showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} containers`,
       defaultPageSize: this.state.DEFAULT_LIMIT,
       pageSizeOptions: ['10', '20', '30', '50'],
-      showQuickJumper: true,
+      //showQuickJumper: true,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
       //current:this.state.currentPage,
@@ -910,15 +917,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         </div>
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.changeTab}>
-            <TabPane key='1' tab={`Container Mismatch Info${(mismatchDataSource && mismatchDataSource.length > 0) ? ` (${mismatchDataSource.length})` : ''}`}>
+            <TabPane key='1' tab={`Container Mismatch Info`}>
               {generateMismatchTable(mismatchDataSource)}
             </TabPane>
-            <TabPane key='2' tab={`Open Keys${(openKeysDataSource && openKeysDataSource.length > 0) ? ` (${openKeysDataSource.length})` : ''}`}>
+            <TabPane key='2' tab={`Open Keys`}>
               {generateOpenKeyTable(openKeysDataSource)}
             </TabPane>
             <TabPane key='3'
-              tab={<label>Keys Pending for Deletion {(pendingDeleteKeyDataSource && pendingDeleteKeyDataSource.length > 0) ? ` (${pendingDeleteKeyDataSource.length})` : ''}
-                &nbsp;&nbsp;<Tooltip placement='top' title="Keys and Directories that are pending for deletion">
+              tab={<label>Keys Pending for Deletion&nbsp;&nbsp;
+                <Tooltip placement='top' title="Keys that are pending for deletion.">
                   <Icon type='info-circle' />
                 </Tooltip>
               </label>
@@ -926,8 +933,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
               {generateKeysPendingTable(pendingDeleteKeyDataSource)}
             </TabPane>
             <TabPane key='4'
-              tab={<label>Deleted Container Keys {(deletedContainerKeysDataSource && deletedContainerKeysDataSource.length > 0) ? ` (${deletedContainerKeysDataSource.length})` : ''}
-                &nbsp;&nbsp;<Tooltip placement='top' title="Containers in DELETED state in SCM ">
+              tab={<label>Deleted Container Keys&nbsp;&nbsp;
+                <Tooltip placement='top' title={"Keys mapped to Containers in DELETED state SCM."}>
                   <Icon type='info-circle' />
                 </Tooltip>
               </label>

@@ -3605,42 +3605,6 @@
           }
         ],
         "existsAt": "SCM"
-      },
-      {
-        "containerId": 11,
-        "numberOfKeys": 11,
-        "pipelines": [
-          {
-            "id": {
-              "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
-            },
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "RATIS"
-            },
-            "healthy": true
-          }
-        ],
-        "existsAt": "SCM"
-      },
-      {
-        "containerId": 12,
-        "numberOfKeys": 12,
-        "pipelines": [
-          {
-            "id": {
-              "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
-            },
-            "replicationConfig": {
-              "replicationFactor": "ONE",
-              "requiredNodes": 1,
-              "replicationType": "RATIS"
-            },
-            "healthy": true
-          }
-        ],
-        "existsAt": "SCM"
       }
     ]
   },
@@ -4832,9 +4796,6 @@
     "fso": []
   },
   "keydeletePending":{
-    "keysSummary": {
-      
-    },
     "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
     "replicatedDataSize": 300000000,
     "unreplicatedDataSize": 100000000,
@@ -4842,15 +4803,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036844470271,
             "updateID": 40429,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/0",
+            "keyName": "List1key1",
             "dataSize": 10000000,
             "creationTime": 1687189663661,
             "modificationTime": 1687189672598,
@@ -4860,7 +4818,57 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "0",
+            "fileName": "List1File1",
+            "file": false,
+            "path": "-9223372036844472575/0",
+            "hsync": false,
+            "replicatedSize": 30000000,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='volume', bucket='bucket1', key='rcmeevblsf/0', dataSize='10000000', creationTime='1687189663661', objectID='-9223372036844470271', parentID='-9223372036844472575', replication='RATIS/THREE', fileChecksum='null}",
+            "updateIDset": true
+          },
+          {
+            "objectID": -9223372036844470271,
+            "updateID": 40429,
+            "parentObjectID": -9223372036844472575,
+            "volumeName": "volume",
+            "bucketName": "bucket1",
+            "keyName": "List1key1",
+            "dataSize": 20000000,
+            "creationTime": 1687189663661,
+            "modificationTime": 1687189672598,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "List1File1",
+            "file": false,
+            "path": "-9223372036844472575/0",
+            "hsync": false,
+            "replicatedSize": 30000000,
+            "fileEncryptionInfo": null,
+            "objectInfo": "OMKeyInfo{volume='volume', bucket='bucket1', key='rcmeevblsf/0', dataSize='10000000', creationTime='1687189663661', objectID='-9223372036844470271', parentID='-9223372036844472575', replication='RATIS/THREE', fileChecksum='null}",
+            "updateIDset": true
+          },
+          {
+            "objectID": -9223372036844470271,
+            "updateID": 40429,
+            "parentObjectID": -9223372036844472575,
+            "volumeName": "volume",
+            "bucketName": "bucket1",
+            "keyName": "List1key1",
+            "dataSize": 30000000,
+            "creationTime": 1687189663661,
+            "modificationTime": 1687189672598,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "List1File1",
             "file": false,
             "path": "-9223372036844472575/0",
             "hsync": false,
@@ -4874,15 +4882,13 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
+            
             "objectID": -9223372036844470015,
             "updateID": 40407,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/1",
+            "keyName": "List2Key1",
             "dataSize": 10000000,
             "creationTime": 1687189663664,
             "modificationTime": 1687189671884,
@@ -4892,7 +4898,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "1",
+            "fileName": "List2File2",
             "file": false,
             "path": "-9223372036844472575/1",
             "hsync": false,
@@ -4906,15 +4912,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036844432639,
             "updateID": 40601,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/10",
+            "keyName": "List3Key1",
             "dataSize": 10000000,
             "creationTime": 1687189671823,
             "modificationTime": 1687189676084,
@@ -4924,7 +4927,29 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "10",
+            "fileName": "List3File1",
+            "file": false,
+            "path": "-9223372036844472575/10",
+            "hsync": false,
+            "replicatedSize": 30000000
+          },
+          {
+            "objectID": -9223372036844432639,
+            "updateID": 40601,
+            "parentObjectID": -9223372036844472575,
+            "volumeName": "volume",
+            "bucketName": "bucket1",
+            "keyName": "List3Key1",
+            "dataSize": 20000000,
+            "creationTime": 1687189671823,
+            "modificationTime": 1687189676084,
+            "replicationConfig": {
+              "replicationFactor": "THREE",
+              "requiredNodes": 3,
+              "replicationType": "RATIS"
+            },
+            "fileChecksum": null,
+            "fileName": "List3File1",
             "file": false,
             "path": "-9223372036844472575/10",
             "hsync": false,
@@ -4935,15 +4960,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843970815,
             "updateID": 42403,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/100",
+            "keyName": "List4Key1",
             "dataSize": 10000000,
             "creationTime": 1687189713476,
             "modificationTime": 1687189717756,
@@ -4953,7 +4975,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "100",
+            "fileName": "List4File3",
             "file": false,
             "path": "-9223372036844472575/100"
           }
@@ -4962,15 +4984,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843964159,
             "updateID": 42443,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/101",
+            "keyName": "List5Key1",
             "dataSize": 10000000,
             "creationTime": 1687189714437,
             "modificationTime": 1687189719458,
@@ -4980,7 +4999,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "101",
+            "fileName": "List5File1",
             "file": false,
             "path": "-9223372036844472575/101"
           }
@@ -4989,15 +5008,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843961087,
             "updateID": 42450,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/102",
+            "keyName": "List6Key1",
             "dataSize": 10000000,
             "creationTime": 1687189714558,
             "modificationTime": 1687189719533,
@@ -5007,7 +5023,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "102",
+            "fileName": "List6File1",
             "file": false,
             "path": "-9223372036844472575/102",
             "hsync": false,
@@ -5021,15 +5037,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843959807,
             "updateID": 42449,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/103",
+            "keyName": "List7Key1",
             "dataSize": 10000000,
             "creationTime": 1687189714594,
             "modificationTime": 1687189719533,
@@ -5039,7 +5052,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "103",
+            "fileName": "List7File1",
             "file": false,
             "path": "-9223372036844472575/103",
             "hsync": false,
@@ -5053,15 +5066,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843953919,
             "updateID": 42467,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/104",
+            "keyName": "List8Key1",
             "dataSize": 10000000,
             "creationTime": 1687189715040,
             "modificationTime": 1687189720085,
@@ -5071,7 +5081,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "104",
+            "fileName": "List8File1",
             "file": false,
             "path": "-9223372036844472575/104",
             "hsync": false,
@@ -5085,15 +5095,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843951359,
             "updateID": 42483,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/105",
+            "keyName": "List9Key1",
             "dataSize": 10000000,
             "creationTime": 1687189715391,
             "modificationTime": 1687189720373,
@@ -5103,7 +5110,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "105",
+            "fileName": "List9File9",
             "file": false,
             "path": "-9223372036844472575/105",
             "hsync": false,
@@ -5117,15 +5124,12 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {
-              
-            },
             "objectID": -9223372036843950335,
             "updateID": 42478,
             "parentObjectID": -9223372036844472575,
             "volumeName": "volume",
             "bucketName": "bucket1",
-            "keyName": "rcmeevblsf/106",
+            "keyName": "List10Key1",
             "dataSize": 10000000,
             "creationTime": 1687189715413,
             "modificationTime": 1687189720247,
@@ -5135,7 +5139,7 @@
               "replicationType": "RATIS"
             },
             "fileChecksum": null,
-            "fileName": "106",
+            "fileName": "List10File1",
             "file": false,
             "path": "-9223372036844472575/106",
             "hsync": false,
@@ -5149,6 +5153,7 @@
     ],
     "status": "OK"
   },
+
   "keydeletePending1": {
     "lastKey":"/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191",
     "replicatedTotal": -1530804718628866300,
@@ -5157,7 +5162,6 @@
       {
         "omKeyInfoList": [
           {
-            "metadata": {},
             "objectID": 0,
             "updateID": 0,
             "parentObjectID": 0,
