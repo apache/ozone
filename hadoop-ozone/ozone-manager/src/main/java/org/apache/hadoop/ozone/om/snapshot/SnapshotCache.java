@@ -327,6 +327,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @return true if the cache internal structure is consistent to the best of
    * its knowledge, false if found to be inconsistent and details logged.
    */
+  @VisibleForTesting
   public boolean isConsistent() {
     // Uses dbMap as the source of truth for this check, whether dbMap entries
     // are in OM DB's snapshotInfoTable is out of the scope of this check.
