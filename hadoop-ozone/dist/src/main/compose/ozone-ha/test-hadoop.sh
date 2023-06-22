@@ -23,7 +23,5 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=false
 export SCM=scm1
 export OM_SERVICE_ID=omservice
-export HADOOP_VERSION=3.2.2
-export HADOOP_IMAGE=flokkr/hadoop
 
 source "$COMPOSE_DIR/../common/hadoop-test.sh"
