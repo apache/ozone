@@ -158,7 +158,8 @@ public class SstFilteringService extends BackgroundService
           try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
               .loadDB(ozoneManager.getConfiguration(),
                       new File(snapshotCheckpointDir),
-                      dbName, true, Optional.of(Boolean.TRUE), false, false)) {
+                      dbName, true, Optional.of(Boolean.TRUE),
+                      Optional.empty(), false, false)) {
             RocksDatabase db = rdbStore.getDb();
             try (BootstrapStateHandler.Lock lock =
                 getBootstrapStateLock().lock()) {

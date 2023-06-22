@@ -616,9 +616,19 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     }
   }
 
+  // TODO: Move this util class.
   public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
                                                 OmKeyInfo deletedKeyInfo) {
 
+    if (prevKeyInfo == null && deletedKeyInfo == null) {
+      LOG.debug("Both prevKeyInfo and deletedKeyInfo are null.");
+      return true;
+    }
+    if (prevKeyInfo == null || deletedKeyInfo == null) {
+      LOG.debug("prevKeyInfo: '{}' or deletedKeyInfo: '{}' is null.",
+          prevKeyInfo, deletedKeyInfo);
+      return false;
+    }
     // For hsync, Though the blockLocationInfo of a key may not be same
     // at the time of snapshot and key deletion as blocks can be appended.
     // If the objectId is same then the key is same.
