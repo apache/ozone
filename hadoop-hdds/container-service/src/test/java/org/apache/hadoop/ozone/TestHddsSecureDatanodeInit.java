@@ -105,12 +105,8 @@ public class TestHddsSecureDatanodeInit {
         ServicePlugin.class);
     conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT5S"); // 5s
     conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S"); // 1s
-<<<<<<< HEAD
     conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
-
-=======
     conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT1S"); // 1s
->>>>>>> 2a37dcefd (fix findbugs)
     securityConfig = new SecurityConfig(conf);
 
     service = new HddsDatanodeService(args) {

@@ -124,11 +124,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private ScheduledExecutorService executorService;
   private Consumer<String> certIdSaveCallback;
   private Runnable shutdownCallback;
-<<<<<<< HEAD
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
-=======
-  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient;
->>>>>>> 898ec9b4d (fix checkstyle and refactor robot test)
   private final Set<CertificateNotification> notificationReceivers;
   private static Semaphore semaphore = new Semaphore(1);
 
