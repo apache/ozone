@@ -81,9 +81,9 @@ public class ScmTableCountTask extends ReconScmTask {
         wait(interval);
         runTableCountProcess();
       }
-    } catch (Throwable t) {
-      LOG.error("Error while running ScmTableCountTask: {}", t);
-      if (t instanceof InterruptedException) {
+    } catch (Exception e) {
+      LOG.error("Error while running ScmTableCountTask: {}", e);
+      if (e instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
     }
@@ -179,15 +179,14 @@ public class ScmTableCountTask extends ReconScmTask {
   }
 
   private Map<String, Long> initializeCountMap() throws IOException {
-    Collection<String> tables = getTaskTables();
+    List<String> tables = getTaskTables();
     Map<String, Long> objectCountMap = new HashMap<>(tables.size());
-    for (String tableName: tables) {
+    for (String tableName : tables) {
       String key = getRowKeyFromTable(tableName);
       objectCountMap.put(key, 0L);
     }
     return objectCountMap;
   }
-
 
   /**
    * Returns the list of SCM tables to be processed by the task.
@@ -195,10 +194,10 @@ public class ScmTableCountTask extends ReconScmTask {
    * @return the list of SCM tables to be processed by the task.
    * @throws IOException if an I/O error occurs.
    */
-  public Collection<String> getTaskTables() throws IOException {
-    Collection<String> tables = new ArrayList<>();
+  public List<String> getTaskTables() throws IOException {
+    List<String> tables = new ArrayList<>();
 
-    // Add the table names to the array list
+    // Add the table names to the list
     tables.add(DELETED_BLOCKS.getName());
 
     return tables;
