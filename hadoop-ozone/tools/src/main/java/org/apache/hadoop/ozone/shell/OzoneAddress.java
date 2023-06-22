@@ -204,16 +204,11 @@ public class OzoneAddress {
       // But before that check if serviceId is defined. If it is defined
       // and has length = 1, then take that ID as default.
       // otherwise throw an error "om service ID needs to be specified."
-      if (OmUtils.isServiceIdsDefined(conf)) {
-        if (serviceIds.size() == 1) {
-          return OzoneClientFactory.getRpcClient(serviceIds.iterator().next(),
-              conf);
-        } else {
+      if (serviceIds.size() == 1) {
           throw new OzoneClientException("Service ID must not"
               + " be omitted when cluster has multiple OM Services." +
               "  Configured " + OZONE_OM_SERVICE_IDS_KEY + " are "
               + serviceIds);
-        }
       }
       return OzoneClientFactory.getRpcClient(conf);
     }
