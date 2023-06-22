@@ -81,9 +81,9 @@ public class ScmTableCountTask extends ReconScmTask {
         wait(interval);
         runTableCountProcess();
       }
-    } catch (Exception e) {
-      LOG.error("Error while running ScmTableCountTask: {}", e);
-      if (e instanceof InterruptedException) {
+    } catch (Throwable t) {
+      LOG.error("Error while running ScmTableCountTask: {}", t);
+      if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
     }
@@ -109,8 +109,8 @@ public class ScmTableCountTask extends ReconScmTask {
       LOG.info(
           "Elapsed Time in milliseconds for processTableCount() execution: {}",
           durationMilliseconds);
-    } catch (Throwable t) {
-      LOG.error("Error while performing table count: {}", t);
+    } catch (Exception e) {
+      LOG.error("Error while performing table count: {}", e);
     }
   }
 
