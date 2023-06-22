@@ -177,8 +177,7 @@ public interface ConfigurationSource {
         .injectConfiguration(this, configurationClass, configObject,
             prefix, false);
 
-    ConfigurationReflectionUtil
-        .callPostConstruct(configurationClass, configObject);
+    ConfigurationReflectionUtil.callPostConstruct(configObject);
 
     return configObject;
 

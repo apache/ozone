@@ -43,6 +43,7 @@ public final class OzonePathCapabilities {
     switch (validatePathCapabilityArgs(path, capability)) {
     case CommonPathCapabilities.FS_ACLS:
     case CommonPathCapabilities.FS_CHECKSUMS:
+    case CommonPathCapabilities.FS_SNAPSHOTS:
       return true;
     default:
       return false;

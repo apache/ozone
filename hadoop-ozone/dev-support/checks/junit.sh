@@ -29,7 +29,7 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx --no-transfer-progress'
+MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"

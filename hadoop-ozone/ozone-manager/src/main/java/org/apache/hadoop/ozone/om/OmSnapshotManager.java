@@ -27,6 +27,8 @@ import com.google.common.cache.RemovalListener;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -57,7 +60,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -80,6 +84,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT;
@@ -96,7 +102,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamily
  */
 public final class OmSnapshotManager implements AutoCloseable {
   public static final String OM_HARDLINK_FILE = "hardLinkFile";
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
   // Threshold for the table iterator loop in nanoseconds.
@@ -147,6 +153,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       "snap-diff-purged-job-table";
 
   private final long diffCleanupServiceInterval;
+  private final int maxOpenSstFilesInSnapshotDb;
   private final ManagedColumnFamilyOptions columnFamilyOptions;
   private final ManagedDBOptions options;
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
@@ -180,7 +187,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
     );
-
+    this.maxOpenSstFilesInSnapshotDb = ozoneManager.getConfiguration().getInt(
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+    );
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
@@ -317,7 +327,8 @@ public final class OmSnapshotManager implements AutoCloseable {
         OMMetadataManager snapshotMetadataManager;
         try {
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
-              snapshotInfo.getCheckpointDirName(), isSnapshotInCache);
+              snapshotInfo.getCheckpointDirName(), isSnapshotInCache,
+              maxOpenSstFilesInSnapshotDb);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
           throw e;
@@ -354,6 +365,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
+    registry.addCodec(SnapshotDiffObject.class, SnapshotDiffObject.getCodec());
     return registry.build();
   }
 
@@ -386,9 +398,20 @@ public final class OmSnapshotManager implements AutoCloseable {
     omMetadataManager.getTableLock(OmMetadataManagerImpl.DELETED_TABLE)
         .writeLock().lock();
 
+    boolean snapshotDirExist = false;
+
     try {
       // Create DB checkpoint for snapshot
-      dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      String checkpointPrefix = store.getDbLocation().getName();
+      Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
+          checkpointPrefix + snapshotInfo.getCheckpointDir());
+      if (Files.exists(snapshotDirPath)) {
+        snapshotDirExist = true;
+        dbCheckpoint = new RocksDBCheckpoint(snapshotDirPath);
+      } else {
+        dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
+      }
+
       // Clean up active DB's deletedTable right after checkpoint is taken,
       // with table write lock held
       deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
@@ -405,7 +428,11 @@ public final class OmSnapshotManager implements AutoCloseable {
           .writeLock().unlock();
     }
 
-    if (dbCheckpoint != null) {
+    if (dbCheckpoint != null && snapshotDirExist) {
+      LOG.info("Checkpoint : {} for snapshot {} already exists.",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+      return dbCheckpoint;
+    } else if (dbCheckpoint != null) {
       LOG.info("Created checkpoint : {} for snapshot {}",
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
     }
@@ -416,10 +443,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (dbCpDiffer != null) {
       final long dbLatestSequenceNumber = snapshotInfo.getDbTxSequenceNumber();
 
+      Objects.requireNonNull(snapshotInfo.getSnapshotId(),
+          "SnapshotId is null for snapshot: " + snapshotInfo.getName());
       // Write snapshot generation (latest sequence number) to compaction log.
       // This will be used for DAG reconstruction as snapshotGeneration.
       dbCpDiffer.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-          snapshotInfo.getSnapshotID(),
+          snapshotInfo.getSnapshotId().toString(),
           snapshotInfo.getCreationTime());
 
       // Set compaction log filename to the latest DB sequence number
@@ -485,6 +514,16 @@ public final class OmSnapshotManager implements AutoCloseable {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
     return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX;
+  }
+
+  @VisibleForTesting
+  public SnapshotDiffManager getSnapshotDiffManager() {
+    return snapshotDiffManager;
+  }
+
+  @VisibleForTesting
+  public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
+    return snapshotDiffCleanupService;
   }
 
   /**
@@ -586,18 +625,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     // one by one.
   }
 
-  // Get OmSnapshot if the keyname has ".snapshot" key indicator
+  // Get OmSnapshot if the keyName has ".snapshot" key indicator
   public IOmMetadataReader checkForSnapshot(String volumeName,
                                             String bucketName,
-                                            String keyname,
+                                            String keyName,
                                             boolean skipActiveCheck)
       throws IOException {
-    if (keyname == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
+    if (keyName == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
 
     // see if key is for a snapshot
-    String[] keyParts = keyname.split("/");
+    String[] keyParts = keyName.split("/");
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
       if (snapshotName == null || snapshotName.isEmpty()) {
@@ -650,6 +689,15 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
+  public SnapshotDiffResponse cancelSnapshotDiff(final String volume,
+                                                 final String bucket,
+                                                 final String fromSnapshot,
+                                                 final String toSnapshot)
+      throws IOException {
+    return snapshotDiffManager.cancelSnapshotDiff(volume,
+        bucket, fromSnapshot, toSnapshot);
+  }
+
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
@@ -679,6 +727,38 @@ public final class OmSnapshotManager implements AutoCloseable {
     // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
+                                                   final String bucketName,
+                                                   final String jobStatus,
+                                                   final boolean listAll)
+      throws IOException {
+    String volumeKey = ozoneManager.getMetadataManager()
+        .getVolumeKey(volumeName);
+    String bucketKey = ozoneManager.getMetadataManager()
+        .getBucketKey(volumeName, bucketName);
+
+    if (!ozoneManager.getMetadataManager()
+            .getVolumeTable().isExist(volumeKey) ||
+        !ozoneManager.getMetadataManager()
+            .getBucketTable().isExist(bucketKey)) {
+      throw new IOException("Provided volume name " + volumeName +
+          " or bucket name " + bucketName + " doesn't exist");
+    }
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+    String snapshotPath = volumeName + OM_KEY_PREFIX + bucketName;
+    if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
+      // Return an empty ArrayList here to avoid
+      // unnecessarily iterating the SnapshotDiffJob table.
+      return new ArrayList<>();
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(
+        volumeName, bucketName, jobStatus, listAll);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,

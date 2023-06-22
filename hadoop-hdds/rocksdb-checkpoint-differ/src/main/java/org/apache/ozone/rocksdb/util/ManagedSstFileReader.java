@@ -88,8 +88,7 @@ public class ManagedSstFileReader {
     return estimatedTotalKeys;
   }
 
-  public Stream<String> getKeyStream() throws RocksDBException,
-      NativeLibraryNotLoadedException, IOException {
+  public Stream<String> getKeyStream() throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {

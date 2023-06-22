@@ -21,10 +21,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import javax.net.ssl.TrustManager;
 import java.security.cert.X509Certificate;
 
 import static org.junit.Assert.assertEquals;
@@ -48,19 +49,22 @@ public class TestReloadingX509TrustManager {
 
   @Test
   public void testReload() throws Exception {
-    TrustManager tm =
-        caClient.getServerKeyStoresFactory().getTrustManagers()[0];
+    ReloadingX509TrustManager tm =
+        (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
+            .getTrustManagers()[0];
     X509Certificate cert1 = caClient.getRootCACertificate();
-    assertEquals(cert1,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.arrayContaining(cert1));
 
     caClient.renewRootCA();
     caClient.renewKey();
     X509Certificate cert2 = caClient.getRootCACertificate();
     assertNotEquals(cert1, cert2);
 
-    assertEquals(cert2,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.hasItemInArray(cert1));
+    MatcherAssert.assertThat(tm.getAcceptedIssuers(),
+        Matchers.hasItemInArray(cert2));
 
     assertTrue(reloaderLog.getOutput().contains(
         "ReloadingX509TrustManager is reloaded"));

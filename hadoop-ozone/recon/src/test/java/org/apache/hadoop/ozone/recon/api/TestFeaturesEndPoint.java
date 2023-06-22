@@ -37,6 +37,7 @@ import javax.ws.rs.core.Response;
 
 import java.util.List;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -89,7 +90,7 @@ public class TestFeaturesEndPoint {
   }
 
   @Test
-  public void testGetDisabledFeaturesGreaerThanZero() {
+  public void testGetDisabledFeaturesGreaterThanZero() {
     ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY, "");
     FeatureProvider.initFeatureSupport(ozoneConfiguration);
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
@@ -105,6 +106,35 @@ public class TestFeaturesEndPoint {
   public void testNoDisabledFeatures() {
     ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY,
         "org.apache.hadoop.ozone.recon.heatmap.TestHeatMapProviderImpl");
+    ozoneConfiguration.setBoolean(OZONE_RECON_HEATMAP_ENABLE_KEY, true);
+    FeatureProvider.initFeatureSupport(ozoneConfiguration);
+    Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
+    List<FeatureProvider.Feature> allDisabledFeatures =
+        (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
+    Assertions.assertNotNull(allDisabledFeatures);
+    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+  }
+
+  @Test
+  public void testGetHeatMapInDisabledFeaturesListWhenHeatMapFlagIsFalse() {
+    ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY,
+        "org.apache.hadoop.ozone.recon.heatmap.TestHeatMapProviderImpl");
+    ozoneConfiguration.setBoolean(OZONE_RECON_HEATMAP_ENABLE_KEY, false);
+    FeatureProvider.initFeatureSupport(ozoneConfiguration);
+    Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
+    List<FeatureProvider.Feature> allDisabledFeatures =
+        (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
+    Assertions.assertNotNull(allDisabledFeatures);
+    Assertions.assertTrue(allDisabledFeatures.size() > 0);
+    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
+        allDisabledFeatures.get(0).getFeatureName());
+  }
+
+  @Test
+  public void testGetHeatMapNotInDisabledFeaturesListWhenHeatMapFlagIsTrue() {
+    ozoneConfiguration.set(OZONE_RECON_HEATMAP_PROVIDER_KEY,
+        "org.apache.hadoop.ozone.recon.heatmap.TestHeatMapProviderImpl");
+    ozoneConfiguration.setBoolean(OZONE_RECON_HEATMAP_ENABLE_KEY, true);
     FeatureProvider.initFeatureSupport(ozoneConfiguration);
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =

@@ -27,6 +27,6 @@ with_this_version_pre_finalized() {
 
 with_this_version_finalized() {
   execute_robot_test "$SCM" --include finalized upgrade/check-finalization.robot
-  execute_robot_test "$SCM" --include finalized-snapshot-tests snapshot/upgrade-snapshot-check.robot
+  execute_robot_test "$SCM" snapshot/snapshot-sh.robot
 }
 

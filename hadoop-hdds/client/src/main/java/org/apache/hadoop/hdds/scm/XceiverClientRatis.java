@@ -33,7 +33,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -47,7 +46,7 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -227,7 +226,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ContainerCommandRequestProto request) {
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
-        (Supplier<CompletableFuture<RaftClientReply>>) () -> {
+        () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
               request, TracingUtil.exportCurrentSpan());
