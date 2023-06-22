@@ -159,26 +159,31 @@ public class SnapshotCache implements ReferenceCountedCallback {
   public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key,
       boolean skipActiveCheck) throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
-    // does not exist.
+    // does not exist, and increment the reference count on the instance.
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        dbMap.computeIfAbsent(key, k -> {
+        dbMap.compute(key, (k, v) -> {
           LOG.info("Loading snapshot. Table key: {}", k);
-          try {
-            return new ReferenceCounted<>(cacheLoader.load(k), false, this);
-          } catch (OMException omEx) {
-            // Return null if the snapshot is no longer active
-            if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
-              throw new IllegalStateException(omEx);
+          if (v == null) {
+            try {
+              v = new ReferenceCounted<>(cacheLoader.load(k), false, this);
+            } catch (OMException omEx) {
+              // Return null if the snapshot is no longer active
+              if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
+                throw new IllegalStateException(omEx);
+              }
+            } catch (IOException ioEx) {
+              // Failed to load snapshot DB
+              throw new IllegalStateException(ioEx);
+            } catch (Exception ex) {
+              // Unexpected and unknown exception thrown from CacheLoader#load
+              throw new IllegalStateException(ex);
             }
-          } catch (IOException ioEx) {
-            // Failed to load snapshot DB
-            throw new IllegalStateException(ioEx);
-          } catch (Exception ex) {
-            // Unexpected and unknown exception thrown from CacheLoader#load
-            throw new IllegalStateException(ex);
           }
-          // Do not put the value in the map on exception
-          return null;
+          if (v != null) {
+            // When RC OmSnapshot is successfully loaded
+            v.incrementRefCount();
+          }
+          return v;
         });
 
     if (rcOmSnapshot == null) {
@@ -194,13 +199,12 @@ public class SnapshotCache implements ReferenceCountedCallback {
     // when called from SDT (and some) if the snapshot is not active anymore.
     if (!skipActiveCheck &&
         !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
+      // Ref count was incremented. Need to decrement on exception here.
+      rcOmSnapshot.decrementRefCount();
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
           FILE_NOT_FOUND);
     }
-
-    // Increment the reference count on the instance.
-    rcOmSnapshot.incrementRefCount();
 
     synchronized (pendingEvictionList) {
       // Remove instance from clean up list when it exists.
