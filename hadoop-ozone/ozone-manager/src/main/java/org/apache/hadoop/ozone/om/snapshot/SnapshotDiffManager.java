@@ -1066,7 +1066,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                 createDiffObjectWithOldName(fromObjectId.getObjectID(), key,
                     objectIdToDiffObject.get(rawObjId));
             objectIdToDiffObject.put(rawObjId, diffObject);
-            oldParentIds.ifPresent(set -> set.add(oldKey.getParentObjectID()));
+            oldParentIds.ifPresent(set -> set.add(
+                fromObjectId.getParentObjectID()));
           }
           if (toObjectId != null) {
             byte[] rawObjId = codecRegistry.asRawData(toObjectId.getObjectID());
@@ -1077,7 +1078,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                 createDiffObjectWithNewName(toObjectId.getObjectID(), key,
                     objectIdToDiffObject.get(rawObjId));
             objectIdToDiffObject.put(rawObjId, diffObject);
-            newParentIds.ifPresent(set -> set.add(newKey.getParentObjectID()));
+            newParentIds.ifPresent(set -> set.add(toObjectId
+                .getParentObjectID()));
           }
         } catch (IOException e) {
           throw new RuntimeException(e);
