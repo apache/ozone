@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1292,6 +1293,122 @@ public class TestOzoneShellHA {
     Assert.assertEquals(99, getNumOfKeys());
   }
 
+  @Test
+  public void testRecursiveBucketDelete()
+      throws Exception {
+    String volume1 = "volume50";
+    String bucket1 = "bucketfso";
+    String bucket2 = "bucketobs";
+    String bucket3 = "bucketlegacy";
+
+    // Create volume volume1
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert some keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        OZONE_URI_DELIMITER + bucket1,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volume1
+    String[] args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 +
+          OZONE_URI_DELIMITER + bucket2};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 +
+        OZONE_URI_DELIMITER + bucket2 +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volume1
+    args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 +
+          OZONE_URI_DELIMITER + bucket3};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + OZONE_URI_DELIMITER + bucket3 +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Try bucket delete without recursive
+    // It should fail as bucket is not empty
+    final String[] args1 = new String[] {"bucket", "delete",
+        volume1 + OZONE_URI_DELIMITER + bucket1};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "BUCKET_NOT_EMPTY", () -> execute(ozoneShell, args1));
+    out.reset();
+
+    // bucket1 should still exist
+    Assert.assertEquals(client.getObjectStore()
+        .getVolume(volume1).getBucket(bucket1)
+        .getName(), bucket1);
+
+    // Delete bucket1 recursively
+    args =
+        new String[] {"bucket", "delete", volume1 +
+              OZONE_URI_DELIMITER + bucket1, "-r", "--yes",
+            "-id", omServiceId};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Bucket1 should not exist
+    LambdaTestUtils.intercept(OMException.class,
+        "BUCKET_NOT_FOUND", () -> client.getObjectStore()
+            .getVolume(volume1).getBucket(bucket1));
+
+    // Bucket2 and Bucket3 should still exist
+    Assert.assertEquals(client.getObjectStore().getVolume(volume1)
+        .getBucket(bucket2).getName(), bucket2);
+    Assert.assertEquals(client.getObjectStore().getVolume(volume1)
+        .getBucket(bucket3).getName(), bucket3);
+
+    // Delete bucket2(obs) recursively.
+    args =
+        new String[] {"bucket", "delete", volume1 +
+              OZONE_URI_DELIMITER + bucket2, "-r", "--yes",
+            "-id", omServiceId};
+    execute(ozoneShell, args);
+    out.reset();
+
+    LambdaTestUtils.intercept(OMException.class,
+        "BUCKET_NOT_FOUND", () -> client.getObjectStore()
+            .getVolume(volume1).getBucket(bucket2));
+
+    // Delete bucket3(legacy) recursively.
+    args =
+        new String[] {"bucket", "delete", volume1 +
+              OZONE_URI_DELIMITER + bucket3, "-r", "--yes",
+            "-id", omServiceId};
+    execute(ozoneShell, args);
+    out.reset();
+
+    LambdaTestUtils.intercept(OMException.class,
+        "BUCKET_NOT_FOUND", () -> client.getObjectStore()
+            .getVolume(volume1).getBucket(bucket3));
+
+    // Now delete volume without recursive
+    // All buckets are already deleted
+    args = new String[] {"volume", "delete", volume1};
+    execute(ozoneShell, args);
+    out.reset();
+    LambdaTestUtils.intercept(OMException.class,
+        "VOLUME_NOT_FOUND", () -> client.getObjectStore().getVolume(volume1));
+  }
 
   private void getVolume(String volumeName) {
     String[] args = new String[] {"volume", "create",
