@@ -846,6 +846,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       Files.createDirectories(path);
       // JobId is prepended to column families name to make them unique
       // for request.
+      LOG.info("");
       fromSnapshotColumnFamily =
           createColumnFamily(jobId + FROM_SNAP_TABLE_SUFFIX);
       toSnapshotColumnFamily =
