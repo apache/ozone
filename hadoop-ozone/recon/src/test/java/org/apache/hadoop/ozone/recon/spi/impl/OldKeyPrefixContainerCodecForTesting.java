@@ -32,17 +32,17 @@ import static org.apache.commons.compress.utils.CharsetNames.UTF_8;
 /**
  * Codec to serialize/deserialize {@link KeyPrefixContainer}.
  */
-public final class KeyPrefixContainerCodec
+public final class OldKeyPrefixContainerCodecForTesting
     implements Codec<KeyPrefixContainer> {
 
   private static final Codec<KeyPrefixContainer> INSTANCE =
-      new KeyPrefixContainerCodec();
+      new OldKeyPrefixContainerCodecForTesting();
 
   public static Codec<KeyPrefixContainer> get() {
     return INSTANCE;
   }
 
-  private KeyPrefixContainerCodec() {
+  private OldKeyPrefixContainerCodecForTesting() {
     // singleton
   }
 

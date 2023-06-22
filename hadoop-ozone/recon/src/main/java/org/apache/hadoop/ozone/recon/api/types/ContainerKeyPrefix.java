@@ -18,6 +18,12 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+
+import javax.annotation.Nonnull;
+import java.util.function.IntFunction;
+
 /**
  * Class to encapsulate the Key information needed for the Recon container DB.
  * Currently, it is the containerId and the whole key + key version.
@@ -40,9 +46,47 @@ public interface ContainerKeyPrefix {
 
   long getContainerId();
 
-  String getKeyPrefix();
+  @Nonnull String getKeyPrefix();
 
   long getKeyVersion();
 
   KeyPrefixContainer toKeyPrefixContainer();
+
+  static Codec<ContainerKeyPrefix> getCodec() {
+    return CodecImpl.INSTANCE;
+  }
+
+  /** Implementing {@link Codec} for {@link ContainerKeyPrefix}. */
+  final class CodecImpl extends ContainerKeyPrefixImpl.CodecBase {
+    private static final Codec<ContainerKeyPrefix> INSTANCE = new CodecImpl();
+
+    private CodecImpl() {
+      // singleton
+    }
+
+    @Override
+    public CodecBuffer toCodecBuffer(@Nonnull ContainerKeyPrefix object,
+        IntFunction<CodecBuffer> allocator) {
+      final int upperBound = getSerializedSizeUpperBound(object);
+      final CodecBuffer buffer = allocator.apply(upperBound)
+          .putLong(object.getContainerId());
+      final String keyPrefix = object.getKeyPrefix();
+      if (!keyPrefix.isEmpty()) {
+        buffer.put(Delimiter.getBytes()).putUtf8(keyPrefix);
+      }
+      return buffer.put(Delimiter.getBytes())
+          .putLong(object.getKeyVersion());
+    }
+
+    @Override
+    public ContainerKeyPrefix fromCodecBuffer(@Nonnull CodecBuffer buffer) {
+      final long containerId = buffer.getLong();
+      final int keyPrefixLength = buffer.readableBytes()
+          - Long.BYTES - 2 * Delimiter.length();
+      final String keyPrefix = keyPrefixLength < 0 ? ""
+          : Delimiter.skip(buffer).getUtf8(keyPrefixLength);
+      final long keyVersion = Delimiter.skip(buffer).getLong();
+      return ContainerKeyPrefix.get(containerId, keyPrefix, keyVersion);
+    }
+  }
 }

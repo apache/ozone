@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
@@ -212,6 +213,30 @@ public final class CodecBuffer implements AutoCloseable {
   }
 
   /**
+   * Similar to {@link ByteBuffer#getLong()}.
+   * The read index of this buffer will be incremented by 8.
+   *
+   * @return the long stored at the current read index.
+   */
+  public long getLong() {
+    return buf.readLong();
+  }
+
+  /**
+   * Get a {@link StandardCharsets#UTF_8} string from this buffer.
+   * The read index of this buffer will be incremented by the given length.
+   *
+   * @param length the number of bytes to be read.
+   * @return the string stored at the current read index.
+   */
+  public String getUtf8(int length) {
+    final int r = buf.readerIndex();
+    final String s = buf.toString(r, length, StandardCharsets.UTF_8);
+    buf.setIndex(r + length, buf.writerIndex());
+    return s;
+  }
+
+  /**
    * Similar to {@link ByteBuffer#putShort(short)}.
    *
    * @return this object.
@@ -241,6 +266,17 @@ public final class CodecBuffer implements AutoCloseable {
   public CodecBuffer putLong(long n) {
     assertRefCnt(1);
     buf.writeLong(n);
+    return this;
+  }
+
+  /**
+   * Put the given string to this buffer using {@link StandardCharsets#UTF_8}.
+   *
+   * @return this object.
+   */
+  public CodecBuffer putUtf8(String s) {
+    assertRefCnt(1);
+    buf.writeCharSequence(s, StandardCharsets.UTF_8);
     return this;
   }
 
@@ -329,5 +365,14 @@ public final class CodecBuffer implements AutoCloseable {
       }
     }
     return size;
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName()
+        + "[" + buf.readerIndex()
+        + "<=" + buf.writerIndex()
+        + "<=" + buf.capacity()
+        + "]";
   }
 }
