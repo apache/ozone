@@ -163,9 +163,10 @@ public class WritableECContainerProvider
       return container;
     }
 
-    throw new IOException("Unable to allocate a pipeline for "
-        + repConfig + " after trying all existing pipelines as the max "
-        + "limit has been reached and no pipelines where closed");
+    throw new IOException("Unable to allocate a pipeline for " + repConfig + ":"
+        + " the maximum of " + maximumPipelines + " has been reached, and "
+        + " none of the " + openPipelineCount + " existing ones are suitable"
+    );
   }
 
   @Nullable
