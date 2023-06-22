@@ -216,6 +216,10 @@ public final class HddsConfigKeys {
   // format hh:mm:ss, representing hour, minute, and second
   public static final String HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT =
       "02:00:00";
+  public static final String HDDS_X509_ROOTCA_CLIENT_POLLING_FREQUENCY =
+      "hdds.x509.rootca.client.polling.frequency";
+  public static final String HDDS_X509_ROOTCA_CLIENT_POLLING_FREQUENCY_DEFAULT
+      = "PT2h";
 
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";
