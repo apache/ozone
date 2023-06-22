@@ -184,21 +184,6 @@ public class NodeStateMap {
   }
 
   /**
-   * Returns the list of node ids which are in the specified state.
-   *
-   * @param status NodeStatus
-   *
-   * @return list of node ids
-   */
-  public List<UUID> getNodes(NodeStatus status) {
-    ArrayList<UUID> nodes = new ArrayList<>();
-    for (DatanodeInfo dn : filterNodes(n -> status.equals(n.getNodeStatus()))) {
-      nodes.add(dn.getUuid());
-    }
-    return nodes;
-  }
-
-  /**
    * Returns the list of node ids which match the desired operational state
    * and health. Passing a null for either value is equivalent to a wild card.
    *
