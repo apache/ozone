@@ -194,7 +194,7 @@ public class ScmTableCountTask extends ReconScmTask {
    * @return the list of SCM tables to be processed by the task.
    * @throws IOException if an I/O error occurs.
    */
-  public List<String> getTaskTables() throws IOException {
+  public List<String> getTaskTables() {
     List<String> tables = new ArrayList<>();
 
     // Add the table names to the list
