@@ -191,6 +191,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
+  @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
     return getSCMCertChain(scmNodeDetails, certSignReq).getX509Certificate();
@@ -298,6 +299,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         builder -> builder.setGetCertRequest(request))
         .getGetCertResponseProto();
   }
+
   /**
    * Get CA certificate.
    *
@@ -307,7 +309,6 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   public String getCACertificate() throws IOException {
     return getCACert().getX509Certificate();
   }
-
 
   public SCMGetCertResponseProto getCACert() throws IOException {
     SCMGetCACertificateRequestProto protoIns = SCMGetCACertificateRequestProto

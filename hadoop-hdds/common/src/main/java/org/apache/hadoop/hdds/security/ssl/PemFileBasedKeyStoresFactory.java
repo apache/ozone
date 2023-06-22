@@ -17,10 +17,9 @@
 */
 package org.apache.hadoop.hdds.security.ssl;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateNotification;
 import org.slf4j.Logger;
@@ -135,19 +134,21 @@ public class PemFileBasedKeyStoresFactory implements KeyStoresFactory,
   /**
    * Returns the keymanagers for owned certificates.
    */
-  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public synchronized KeyManager[] getKeyManagers() {
-    return keyManagers;
+    KeyManager[] copy = new KeyManager[keyManagers.length];
+    System.arraycopy(keyManagers, 0, copy, 0, keyManagers.length);
+    return copy;
   }
 
   /**
    * Returns the trustmanagers for trusted certificates.
    */
-  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public synchronized TrustManager[] getTrustManagers() {
-    return trustManagers;
+    TrustManager[] copy = new TrustManager[trustManagers.length];
+    System.arraycopy(trustManagers, 0, copy, 0, trustManagers.length);
+    return copy;
   }
 
   @Override
