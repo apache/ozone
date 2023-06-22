@@ -32,13 +32,10 @@ public final class PayloadUtils {
 
   public static byte[] generatePayloadBytes(int payloadSize) {
 
-    byte[] payloadBytes = new byte[0];
     int payloadRespSize =
         Math.min(payloadSize * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
     if (payloadRespSize > 0) {
-      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+      return RandomUtils.nextBytes(payloadRespSize);
     }
-
-    return payloadBytes;
   }
 }
