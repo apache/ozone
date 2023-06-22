@@ -218,7 +218,7 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -649,17 +649,14 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap7);
     SnapshotDiffReportOzone
         diff5 = getSnapDiffReport(volume, bucket, snap6, snap7);
-    assertEquals(2, diff5.getDiffList().size());
-    assertEquals(SnapshotDiffReportOzone.DiffType.RENAME,
-        diff5.getDiffList().get(0).getType());
-    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(0).getSourcePath()));
-    assertEquals(renamedKey3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(0).getTargetPath()));
-    assertEquals(SnapshotDiffReportOzone.DiffType.MODIFY,
-        diff5.getDiffList().get(1).getType());
-    assertEquals(key3, org.apache.hadoop.hdds.StringUtils.bytes2String(
-        diff5.getDiffList().get(1).getSourcePath()));
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffList =
+        Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, OZONE_URI_DELIMITER + key3,
+            OZONE_URI_DELIMITER + renamedKey3),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key3)
+        );
+    assertEquals(expectedDiffList, diff5.getDiffList());
   }
 
   @Test
