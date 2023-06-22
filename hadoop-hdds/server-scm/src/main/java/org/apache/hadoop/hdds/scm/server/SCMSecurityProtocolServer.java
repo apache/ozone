@@ -87,6 +87,7 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 
 /**
  * The protocol used to perform security related operations with SCM.
@@ -101,7 +102,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
-  private final X509Certificate rootCACertificate;
+  private final List<X509Certificate> rootCACertificateList;
   private final RPC.Server rpcServer; // HADOOP RPC SERVER
   private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
@@ -116,13 +117,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      X509Certificate rootCACert, StorageContainerManager scm,
+      List<X509Certificate> rootCACertList, StorageContainerManager scm,
       @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
-    this.rootCACertificate = rootCACert;
+    this.rootCACertificateList = rootCACertList;
     this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
@@ -232,6 +233,17 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     }
   }
 
+  @Override
+  public synchronized List<String> getAllRootCaCertificates()
+      throws IOException {
+    List<String> pemEncodedList =
+        new ArrayList<>(rootCACertificateList.size());
+    for (X509Certificate cert : rootCACertificateList) {
+      pemEncodedList.add(getPEMEncodedString(cert));
+    }
+    return pemEncodedList;
+  }
+
   /**
    * Get SCM signed certificate for OM.
    *
@@ -292,7 +304,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           KERBEROS_TRUSTED, nodeType);
     }
     try {
-      return CertificateCodec.getPEMEncodedString(future.get());
+      return getPEMEncodedString(future.get());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw generateException(e, nodeType);
@@ -339,7 +351,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       X509Certificate certificate =
           scmCertificateServer.getCertificate(certSerialId);
       if (certificate != null) {
-        return CertificateCodec.getPEMEncodedString(certificate);
+        return getPEMEncodedString(certificate);
       }
     } catch (CertificateException e) {
       throw new SCMSecurityException("getCertificate operation failed. ", e,
@@ -359,7 +371,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   public String getCACertificate() throws IOException {
     LOGGER.debug("Getting CA certificate.");
     try {
-      return CertificateCodec.getPEMEncodedString(
+      return getPEMEncodedString(
           scmCertificateServer.getCaCertPath());
     } catch (CertificateException e) {
       throw new SCMSecurityException("getRootCertificate operation failed. ",
@@ -385,7 +397,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     List<String> results = new ArrayList<>(certificates.size());
     for (X509Certificate cert : certificates) {
       try {
-        String certStr = CertificateCodec.getPEMEncodedString(cert);
+        String certStr = getPEMEncodedString(cert);
         results.add(certStr);
       } catch (SCMSecurityException e) {
         throw new SCMSecurityException("listCertificate operation failed.",
@@ -403,13 +415,27 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getRootCACertificate() throws IOException {
+  public synchronized String getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
+    X509Certificate lastExpiringRootCa = null;
     if (storageContainerManager.getScmStorageConfig()
         .checkPrimarySCMIdInitialized()) {
-      return CertificateCodec.getPEMEncodedString(rootCACertificate);
+      Date lastCertDate = new Date(0);
+      for (X509Certificate cert : rootCACertificateList) {
+        if (cert.getNotAfter().after(lastCertDate)) {
+          lastCertDate = cert.getNotAfter();
+          lastExpiringRootCa = cert;
+        }
+      }
     }
-    return null;
+    if (lastExpiringRootCa == null) {
+      return null;
+    }
+    return CertificateCodec.getPEMEncodedString(lastExpiringRootCa);
+  }
+
+  public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {
+    rootCACertificateList.add(rootCaCertToAdd);
   }
 
   @Override

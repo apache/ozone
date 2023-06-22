@@ -646,6 +646,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
+    return null;
+  }
+
+  @Override
   public void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException {
   }
