@@ -351,11 +351,12 @@ public class SnapshotDiffManager implements AutoCloseable {
     String bucketId = String.valueOf(
         omMetadataManager.getBucketId(volumeName, bucketName));
     tablePrefixes.put(KEY_TABLE,
-        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
+        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName +
+            OM_KEY_PREFIX);
     tablePrefixes.put(FILE_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX);
     tablePrefixes.put(DIRECTORY_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX);
     return tablePrefixes;
   }
 
@@ -633,8 +634,8 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   @VisibleForTesting
   void checkReportsIntegrity(final SnapshotDiffJob diffJob,
-                                     final int pageStartIdx,
-                                     final int numberOfEntriesInPage)
+                             final int pageStartIdx,
+                             final int numberOfEntriesInPage)
       throws IOException {
     if ((pageStartIdx >= diffJob.getTotalDiffEntries() &&
         numberOfEntriesInPage != 0) || (pageStartIdx <
@@ -846,7 +847,6 @@ public class SnapshotDiffManager implements AutoCloseable {
       Files.createDirectories(path);
       // JobId is prepended to column families name to make them unique
       // for request.
-      LOG.info("");
       fromSnapshotColumnFamily =
           createColumnFamily(jobId + FROM_SNAP_TABLE_SUFFIX);
       toSnapshotColumnFamily =
