@@ -33,9 +33,15 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.1; do
+for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.5; do
   export HADOOP_VERSION
   export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
+  # Check if $HADOOP_VERSION starts with the prefix "3.3."
+  if [[ $HADOOP_VERSION == 3.3.* ]]; then
+    export HADOOP_IMAGE=apache/hadoop
+  else
+    export HADOOP_IMAGE=flokkr/hadoop
+  fi
 
   docker-compose --ansi never --profile hadoop up -d nm rm
 
