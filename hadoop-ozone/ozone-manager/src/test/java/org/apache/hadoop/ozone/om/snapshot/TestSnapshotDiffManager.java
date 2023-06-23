@@ -217,10 +217,10 @@ public class TestSnapshotDiffManager {
   @Mock
   private RocksIterator jobTableIterator;
 
-  private static CodecRegistry codecRegistry;
-
   @Mock
-  private static OmSnapshotManager omSnapshotManager;
+  private OmSnapshotManager omSnapshotManager;
+
+  private static CodecRegistry codecRegistry;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
