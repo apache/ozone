@@ -98,6 +98,12 @@ public class QuotaRepairTask {
       LOG.info("Completed quota repair task");
     }
     updateOldVolumeQuotaSupport();
+
+    // cleanup epoch added to avoid extra epoch id in cache
+    ArrayList<Long> epochs = new ArrayList<>();
+    epochs.add(EPOCH_DEFAULT);
+    metadataManager.getBucketTable().cleanupCache(epochs);
+    metadataManager.getVolumeTable().cleanupCache(epochs);
   }
   
   private void prepareAllVolumeBucketInfo() throws IOException {
@@ -262,10 +268,6 @@ public class QuotaRepairTask {
         metadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(bucketKey),
             CacheValue.get(EPOCH_DEFAULT, bucketInfo));
-        // cleanup epoch added to avoid extra epoch id in cache
-        ArrayList<Long> epochs = new ArrayList<>();
-        epochs.add(EPOCH_DEFAULT);
-        metadataManager.getBucketTable().cleanupCache(epochs);
       }
     }
   }
