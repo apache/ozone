@@ -22,7 +22,6 @@ import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -36,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
@@ -48,6 +48,7 @@ import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Executes deleteVolume call for the shell.
@@ -91,11 +92,17 @@ public class DeleteVolumeHandler extends VolumeHandler {
     String volumeName = address.getVolumeName();
     try {
       if (bRecursive) {
-        if (OmUtils.isServiceIdsDefined(getConf()) &&
-            Strings.isNullOrEmpty(omServiceId)) {
-          out().printf("OmServiceID not provided, provide using " +
-              "-id <OM_SERVICE_ID>%n");
-          return;
+        Collection<String> serviceIds = getConf().getTrimmedStringCollection(
+            OZONE_OM_SERVICE_IDS_KEY);
+        if (Strings.isNullOrEmpty(omServiceId)) {
+          if (serviceIds.size() > 1) {
+            out().printf("OmServiceID not provided, provide using " +
+                "-id <OM_SERVICE_ID>%n");
+            return;
+          } else if (serviceIds.size() == 1) {
+            // Only one OM service ID configured, we can use that
+            omServiceId = serviceIds.iterator().next();
+          }
         }
         if (!yes) {
           // Ask for user confirmation
