@@ -70,6 +70,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -148,6 +149,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   @Override
   public int getQueuedCount() {
     return deleteCommandQueues.size();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return ((ThreadPoolExecutor)executor).getActiveCount();
   }
 
   /**
@@ -307,6 +318,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // recycling thread.
       List<DeletedBlocksTransaction> containerBlocks =
           cmd.getCmd().blocksTobeDeleted();
+      blockDeleteMetrics.incrReceivedTransactionCount(containerBlocks.size());
 
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
@@ -315,6 +327,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           summary.getTxIDSummary(),
           summary.getNumOfContainers(),
           summary.getNumOfBlocks());
+      blockDeleteMetrics.incrReceivedContainerCount(
+          summary.getNumOfContainers());
+      blockDeleteMetrics.incrReceivedRetryTransactionCount(
+          summary.getNumOfRetryTxs());
+      blockDeleteMetrics.incrReceivedBlockCount(summary.getNumOfBlocks());
+
       List<DeleteBlockTransactionResult> results =
           executeCmdWithRetry(containerBlocks);
 
@@ -473,6 +491,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
+    blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
   }
 
   private void markBlocksForDeletionSchemaV1(
@@ -533,6 +552,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         throw new IOException(
             "Failed to delete blocks for TXID = " + delTX.getTxID(), e);
       }
+      blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
     }
   }
 
@@ -600,6 +620,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       return totalTime / invocationCount;
     }
     return 0;
+  }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime;
   }
 
   @Override

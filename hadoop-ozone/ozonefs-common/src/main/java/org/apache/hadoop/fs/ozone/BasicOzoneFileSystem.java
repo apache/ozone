@@ -939,6 +939,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public void deleteSnapshot(Path path, String snapshotName)
+      throws IOException {
+    adapter.deleteSnapshot(pathToKey(path), snapshotName);
+  }
+
+  @Override
   public void setTimes(Path f, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     statistics.incrementWriteOps(1);

@@ -261,7 +261,7 @@ public class TestSnapshotChain {
       prevSnapshotID = snapshotID;
     }
 
-    chainManager.loadSnapshotInfo(omMetadataManager);
+    chainManager = new SnapshotChainManager(omMetadataManager);
     // check if snapshots loaded correctly from snapshotInfoTable
     assertEquals(snapshotID2, chainManager.getLatestGlobalSnapshotId());
     assertEquals(snapshotID2, chainManager.nextGlobalSnapshot(snapshotID1));

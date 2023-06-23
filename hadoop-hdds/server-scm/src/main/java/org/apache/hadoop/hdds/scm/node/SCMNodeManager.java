@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -125,8 +124,7 @@ public class SCMNodeManager implements NodeManager {
   private final NetworkTopology clusterMap;
   private final DNSToSwitchMapping dnsToSwitchMapping;
   private final boolean useHostname;
-  private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
-      new ConcurrentHashMap<>();
+  private final Map<String, Set<UUID>> dnsToUuidMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
@@ -401,7 +399,7 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        addToDnsToUuidMap(dnsName, datanodeDetails.getUuid());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
@@ -435,9 +433,7 @@ public class SCMNodeManager implements NodeManager {
           } else {
             oldDnsName = datanodeInfo.getIpAddress();
           }
-          updateEntryFromDnsToUuidMap(oldDnsName,
-                  dnsName,
-                  datanodeDetails.getUuidString());
+          updateDnsToUuidMap(oldDnsName, dnsName, datanodeDetails.getUuid());
 
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
@@ -464,38 +460,29 @@ public class SCMNodeManager implements NodeManager {
    * running on that host. As each address can have many DNs running on it,
    * this is a one to many mapping.
    *
-   * @param dnsName String representing the hostname or IP of the node
-   * @param uuid    String representing the UUID of the registered node.
+   * @param addr the hostname or IP of the node
+   * @param uuid the UUID of the registered node.
    */
-  @SuppressFBWarnings(value = "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION")
-  private synchronized void addEntryToDnsToUuidMap(
-          String dnsName, String uuid) {
-    Set<String> dnList = dnsToUuidMap.get(dnsName);
-    if (dnList == null) {
-      dnList = ConcurrentHashMap.newKeySet();
-      dnsToUuidMap.put(dnsName, dnList);
-    }
-    dnList.add(uuid);
+  private synchronized void addToDnsToUuidMap(String addr, UUID uuid) {
+    dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
+        .add(uuid);
   }
 
-  private synchronized void removeEntryFromDnsToUuidMap(String dnsName) {
-    if (!dnsToUuidMap.containsKey(dnsName)) {
-      return;
-    }
-    Set<String> dnSet = dnsToUuidMap.get(dnsName);
-    if (dnSet.contains(dnsName)) {
-      dnSet.remove(dnsName);
-    }
-    if (dnSet.isEmpty()) {
-      dnsToUuidMap.remove(dnsName);
+  private synchronized void removeFromDnsToUuidMap(String addr, UUID uuid) {
+    Set<UUID> dnSet = dnsToUuidMap.get(addr);
+    if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
+      dnsToUuidMap.remove(addr);
     }
   }
 
-  private synchronized void updateEntryFromDnsToUuidMap(String oldDnsName,
-                                                        String newDnsName,
-                                                        String uuid) {
-    removeEntryFromDnsToUuidMap(oldDnsName);
-    addEntryToDnsToUuidMap(newDnsName, uuid);
+  private synchronized void updateDnsToUuidMap(
+      String oldDnsName, String newDnsName, UUID uuid) {
+    Preconditions.checkNotNull(oldDnsName, "old address == null");
+    Preconditions.checkNotNull(newDnsName, "new address == null");
+    if (!oldDnsName.equals(newDnsName)) {
+      removeFromDnsToUuidMap(oldDnsName, uuid);
+      addToDnsToUuidMap(newDnsName, uuid);
+    }
   }
 
   /**
@@ -986,7 +973,7 @@ public class SCMNodeManager implements NodeManager {
       return new SCMNodeStat(capacity, used, remaining);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          datanodeDetails.getUuid());
+          datanodeDetails.getUuidString());
       return null;
     }
   }
@@ -1348,14 +1335,19 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public DatanodeDetails getNodeByUuid(String uuid) {
-    if (Strings.isNullOrEmpty(uuid)) {
-      LOG.warn("uuid is null");
+    return uuid != null && !uuid.isEmpty()
+        ? getNodeByUuid(UUID.fromString(uuid))
+        : null;
+  }
+
+  @Override
+  public DatanodeDetails getNodeByUuid(UUID uuid) {
+    if (uuid == null) {
       return null;
     }
-    DatanodeDetails temp = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(uuid)).build();
+
     try {
-      return nodeStateManager.getNode(temp);
+      return nodeStateManager.getNode(uuid);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
@@ -1376,17 +1368,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("address is null");
       return results;
     }
-    Set<String> uuids = dnsToUuidMap.get(address);
+    Set<UUID> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
       LOG.warn("Cannot find node for address {}", address);
       return results;
     }
 
-    for (String uuid : uuids) {
-      DatanodeDetails temp = DatanodeDetails.newBuilder()
-          .setUuid(UUID.fromString(uuid)).build();
+    for (UUID uuid : uuids) {
       try {
-        results.add(nodeStateManager.getNode(temp));
+        results.add(nodeStateManager.getNode(uuid));
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot find node for uuid {}", uuid);
       }

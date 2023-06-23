@@ -55,6 +55,7 @@ public class RatisUnderReplicationHandler
   private final PlacementPolicy placementPolicy;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final ReplicationManagerMetrics metrics;
 
   public RatisUnderReplicationHandler(final PlacementPolicy placementPolicy,
       final ConfigurationSource conf,
@@ -64,6 +65,7 @@ public class RatisUnderReplicationHandler
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
+    this.metrics = replicationManager.getMetrics();
   }
 
   /**
@@ -128,6 +130,7 @@ public class RatisUnderReplicationHandler
           "additional replicas needed: {}",
           containerInfo, targetDatanodes.size(),
           replicaCount.additionalReplicaNeeded());
+      metrics.incrPartialReplicationTotal();
       throw new InsufficientDatanodesException(
           replicaCount.additionalReplicaNeeded(), targetDatanodes.size());
     }
