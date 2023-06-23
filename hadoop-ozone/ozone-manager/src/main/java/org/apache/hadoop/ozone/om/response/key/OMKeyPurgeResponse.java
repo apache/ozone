@@ -95,6 +95,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
         try (BatchOperation writeBatch =
             fromSnapshotStore.initBatchOperation()) {
           processKeys(writeBatch, fromOmSnapshot.getMetadataManager());
+          processKeysToUpdate(writeBatch, fromOmSnapshot.getMetadataManager());
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
       }

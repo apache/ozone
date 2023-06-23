@@ -218,7 +218,7 @@ public class TestOmSnapshot {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-//    preFinalizationChecks();
+    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }

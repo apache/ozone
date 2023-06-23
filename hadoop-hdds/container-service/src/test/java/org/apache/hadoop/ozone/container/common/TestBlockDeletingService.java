@@ -1075,12 +1075,13 @@ public class TestBlockDeletingService {
       DBHandle handle, KeyPrefixFilter filter, long containerID)
       throws IOException {
     long count = 0L;
-    BlockIterator<BlockData> iterator = handle.getStore().
-        getBlockIterator(containerID, filter);
-    iterator.seekToFirst();
-    while (iterator.hasNext()) {
-      iterator.nextBlock();
-      count += 1;
+    try (BlockIterator<BlockData> iterator = handle.getStore().
+        getBlockIterator(containerID, filter)) {
+      iterator.seekToFirst();
+      while (iterator.hasNext()) {
+        iterator.nextBlock();
+        count += 1;
+      }
     }
     Assert.assertEquals("Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "

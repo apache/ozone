@@ -135,9 +135,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       // Check if fromKey exists
-      OzoneFileStatus fromKeyFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
-                      bucketName, fromKeyName, 0);
+      OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, fromKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
@@ -159,9 +159,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
               toKeyName, fromKeyFileStatus.isDirectory());
 
-      OzoneFileStatus toKeyFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
-                      volumeName, bucketName, toKeyName, 0);
+      OzoneFileStatus toKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, toKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       // Check if toKey exists.
       if (toKeyFileStatus != null) {
@@ -186,8 +186,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
                   fromFileName);
           OzoneFileStatus newToOzoneFileStatus =
-                  OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
-                          volumeName, bucketName, newToKeyName, 0);
+              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+                  volumeName, bucketName, newToKeyName, 0,
+                  ozoneManager.getDefaultReplicationConfig());
 
           if (newToOzoneFileStatus != null) {
             // case-5) If new destin '/dst/source' exists then throws exception
@@ -213,7 +214,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         // doesn't exist then throw exception, otw the source can be renamed to
         // destination path.
         OmKeyInfo toKeyParent = OMFileRequest.getKeyParentDir(volumeName,
-                bucketName, toKeyName, omMetadataManager);
+                bucketName, toKeyName, ozoneManager, omMetadataManager);
 
         omClientResponse = renameKey(toKeyParent, toKeyName, fromKeyValue,
             fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
@@ -297,7 +298,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
         modificationTime, dirTable, trxnLogIndex);
     fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
-        fromKeyValue.getBucketName(), fromKeyName, metadataMgr);
+        fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
     if (fromKeyParent == null && omBucketInfo == null) {
       // Get omBucketInfo only when needed to reduce unnecessary DB IO
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);

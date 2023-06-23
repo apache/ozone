@@ -55,7 +55,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -125,7 +126,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * |  fromSnapshotId-toSnapshotId | SnapshotDiffJob |
    * |------------------------------------------------|
    */
-  private static final String SNAP_DIFF_JOB_TABLE_NAME =
+  public static final String SNAP_DIFF_JOB_TABLE_NAME =
       "snap-diff-job-table";
 
   /**
@@ -137,7 +138,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * |  jobId-index | DiffReportEntry |
    * |--------------------------------|
    */
-  private static final String SNAP_DIFF_REPORT_TABLE_NAME =
+  public static final String SNAP_DIFF_REPORT_TABLE_NAME =
       "snap-diff-report-table";
 
   /**
@@ -354,7 +355,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     };
   }
 
-  private CodecRegistry createCodecRegistryForSnapDiff() {
+  private static CodecRegistry createCodecRegistryForSnapDiff() {
     final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
@@ -665,7 +666,8 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param status SnapshotStatus
    * @return true if the snapshot is in given status, false otherwise
    */
-  public boolean isSnapshotStatus(String key, SnapshotStatus status)
+  public boolean isSnapshotStatus(String key,
+                                  SnapshotInfo.SnapshotStatus status)
       throws IOException {
     return getSnapshotInfo(key).getSnapshotStatus().equals(status);
   }

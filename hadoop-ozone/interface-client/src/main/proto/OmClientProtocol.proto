@@ -803,6 +803,7 @@ message SnapshotInfo {
   optional string snapshotPath = 10;
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
+  optional bool deepClean = 13;
  }
 
 message SnapshotDiffJobProto {
@@ -1771,6 +1772,7 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
+  repeated string updatedSnapshotDBKey = 2;
 }
 
 message DeleteTenantRequest {
