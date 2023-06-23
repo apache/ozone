@@ -32,7 +32,7 @@ const size = filesize.partial({ standard: 'iec' });
 const { TabPane } = Tabs;
 interface IContainerResponse {
   containerId: number;
-  containerState: string;
+  mismatchMissingState: string;
   OMContainerState: string;
   SCMContainerState: string;
   existsAt: string;
@@ -290,7 +290,7 @@ interface IOmdbInsightsState {
   expandedRowData: IExpandedRow;
   deletedContainerKeysDataSource: [];
   prevKeyMismatch: number;
-  containerState: any;
+  mismatchMissingState: any;
   prevKeyOpen: string;
   prevKeyDeleted: number;
   prevKeyDeletePending: string;
@@ -315,7 +315,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       pendingDeleteKeyDataSource: [],
       deletedContainerKeysDataSource: [],
       prevKeyMismatch: 0,
-      containerState: 'SCM',
+      mismatchMissingState: 'SCM',
       prevKeyOpen: "",
       prevKeyDeletePending: "",
       prevKeyDeleted: 0,
@@ -357,7 +357,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   existAtScmOmMenu = () => (
     <Menu
-      // defaultSelectedKeys={this.state.containerState}
+      // defaultSelectedKeys={this.state.mismatchMissingState}
       onClick={e => this.handleExistsAtChange(e)}>
       <Menu.Item key='OM'>
         OM
@@ -372,27 +372,27 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     if (e.key === 'OM') {
       console.log("OM before setstate handleExistsAtChange if", this.state);
       this.setState({
-        containerState: 'SCM',
+        mismatchMissingState: 'SCM',
         prevKeyMismatch: 0,
         prevKeyOpen: "",
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
       },() => {
         console.log("before If fetchMismatchContainers OM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
       });
     }
     else {
       console.log("before else setstate else SCM", this.state);
       this.setState({
-        containerState: 'OM',
+        mismatchMissingState: 'OM',
         prevKeyMismatch: 0,
         prevKeyOpen: "",
         prevKeyDeletePending: "",
         prevKeyDeleted: 0,
       },() => {
         console.log("before fetchMismatchContainers SCM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
       });
     }
   };
@@ -470,10 +470,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   componentDidMount(): void {
     // Fetch mismatch containers on component mount
-    this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+    this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
   };
 
-  fetchMismatchContainers = (limit: number, prevKeyMismatch: number, containerState: any) => {
+  fetchMismatchContainers = (limit: number, prevKeyMismatch: number, mismatchMissingState: any) => {
     this.setState({
       loading: true,
       prevKeyOpen: "",
@@ -481,12 +481,13 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevKeyDeleted: 0,
       clickable: true
     });
-    const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${containerState}`
+    const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${mismatchMissingState}`
     axios.get(mismatchEndpoint).then(mismatchContainersResponse => {
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
       console.log("fetchMismatchContainers", mismatchContainersResponse.data);
       localStorage.setItem('prevKeyMismatch', prevKeyMismatch.toString());
       if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
+        //No Further Records may be last record
         this.setState({
           loading: false,
           clickable: false,
@@ -667,7 +668,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
       }
       else {
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
       }
     })
   };
@@ -684,7 +685,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
     }
     else {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.containerState);
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
     }
   };
 
@@ -699,7 +700,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
     }
     else {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.containerState);
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
     }
   };
 
@@ -749,7 +750,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         DEFAULT_LIMIT: pageSize,
         prevKeyMismatch:parseInt(localStorage.getItem('prevKeyMismatch'))
       }, () => {
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.containerState);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
       });
     }
   };
