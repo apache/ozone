@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.conf;
 /**
  * Parent class for the example configuration.
  */
-public class SimpleConfigurationParent {
+public class SimpleConfigurationParent extends ReconfigurableConfig {
 
   @Config(key = "enabled", defaultValue = "true", description = "Example "
       + "boolean config.", tags = ConfigTag.MANAGEMENT)

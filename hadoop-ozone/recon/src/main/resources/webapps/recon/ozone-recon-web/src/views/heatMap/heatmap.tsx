@@ -26,11 +26,11 @@ import HeatMapConfiguration from './heatMapConfiguration';
 
 interface ITreeResponse {
   label: string;
-  children: IChildren[];
-  size: number;
   path: string;
-  minAccessCount: number;
   maxAccessCount: number;
+  minAccessCount: number;
+  size: number;
+  children: IChildren[];
 }
 
 interface IChildren {
@@ -44,10 +44,11 @@ interface ITreeState {
   isLoading: boolean;
   treeResponse: ITreeResponse[];
   showPanel: boolean;
+  inputRadio: number;
   inputPath: string;
   entityType: string;
   date: string;
-  inputRadio?: number;
+  treeEndpointFailed: boolean;
 }
 
 let minSize = Infinity;
@@ -111,7 +112,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       showPanel: false,
       entityType: 'key',
       inputPath: '/',
-      date: '24H'
+      date: '24H',
+      treeEndpointFailed: false
     };
   }
 
@@ -165,28 +167,38 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   updateTreeMap = (path: string, entityType: string, date: string) => {
     this.setState({
-      isLoading: true
+      isLoading: true,
+      treeEndpointFailed: false
     });
 
-    const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
-    axios.get(treeEndpoint).then(response => {
-      minSize = this.minmax(response.data)[0];
-      maxSize = this.minmax(response.data)[1];
-      const treeResponse: ITreeResponse = this.updateSize(response.data);
-      this.setState({
-        isLoading: false,
-        showPanel: false,
-        treeResponse
+    if (date && path && entityType) {
+      const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
+      axios.get(treeEndpoint).then(response => {
+        minSize = this.minmax(response.data)[0];
+        maxSize = this.minmax(response.data)[1];
+        let treeResponse: ITreeResponse = this.updateSize(response.data);
+        console.log("Final treeResponse--", treeResponse);
+        this.setState({
+          isLoading: false,
+          showPanel: false,
+          treeResponse
+        });
+      }).catch(error => {
+        this.setState({
+          isLoading: false,
+          inputPath: '',
+          entityType: '',
+          date: '',
+          treeEndpointFailed: true
+        });
+        showDataFetchError(error.toString());
       });
-    }).catch(error => {
+    }
+    else {
       this.setState({
-        isLoading: false,
-        inputPath: '',
-        entityType: '',
-        date: ''
+        isLoading: false
       });
-      showDataFetchError(error.toString());
-    });
+    }
   };
 
   updateTreemapParent = (path: any) => {
@@ -232,12 +244,12 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     }
   };
 
-  minmax = (obj: any) => {
-    if (Object.prototype.hasOwnProperty.call(obj, 'children')) {
-      obj.children.forEach((child: any) => this.minmax(child));
-    }
-
-    if (Object.prototype.hasOwnProperty.call(obj, 'size') && Object.prototype.hasOwnProperty.call(obj, 'color')) {
+  minmax = (obj :any) => {
+    //min max property will get applied to only for leaf level which we are showing on UI.
+    if (obj.hasOwnProperty('children')) {
+      obj.children.forEach((child: any) => this.minmax(child))
+    };
+    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
       minSize = Math.min(minSize, obj.size);
       maxSize = Math.max(maxSize, obj.size);
     }
@@ -246,11 +258,27 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   updateSize = (obj: any) => {
     //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
-    if (Object.prototype.hasOwnProperty.call(obj, 'size') && Object.prototype.hasOwnProperty.call(obj, 'color')) {
-      const newSize = this.normalize(minSize, maxSize, obj.size);
-      obj['normalizedSize'] = newSize;
+    // it will only apply on leaf level as checking color property
+    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
+
+      // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
+      if (obj && obj.size === 0 && obj.accessCount === 0) {
+        obj['normalizedSize'] = 0;
+      } else if (obj && obj.size === 0 && obj.maxAccessCount === 0) {
+        obj['normalizedSize'] = 0;
+      }
+      else if (obj && obj.size === 0 && (obj.accessCount >= 0 || obj.maxAccessCount >= 0))
+      {
+        obj['normalizedSize'] = 1;
+        obj.size = 0;
+      }
+      else {
+        let newSize = this.normalize(minSize, maxSize, obj.size);
+        obj['normalizedSize'] = newSize;
+      }
     }
-    if (Object.prototype.hasOwnProperty.call(obj, 'children')) {
+
+    if (obj.hasOwnProperty('children')) {
       obj.children.forEach((child: any) => this.updateSize(child));
     }
     return obj;
@@ -278,7 +306,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   render() {
-    const { treeResponse, isLoading, inputPath, date } = this.state;
+    const { treeResponse, isLoading, inputPath, date, treeEndpointFailed } = this.state;
     const menuCalendar = (
       <Menu
         defaultSelectedKeys={[date]}
@@ -328,9 +356,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
         <div className='content-div'>
           {isLoading ? <span><Icon type='loading' /> Loading...</span> : (
             <div>
-              {(Object.keys(treeResponse).length > 0 && (treeResponse.minAccessCount > 0 || treeResponse.maxAccessCount > 0)) ?
-                (treeResponse.size === 0) ? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br /></div>
-                  :
+              {treeEndpointFailed ? <div className='heatmapinformation'><br />Failed to Load Heatmap.{' '}<br /></div> :
+                (Object.keys(treeResponse).length > 0 && (treeResponse.label !== null || treeResponse.path !== null)) ?
                   <div>
                     <div className='heatmap-header-container'>
                       <Row>
@@ -373,6 +400,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                       <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                     </div>
                   </div>
+<<<<<<< HEAD
                 :
                 <div className='heatmap-no-data-text'><br />
                   No Data Available.{' '}<br />
@@ -380,6 +408,17 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
               }
             </div>
           )}
+=======
+                  :
+                  <div className='heatmapinformation'><br />
+                    No Data Available. {' '}<br />
+                  </div>
+              }
+
+            </div>
+          )
+          }
+>>>>>>> master
         </div>
       </div>
     );

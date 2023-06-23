@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,14 +50,21 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       Paths.get(OzoneConsts.SCM_CA_CERT_STORAGE_DIR,
           OzoneConsts.SCM_SUB_CA_PATH).toString();
 
-  public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
+  public SCMCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String certSerialId
+  ) {
+    super(securityConfig, scmClient, LOG, certSerialId,
+        COMPONENT_NAME, null, null);
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String component) {
-    super(securityConfig, LOG, certSerialId, component, null, null);
+  public SCMCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String certSerialId,
+      String component) {
+    super(securityConfig, scmClient, LOG, certSerialId, component, null, null);
   }
 
   @Override

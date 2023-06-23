@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -55,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,12 +94,12 @@ public final class OzoneManagerDoubleBuffer {
   // daemon thread, we complete the futures in readyFutureQueue and clear them.
   private volatile Queue<CompletableFuture<Void>> readyFutureQueue;
 
-  private Daemon daemon;
+  private final Daemon daemon;
   private final OMMetadataManager omMetadataManager;
   private final AtomicLong flushedTransactionCount = new AtomicLong(0);
   private final AtomicLong flushIterations = new AtomicLong(0);
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
-  private OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
+  private final OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
   private long maxFlushedTransactionsInOneIteration;
 
   private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
@@ -112,7 +112,7 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * function which will get term associated with the transaction index.
    */
-  private Function<Long, Long> indexToTerm;
+  private final Function<Long, Long> indexToTerm;
 
   /**
    *  Builder for creating OzoneManagerDoubleBuffer.
@@ -231,40 +231,42 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add to write batch with trace span if tracing is enabled.
    */
-  private Void addToBatchWithTrace(OMResponse omResponse,
-      SupplierWithIOException<Void> supplier) throws IOException {
+  private void addToBatchWithTrace(OMResponse omResponse,
+      CheckedRunnable<IOException> runnable) throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-addToWriteBatch" + "-" +
-        omResponse.getCmdType().toString();
-    return TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(),
-        supplier);
+        omResponse.getCmdType();
+    TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(), runnable);
   }
 
   /**
    * Flush write batch with trace span if tracing is enabled.
    */
-  private Void flushBatchWithTrace(String parentName, int batchSize,
-      SupplierWithIOException<Void> supplier) throws IOException {
+  private void flushBatchWithTrace(String parentName, int batchSize,
+      CheckedRunnable<IOException> runnable) throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-commitWriteBatch-Size-" + batchSize;
-    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
   }
 
   /**
    * Add to writeBatch {@link TransactionInfo}.
    */
-  private Void addToBatchTransactionInfoWithTrace(String parentName,
-      long transactionIndex, SupplierWithIOException<Void> supplier)
+  private void addToBatchTransactionInfoWithTrace(String parentName,
+      long transactionIndex, CheckedRunnable<IOException> runnable)
       throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-addWriteBatch-transactioninfo-" + transactionIndex;
-    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
   }
 
   /**
@@ -349,23 +351,17 @@ public final class OzoneManagerDoubleBuffer {
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
           lastRatisTransactionIndex,
-          () -> {
-            omMetadataManager.getTransactionInfoTable().putWithBatch(
-                batchOperation, TRANSACTION_INFO_KEY,
-                new TransactionInfo.Builder()
-                    .setTransactionIndex(lastRatisTransactionIndex)
-                    .setCurrentTerm(term)
-                    .build());
-            return null;
-          });
+          () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
+              batchOperation, TRANSACTION_INFO_KEY,
+              new TransactionInfo.Builder()
+                  .setTransactionIndex(lastRatisTransactionIndex)
+                  .setCurrentTerm(term)
+                  .build()));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
-          () -> {
-            omMetadataManager.getStore()
-                .commitBatchOperation(batchOperation);
-            return null;
-          });
+          () -> omMetadataManager.getStore()
+              .commitBatchOperation(batchOperation));
 
       ozoneManagerDoubleBufferMetrics.updateFlushTime(
           Time.monotonicNow() - startTime);
@@ -410,10 +406,7 @@ public final class OzoneManagerDoubleBuffer {
 
       try {
         addToBatchWithTrace(omResponse,
-            () -> {
-              response.checkAndUpdateDB(omMetadataManager, batchOperation);
-              return null;
-            });
+            () -> response.checkAndUpdateDB(omMetadataManager, batchOperation));
       } catch (IOException ex) {
         // During Adding to RocksDB batch entry got an exception.
         // We should terminate the OM.
@@ -523,7 +516,6 @@ public final class OzoneManagerDoubleBuffer {
   }
   /**
    * Update OzoneManagerDoubleBuffer metrics values.
-   * @param flushedTransactionsSize
    */
   private void updateMetrics(int flushedTransactionsSize) {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
@@ -601,8 +593,6 @@ public final class OzoneManagerDoubleBuffer {
 
   /**
    * Add OmResponseBufferEntry to buffer.
-   * @param response
-   * @param transactionIndex
    */
   public synchronized CompletableFuture<Void> add(OMClientResponse response,
       long transactionIndex) {

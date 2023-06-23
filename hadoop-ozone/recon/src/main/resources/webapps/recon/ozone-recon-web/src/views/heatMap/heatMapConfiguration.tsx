@@ -91,11 +91,15 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
             },
           },
           listeners: {
-            nodeClick: (event) => {
-              const data = event.datum;
-              if (data.path) {
-                this.props.onClick(data.path);
-              }
+              nodeClick: (event) => {
+              var data = event.datum;
+              // Leaf level box should not call API
+              if (!data.color)
+                if (data.path) {
+                  console.log("Path", data.path);
+                  this.props.onClick(data.path);
+                }
+              },
             },
           },
         }],
@@ -106,7 +110,7 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
   }
   
 
-
+    
   tooltipContent = (params: any) => {
     let tooltipContent = `<span>
       Size:
@@ -115,13 +119,18 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
     if (params.datum.accessCount !== undefined) {
       tooltipContent += `<br/>
         Access count:
-      ${params.datum.accessCount}
+      ${params.datum.accessCount }
     `;
-    }
+      }
+    else{
+        tooltipContent += `<br/>
+        Max Access Count:
+      ${params.datum.maxAccessCount}
+    `;}
     if (params.datum.label !== "") {
       tooltipContent += `<br/>
           File Name:
-          ${params.datum.label ? params.datum.label.split("/").slice(-1) : "None"}
+          ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
         `;
     }
     tooltipContent += '</span>';
