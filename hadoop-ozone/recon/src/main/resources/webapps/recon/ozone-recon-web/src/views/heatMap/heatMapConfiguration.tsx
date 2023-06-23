@@ -101,15 +101,12 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
                 }
               },
             },
-          },
-        }],
+          }],
         title: { text: 'Volumes and Buckets' },
       }
       // Tree Map Options End
     };
   }
-  
-
     
   tooltipContent = (params: any) => {
     let tooltipContent = `<span>

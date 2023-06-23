@@ -400,15 +400,6 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                       <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                     </div>
                   </div>
-<<<<<<< HEAD
-                :
-                <div className='heatmap-no-data-text'><br />
-                  No Data Available.{' '}<br />
-                </div>
-              }
-            </div>
-          )}
-=======
                   :
                   <div className='heatmapinformation'><br />
                     No Data Available. {' '}<br />
@@ -418,7 +409,6 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
             </div>
           )
           }
->>>>>>> master
         </div>
       </div>
     );
