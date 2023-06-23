@@ -166,7 +166,7 @@ const OPEN_KEY_TAB_COLUMNS = [
     isSearchable: true,
   },
   {
-    title: 'Amount of data',
+    title: 'Amount of data (KB)',
     dataIndex: 'size',
     key: 'size',
   },
@@ -228,7 +228,7 @@ const PENDING_TAB_COLUMNS = [
     isSearchable: true,
   },
   {
-    title: 'Total data size',
+    title: 'Total data size (KB)',
     dataIndex: 'dataSize',
     key: 'dataSize',
   },
@@ -483,6 +483,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     axios.get(mismatchEndpoint).then(mismatchContainersResponse => {
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
       console.log("fetchMismatchContainers", mismatchContainersResponse.data);
+      localStorage.setItem('prevKeyMismatch', prevKeyMismatch.toString());
       if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
         this.setState({
           loading: false,
@@ -530,6 +531,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           openKeys[key] && openKeys[key].map((item: any) => (allopenKeysResponse.push({ ...item, type: key })));
         }
       }
+
+      localStorage.setItem('prevKeyOpen', prevKeyOpen);
+
       if (openKeysResponse && openKeysResponse.data && openKeysResponse.data.lastKey === "") {
         this.setState({
           loading: false,
@@ -561,45 +565,51 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevKeyDeleted: 0,
       clickable: true
     });
-    let deletePendingKeysEndpoint
+    let deletePendingKeysEndpoint;
     if (prevKeyDeletePending === "") {
-      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey`
+      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey`;
     }
     else {
-      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey=${prevKeyDeletePending}`
+      deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey=${prevKeyDeletePending}`;
     }
     axios.get(deletePendingKeysEndpoint).then(deletePendingKeysResponse => {
       const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
-      //const deletePendingKey = deletePendingKeys && deletePendingKeys.map(item => item.omKeyInfoList);
-   
-      const data = deletePendingKeys && deletePendingKeys
-        .flatMap((info: any) => info.omKeyInfoList)
-        .reduce((deletePending, item) => {
-          
-          const existingKey = deletePending.find((key) => key.keyName === item.keyName && key.fileName === item.fileName);
-          if (existingKey) {
-            existingKey.dataSize += item.dataSize;
-           // keyCount+=keyCount
-           existingKey.keyCount++; 
-            }
-           else {
-            deletePending.push({ ...item, keyCount:1 });
-          }
-          return deletePending;
-        }, []);
+      //Use Summation Logic iterate through all object and find sum of all datasize
+      const deletedKeyInfoData = deletePendingKeys && deletePendingKeys.flatMap((infoObject:any) => {
+        const { omKeyInfoList } = infoObject;
+        console.log("omKeyInfoList", omKeyInfoList);
+        let count = 0;
+        let item = omKeyInfoList && omKeyInfoList.reduce((obj:any, item:any) => {
+          const { dataSize } = item;
+          item.dataSize = obj.dataSize + dataSize;
+          count = count + 1;
+          return item;
+        }, { "dataSize": 0 });
+      
+        return {
+          "dataSize": item.dataSize,
+          "fileName":item.fileName,
+          "keyName": item.keyName,
+          "path": item.path,
+          "keyCount": count
+        }
+      });
+      //end
+    console.log("eletedKeyInfoData",deletedKeyInfoData);
 
+      localStorage.setItem('prevKeyDeletePending', prevKeyDeletePending);
       if (deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey === "") {
         this.setState({
           loading: false,
           clickable: false,
-          pendingDeleteKeyDataSource: data
+          pendingDeleteKeyDataSource: deletedKeyInfoData
         })
       }
       else {
         this.setState({
           loading: false,
           prevKeyDeletePending: deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey,
-          pendingDeleteKeyDataSource: data
+          pendingDeleteKeyDataSource: deletedKeyInfoData
         });
       }
     }).catch(error => {
@@ -618,10 +628,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevKeyMismatch: 0,
       clickable: true
     });
-    const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`
+    const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`;
+
     axios.get(deletedKeysEndpoint).then(deletedKeysResponse => {
-      
       const deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
+      localStorage.setItem('prevKeyDeleted', prevKeyDeleted.toString());
 
       if (deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey === null) {
         this.setState({
@@ -664,7 +675,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   fetchPreviousRecords = () => {
-    // To Call API for Page Level for each page
+    // To call API get key from local storage
+    console.log("previous Records", this.state);
+    
     if (this.state.activeTab === '2') {
       this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
     } else if (this.state.activeTab === '3') {
@@ -673,7 +686,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
     }
     else {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.nextKeyMismatch, this.state.containerState);
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.containerState);
     }
   };
 
@@ -703,42 +716,44 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   onShowSizeChange = (current: number, pageSize: number) => {
-    // To Call API for Page Level for each page
-    let new2 = 0;
-    new2 = ((pageSize * current) - pageSize) + 1;
+    console.log("onShowSizeChange", current, pageSize, this.state);
+   //On Size Change Call respective API with current previous page key
     if (this.state.activeTab === '2') {
       this.setState({
         DEFAULT_LIMIT: pageSize,
-        currentPage: current,
+        prevKeyOpen:localStorage.getItem('prevKeyOpen')
       }, () => {
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, new2 === 1 ? 0 : new2);
+        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,this.state.prevKeyOpen);
       });
     }
     else if (this.state.activeTab === '3') {
+      //keys pending for deletiontion
       this.setState({
         DEFAULT_LIMIT: pageSize,
-        currentPage: current
+        prevKeyDeletePending: localStorage.getItem('prevKeyDeletePending')
       }, () => {
-        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, new2 === 1 ? 0 : new2);
+        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
       })
     }
     else if (this.state.activeTab === '4') {
+      //deleted container keys
       this.setState({
         DEFAULT_LIMIT: pageSize,
-        currentPage: current,
+        prevKeyDeleted:parseInt(localStorage.getItem('prevKeyDeleted'))
       }, () => {
-        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, new2 === 1 ? 0 : new2);
+        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
       })
     }
     else {
+      // active tab 1 for mismatch
+      console.log(parseInt(localStorage.getItem('prevKeyMismatch')) );
       this.setState({
         DEFAULT_LIMIT: pageSize,
-        currentPage: current,
+        prevKeyMismatch:parseInt(localStorage.getItem('prevKeyMismatch'))
       }, () => {
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, new2 === 1 ? 0 : new2, this.state.containerState);
+        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.containerState);
       });
     }
-    //current=1;
   };
 
   onRowExpandClick = (expanded: boolean, record: IContainerResponse) => {
@@ -860,6 +875,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }, [])
   };
 
+  localStorageSetItem = (item:any) => {
+    localStorage.setItem(item, JSON.stringify(item));
+  };
+
+  localStorageGetItem = (item:any) => {
+    localStorage.getItem(item);
+  }
+
   render() {
     const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource } = this.state;
 
@@ -867,10 +890,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       //showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} containers`,
       defaultPageSize: this.state.DEFAULT_LIMIT,
       pageSizeOptions: ['10', '20', '30', '50'],
-      //showQuickJumper: true,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
-      //current:this.state.currentPage,
       //onChange: this.onChangePagination,
       itemRender: this.itemRender
     };

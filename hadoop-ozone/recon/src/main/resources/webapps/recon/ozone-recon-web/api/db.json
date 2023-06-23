@@ -4043,42 +4043,6 @@
         }
       ],
       "existsAt": "OM"
-    },
-    {
-      "containerId": 11,
-      "numberOfKeys": 11,
-      "pipelines": [
-        {
-          "id": {
-            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
-          },
-          "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "RATIS"
-          },
-          "healthy": true
-        }
-      ],
-      "existsAt": "OM"
-    },
-    {
-      "containerId": 12,
-      "numberOfKeys": 12,
-      "pipelines": [
-        {
-          "id": {
-            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
-          },
-          "replicationConfig": {
-            "replicationFactor": "ONE",
-            "requiredNodes": 1,
-            "replicationType": "RATIS"
-          },
-          "healthy": true
-        }
-      ],
-      "existsAt": "OM"
     }
   ]
   },
@@ -4469,32 +4433,6 @@
       },
       {
         "key": "fso 10",
-        "path": "2",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      
-      },
-      {
-        "key": "fso 11",
-        "path": "2",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2412/110569623850191713",
         "path": "2",
         "inStateSince": 1686156887186,
         "size": 268435456,
