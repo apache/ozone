@@ -433,6 +433,17 @@ public class TestKeyValueHandler {
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
       hddsVolume.setTmpDirPath(tmpDirPath);
+
+      // Case 3:  Delete Container on a failed volume
+      hddsVolume.failVolume();
+      GenericTestUtils.LogCapturer kvHandlerLogs =
+          GenericTestUtils.LogCapturer.captureLogs(KeyValueHandler.getLogger());
+      kvHandler.deleteContainer(containerSet.getContainer(container2ID), true);
+      String expectedLog =
+          "Delete container issued on containerID 2 which is " +
+              "in a failed volume";
+      Assert.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

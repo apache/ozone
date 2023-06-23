@@ -127,7 +127,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueHandler extends Handler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  public static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
   private final BlockManager blockManager;
@@ -1289,6 +1289,16 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     container.writeLock();
     try {
+      if (container.getContainerData().getVolume().isFailed()) {
+        // if the  volume in which the container resides fails
+        // don't attempt to delete/move it. When a volume fails,
+        // failedVolumeListener will pick it up and clear the container
+        // from the container set.
+        LOG.info("Delete container issued on containerID {} which is in a " +
+                "failed volume. Skipping", container.getContainerData()
+            .getContainerID());
+        return;
+      }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
@@ -1377,4 +1387,9 @@ public class KeyValueHandler extends Handler {
     StorageVolumeUtil.onFailure(container.getContainerData().getVolume());
     throw new StorageContainerException(msg, result);
   }
+
+  public static Logger getLogger() {
+    return LOG;
+  }
+
 }
