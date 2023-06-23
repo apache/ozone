@@ -104,9 +104,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
     } finally {
       lock.writeLock().unlock();
     }
-    if (pipelineStore != null) {
-      LOG.info("Created pipeline {}.", pipeline);
-    }
   }
 
   @Override
@@ -249,7 +246,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       } finally {
         lock.writeLock().unlock();
       }
-      LOG.info("Pipeline {} removed.", pipeline);
     } catch (PipelineNotFoundException pnfe) {
       LOG.warn("Pipeline {} is not found in the pipeline Map. Pipeline"
           + " may have been deleted already.", pipelineIDProto.getId());
