@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -139,6 +140,11 @@ public class TestOmSnapshot {
   private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(10);
 
   private static AtomicInteger counter;
+  private static final String SNAPSHOT_DAY_PREFIX = "snap-day-";
+  private static final String SNAPSHOT_WEEK_PREFIX = "snap-week-";
+  private static final String SNAPSHOT_MONTH_PREFIX = "snap-month-";
+  private static final String keyPrefix = "key-";
+  private static final String keyTestData = "test";
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -1293,4 +1299,146 @@ public class TestOmSnapshot {
     assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
     assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
   }
+
+  @Test
+  public void TestDayWeekMonthSnapshotCreationExpiration() throws Exception {
+    String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
+    String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeA);
+    OzoneVolume volA = store.getVolume(volumeA);
+    volA.createBucket(bucketA);
+    OzoneBucket volAbucketA = volA.getBucket(bucketA);
+
+    int latestDayIndex = 0;
+    int latestWeekIndex = 0;
+    int latestMonthIndex = 0;
+    int oldestDayIndex = latestDayIndex;
+    int oldestWeekIndex = latestWeekIndex;
+    int oldestMonthIndex = latestMonthIndex;
+    int daySnapshotRetentionPeriodDays = 7;
+    int weekSnapshotRetentionPeriodWeek = 1;
+    int monthSnapshotRetentionPeriodMonth = 1;
+    int[] updatedDayIndexArr;
+    int[] updatedWeekIndexArr;
+    int[] updatedMonthIndexArr;
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 4; j++) {
+        for (int k = 0; k < 7; k++) {
+          // if there are seven day's snapshots in cluster already,
+          // remove the oldest day snapshot then create the latest day snapshot
+          updatedDayIndexArr = checkSnapshotExpirationThenCreateLatest(
+              SNAPSHOT_DAY_PREFIX, oldestDayIndex, latestDayIndex,
+              daySnapshotRetentionPeriodDays, volumeA, bucketA, volAbucketA);
+          oldestDayIndex = updatedDayIndexArr[0];
+          latestDayIndex = updatedDayIndexArr[1];
+        }
+        // if there is one week's snapshot in cluster already,
+        // remove the oldest week snapshot then create the latest week snapshot
+        updatedWeekIndexArr = checkSnapshotExpirationThenCreateLatest(
+            SNAPSHOT_WEEK_PREFIX, oldestWeekIndex, latestWeekIndex,
+            weekSnapshotRetentionPeriodWeek, volumeA, bucketA, volAbucketA);
+        oldestWeekIndex = updatedWeekIndexArr[0];
+        latestWeekIndex = updatedWeekIndexArr[1];
+      }
+      // if there is one month's snapshot in cluster already,
+      // remove the oldest month snapshot then create the latest month snapshot
+      updatedMonthIndexArr = checkSnapshotExpirationThenCreateLatest(
+          SNAPSHOT_MONTH_PREFIX, oldestMonthIndex, latestMonthIndex,
+          monthSnapshotRetentionPeriodMonth, volumeA, bucketA, volAbucketA);
+      oldestMonthIndex = updatedMonthIndexArr[0];
+      latestMonthIndex = updatedMonthIndexArr[1];
+    }
+
+    checkDayWeekMonthSnapshotData(volAbucketA,
+        latestDayIndex,
+        latestWeekIndex,
+        latestMonthIndex,
+        keyTestData);
+  }
+
+  private int[] checkSnapshotExpirationThenCreateLatest(String snapshotPrefix,
+                                                        int oldestIndex,
+                                                        int latestIndex,
+                                                        int snapshotRetentionPeriod,
+                                                        String volumeName,
+                                                        String bucketName,
+                                                        OzoneBucket ozoneBucket)
+      throws Exception {
+    if (latestIndex - oldestIndex >= snapshotRetentionPeriod) {
+      store.deleteSnapshot(volumeName, bucketName,
+          snapshotPrefix + oldestIndex);
+      oldestIndex++;
+    }
+    createFileKeyWithData(ozoneBucket, keyPrefix + latestIndex,
+        keyTestData);
+    createSnapshot(volumeName, bucketName, snapshotPrefix + latestIndex);
+    latestIndex++;
+    return new int[]{oldestIndex, latestIndex};
+  }
+
+  private void checkDayWeekMonthSnapshotData(OzoneBucket ozoneBucket,
+                                             int latestDayIndex,
+                                             int latestWeekIndex,
+                                             int latestMonthIndex,
+                                             String keyTestData)
+      throws Exception {
+    String curKey = "";
+    for (int i = 0; i < latestDayIndex; i++) {
+      curKey = keyPrefix + i;
+      //validate keys metadata
+      OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(curKey);
+      Assert.assertEquals(curKey, ozoneKeyDetails.getName());
+      Assert.assertEquals(ozoneBucket.getName(),
+          ozoneKeyDetails.getBucketName());
+      Assert.assertEquals(ozoneBucket.getVolumeName(),
+          ozoneKeyDetails.getVolumeName());
+
+      //validate keys data
+      try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(curKey)) {
+        byte[] fileContent = new byte[keyTestData.getBytes().length];
+        ozoneInputStream.read(fileContent);
+        Assert.assertEquals(keyTestData, new String(fileContent));
+      }
+
+      //validate day snapshot data integrity
+      validateSnapshotDataIntegrity(SNAPSHOT_DAY_PREFIX, latestDayIndex, curKey,
+          ozoneBucket);
+      //validate week snapshot data integrity
+      validateSnapshotDataIntegrity(SNAPSHOT_WEEK_PREFIX, latestWeekIndex,
+          curKey, ozoneBucket);
+      //validate month snapshot data integrity
+      validateSnapshotDataIntegrity(SNAPSHOT_MONTH_PREFIX, latestMonthIndex,
+          curKey, ozoneBucket);
+    }
+
+  }
+
+  private void validateSnapshotDataIntegrity(String snapshotPrefix, int index,
+                                             String keyName,
+                                             OzoneBucket ozoneBucket)
+      throws Exception {
+    Iterator<? extends OzoneKey> iterator =
+        ozoneBucket.listKeys(
+            OmSnapshotManager.getSnapshotPrefix(snapshotPrefix + (index - 1)) +
+                keyPrefix);
+    boolean findKey = false;
+    while (iterator.hasNext()) {
+      OzoneKey ozoneKey = iterator.next();
+      if (ozoneKey.getName().contains(keyName)) {
+        findKey = true;
+        break;
+      }
+    }
+    Assert.assertTrue(findKey);
+  }
+
+  private String createFileKeyWithData(OzoneBucket bucket, String key,
+                                       String data)
+      throws IOException {
+    OzoneOutputStream fileKey = bucket.createKey(key, data.getBytes().length);
+    fileKey.write(data.getBytes());
+    fileKey.close();
+    return key;
+  }
+
 }
