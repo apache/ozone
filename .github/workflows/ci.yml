@@ -25,14 +25,13 @@ jobs:
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
-      basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
-      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
-      needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
-      needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
+      needs-basic-checks: false
+      needs-build: false
+      needs-compile: false
+      needs-compose-tests: false
+      needs-dependency-check: false
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
-      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-kubernetes-tests: false
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v3
@@ -321,18 +320,11 @@ jobs:
     needs:
       - build-info
     runs-on: ubuntu-20.04
-    timeout-minutes: 150
+    timeout-minutes: 600
     if: needs.build-info.outputs.needs-integration-tests == 'true'
     strategy:
       matrix:
-        profile:
-          - client
-          - filesystem
-          - hdds
-          - om
-          - ozone
-          - scm
-          - flaky
+        profile: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
       fail-fast: false
     steps:
       - name: Checkout project
@@ -352,13 +344,14 @@ jobs:
           distribution: 'temurin'
           java-version: 8
       - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
-        if: matrix.profile != 'flaky'
-      - name: Execute flaky tests
-        run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
-        if: matrix.profile == 'flaky'
+        run: hadoop-ozone/dev-support/checks/integration.sh -Dtest=TestBlockDeletion
+        env:
+          ITERATIONS: 10
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Number of failures
+        run: cat target/${{ github.job }}/failures
         if: always()
       - name: Archive build results
         uses: actions/upload-artifact@v3
