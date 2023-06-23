@@ -22,7 +22,7 @@ import { Table, Tabs, Menu, Dropdown, Icon, Tooltip } from 'antd';
 import { PaginationConfig } from 'antd/lib/pagination';
 import filesize from 'filesize';
 import moment from 'moment';
-import { showDataFetchError } from 'utils/common';
+import { showDataFetchError, byteToSize } from 'utils/common';
 import './om.less';
 import { ColumnSearch } from 'utils/columnSearch';
 import { Link } from 'react-router-dom';
@@ -166,9 +166,10 @@ const OPEN_KEY_TAB_COLUMNS = [
     isSearchable: true,
   },
   {
-    title: 'Amount of data (KB)',
+    title: 'Amount of data',
     dataIndex: 'size',
     key: 'size',
+    render: (size :any) => size = byteToSize(size,1)
   },
   {
     title: 'Key',
@@ -231,6 +232,7 @@ const PENDING_TAB_COLUMNS = [
     title: 'Total data size (KB)',
     dataIndex: 'dataSize',
     key: 'dataSize',
+    render: (dataSize :any) => dataSize = byteToSize(dataSize,1)
   },
   {
     title: 'Total Key Count',
