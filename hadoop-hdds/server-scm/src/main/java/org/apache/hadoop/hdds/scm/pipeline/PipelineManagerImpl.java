@@ -235,7 +235,7 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
-
+    LOG.info("Created pipeline {}.", pipeline);
     recordMetricsForPipeline(pipeline);
     return pipeline;
   }
@@ -403,7 +403,7 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
-
+    LOG.info("Pipeline {} removed.", pipeline);
     metrics.incNumPipelineDestroyed();
   }
 
