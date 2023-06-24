@@ -259,7 +259,8 @@ public class ObjectEndpoint extends EndpointBase {
       if (datastreamEnabled && !enableEC) {
         getMetrics().updatePutKeyMetadataStats(startNanos);
         putLength = ObjectEndpointStreaming
-            .put(bucket, keyPath, length, replicationConfig, chunkSize, body);
+            .put(bucket, keyPath, length, replicationConfig, chunkSize,
+                customMetadata, body);
       } else {
         output = getClientProtocol().createKey(volume.getName(), bucketName,
             keyPath, length, replicationConfig, customMetadata);

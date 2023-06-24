@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
@@ -48,11 +47,11 @@ final class ObjectEndpointStreaming {
 
   public static long put(OzoneBucket bucket, String keyPath,
                          long length, ReplicationConfig replicationConfig,
-                         int chunkSize, InputStream body)
+                         int chunkSize, Map<String, String> keyMetadata,
+                         InputStream body)
       throws IOException, OS3Exception {
 
     try {
-      Map<String, String> keyMetadata = new HashMap<>();
       return putKeyWithStream(bucket, keyPath,
           length, chunkSize, replicationConfig, keyMetadata, body);
     } catch (IOException ex) {
