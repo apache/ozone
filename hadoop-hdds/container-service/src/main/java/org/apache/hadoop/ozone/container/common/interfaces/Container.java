@@ -164,6 +164,12 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   long getBlockCommitSequenceId();
 
   /**
+   * Returns if the container metadata should be checked. The result depends
+   * on the state of the container.
+   */
+  boolean shouldScanMetadata();
+
+  /**
    * check and report the structural integrity of the container.
    * @return true if the integrity checks pass
    * Scan the container metadata to detect corruption.
