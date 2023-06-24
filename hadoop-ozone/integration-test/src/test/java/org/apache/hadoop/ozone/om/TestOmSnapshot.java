@@ -1435,7 +1435,7 @@ public class TestOmSnapshot {
       throws IOException {
     OzoneOutputStream fileKey = bucket.createKey(key,
         data.getBytes(UTF_8).length);
-    fileKey.write(data.getBytes());
+    fileKey.write(data.getBytes(UTF_8));
     fileKey.close();
     return key;
   }
