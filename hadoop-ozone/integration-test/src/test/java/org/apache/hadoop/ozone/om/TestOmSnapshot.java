@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -143,8 +144,8 @@ public class TestOmSnapshot {
   private static final String SNAPSHOT_DAY_PREFIX = "snap-day-";
   private static final String SNAPSHOT_WEEK_PREFIX = "snap-week-";
   private static final String SNAPSHOT_MONTH_PREFIX = "snap-month-";
-  private static final String keyPrefix = "key-";
-  private static final String keyTestData = "test";
+  private static final String KEY_PREFIX = "key-";
+  private static final String KEY_TEST_DATA = "test";
 
   @Rule
   public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
@@ -1301,7 +1302,7 @@ public class TestOmSnapshot {
   }
 
   @Test
-  public void TestDayWeekMonthSnapshotCreationExpiration() throws Exception {
+  public void testDayWeekMonthSnapshotCreationExpiration() throws Exception {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
     String bucketA = "buc-a-" + RandomStringUtils.randomNumeric(5);
     store.createVolume(volumeA);
@@ -1353,30 +1354,26 @@ public class TestOmSnapshot {
         latestDayIndex,
         latestWeekIndex,
         latestMonthIndex,
-        keyTestData);
+        KEY_TEST_DATA);
   }
 
   private int[] checkSnapshotExpirationThenCreateLatest(String snapshotPrefix,
-                                                        int oldestIndex,
-                                                        int latestIndex,
-                                                        int snapshotRetentionPeriod,
-                                                        String volumeName,
-                                                        String bucketName,
-                                                        OzoneBucket ozoneBucket)
+      int oldestIndex, int latestIndex, int snapshotRetentionPeriod,
+      String volumeNameStr, String bucketNameStr, OzoneBucket ozoneBucketClient)
       throws Exception {
     if (latestIndex - oldestIndex >= snapshotRetentionPeriod) {
-      store.deleteSnapshot(volumeName, bucketName,
+      store.deleteSnapshot(volumeNameStr, bucketNameStr,
           snapshotPrefix + oldestIndex);
       oldestIndex++;
     }
-    createFileKeyWithData(ozoneBucket, keyPrefix + latestIndex,
-        keyTestData);
-    createSnapshot(volumeName, bucketName, snapshotPrefix + latestIndex);
+    createFileKeyWithData(ozoneBucketClient, KEY_PREFIX + latestIndex,
+        KEY_TEST_DATA);
+    createSnapshot(volumeNameStr, bucketNameStr, snapshotPrefix + latestIndex);
     latestIndex++;
     return new int[]{oldestIndex, latestIndex};
   }
 
-  private void checkDayWeekMonthSnapshotData(OzoneBucket ozoneBucket,
+  private void checkDayWeekMonthSnapshotData(OzoneBucket ozoneBucketClient,
                                              int latestDayIndex,
                                              int latestWeekIndex,
                                              int latestMonthIndex,
@@ -1384,17 +1381,18 @@ public class TestOmSnapshot {
       throws Exception {
     String curKey = "";
     for (int i = 0; i < latestDayIndex; i++) {
-      curKey = keyPrefix + i;
+      curKey = KEY_PREFIX + i;
       //validate keys metadata
-      OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(curKey);
+      OzoneKeyDetails ozoneKeyDetails = ozoneBucketClient.getKey(curKey);
       Assert.assertEquals(curKey, ozoneKeyDetails.getName());
-      Assert.assertEquals(ozoneBucket.getName(),
+      Assert.assertEquals(ozoneBucketClient.getName(),
           ozoneKeyDetails.getBucketName());
-      Assert.assertEquals(ozoneBucket.getVolumeName(),
+      Assert.assertEquals(ozoneBucketClient.getVolumeName(),
           ozoneKeyDetails.getVolumeName());
 
       //validate keys data
-      try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(curKey)) {
+      try (OzoneInputStream ozoneInputStream =
+               ozoneBucketClient.readKey(curKey)) {
         byte[] fileContent = new byte[keyTestData.getBytes().length];
         ozoneInputStream.read(fileContent);
         Assert.assertEquals(keyTestData, new String(fileContent));
@@ -1402,25 +1400,25 @@ public class TestOmSnapshot {
 
       //validate day snapshot data integrity
       validateSnapshotDataIntegrity(SNAPSHOT_DAY_PREFIX, latestDayIndex, curKey,
-          ozoneBucket);
+          ozoneBucketClient);
       //validate week snapshot data integrity
       validateSnapshotDataIntegrity(SNAPSHOT_WEEK_PREFIX, latestWeekIndex,
-          curKey, ozoneBucket);
+          curKey, ozoneBucketClient);
       //validate month snapshot data integrity
       validateSnapshotDataIntegrity(SNAPSHOT_MONTH_PREFIX, latestMonthIndex,
-          curKey, ozoneBucket);
+          curKey, ozoneBucketClient);
     }
 
   }
 
   private void validateSnapshotDataIntegrity(String snapshotPrefix, int index,
                                              String keyName,
-                                             OzoneBucket ozoneBucket)
+                                             OzoneBucket ozoneBucketClient)
       throws Exception {
     Iterator<? extends OzoneKey> iterator =
-        ozoneBucket.listKeys(
+        ozoneBucketClient.listKeys(
             OmSnapshotManager.getSnapshotPrefix(snapshotPrefix + (index - 1)) +
-                keyPrefix);
+                KEY_PREFIX);
     boolean findKey = false;
     while (iterator.hasNext()) {
       OzoneKey ozoneKey = iterator.next();
