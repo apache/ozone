@@ -1393,7 +1393,7 @@ public class TestOmSnapshot {
       //validate keys data
       try (OzoneInputStream ozoneInputStream =
                ozoneBucketClient.readKey(curKey)) {
-        byte[] fileContent = new byte[keyTestData.getBytes(UTF_8).length];
+        byte[] fileContent = new byte[keyTestData.length()];
         ozoneInputStream.read(fileContent);
         Assert.assertEquals(keyTestData, new String(fileContent, UTF_8));
       }
@@ -1434,7 +1434,7 @@ public class TestOmSnapshot {
                                        String data)
       throws IOException {
     OzoneOutputStream fileKey = bucket.createKey(key,
-        data.getBytes(UTF_8).length);
+        data.length());
     fileKey.write(data.getBytes(UTF_8));
     fileKey.close();
     return key;
