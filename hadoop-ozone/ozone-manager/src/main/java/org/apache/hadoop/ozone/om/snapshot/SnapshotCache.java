@@ -137,6 +137,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
 
   /**
    * State the reason the current thread is getting the OmSnapshot instance.
+   * Unused for now.
    */
   public enum Reason {
     FS_API_READ,
@@ -224,20 +225,24 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @param key snapshot table key
    */
   public void release(String key) {
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        dbMap.get(key);
-    Preconditions.checkNotNull(rcOmSnapshot,
-        "Key '" + key + "' does not exist in cache");
-
-    if (rcOmSnapshot.decrementRefCount() == 0L) {
-      synchronized (pendingEvictionList) {
-        // Eligible to be closed, add it to the list.
-        pendingEvictionList.add(rcOmSnapshot);
-        // The cache size might have already exceed the soft limit
-        // Thus triggering cleanup() to check and evict if applicable
-        cleanup();
+    dbMap.compute(key, (k, v) -> {
+      if (v == null) {
+        throw new IllegalArgumentException(
+            "Key '" + key + "' does not exist in cache");
       }
-    }
+
+      if (v.decrementRefCount() == 0L) {
+        synchronized (pendingEvictionList) {
+          // Eligible to be closed, add it to the list.
+          pendingEvictionList.add(v);
+          // The cache size might have already exceed the soft limit
+          // Thus triggering cleanup() to check and evict if applicable
+          cleanup();
+        }
+      }
+
+      return v;
+    });
   }
 
   /**
@@ -245,8 +250,8 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @param omSnapshot OmSnapshot
    */
   public void release(OmSnapshot omSnapshot) {
-    final String key = omSnapshot.getSnapshotTableKey();
-    release(key);
+    final String snapshotTableKey = omSnapshot.getSnapshotTableKey();
+    release(snapshotTableKey);
   }
 
   /**
