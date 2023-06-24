@@ -578,14 +578,84 @@ public class ObjectStore {
 
   /**
    * List snapshots in a volume/bucket.
-   * @param volumeName volume name
-   * @param bucketName bucket name
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   snapshots will be listed after this snapshot name
    * @return list of snapshots for volume/bucket snapshot path.
    * @throws IOException
    */
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
-    return proxy.listSnapshot(volumeName, bucketName);
+  public Iterator<? extends OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot) throws IOException {
+    return new SnapshotIterator(
+        volumeName, bucketName, snapshotPrefix, prevSnapshot);
+  }
+
+  /**
+   * An Iterator to iterate over {@link OzoneSnapshot} list.
+   */
+  private class SnapshotIterator implements Iterator<OzoneSnapshot> {
+
+    private String volumeName = null;
+    private String bucketName = null;
+    private String snapshotPrefix = null;
+
+    private Iterator<OzoneSnapshot> currentIterator;
+    private OzoneSnapshot currentValue;
+
+    /**
+     * Creates an Iterator to iterate over all snapshots after
+     * prevSnapshot of specified bucket. If prevSnapshot is null it iterates
+     * from the first snapshot. The returned snapshots match snapshot prefix.
+     * @param snapshotPrefix snapshot prefix to match
+     * @param prevSnapshot snapshots will be listed after this snapshot name
+     */
+    SnapshotIterator(String volumeName, String bucketName,
+                     String snapshotPrefix, String prevSnapshot)
+        throws IOException {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.snapshotPrefix = snapshotPrefix;
+      this.currentValue = null;
+      this.currentIterator = getNextListOfSnapshots(prevSnapshot).iterator();
+    }
+
+    @Override
+    public boolean hasNext() {
+      // IMPORTANT: Without this logic, remote iteration will not work.
+      // Removing this will break the listSnapshot call if we try to
+      // list more than 1000 (ozone.client.list.cache ) snapshots.
+      if (!currentIterator.hasNext() && currentValue != null) {
+        try {
+          currentIterator = getNextListOfSnapshots(currentValue.getName())
+              .iterator();
+        } catch (IOException e) {
+          LOG.error("Error retrieving next batch of list results", e);
+        }
+      }
+      return currentIterator.hasNext();
+    }
+
+    @Override
+    public OzoneSnapshot next() {
+      if (hasNext()) {
+        currentValue = currentIterator.next();
+        return currentValue;
+      }
+      throw new NoSuchElementException();
+    }
+
+    /**
+     * Returns the next set of snapshot list using proxy.
+     * @param prevSnapshot previous snapshot, this will be excluded from result
+     * @return {@code List<OzoneSnapshot>}
+     */
+    private List<OzoneSnapshot> getNextListOfSnapshots(String prevSnapshot)
+        throws IOException {
+      return proxy.listSnapshot(volumeName, bucketName, snapshotPrefix,
+          prevSnapshot, listCacheSize);
+    }
   }
 
   /**
@@ -597,18 +667,39 @@ public class ObjectStore {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param cancel request to cancel a running snapshot diff job.
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
     return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff);
+        token, pageSize, forceFullDiff, cancel);
+  }
+
+  /**
+   * Get a list of the SnapshotDiff jobs for a bucket based on the JobStatus.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAll Option to specify whether to list all jobs or not
+   * @return a list of SnapshotDiffJob objects
+   * @throws IOException in case there is a failure while getting a response.
+   */
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus,
+                                                    boolean listAll)
+      throws IOException {
+    return proxy.listSnapshotDiffJobs(volumeName,
+        bucketName, jobStatus, listAll);
   }
 }

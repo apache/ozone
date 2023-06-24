@@ -17,11 +17,11 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Streams;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -50,22 +50,23 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
@@ -115,7 +116,6 @@ public final class HAUtils {
    * @param selfId - Node Id of the SCM which is submitting the request to
    * add SCM.
    * @return true - if SCM node is added successfully, else false.
-   * @throws IOException
    */
   public static boolean addSCM(OzoneConfiguration conf, AddSCMRequest request,
       String selfId) throws IOException {
@@ -131,9 +131,6 @@ public final class HAUtils {
 
   /**
    * Create a scm block client.
-   *
-   * @return {@link ScmBlockLocationProtocol}
-   * @throws IOException
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
@@ -176,7 +173,6 @@ public final class HAUtils {
    * @param lastAppliedIndex the last applied index in the current SCM DB.
    * @param checkpointPath   path to the new DB checkpoint
    * @return location of backup of the original DB
-   * @throws Exception
    */
   public static File replaceDBWithCheckpoint(long lastAppliedIndex,
       File oldDB, Path checkpointPath, String dbPrefix) throws IOException {
@@ -249,10 +245,7 @@ public final class HAUtils {
 
   /**
    * Obtain Transaction info from DB.
-   * @param tempConfig
    * @param dbDir path to DB
-   * @return TransactionInfo
-   * @throws IOException
    */
   private static TransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir, String dbName,
@@ -284,7 +277,8 @@ public final class HAUtils {
 
   public static Table<String, TransactionInfo> getTransactionInfoTable(
       DBStore dbStore, DBDefinition definition) throws IOException {
-    return Arrays.stream(definition.getColumnFamilies())
+    return (Table<String, TransactionInfo>)
+        Streams.stream(definition.getColumnFamilies())
         .filter(t -> t.getValueType() == TransactionInfo.class).findFirst()
         .get().getTable(dbStore);
   }
@@ -294,11 +288,6 @@ public final class HAUtils {
    *
    * If transaction info transaction Index is less than or equal to
    * lastAppliedIndex, return false, else return true.
-   * @param transactionInfo
-   * @param lastAppliedIndex
-   * @param leaderId
-   * @param newDBlocation
-   * @return boolean
    */
   public static boolean verifyTransactionInfo(TransactionInfo transactionInfo,
       long lastAppliedIndex, String leaderId, Path newDBlocation,
@@ -357,26 +346,26 @@ public final class HAUtils {
   }
 
   /**
-   * Scan the DB dir and return the existing SST files.
+   * Scan the DB dir and return the existing SST files,
+   * including omSnapshot sst files.
    * SSTs could be used for avoiding repeated download.
    *
    * @param db the file representing the DB to be scanned
    * @return the list of SST file name. If db not exist, will return empty list
    */
-  public static List<String> getExistingSstFiles(File db) {
+  public static List<String> getExistingSstFiles(File db) throws IOException {
     List<String> sstList = new ArrayList<>();
     if (!db.exists()) {
       return sstList;
     }
-    FilenameFilter filter = new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.endsWith(ROCKSDB_SST_SUFFIX);
-      }
-    };
-    String[] tempArray = db.list(filter);
-    if (tempArray != null) {
-      sstList = Arrays.asList(tempArray);
+
+    int truncateLength = db.toString().length() + 1;
+    // Walk the db dir and get all sst files including omSnapshot files.
+    try (Stream<Path> files = Files.walk(db.toPath())) {
+      sstList =
+          files.filter(path -> path.toString().endsWith(ROCKSDB_SST_SUFFIX)).
+              map(p -> p.toString().substring(truncateLength)).
+              collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
       }
@@ -389,10 +378,7 @@ public final class HAUtils {
    *
    * If certificate client is null, obtain the list of CA using SCM security
    * client, else it uses certificate client.
-   * @param certClient
-   * @param configuration
    * @return list of CA
-   * @throws IOException
    */
   public static List<String> buildCAList(CertificateClient certClient,
       ConfigurationSource configuration) throws IOException {
@@ -451,16 +437,15 @@ public final class HAUtils {
   private static List<String> generateCAList(CertificateClient certClient)
       throws IOException {
     List<String> caCertPemList = new ArrayList<>();
-    if (certClient.getRootCACertificate() != null) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(
-          certClient.getRootCACertificate()));
+    for (X509Certificate cert : certClient.getAllRootCaCerts()) {
+      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
     }
-    if (certClient.getCACertificate() != null) {
-      caCertPemList.add(CertificateCodec.getPEMEncodedString(
-          certClient.getCACertificate()));
+    for (X509Certificate cert : certClient.getAllCaCerts()) {
+      caCertPemList.add(CertificateCodec.getPEMEncodedString(cert));
     }
     return caCertPemList;
   }
+
 
   /**
    * Retry forever until CA list matches expected count.
@@ -482,13 +467,13 @@ public final class HAUtils {
   }
 
   private static List<String> waitForCACerts(
-      final SupplierWithIOException<List<String>> applyFunction,
+      final CheckedSupplier<List<String>, IOException> caCertListSupplier,
       int expectedCount) throws IOException {
     // TODO: If SCMs are bootstrapped later, then listCA need to be
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
-    List<String> caCertPemList = applyFunction.get();
+    List<String> caCertPemList = caCertListSupplier.get();
     boolean caListUpToDate = caCertPemList.size() >= expectedCount;
     if (!caListUpToDate) {
       LOG.info("Expected CA list size {}, where as received CA List size " +
@@ -503,10 +488,7 @@ public final class HAUtils {
    * Build CA List in the format of X509Certificate.
    * If certificate client is null, obtain the list of CA using SCM
    * security client, else it uses certificate client.
-   * @param certClient
-   * @param conf
    * @return list of CA X509Certificates.
-   * @throws IOException
    */
   public static List<X509Certificate> buildCAX509List(
       CertificateClient certClient,
@@ -516,10 +498,8 @@ public final class HAUtils {
       // X509 by buildCAList.
       if (!SCMHAUtils.isSCMHAEnabled(conf)) {
         List<X509Certificate> x509Certificates = new ArrayList<>();
-        if (certClient.getRootCACertificate() != null) {
-          x509Certificates.add(certClient.getRootCACertificate());
-        }
-        x509Certificates.add(certClient.getCACertificate());
+        x509Certificates.addAll(certClient.getAllCaCerts());
+        x509Certificates.addAll(certClient.getAllRootCaCerts());
         return x509Certificates;
       }
     }

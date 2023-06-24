@@ -42,8 +42,6 @@ import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -82,7 +80,7 @@ public class TestMoveManager {
   @Before
   public void setup() throws ContainerNotFoundException,
       NodeNotFoundException {
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = TestClock.newInstance();
     containerInfo = ReplicationTestUtil.createContainerInfo(
         RatisReplicationConfig.getInstance(THREE), 1,
         HddsProtos.LifeCycleState.CLOSED);
@@ -278,8 +276,9 @@ public class TestMoveManager {
         containerInfo.containerID());
 
     // check for an under replicated EC container
-    containerInfo = ReplicationTestUtil.createContainer(
-        HddsProtos.LifeCycleState.CLOSED, new ECReplicationConfig(3, 2));
+    containerInfo = ReplicationTestUtil.createContainerInfo(
+        new ECReplicationConfig(3, 2), 1,
+        HddsProtos.LifeCycleState.CLOSED);
     replicas.clear();
     replicas.addAll(ReplicationTestUtil.createReplicas(
         containerInfo.containerID(), ContainerReplicaProto.State.CLOSED,

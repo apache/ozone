@@ -55,6 +55,10 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
 
   private final List<OmKeyInfo> omKeyInfoList;
 
+  public RepeatedOmKeyInfo() {
+    this.omKeyInfoList = new ArrayList<>();
+  }
+
   public RepeatedOmKeyInfo(List<OmKeyInfo> omKeyInfos) {
     this.omKeyInfoList = omKeyInfos;
   }

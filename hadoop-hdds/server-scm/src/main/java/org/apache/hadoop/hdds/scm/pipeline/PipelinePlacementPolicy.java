@@ -124,12 +124,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * The results are sorted based on pipeline count of each node.
    *
    * @param excludedNodes - excluded nodes
+   * @param usedNodes - used nodes
    * @param nodesRequired - number of datanodes required.
    * @return a list of viable nodes
    * @throws SCMException when viable nodes are not enough in numbers
    */
   List<DatanodeDetails> filterViableNodes(
-      List<DatanodeDetails> excludedNodes, int nodesRequired,
+      List<DatanodeDetails> excludedNodes,
+      List<DatanodeDetails> usedNodes, int nodesRequired,
       long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     // get nodes in HEALTHY state
@@ -150,6 +152,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (excludedNodes != null) {
       excludedNodesSize = excludedNodes.size();
       healthyNodes.removeAll(excludedNodes);
+    }
+    if (usedNodes != null) {
+      excludedNodesSize += usedNodes.size();
+      healthyNodes.removeAll(usedNodes);
     }
     int initialHealthyNodesCount = healthyNodes.size();
 
@@ -248,7 +254,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // Get a list of viable nodes based on criteria
     // and make sure excludedNodes are excluded from list.
     List<DatanodeDetails> healthyNodes = filterViableNodes(excludedNodes,
-        nodesRequired, metadataSizeRequired, dataSizeRequired);
+        usedNodes, nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     // Randomly picks nodes when all nodes are equal or factor is ONE.
     // This happens when network topology is absent or
@@ -258,7 +264,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     } else {
       // Since topology and rack awareness are available, picks nodes
       // based on them.
-      return this.getResultSet(nodesRequired, healthyNodes);
+      return this.getResultSetWithTopology(nodesRequired, healthyNodes,
+          usedNodes);
     }
   }
 
@@ -281,56 +288,40 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * network topology and rack awareness.
    * @param nodesRequired - Nodes Required
    * @param healthyNodes - List of Nodes in the result set.
+   * @param usedNodes - List of used Nodes.
    * @return a list of datanodes
    * @throws SCMException SCMException
    */
-  @Override
-  public List<DatanodeDetails> getResultSet(
-      int nodesRequired, List<DatanodeDetails> healthyNodes)
+  private List<DatanodeDetails> getResultSetWithTopology(
+      int nodesRequired, List<DatanodeDetails> healthyNodes,
+      List<DatanodeDetails> usedNodes)
       throws SCMException {
-    if (nodesRequired != HddsProtos.ReplicationFactor.THREE.getNumber()) {
+    Preconditions.checkNotNull(usedNodes);
+    Preconditions.checkNotNull(healthyNodes);
+    Preconditions.checkState(nodesRequired >= 1);
+
+    if (nodesRequired + usedNodes.size() !=
+        HddsProtos.ReplicationFactor.THREE.getNumber()) {
       throw new SCMException("Nodes required number is not supported: " +
           nodesRequired, SCMException.ResultCodes.INVALID_CAPACITY);
     }
 
-    // Assume rack awareness is not enabled.
-    boolean rackAwareness = false;
     List <DatanodeDetails> results = new ArrayList<>(nodesRequired);
-    // Since nodes are widely distributed, the results should be selected
-    // base on distance in topology, rack awareness and load balancing.
-    List<DatanodeDetails> exclude = new ArrayList<>();
-    // First choose an anchor node.
-    DatanodeDetails anchor = chooseFirstNode(healthyNodes);
-    if (anchor != null) {
-      results.add(anchor);
-      removePeers(anchor, healthyNodes);
-      exclude.add(anchor);
-    } else {
+    List <DatanodeDetails> mutableLstNodes = new ArrayList<>();
+    List<DatanodeDetails> mutableExclude = new ArrayList<>();
+    boolean rackAwareness = getAnchorAndNextNode(healthyNodes,
+        usedNodes, results, mutableLstNodes, mutableExclude);
+    if (mutableLstNodes.size() == 0) {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
       throw new SCMException("Unable to find anchor node.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("First node chosen: {}", anchor);
-    }
-
-
-    // Choose the second node on different racks from anchor.
-    DatanodeDetails nextNode = chooseNodeBasedOnRackAwareness(
-        healthyNodes, exclude,
-        nodeManager.getClusterNetworkTopologyMap(), anchor);
-    if (nextNode != null) {
-      // Rack awareness is detected.
-      rackAwareness = true;
-      results.add(nextNode);
-      removePeers(nextNode, healthyNodes);
-      exclude.add(nextNode);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Second node chosen: {}", nextNode);
-      }
-    } else {
-      LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
-          "rack based on rack awareness. anchor: {}", anchor);
+    // First node is anchor node
+    DatanodeDetails anchor = mutableLstNodes.get(0);
+    DatanodeDetails nextNode = null;
+    if (mutableLstNodes.size() == 2) {
+      // Second node is next node
+      nextNode = mutableLstNodes.get(1);
     }
 
     // Then choose nodes close to anchor based on network topology
@@ -341,14 +332,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       DatanodeDetails pick = null;
       if (rackAwareness && bCheckNodeInAnchorRack) {
         pick = chooseNodeBasedOnSameRack(
-            healthyNodes, exclude,
+            healthyNodes, mutableExclude,
             nodeManager.getClusterNetworkTopologyMap(), anchor);
         if (pick == null) {
           // No available node to pick from first anchor node
           // Make nextNode as anchor node and pick remaining node
           anchor = nextNode;
           pick = chooseNodeBasedOnSameRack(
-              healthyNodes, exclude,
+              healthyNodes, mutableExclude,
               nodeManager.getClusterNetworkTopologyMap(), anchor);
         }
       }
@@ -358,7 +349,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         // it will just search in fallback nodes and avoid searching in
         // anchor node rack.
         bCheckNodeInAnchorRack = false;
-        pick = fallBackPickNodes(healthyNodes, exclude);
+        pick = fallBackPickNodes(healthyNodes, mutableExclude);
         if (rackAwareness) {
           LOG.debug("Failed to choose node based on topology. Fallback " +
               "picks node as: {}", pick);
@@ -368,12 +359,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       if (pick != null) {
         results.add(pick);
         removePeers(pick, healthyNodes);
-        exclude.add(pick);
+        mutableExclude.add(pick);
         LOG.debug("Remaining node chosen: {}", pick);
       } else {
         String msg = String.format("Unable to find suitable node in " +
             "pipeline allocation. healthyNodes size: %d, " +
-            "excludeNodes size: %d", healthyNodes.size(), exclude.size());
+            "excludeNodes size: %d", healthyNodes.size(),
+            mutableExclude.size());
         LOG.warn(msg);
         throw new SCMException(msg,
             SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -388,6 +380,96 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return results;
+  }
+
+  /**
+   * Get Anchor and Next node based on healthyNodes and usedNodes.
+   * @param healthyNodes - List of healthy nodes.
+   * @param usedNodes - List of used nodes.
+   * @param results - List of Nodes in the result set.
+   * @param mutableLstNodes - Anchor and Next node.
+   * @param mutableExclude - List of excluded nodes.
+   * @return whether rack aware is satisfied
+   * @throws SCMException SCMException
+   */
+  private boolean getAnchorAndNextNode(List<DatanodeDetails> healthyNodes,
+                                       List<DatanodeDetails> usedNodes,
+                                       List<DatanodeDetails> results,
+                                       List<DatanodeDetails> mutableLstNodes,
+                                       List<DatanodeDetails> mutableExclude)
+      throws SCMException {
+    // Assume rack awareness is not enabled.
+    boolean rackAwareness = false;
+    // Since nodes are widely distributed, the results should be selected
+    // base on distance in topology, rack awareness and load balancing.
+    DatanodeDetails anchor;
+    DatanodeDetails nextNode = null;
+    // First choose an anchor node.
+    if (usedNodes.size() == 0) {
+      // No usedNode, choose anchor based on healthyNodes
+      anchor = chooseFirstNode(healthyNodes);
+      if (anchor != null) {
+        results.add(anchor);
+        removePeers(anchor, healthyNodes);
+        mutableExclude.add(anchor);
+      } else {
+        LOG.warn("Unable to find healthy node for anchor(first) node.");
+        throw new SCMException("Unable to find anchor node.",
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("First node chosen: {}", anchor);
+      }
+    } else if (usedNodes.size() == 1) {
+      // Only 1 usedNode, consider it as anchor node.
+      anchor = usedNodes.get(0);
+      removePeers(anchor, healthyNodes);
+      mutableExclude.add(anchor);
+    } else if (usedNodes.size() == 2) {
+      // 2 usedNodes, consider 1st as anchor node
+      anchor = usedNodes.get(0);
+      removePeers(anchor, healthyNodes);
+      mutableExclude.add(anchor);
+      if (usedNodes.get(0).getParent() != usedNodes.get(1).getParent()) {
+        // Rack awareness is detected.
+        // If 2 usedNodes are in different rack then
+        // consider second node as next node
+        nextNode = usedNodes.get(1);
+        rackAwareness = true;
+      }
+      mutableExclude.add(usedNodes.get(1));
+      removePeers(nextNode, healthyNodes);
+    } else {
+      // Maximum 2 used nodes can exist.
+      LOG.warn("More than 2 used nodes, unable to choose anchor node.");
+      throw new SCMException("Used Nodes required number is not supported: " +
+          usedNodes.size(), SCMException.ResultCodes.INVALID_CAPACITY);
+    }
+
+    if (nextNode == null) {
+      // Choose the second node on different racks from anchor.
+      nextNode = chooseNodeBasedOnRackAwareness(
+          healthyNodes, mutableExclude,
+          nodeManager.getClusterNetworkTopologyMap(), anchor);
+      if (nextNode != null) {
+        // Rack awareness is detected.
+        rackAwareness = true;
+        results.add(nextNode);
+        removePeers(nextNode, healthyNodes);
+        mutableExclude.add(nextNode);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Second node chosen: {}", nextNode);
+        }
+      } else {
+        LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
+            "rack based on rack awareness. anchor: {}", anchor);
+      }
+    }
+    mutableLstNodes.add(anchor);
+    if (nextNode != null) {
+      mutableLstNodes.add(nextNode);
+    }
+    return rackAwareness;
   }
 
   /**

@@ -1403,4 +1403,105 @@ public class TestOzoneShellHA {
           e);
     }
   }
+
+  @Test
+  public void testListAllKeys()
+      throws Exception {
+    String volumeName = "vollst";
+    // Create volume vollst
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[]{"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 120 keys into bucket1
+    String keyName = OZONE_URI_DELIMITER + volumeName + "/bucket1" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 120; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+
+    out.reset();
+    // Number of keys should return less than 120(100 by default)
+    args =
+        new String[]{"key", "list", volumeName};
+    execute(ozoneShell, args);
+    Assert.assertTrue(getNumOfKeys() < 120);
+
+    out.reset();
+    // Use --all option to get all the keys
+    args =
+        new String[]{"key", "list", "--all", volumeName};
+    execute(ozoneShell, args);
+    // Number of keys returned should be 120
+    Assert.assertEquals(120, getNumOfKeys());
+  }
+
+  @Test
+  public void testVolumeListKeys()
+      throws Exception {
+    String volume1 = "volx";
+    // Create volume volx
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert 100 keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        "/bucketfso",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volx
+    String[] args = new String[]{"bucket", "create", volume1 + "/bucketobs"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 5 keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 + "/bucketobs" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volx
+    args = new String[]{"bucket", "create", volume1 + "/bucketlegacy"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 5 keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + "/bucketlegacy" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+    args =
+        new String[]{"key", "list", "-l", "200", volume1};
+    execute(ozoneShell, args);
+    // Total keys should be 100+5+5=110
+    Assert.assertEquals(110, getNumOfKeys());
+    out.reset();
+
+    // Try listkeys on non-existing volume
+    String volume2 = "voly";
+    final String[] args1 =
+        new String[]{"key", "list", volume2};
+    execute(ozoneShell, args);
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "VOLUME_NOT_FOUND", () -> execute(ozoneShell, args1));
+  }
 }

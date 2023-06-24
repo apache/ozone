@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -79,7 +81,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ConfigurationProvider;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
@@ -130,6 +131,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
+  private SecretKeyClient secretKeyClient;
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -380,7 +382,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     GenericTestUtils.waitFor(() -> {
       NodeStatus status;
       try {
-        status = scm.getScmNodeManager().getNodeStatus(dn);
+        status = getStorageContainerManager()
+            .getScmNodeManager().getNodeStatus(dn);
       } catch (NodeNotFoundException e) {
         return true;
       }
@@ -405,8 +408,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       waitForHddsDatanodeToStop(datanodeService.getDatanodeDetails());
     }
     String[] args = new String[] {};
-    HddsDatanodeService service =
-        HddsDatanodeService.createHddsDatanodeService(args);
+    HddsDatanodeService service = new HddsDatanodeService(args);
     hddsDatanodes.add(i, service);
     service.start(config);
     if (waitForDatanode) {
@@ -481,6 +483,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       } catch (IOException e) {
         LOG.error("Exception while setting certificate client to DataNode.", e);
       }
+      datanode.setSecretKeyClient(secretKeyClient);
       datanode.start();
     });
   }
@@ -513,6 +516,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   private void setCAClient(CertificateClient client) {
     this.caClient = client;
+  }
+
+  private void setSecretKeyClient(SecretKeyClient client) {
+    this.secretKeyClient = client;
   }
 
   private static void stopDatanodes(
@@ -589,6 +596,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (certClient != null) {
           om.setCertClient(certClient);
         }
+        if (secretKeyClient != null) {
+          om.setSecretKeyClient(secretKeyClient);
+        }
         om.start();
 
         if (includeRecon) {
@@ -605,6 +615,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             hddsDatanodes, reconServer);
 
         cluster.setCAClient(certClient);
+        cluster.setSecretKeyClient(secretKeyClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
@@ -756,7 +767,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       //TODO: HDDS-6897
       //Disabling Ratis for only of MiniOzoneClusterImpl.
       //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
-      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
+      if (StringUtils.isNotEmpty(
+          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
               && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
@@ -863,8 +875,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
                   reconScm.getDatanodeRpcAddress().getPort());
         }
 
-        HddsDatanodeService datanode
-            = HddsDatanodeService.createHddsDatanodeService(args);
+        HddsDatanodeService datanode = new HddsDatanodeService(args);
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
@@ -940,6 +951,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY,
           anyHostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY,
+          anyHostWithFreePort());
+      conf.set(HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY,
           anyHostWithFreePort());
       conf.setInt(DFS_CONTAINER_IPC_PORT, getFreePort());
       conf.setInt(DFS_CONTAINER_RATIS_IPC_PORT, getFreePort());

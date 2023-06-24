@@ -44,7 +44,7 @@ public final class TransactionInfo {
       StringCodec.get(),
       TransactionInfo::new,
       TransactionInfo::generateTransactionInfo,
-      true);
+      DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<TransactionInfo> getCodec() {
     return CODEC;

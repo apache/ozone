@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,6 +64,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -258,6 +258,7 @@ public final class OmUtils {
     case TenantListUser:
     case ListSnapshot:
     case EchoRPC:
+    case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
@@ -265,6 +266,7 @@ public final class OmUtils {
       // operation SetRangerServiceVersion.
     case GetKeyInfo:
     case SnapshotDiff:
+    case ListSnapshotDiffJobs:
     case TransferLeadership:
       return true;
     case CreateVolume:
@@ -315,6 +317,7 @@ public final class OmUtils {
     case SnapshotMoveDeletedKeys:
     case SnapshotPurge:
     case RecoverLease:
+    case SetTimes:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -604,6 +607,22 @@ public final class OmUtils {
   }
 
   /**
+   * Verify if key name contains snapshot reserved word.
+   * This verification will run even when
+   * ozone.om.keyname.character.check.enabled sets to false
+   */
+  public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
+          throws OMException {
+    if (keyName != null && 
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
+      throw new OMException(
+          "Cannot create key under path reserved for "
+              + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+
+  /**
    * Return configured OzoneManager service id based on the following logic.
    * Look at 'ozone.om.internal.service.id' first. If configured, return that.
    * If the above is not configured, look at 'ozone.om.service.ids'.
@@ -656,7 +675,6 @@ public final class OmUtils {
    * does not preserve.
    * @return normalized key name.
    */
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public static String normalizeKey(String keyName,
       boolean preserveTrailingSlash) {
     // For empty strings do nothing, just return the same.
@@ -673,8 +691,8 @@ public final class OmUtils {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
-      if (preserveTrailingSlash && keyName.endsWith("/")) {
-        return normalizedKeyName.substring(1) + "/";
+      if (preserveTrailingSlash && keyName.endsWith(OZONE_URI_DELIMITER)) {
+        return normalizedKeyName.substring(1) + OZONE_URI_DELIMITER;
       }
       return normalizedKeyName.substring(1);
     }

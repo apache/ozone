@@ -87,18 +87,19 @@ public class WritableECContainerProvider
    * @param owner The owner of the container
    * @param excludeList A set of datanodes, container and pipelines which should
    *                    not be considered.
-   * @return A containerInfo representing a block group with with space for the
+   * @return A containerInfo representing a block group with space for the
    *         write, or null if no container can be allocated.
    */
   @Override
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException, TimeoutException {
-    int minimumPipelines = getMinimumPipelines(repConfig);
+    int maximumPipelines = getMaximumPipelines(repConfig);
+    int openPipelineCount = 0;
     synchronized (this) {
-      int openPipelineCount = pipelineManager.getPipelineCount(repConfig,
+      openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
-      if (openPipelineCount < minimumPipelines) {
+      if (openPipelineCount < maximumPipelines) {
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
@@ -116,42 +117,49 @@ public class WritableECContainerProvider
             .setSize(size)
             .build();
     while (existingPipelines.size() > 0) {
-      Pipeline pipeline =
-          pipelineChoosePolicy.choosePipeline(existingPipelines, pri);
-      if (pipeline == null) {
+      int pipelineIndex =
+          pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
+      if (pipelineIndex < 0) {
         LOG.warn("Unable to select a pipeline from {} in the list",
             existingPipelines.size());
         break;
       }
+      Pipeline pipeline = existingPipelines.get(pipelineIndex);
       synchronized (pipeline.getId()) {
         try {
           ContainerInfo containerInfo = getContainerFromPipeline(pipeline);
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
-            // This is O(n), which isn't great if there are a lot of pipelines
-            // and we keep finding pipelines without enough space.
-            existingPipelines.remove(pipeline);
+            existingPipelines.remove(pipelineIndex);
             pipelineManager.closePipeline(pipeline, true);
+            openPipelineCount--;
           } else {
             if (containerIsExcluded(containerInfo, excludeList)) {
-              existingPipelines.remove(pipeline);
+              existingPipelines.remove(pipelineIndex);
             } else {
+              containerInfo.updateLastUsedTime();
               return containerInfo;
             }
           }
         } catch (PipelineNotFoundException | ContainerNotFoundException e) {
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
-          existingPipelines.remove(pipeline);
+          existingPipelines.remove(pipelineIndex);
           pipelineManager.closePipeline(pipeline, true);
+          openPipelineCount--;
         }
       }
     }
     // If we get here, all the pipelines we tried were no good. So try to
-    // allocate a new one and usePipelineManagerV2Impl.java it.
+    // allocate a new one.
     try {
       synchronized (this) {
-        return allocateContainer(repConfig, size, owner, excludeList);
+        if (openPipelineCount < maximumPipelines) {
+          return allocateContainer(repConfig, size, owner, excludeList);
+        }
+        throw new IOException("Unable to allocate a pipeline for "
+            + repConfig + " after trying all existing pipelines as the max "
+            + "limit has been reached and no pipelines where closed");
       }
     } catch (IOException e) {
       LOG.error("Unable to allocate a container for {} after trying all "
@@ -160,7 +168,7 @@ public class WritableECContainerProvider
     }
   }
 
-  private int getMinimumPipelines(ECReplicationConfig repConfig) {
+  private int getMaximumPipelines(ECReplicationConfig repConfig) {
     final double factor = providerConfig.getPipelinePerVolumeFactor();
     int volumeBasedCount = 0;
     if (factor > 0) {

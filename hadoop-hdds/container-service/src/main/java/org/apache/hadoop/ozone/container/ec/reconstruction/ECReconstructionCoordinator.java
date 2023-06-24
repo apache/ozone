@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -35,6 +34,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -100,7 +101,6 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECContainerOperationClient containerOperationClient;
 
   private final ByteBufferPool byteBufferPool;
-  private final CertificateClient certificateClient;
 
   private final ExecutorService ecReconstructExecutor;
 
@@ -110,15 +110,14 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
 
-  public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient,
-      StateContext context,
+  public ECReconstructionCoordinator(
+      ConfigurationSource conf, CertificateClient certificateClient,
+      SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
-    this.certificateClient = certificateClient;
     this.ecReconstructExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
             conf.getObject(OzoneClientConfig.class)
@@ -128,7 +127,7 @@ public class ECReconstructionCoordinator implements Closeable {
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
-    tokenHelper = new TokenHelper(conf, certificateClient);
+    tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
   }
@@ -212,16 +211,17 @@ public class ECReconstructionCoordinator implements Closeable {
 
   }
 
-  ECBlockOutputStream getECBlockOutputstream(
+  private ECBlockOutputStream getECBlockOutputStream(
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
-      ECReplicationConfig repConfig, int replicaIndex, BufferPool bufferPool,
+      ECReplicationConfig repConfig, int replicaIndex,
       OzoneClientConfig configuration) throws IOException {
-    return new ECBlockOutputStream(blockLocationInfo.getBlockID(),
-            this.containerOperationClient.getXceiverClientManager(),
-            this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig,
-                            replicaIndex), bufferPool, configuration,
-            blockLocationInfo.getToken(), clientMetrics);
+    return new ECBlockOutputStream(
+        blockLocationInfo.getBlockID(),
+        containerOperationClient.getXceiverClientManager(),
+        containerOperationClient.singleNodePipeline(datanodeDetails,
+            repConfig, replicaIndex),
+        BufferPool.empty(), configuration,
+        blockLocationInfo.getToken(), clientMetrics);
   }
 
   @VisibleForTesting
@@ -267,20 +267,13 @@ public class ECReconstructionCoordinator implements Closeable {
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
       OzoneClientConfig configuration = new OzoneClientConfig();
-      // TODO: Let's avoid unnecessary bufferPool creation. This pool actually
-      //  not used in EC flows, but there are some dependencies on buffer pool.
-      BufferPool bufferPool =
-          new BufferPool(configuration.getStreamBufferSize(),
-              (int) (configuration.getStreamBufferMaxSize() / configuration
-                  .getStreamBufferSize()),
-              ByteStringConversion.createByteBufferConversion(false));
       try {
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails =
               targetMap.get(replicaIndex);
-          targetBlockStreams[i] = getECBlockOutputstream(blockLocationInfo,
-              datanodeDetails, repConfig, replicaIndex, bufferPool,
+          targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo,
+              datanodeDetails, repConfig, replicaIndex,
               configuration);
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
           // Make sure it's clean. Don't want to reuse the erroneously returned
@@ -393,7 +386,6 @@ public class ECReconstructionCoordinator implements Closeable {
     if (containerOperationClient != null) {
       containerOperationClient.close();
     }
-    tokenHelper.stop();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,

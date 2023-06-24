@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Deleted
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +60,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
+    List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest
+        .getKeysToUpdateList();
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
         purgeKeysRequest.getSnapshotTableKey() : null;
@@ -84,11 +88,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         omFromSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(snapshotInfo.getVolumeName(),
                 snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+                getSnapshotPrefix(snapshotInfo.getName()), true);
       }
 
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList, omFromSnapshot);
+          keysToBePurgedList, omFromSnapshot, keysToUpdateList);
     } catch (IOException ex) {
       omClientResponse = new OMKeyPurgeResponse(
           createErrorOMResponse(omResponse, ex));

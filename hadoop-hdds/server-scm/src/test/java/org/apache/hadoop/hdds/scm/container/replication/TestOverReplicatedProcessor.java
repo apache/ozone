@@ -39,7 +39,6 @@ import static org.mockito.ArgumentMatchers.any;
  */
 public class TestOverReplicatedProcessor {
 
-  private ConfigurationSource conf;
   private ReplicationManager replicationManager;
   private ECReplicationConfig repConfig;
   private OverReplicatedProcessor overReplicatedProcessor;
@@ -47,7 +46,7 @@ public class TestOverReplicatedProcessor {
 
   @Before
   public void setup() {
-    conf = new OzoneConfiguration();
+    ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
     replicationManager = Mockito.mock(ReplicationManager.class);
@@ -56,7 +55,7 @@ public class TestOverReplicatedProcessor {
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
-        replicationManager, rmConf.getOverReplicatedInterval());
+        replicationManager, rmConf::getOverReplicatedInterval);
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
 
     // Even through the limit has been exceeded, it should not stop over-rep

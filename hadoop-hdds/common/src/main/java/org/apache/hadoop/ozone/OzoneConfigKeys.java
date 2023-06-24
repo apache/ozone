@@ -112,6 +112,14 @@ public final class OzoneConfigKeys {
       = false;
 
   /**
+   * A threshold to auto select datastream to write files in OzoneFileSystem.
+   */
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD
+      = "ozone.fs.datastream.auto.threshold";
+  public static final String OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT
+      = "4MB";
+
+  /**
    * Flag to enable hsync/hflush.
    */
   public static final String OZONE_FS_HSYNC_ENABLED
@@ -463,9 +471,6 @@ public final class OzoneConfigKeys {
           "ozone.s3g.volume.name";
   public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
           "s3v";
-  public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
-      "ozone.s3.token.max.lifetime";
-  public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
 
   public static final String OZONE_FS_ITERATE_BATCH_SIZE =
       "ozone.fs.iterate.batch-size";

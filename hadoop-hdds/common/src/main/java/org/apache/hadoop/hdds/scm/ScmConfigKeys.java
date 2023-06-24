@@ -346,6 +346,10 @@ public final class ScmConfigKeys {
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
+  public static final String OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE =
+      "ozone.scm.container.lock.stripes";
+  public static final int OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT = 512;
+
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
   public static final String OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY =
@@ -560,11 +564,24 @@ public final class ScmConfigKeys {
           "ozone.scm.ha.ratis.log.purge.gap";
   public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
+  /**
+   * the config will transfer value to ratis config
+   * raft.server.snapshot.auto.trigger.threshold.
+   */
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
+  /**
+   * the config will transfer value to ratis config
+   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
+   * when manual trigger using api.
+   */
+  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
+      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
+  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
+      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
@@ -585,6 +602,11 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";
+
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
+      "ozone.scm.ha.dbtransactionbuffer.flush.interval";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
   /**
    * Never constructed.
    */
