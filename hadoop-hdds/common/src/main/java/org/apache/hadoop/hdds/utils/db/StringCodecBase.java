@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.util.Preconditions;
-import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +94,7 @@ abstract class StringCodecBase implements Codec<String> {
     return maxBytesPerChar * s.length();
   }
 
-  private <E extends Exception> CheckedFunction<ByteBuffer, Integer, E> encode(
+  private <E extends Exception> PutToByteBuffer<E> encode(
       String string, Integer serializedSize, Function<String, E> newE) {
     return buffer -> {
       final CoderResult result = newEncoder().encode(
@@ -140,8 +139,7 @@ abstract class StringCodecBase implements Codec<String> {
       Function<String, E> newE) throws E {
     final int upperBound = getSerializedSizeUpperBound(string);
     final Integer serializedSize = isFixedLength() ? upperBound : null;
-    final CheckedFunction<ByteBuffer, Integer, E> encoder
-        = encode(string, serializedSize, newE);
+    final PutToByteBuffer<E> encoder = encode(string, serializedSize, newE);
 
     if (serializedSize != null) {
       // When the serialized size is known, create an array

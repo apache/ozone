@@ -19,7 +19,9 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -31,6 +33,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 
@@ -110,5 +113,43 @@ public class TestBackgroundContainerMetadataScanner extends
     verifyContainerMarkedUnhealthy(corruptData, never());
     verifyContainerMarkedUnhealthy(openCorruptMetadata, atLeastOnce());
     verifyContainerMarkedUnhealthy(openContainer, never());
+  }
+
+  /**
+   * A datanode will have one metadata scanner thread for the whole process.
+   * When a volume fails, any the containers queued for scanning in that volume
+   * should be skipped but the thread will continue to run.
+   */
+  @Test
+  @Override
+  // Override findbugs warning about Mockito.verify
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+  public void testWithVolumeFailure() throws Exception {
+    Mockito.when(vol.isFailed()).thenReturn(true);
+
+    ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
+    // Start metadata scanner thread in the background.
+    scanner.start();
+    // Wait for at least one iteration to complete.
+    GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
+        5000);
+    // Volume health should have been checked.
+    Mockito.verify(vol, atLeastOnce()).isFailed();
+    // Scanner should not have shutdown when it encountered the failed volume.
+    assertTrue(scanner.isAlive());
+
+    // Now explicitly shutdown the scanner.
+    scanner.shutdown();
+    // Wait for shutdown to finish.
+    GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
+
+    // All containers were on the failed volume, so they should not have
+    // been scanned.
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+    Mockito.verify(healthy, never()).scanMetaData();
+    Mockito.verify(openContainer, never()).scanMetaData();
+    Mockito.verify(corruptData, never()).scanMetaData();
+    Mockito.verify(openCorruptMetadata, never()).scanMetaData();
   }
 }

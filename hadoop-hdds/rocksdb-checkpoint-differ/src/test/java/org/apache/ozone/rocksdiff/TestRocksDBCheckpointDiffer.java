@@ -175,13 +175,13 @@ public class TestRocksDBCheckpointDiffer {
   private static Stream<Arguments> casesGetSSTDiffListWithoutDB() {
 
     DifferSnapshotInfo snapshotInfo1 = new DifferSnapshotInfo(
-        "/path/to/dbcp1", "ssUUID1", 3008L, null);
+        "/path/to/dbcp1", UUID.randomUUID(), 3008L, null);
     DifferSnapshotInfo snapshotInfo2 = new DifferSnapshotInfo(
-        "/path/to/dbcp2", "ssUUID2", 14980L, null);
+        "/path/to/dbcp2", UUID.randomUUID(), 14980L, null);
     DifferSnapshotInfo snapshotInfo3 = new DifferSnapshotInfo(
-        "/path/to/dbcp3", "ssUUID3", 17975L, null);
+        "/path/to/dbcp3", UUID.randomUUID(), 17975L, null);
     DifferSnapshotInfo snapshotInfo4 = new DifferSnapshotInfo(
-        "/path/to/dbcp4", "ssUUID4", 18000L, null);
+        "/path/to/dbcp4", UUID.randomUUID(), 18000L, null);
 
     Set<String> snapshotSstFiles1 = new HashSet<>(asList(
         "000059", "000053"));
@@ -432,14 +432,14 @@ public class TestRocksDBCheckpointDiffer {
     final long dbLatestSequenceNumber = rocksDB.getLatestSequenceNumber();
 
     createCheckPoint(activeDbDirName, cpPath, rocksDB);
-    final String snapshotId = "snap_id_" + snapshotGeneration;
+    final UUID snapshotId = UUID.randomUUID();
     final DifferSnapshotInfo currentSnapshot =
         new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null);
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
     differ.appendSnapshotInfoToCompactionLog(dbLatestSequenceNumber,
-        snapshotId,
+        snapshotId.toString(),
         System.currentTimeMillis());
 
     differ.setCurrentCompactionLog(dbLatestSequenceNumber);

@@ -72,7 +72,7 @@ public class TestHddsDatanodeService {
   private final String clusterId = UUID.randomUUID().toString();
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private final HddsDatanodeService service =
-      HddsDatanodeService.createHddsDatanodeService(new String[] {});
+      new HddsDatanodeService(new String[] {});
   private static final int SCM_SERVER_COUNT = 1;
 
   @BeforeEach

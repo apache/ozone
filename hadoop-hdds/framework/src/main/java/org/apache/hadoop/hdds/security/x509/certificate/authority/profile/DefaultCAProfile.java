@@ -25,40 +25,22 @@ import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
 
 import java.util.Map;
-import java.util.function.BiFunction;
-
-import static java.lang.Boolean.TRUE;
+import java.util.function.BiPredicate;
 
 /**
  * CA Profile, this is needed when SCM does HA.
- * A place holder class indicating what we need to do when we support issuing
+ * A placeholder class indicating what we need to do when we support issuing
  * CA certificates to other SCMs in HA mode.
  */
 public class DefaultCAProfile extends DefaultProfile {
-  static final BiFunction<Extension, PKIProfile, Boolean>
+  private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_BASIC_CONSTRAINTS = DefaultCAProfile::validateBasicExtensions;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_CRL_NUMBER = (e, b) -> TRUE;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_REASON_CODE = (e, b) -> TRUE;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_DELTA_CRL_INDICATOR = (e, b) -> TRUE;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_NAME_CONSTRAINTS = (e, b) -> TRUE;
-  static final BiFunction<Extension, PKIProfile, Boolean>
-      VALIDATE_CRL_DISTRIBUTION_POINTS = (e, b) -> TRUE;
-
 
   private static boolean validateBasicExtensions(Extension ext,
       PKIProfile pkiProfile) {
     BasicConstraints constraints =
         BasicConstraints.getInstance(ext.getParsedValue());
-    if (constraints.isCA()) {
-      if (pkiProfile.isCA()) {
-        return true;
-      }
-    }
-    return false;
+    return constraints.isCA() && pkiProfile.isCA();
   }
 
   @Override
@@ -68,7 +50,7 @@ public class DefaultCAProfile extends DefaultProfile {
 
   @Override
   public Map<ASN1ObjectIdentifier,
-      BiFunction< Extension, PKIProfile, Boolean>> getExtensionsMap() {
+      BiPredicate<Extension, PKIProfile>> getExtensionsMap() {
     // Add basic constraint.
     EXTENSIONS_MAP.putIfAbsent(Extension.basicConstraints,
         VALIDATE_BASIC_CONSTRAINTS);

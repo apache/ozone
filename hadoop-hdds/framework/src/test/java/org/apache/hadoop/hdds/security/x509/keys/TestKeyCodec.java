@@ -40,7 +40,7 @@ import java.util.Set;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +52,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestKeyCodec {
 
-  private OzoneConfiguration configuration;
   private SecurityConfig securityConfig;
   private String component;
   private HDDSKeyGenerator keyGenerator;
@@ -60,11 +59,11 @@ public class TestKeyCodec {
 
   @BeforeEach
   public void init(@TempDir Path tempDir) throws IOException {
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     prefix = tempDir.toString();
     configuration.set(HDDS_METADATA_DIR_NAME, prefix);
-    keyGenerator = new HDDSKeyGenerator(configuration);
     securityConfig = new SecurityConfig(configuration);
+    keyGenerator = new HDDSKeyGenerator(securityConfig);
     component = "test_component";
   }
 

@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,16 +55,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMBucketAddAclRequest.class);
 
-  private static BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> bucketAddAclOp;
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
-
-  static {
-    bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
-      return omBucketInfo.addAcl(ozoneAcls.get(0));
-    };
-  }
+  private final String path;
+  private final List<OzoneAcl> ozoneAcls;
+  private final OzoneObj obj;
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -81,7 +73,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   public OMBucketAddAclRequest(OMRequest omRequest) {
-    super(omRequest, bucketAddAclOp);
+    super(omRequest, (acls, omBucketInfo) -> omBucketInfo.addAcl(acls.get(0)));
     OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
         getOmRequest().getAddAclRequest();
     obj = OzoneObjInfo.fromProtobuf(addAclRequest.getObj());

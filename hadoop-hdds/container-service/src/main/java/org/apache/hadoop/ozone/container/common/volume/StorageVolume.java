@@ -97,7 +97,7 @@ public abstract class StorageVolume
     NOT_INITIALIZED
   }
 
-  private VolumeState state;
+  private volatile VolumeState state;
 
   // VERSION file properties
   private String storageID;       // id of the file system

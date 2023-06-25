@@ -155,6 +155,11 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return totalTime.get();
+  }
+
+  @Override
   public void stop() {
     try {
       executor.shutdown();

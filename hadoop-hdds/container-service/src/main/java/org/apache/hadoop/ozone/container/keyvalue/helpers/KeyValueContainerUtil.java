@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -175,21 +176,37 @@ public final class KeyValueContainerUtil {
 
   /**
    * Returns if there are no blocks in the container.
+   * @param store DBStore
    * @param containerData Container to check
+   * @param bCheckChunksFilePath Whether to check chunksfilepath has any blocks
    * @return true if the directory containing blocks is empty
    * @throws IOException
    */
-  public static boolean noBlocksInContainer(KeyValueContainerData
-                                                containerData)
+  public static boolean noBlocksInContainer(DatanodeStore store,
+                                            KeyValueContainerData
+                                            containerData,
+                                            boolean bCheckChunksFilePath)
       throws IOException {
+    Preconditions.checkNotNull(store);
     Preconditions.checkNotNull(containerData);
-    File chunksPath = new File(containerData.getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
-
-    try (DirectoryStream<Path> dir
-             = Files.newDirectoryStream(chunksPath.toPath())) {
-      return !dir.iterator().hasNext();
+    if (containerData.isOpen()) {
+      return false;
     }
+    try (BlockIterator<BlockData> blockIterator =
+             store.getBlockIterator(containerData.getContainerID())) {
+      if (blockIterator.hasNext()) {
+        return false;
+      }
+    }
+    if (bCheckChunksFilePath) {
+      File chunksPath = new File(containerData.getChunksPath());
+      Preconditions.checkArgument(chunksPath.isDirectory());
+      try (DirectoryStream<Path> dir
+               = Files.newDirectoryStream(chunksPath.toPath())) {
+        return !dir.iterator().hasNext();
+      }
+    }
+    return true;
   }
 
   /**
@@ -224,9 +241,14 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
+    DatanodeConfiguration dnConf =
+        config.getObject(DatanodeConfiguration.class);
+    boolean bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
+
     if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
-        populateContainerMetadata(kvContainerData, db.getStore());
+        populateContainerMetadata(kvContainerData,
+            db.getStore(), bCheckChunksFilePath);
       }
       return;
     }
@@ -249,7 +271,7 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      populateContainerMetadata(kvContainerData, store);
+      populateContainerMetadata(kvContainerData, store, bCheckChunksFilePath);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -271,7 +293,8 @@ public final class KeyValueContainerUtil {
   }
 
   private static void populateContainerMetadata(
-      KeyValueContainerData kvContainerData, DatanodeStore store)
+      KeyValueContainerData kvContainerData, DatanodeStore store,
+      boolean bCheckChunksFilePath)
       throws IOException {
     boolean isBlockMetadataSet = false;
     Table<String, Long> metadataTable = store.getMetadataTable();
@@ -336,6 +359,11 @@ public final class KeyValueContainerUtil {
     if (!chunksDir.exists()) {
       Files.createDirectories(chunksDir.toPath());
     }
+
+    if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
+      kvContainerData.markAsEmpty();
+    }
+
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
