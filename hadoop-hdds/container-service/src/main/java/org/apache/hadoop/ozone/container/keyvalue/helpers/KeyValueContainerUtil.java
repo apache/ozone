@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -52,6 +54,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -493,7 +496,8 @@ public final class KeyValueContainerUtil {
      * Delete all files under
      * <volume>/hdds/<cluster-id>/tmp/container_delete_service.
      */
-    public static synchronized void cleanTmpDir(HddsVolume hddsVolume)
+    public static synchronized void cleanTmpDir(
+        HddsVolume hddsVolume, @Nullable OzoneContainer ozoneContainer)
         throws IOException {
       if (hddsVolume.getStorageState() != StorageVolume.VolumeState.NORMAL) {
         LOG.debug("Call to clean tmp dir container_delete_service directory "
@@ -545,8 +549,20 @@ public final class KeyValueContainerUtil {
           keyValueContainerData.setDbFile(dbFile);
           try {
             // Remove container from Rocks DB
-            BlockUtils.removeContainerFromDB(keyValueContainerData,
-                hddsVolume.getConf());
+            // check if container already exist and not in deleted state
+            boolean isContainerExist = false;
+            if (ozoneContainer != null) {
+              Container<?> container = ozoneContainer.getContainerSet()
+                  .getContainer(containerData.getContainerID());
+              if (null != container) {
+                isContainerExist = container.getContainerState()
+                    != ContainerProtos.ContainerDataProto.State.DELETED;
+              }
+            }
+            if (!isContainerExist) {
+              BlockUtils.removeContainerFromDB(keyValueContainerData,
+                  hddsVolume.getConf());
+            }
           } catch (IOException ex) {
             LOG.error("Failed to remove container from Rocks DB", ex);
           }

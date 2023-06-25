@@ -161,7 +161,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           HddsVolume hddsVolume = (HddsVolume) volume;
           try {
             KeyValueContainerUtil.ContainerDeleteDirectory
-                .cleanTmpDir(hddsVolume);
+                .cleanTmpDir(hddsVolume, null);
           } catch (IOException ex) {
             LOG.error("Error while cleaning tmp delete directory " +
                 "under {}", hddsVolume.getWorkingDir(), ex);

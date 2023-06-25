@@ -366,6 +366,22 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
+  public void markContainerForDelete() throws StorageContainerException {
+    writeLock();
+    ContainerDataProto.State prevState = containerData.getState();
+    try {
+      updateContainerData(() ->
+          containerData.setState(ContainerDataProto.State.DELETED));
+      clearPendingPutBlockCache();
+    } finally {
+      writeUnlock();
+    }
+    LOG.warn("Moving container {} to state {} from state:{}",
+        containerData.getContainerPath(), containerData.getState(),
+        prevState);
+  }
+
+  @Override
   public void quasiClose() throws StorageContainerException {
     closeAndFlushIfNeeded(containerData::quasiCloseContainer);
   }

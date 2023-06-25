@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -27,6 +28,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
@@ -130,8 +132,22 @@ public class VersionEndpointTask implements
           if (volume instanceof HddsVolume) {
             HddsVolume hddsVolume = (HddsVolume) volume;
             try {
+              // move container to tmp directory which can be cleaned up down
+              ozoneContainer.getContainerSet().getContainerMap().entrySet()
+                  .forEach(e -> {
+                    if (e.getValue().getContainerState()
+                        == ContainerProtos.ContainerDataProto.State.DELETED) {
+                      if (e.getValue() instanceof KeyValueContainer) {
+                        KeyValueContainerUtil.ContainerDeleteDirectory
+                            .moveToTmpDeleteDirectory(
+                                ((KeyValueContainer) e.getValue())
+                                    .getContainerData(), hddsVolume);
+                      }
+                    }
+                  });
+              // cleanup all containers in tmp directory
               KeyValueContainerUtil.ContainerDeleteDirectory
-                  .cleanTmpDir(hddsVolume);
+                  .cleanTmpDir(hddsVolume, ozoneContainer);
             } catch (IOException ex) {
               LOG.error("Error while cleaning tmp delete directory " +
                   "under {}", hddsVolume.getWorkingDir(), ex);

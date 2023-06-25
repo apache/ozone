@@ -1324,6 +1324,7 @@ public class KeyValueHandler extends Handler {
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Rename container location
+        container.markContainerForDelete();
         boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
             .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
 
