@@ -455,9 +455,9 @@ public class RootCARotationManager implements SCMService {
   }
 
   private void cleanupAndStop(String reason) {
-    scm.getSecurityProtocolServer()
-        .setRootCertificateServer(null);
     try {
+      scm.getSecurityProtocolServer().setRootCertificateServer(null);
+
       FileUtils.deleteDirectory(new File(scmCertClient.getSecurityConfig()
           .getLocation(newCAComponent).toString()));
       LOG.info("In-progress root CA directory {} is deleted for '{}'",
@@ -572,7 +572,7 @@ public class RootCARotationManager implements SCMService {
               Paths.get(newSubCAProgressPath, HDDS_X509_DIR_NAME_DEFAULT),
               true);
           LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
-              "scm certificate signed.", rootCACertId);
+              "scm certificate {} signed.", rootCACertId, newCertSerialId);
         } catch (Exception e) {
           LOG.error("Failed to generate certificate under {}",
               newProgressDir, e);
@@ -647,8 +647,14 @@ public class RootCARotationManager implements SCMService {
         return;
       }
       synchronized (RootCARotationManager.class) {
+        int numFromHADetails =
+            scm.getSCMHANodeDetails().getPeerNodeDetails().size() + 1;
+        int numFromRatisServer = scm.getScmHAManager().getRatisServer()
+            .getDivision().getGroup().getPeers().size();
+        LOG.info("numFromHADetails {}, numFromRatisServer {}",
+            numFromHADetails, numFromRatisServer);
         if (handler.rotationPrepareAcks() ==
-            (scm.getSCMHANodeDetails().getPeerNodeDetails().size() + 1)) {
+            (Math.max(numFromHADetails, numFromRatisServer))) {
           // all acks are received.
           try {
             waitAckTimeoutTask.cancel(false);

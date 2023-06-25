@@ -39,6 +39,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +75,9 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    */
   private PrivateKey currentPrivateKey;
   private List<String> currentCertIdsList = new ArrayList<>();
+  private final Pattern dnPattern =
+      Pattern.compile("^.+, CN=scm-\\d{1}@.+");
+  private final String alias = "scm/sub-ca_key";
 
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
@@ -110,6 +115,42 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
           principals == null ? "" : Arrays.stream(principals)
               .map(Object::toString).collect(Collectors.joining(", ")),
           sslEngine == null ? "" : sslEngine.toString());
+        /*
+        Workaround to address that netty tc-native doesn't handle the dynamic
+        KeyManager re-loading well.
+
+        TODO: If this issue is fixed in tc-native in future version, following
+        logic can be removed.
+
+        Example error message:
+        Engine client aliases for RSA, DH_RSA, EC, EC_RSA, EC_EC,
+        O=CID-f9f2b2cf-a784-49d7-8577-5d3b13bf0b46,
+        OU=9f52487c-f8f9-45ee-bb56-aca60b56327f,
+        CN=scm-1@scm1.org,
+        org.apache.ratis.thirdparty.io.netty.handler.ssl.OpenSslEngine@5eec0d10
+        is null
+
+        Example success message:
+        Engine client aliases for RSA, DH_RSA, EC, EC_RSA, EC_EC,
+        O=CID-f9f2b2cf-a784-49d7-8577-5d3b13bf0b46,
+        OU=9f52487c-f8f9-45ee-bb56-aca60b56327f,
+        CN=scm-1@scm1.org,
+        org.apache.ratis.thirdparty.io.netty.handler.ssl.OpenSslEngine@5eec0d10
+        is scm/sub-ca_key
+       */
+      if (principals != null) {
+        String dn = principals[0].toString();
+        Matcher matcher = dnPattern.matcher(dn);
+        if (matcher.matches()) {
+          ret = alias;
+        }
+        LOG.warn("Engine client aliases for {}, {}, {} is changed to {}",
+            strings == null ? "" : Arrays.stream(strings).map(Object::toString)
+                .collect(Collectors.joining(",")),
+            principals == null ? "" : Arrays.stream(principals)
+                .map(Object::toString).collect(Collectors.joining(",")),
+            sslEngine == null ? "" : sslEngine.toString(), ret);
+      }
     }
     return ret;
   }
@@ -127,8 +168,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
         }
       }
     }
-    if (ret == null) {
-      LOG.info("Engine server aliases for {}, {}, {} is null", s,
+    if (ret == null && LOG.isDebugEnabled()) {
+      LOG.debug("Engine server aliases for {}, {}, {} is null", s,
           principals == null ? "" : Arrays.stream(principals)
               .map(Object::toString).collect(Collectors.joining(", ")),
           sslEngine == null ? "" : sslEngine.toString());

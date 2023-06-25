@@ -198,6 +198,7 @@ public final class HASecurityUtils {
       String scmHostname) {
 
     try {
+
       CertificateServer rootCAServer =
           initializeRootCertificateServer(config, null, scmStorageConfig,
               new DefaultCAProfile());
@@ -383,7 +384,7 @@ public final class HASecurityUtils {
   }
 
   private static SCMSecurityProtocolClientSideTranslatorPB
-  getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
+      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
       throws IOException {
     // As for OM during init, we need to wait for specific duration so that
     // we can give response to user performed operation init in a definite

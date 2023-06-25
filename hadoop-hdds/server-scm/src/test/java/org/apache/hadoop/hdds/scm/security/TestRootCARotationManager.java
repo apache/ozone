@@ -45,6 +45,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.KeyPair;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -87,7 +88,8 @@ public class TestRootCARotationManager {
   private BigInteger certID = new BigInteger("1");
 
   @BeforeEach
-  public void init() throws IOException, TimeoutException {
+  public void init() throws IOException, TimeoutException,
+      CertificateException {
     ozoneConfig = new OzoneConfiguration();
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
@@ -182,7 +184,7 @@ public class TestRootCARotationManager {
   public void testRotationOnSchedule() throws Exception {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
-    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT15S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
     Date date = Calendar.getInstance().getTime();
     date.setSeconds(date.getSeconds() + 10);
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY,
@@ -215,7 +217,7 @@ public class TestRootCARotationManager {
   public void testRotationImmediately() throws Exception {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
-    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT15S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
     Date date = Calendar.getInstance().getTime();
     date.setMinutes(date.getMinutes() + 5);
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY,

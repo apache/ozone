@@ -67,10 +67,25 @@ execute_robot_test scm4.org kinit.robot
 wait_for_execute_command scm4.org 120 "ozone admin scm roles | grep scm4.org"
 wait_for_execute_command scm1.org 30 "ozone admin cert list --role=scm | grep scm4.org"
 
+#transfer leader to scm4.org
+export TARGET_SCM=scm4.org
+execute_robot_test scm4.org scmha/scm-leader-transfer.robot
+
+# verify data read write
+wait_for_execute_command scm4.org 10 "ozone sh key put /opt/hadoop/LICENSE.txt  /rotation-vol/rotation-bucket/LICENSE.txt"
+wait_for_execute_command scm4.org 10 "ozone sh key get /opt/hadoop/LICENSE.txt.1  /rotation-vol/rotation-bucket/LICENSE.txt"
+
 # add new datanode4 and verify certificate
 docker-compose up -d datanode4
 wait_for_port datanode4 9856 60
 wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
+
+#decomission scm1.org
+execute_robot_test scm4.org scmha/scm-decommission.robot
+
+# verify data read write
+wait_for_execute_command scm4.org 10 "ozone sh key put /opt/hadoop/NOTICE.txt  /rotation-vol/rotation-bucket/NOTICE.txt"
+wait_for_execute_command scm4.org 10 "ozone sh key get /opt/hadoop/NOTICE.txt.1  /rotation-vol/rotation-bucket/NOTICE.txt"
 
 # check the metrics
 execute_robot_test scm1.org scmha/root-ca-rotation.robot
