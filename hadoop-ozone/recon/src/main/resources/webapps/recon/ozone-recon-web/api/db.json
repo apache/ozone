@@ -3409,6 +3409,48 @@
   "disabledFeatures": [
        "FLAG1"
   ],
+
+  "keysOpenSummary": {
+    "keysSummary": {
+      "totalUnreplicatedDataSize": 1000,
+      "totalReplicatedDataSize": 30000000,
+      "totalOpenKeys": 10
+    },
+    "lastKey": "",
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "status": "OK"
+   },
+  "keysdeletePendingSummary":{
+    "keysSummary": {
+      "totalUnreplicatedDataSize": 29291,
+      "totalReplicatedDataSize": 87873,
+      "totalDeletedKeys": 3
+    },
+    "lastKey": "/s3v/fso-bucket/dira/dira13/key3/-9223372036854762239",
+    "replicatedDataSize": 87873,
+    "unreplicatedDataSize": 29291,
+    "status": "OK"
+  },
+  "blocksdeletePendingSummary": {
+    "totalCount": 1000,
+    "containerStateBlockInfoListMap": {
+      "OPEN": [
+        {
+          "containerId": 100,
+          "localIDList": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "localIDCount": 4,
+          "txID": 1
+        }
+      ]
+    }
+  },
+  
   "omMismatch":{
       "lastKey":11,
       "containerDiscrepancyInfo": [
@@ -4246,11 +4288,613 @@
   ]
   },
   "scmMismatch2":{
+    "lastKey":31,
+    "containerDiscrepancyInfo": [
+    {
+      "containerId": 21,
+      "numberOfKeys": 1,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        },
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-613724nn"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 22,
+      "numberOfKeys": 2,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 23,
+      "numberOfKeys": 3,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 24,
+      "numberOfKeys": 4,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 25,
+      "numberOfKeys": 5,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 26,
+      "numberOfKeys": 6,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 27,
+      "numberOfKeys": 7,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 28,
+      "numberOfKeys": 8,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 29,
+      "numberOfKeys": 9,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 30,
+      "numberOfKeys": 10,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    }
+  ]
+  },
+  "scmMismatch3":{
+    "lastKey":41,
+    "containerDiscrepancyInfo": [
+    {
+      "containerId": 31,
+      "numberOfKeys": 1,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        },
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-613724nn"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 32,
+      "numberOfKeys": 2,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 33,
+      "numberOfKeys": 3,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 34,
+      "numberOfKeys": 4,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 35,
+      "numberOfKeys": 5,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 36,
+      "numberOfKeys": 6,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 37,
+      "numberOfKeys": 7,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 38,
+      "numberOfKeys": 8,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 39,
+      "numberOfKeys": 9,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 40,
+      "numberOfKeys": 10,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    }
+  ]
+  },
+  "scmMismatch4":{
+    "lastKey":51,
+    "containerDiscrepancyInfo": [
+    {
+      "containerId": 41,
+      "numberOfKeys": 1,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        },
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-613724nn"
+          },
+          
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 42,
+      "numberOfKeys": 2,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 43,
+      "numberOfKeys": 3,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 44,
+      "numberOfKeys": 4,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 45,
+      "numberOfKeys": 5,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 46,
+      "numberOfKeys": 6,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 47,
+      "numberOfKeys": 7,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 48,
+      "numberOfKeys": 8,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 49,
+      "numberOfKeys": 9,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    },
+    {
+      "containerId": 50,
+      "numberOfKeys": 10,
+      "pipelines": [
+        {
+          "id": {
+            "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
+          },
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "RATIS"
+          },
+          "healthy": true
+        }
+      ],
+      "existsAt": "OM"
+    }
+  ]
+  },
+  "scmMismatch5":{
     "lastKey": null,
     "containerDiscrepancyInfo": []
   },
   "nonFSO": {
     "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/1105696238501917",
+    "keysSummary": {
+      "totalUnreplicatedDataSize": 1000,
+      "totalReplicatedDataSize": 3000,
+      "totalOpenKeys": 0
+    },
     "nonFSO": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/01/110569623850191713",
@@ -4343,7 +4987,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191713",
-        "path": "2",
+        "path": "3",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4356,7 +5000,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191713",
-        "path": "2",
+        "path": "4",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4368,7 +5012,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191713",
-        "path": "2",
+        "path": "5",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4381,7 +5025,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191713",
-        "path": "2",
+        "path": "6",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4394,7 +5038,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191713",
-        "path": "2",
+        "path": "7",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4407,7 +5051,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191713",
-        "path": "2",
+        "path": "8",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4420,7 +5064,7 @@
       },
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191713",
-        "path": "2",
+        "path": "9",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4433,7 +5077,7 @@
       },
       {
         "key": "fso 10",
-        "path": "2",
+        "path": "10",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -4735,6 +5379,11 @@
   },
   "keydeletePending":{
     "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
+    "keysSummary": {
+      "totalUnreplicatedDataSize": 29291,
+      "totalReplicatedDataSize": 87873,
+      "totalDeletedKeys": 3
+    },
     "replicatedDataSize": 300000000,
     "unreplicatedDataSize": 100000000,
     "deletedKeyInfo": [
