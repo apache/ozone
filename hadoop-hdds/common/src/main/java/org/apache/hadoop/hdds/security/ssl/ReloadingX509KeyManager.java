@@ -147,7 +147,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
         LOG.warn("Engine client aliases for {}, {}, {} is changed to {}",
             strings == null ? "" : Arrays.stream(strings).map(Object::toString)
                 .collect(Collectors.joining(",")),
-            principals == null ? "" : Arrays.stream(principals)
+            Arrays.stream(principals)
                 .map(Object::toString).collect(Collectors.joining(",")),
             sslEngine == null ? "" : sslEngine.toString(), ret);
       }
