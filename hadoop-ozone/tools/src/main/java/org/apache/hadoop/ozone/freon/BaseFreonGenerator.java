@@ -245,7 +245,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0) {
+    if (!failAtEnd) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
@@ -329,7 +329,7 @@ public class BaseFreonGenerator {
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
     } else {
       maxValue = testNo;
-      supplier = successCounter::get;
+      supplier = () -> successCounter.get() + failureCounter.get();
     }
     progressBar = new ProgressBar(System.out, maxValue, supplier,
         freonCommand.isInteractive(), realTimeStatusSupplier());
