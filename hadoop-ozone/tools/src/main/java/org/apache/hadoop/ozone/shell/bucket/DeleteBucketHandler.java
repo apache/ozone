@@ -113,11 +113,11 @@ public class DeleteBucketHandler extends BucketHandler {
       } else {
         deleteFSBucketRecursive(vol, bucket);
       }
-      out().printf("Bucket %s is deleted%n", bucketName);
       return;
     }
-    out().printf("Bucket %s is deleted%n", bucketName);
+    // Delete bucket without recursive
     vol.deleteBucket(bucketName);
+    out().printf("Bucket %s is deleted%n", bucketName);
   }
 
   /**
@@ -143,6 +143,7 @@ public class DeleteBucketHandler extends BucketHandler {
         }
       }
       vol.deleteBucket(bucket.getName());
+      out().printf("Bucket %s is deleted%n", bucket.getName());
     } catch (Exception e) {
       out().println("Could not delete bucket.");
     }
@@ -172,6 +173,7 @@ public class DeleteBucketHandler extends BucketHandler {
       if (!fs.delete(path, true)) {
         out().println("Could not delete bucket.");
       }
+      out().printf("Bucket %s is deleted%n", bucket.getName());
     } catch (IOException e) {
       out().println("Could not delete bucket.");
     }
