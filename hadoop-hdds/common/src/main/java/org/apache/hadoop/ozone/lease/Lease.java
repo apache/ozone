@@ -77,6 +77,8 @@ public class Lease<T> {
    *        Resource for which the lease has to be created
    * @param timeout
    *        Lease lifetime in milliseconds
+   * @param callback
+   *        Callback registered to be triggered when lease expire
    */
   public Lease(T resource, long timeout, Callable<Void> callback) {
     this(resource, timeout);
@@ -182,6 +184,7 @@ public class Lease<T> {
    * Expires/Invalidates the lease.
    */
   void invalidate() {
+    callbacks = null;
     expired = true;
   }
 

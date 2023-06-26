@@ -156,7 +156,7 @@ public class LeaseManager<T> {
   }
 
   /**
-   * Returns a lease for the specified resource with the timeout provided.
+   * Returns a lease for the specified resource with the default timeout.
    *
    * @param resource
    *        Resource for which lease has to be created
