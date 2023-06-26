@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
@@ -61,7 +61,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for the default PKI Profile.
  */
 public class TestDefaultProfile {
-  private OzoneConfiguration configuration;
   private SecurityConfig securityConfig;
   private DefaultProfile defaultProfile;
   private MockApprover testApprover;
@@ -69,7 +68,7 @@ public class TestDefaultProfile {
 
   @BeforeEach
   public void setUp(@TempDir Path tempDir) throws Exception {
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(configuration);
     defaultProfile = new DefaultProfile();
@@ -112,7 +111,7 @@ public class TestDefaultProfile {
         .setClusterID("ClusterID")
         .setScmID("SCMID")
         .setSubject("Ozone Cluster")
-        .setConfiguration(configuration)
+        .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
     assertTrue(testApprover.verifyPkcs10Request(csr));
@@ -144,7 +143,7 @@ public class TestDefaultProfile {
         .setClusterID("ClusterID")
         .setScmID("SCMID")
         .setSubject("Ozone Cluster")
-        .setConfiguration(configuration)
+        .setConfiguration(securityConfig)
         .setKey(wrongKey)
         .build();
     // Signature verification should fail here, since the public/private key
@@ -168,7 +167,7 @@ public class TestDefaultProfile {
         .setClusterID("ClusterID")
         .setScmID("SCMID")
         .setSubject("Ozone Cluster")
-        .setConfiguration(configuration)
+        .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
     assertTrue(testApprover.verfiyExtensions(csr));
@@ -190,7 +189,7 @@ public class TestDefaultProfile {
         .setClusterID("ClusterID")
         .setScmID("SCMID")
         .setSubject("Ozone Cluster")
-        .setConfiguration(configuration)
+        .setConfiguration(securityConfig)
         .setKey(keyPair)
         .build();
     assertFalse(testApprover.verfiyExtensions(csr));

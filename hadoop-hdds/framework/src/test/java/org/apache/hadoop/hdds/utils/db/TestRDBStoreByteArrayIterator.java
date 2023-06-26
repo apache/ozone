@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -39,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
@@ -50,7 +49,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * This test prescribe expected behaviour from the RDBStoreIterator which wraps
+ * This test prescribe expected behaviour
+ * from {@link RDBStoreByteArrayIterator} which wraps
  * RocksDB's own iterator. Ozone internally in TypedTableIterator uses, the
  * RDBStoreIterator to provide iteration over table elements in a typed manner.
  * The tests are to ensure we access RocksDB via the iterator properly.
@@ -70,7 +70,7 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   RDBStoreByteArrayIterator newIterator() {
-    return new RDBStoreByteArrayIterator(managedRocksIterator, null);
+    return new RDBStoreByteArrayIterator(managedRocksIterator, null, null);
   }
 
   RDBStoreByteArrayIterator newIterator(byte[] prefix) {
@@ -234,8 +234,7 @@ public class TestRDBStoreByteArrayIterator {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(testKey);
 
-    RDBStoreByteArrayIterator iter =
-        new RDBStoreByteArrayIterator(managedRocksIterator, rocksTableMock);
+    RDBStoreByteArrayIterator iter = newIterator(null);
     iter.removeFromDB();
 
     InOrder verifier = inOrder(rocksDBIteratorMock, rocksTableMock);
@@ -329,6 +328,6 @@ public class TestRDBStoreByteArrayIterator {
     }
     String expectedTrace = sb.toString();
     String fromObjectInit = iterator.getStackTrace();
-    Assert.assertTrue(fromObjectInit.contains(expectedTrace));
+    assertTrue(fromObjectInit.contains(expectedTrace));
   }
 }

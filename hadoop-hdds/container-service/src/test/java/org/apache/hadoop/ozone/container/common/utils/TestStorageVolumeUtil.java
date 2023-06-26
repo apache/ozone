@@ -27,6 +27,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -45,6 +47,9 @@ import static org.powermock.api.mockito.PowerMockito.when;
 public class TestStorageVolumeUtil {
   @Rule
   public final TemporaryFolder folder = new TemporaryFolder();
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestStorageVolumeUtil.class);
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
@@ -90,7 +95,7 @@ public class TestStorageVolumeUtil {
 
     // checkVolume for the 2nd time: rootFiles.length == 2
     res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
-        CLUSTER_ID, CONF, null, dbVolumeSet);
+        CLUSTER_ID, CONF, LOG, dbVolumeSet);
     assertTrue(res);
 
     // should only call createDbStore once, so no dup db instance

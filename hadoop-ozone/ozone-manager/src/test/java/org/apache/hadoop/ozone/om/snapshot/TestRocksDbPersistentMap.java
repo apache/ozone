@@ -25,15 +25,27 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.util.ClosableIterator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -49,6 +61,8 @@ public class TestRocksDbPersistentMap {
   private static ManagedRocksDB db;
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
+
+  private static AtomicInteger id;
 
   @BeforeAll
   public static void staticInit() throws RocksDBException {
@@ -74,10 +88,11 @@ public class TestRocksDbPersistentMap {
 
     db = ManagedRocksDB.open(dbOptions, absolutePath, columnFamilyDescriptors,
         columnFamilyHandles);
+    id = new AtomicInteger(0);
   }
 
-  @AfterEach
-  public void teardown() throws RocksDBException {
+  @AfterAll
+  public static void teardown() throws RocksDBException {
     if (dbOptions != null) {
       dbOptions.close();
     }
@@ -97,7 +112,8 @@ public class TestRocksDbPersistentMap {
     try {
       final CodecRegistry codecRegistry = CodecRegistry.newBuilder().build();
       columnFamily = db.get().createColumnFamily(new ColumnFamilyDescriptor(
-          codecRegistry.asRawData("testMap"), columnFamilyOptions));
+          codecRegistry.asRawData("testMap" + id.incrementAndGet()),
+          columnFamilyOptions));
 
       PersistentMap<String, String> persistentMap = new RocksDbPersistentMap<>(
           db,
@@ -124,6 +140,95 @@ public class TestRocksDbPersistentMap {
       for (Map.Entry<String, String> entry : expectedMap.entrySet()) {
         assertEquals(entry.getValue(), persistentMap.get(entry.getKey()));
       }
+    } finally {
+      if (columnFamily != null) {
+        db.get().dropColumnFamily(columnFamily);
+        columnFamily.close();
+      }
+    }
+  }
+
+  /**
+   * Test cases for testRocksDBPersistentMapIterator.
+   */
+  private static Stream<Arguments> rocksDBPersistentMapIteratorCases() {
+    return Stream.of(
+        Arguments.of(
+            Optional.empty(),
+            Optional.of("key202"),
+            Stream.concat(IntStream.range(0, 100).boxed(),
+                    IntStream.range(200, 300).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList()),
+            Stream.concat(IntStream.range(0, 100).boxed(),
+                    IntStream.range(200, 202).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList())),
+        Arguments.of(Optional.of("key050"),
+            Optional.empty(), Stream.concat(IntStream.range(50, 100).boxed(),
+                    IntStream.range(200, 300).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList()),
+            Stream.concat(IntStream.range(50, 100).boxed(),
+                    IntStream.range(200, 300).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList())
+            ),
+        Arguments.of(Optional.of("key050"),
+            Optional.of("key210"),
+            Stream.concat(IntStream.range(50, 100).boxed(),
+                    IntStream.range(200, 300).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList()),
+            Stream.concat(IntStream.range(50, 100).boxed(),
+                    IntStream.range(200, 210).boxed())
+                .map(i -> Pair.of(String.format("key%03d", i),
+                    String.format("value%03d", i)))
+                .collect(Collectors.toList())
+        ));
+  }
+
+  @ParameterizedTest
+  @MethodSource("rocksDBPersistentMapIteratorCases")
+  public void testRocksDBPersistentMapIterator(Optional<String> lowerBound,
+              Optional<String> upperBound, List<Pair<String, String>> keys,
+              List<Pair<String, String>> expectedKeys)
+      throws IOException, RocksDBException {
+    ColumnFamilyHandle columnFamily = null;
+    try {
+      final CodecRegistry codecRegistry = CodecRegistry.newBuilder().build();
+      columnFamily = db.get().createColumnFamily(new ColumnFamilyDescriptor(
+          codecRegistry.asRawData("testMap" + id.incrementAndGet()),
+          columnFamilyOptions));
+
+      PersistentMap<String, String> persistentMap = new RocksDbPersistentMap<>(
+          db,
+          columnFamily,
+          codecRegistry,
+          String.class,
+          String.class
+      );
+
+      for (int i = 0; i < keys.size(); i++) {
+        String key = keys.get(i).getKey();
+        String value = keys.get(i).getValue();
+        persistentMap.put(key, value);
+      }
+      ClosableIterator<Map.Entry<String, String>> iterator =
+          persistentMap.iterator(lowerBound, upperBound);
+      int idx = 0;
+      while (iterator.hasNext()) {
+        Map.Entry<String, String> e = iterator.next();
+        Assertions.assertEquals(Pair.of(e.getKey(), e.getValue()),
+            expectedKeys.get(idx));
+        idx += 1;
+      }
+
     } finally {
       if (columnFamily != null) {
         db.get().dropColumnFamily(columnFamily);

@@ -1333,8 +1333,14 @@ public class ReplicationManager implements SCMService {
             + " event.timeout, which is set to " + eventTimeout);
       }
       if (reconstructionCommandWeight <= 0) {
-        throw new IllegalArgumentException("reconstructionCommandWeight is"
-            + " set to " + reconstructionCommandWeight + " and must be > 0");
+        throw new IllegalArgumentException("datanode.reconstruction.weight: "
+            + reconstructionCommandWeight + " must be > 0");
+      }
+      if (datanodeReplicationLimit < reconstructionCommandWeight) {
+        throw new IllegalArgumentException("datanode.replication.limit: "
+            + datanodeReplicationLimit
+            + " must be >= datanode.reconstruction.weight: "
+            + reconstructionCommandWeight);
       }
       if (inflightReplicationLimitFactor < 0) {
         throw new IllegalArgumentException(

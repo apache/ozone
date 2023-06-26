@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -32,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
@@ -46,6 +49,38 @@ import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
  */
 public final class CodecBuffer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
+
+  /** The size of a buffer. */
+  public static class Capacity {
+    private final Object name;
+    private final AtomicInteger value;
+
+    public Capacity(Object name, int initialCapacity) {
+      this.name = name;
+      this.value = new AtomicInteger(initialCapacity);
+    }
+
+    public int get() {
+      return value.get();
+    }
+
+    private static int nextValue(int n) {
+      // round up to the next power of 2.
+      final long roundUp = Long.highestOneBit(n) << 1;
+      return roundUp > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) roundUp;
+    }
+
+    /** Increase this size to accommodate the given required size. */
+    public void increase(int required) {
+      final MemoizedSupplier<Integer> newBufferSize = MemoizedSupplier.valueOf(
+          () -> nextValue(required));
+      final int previous = value.getAndUpdate(
+          current -> required <= current ? current : newBufferSize.get());
+      if (newBufferSize.isInitialized()) {
+        LOG.info("{}: increase {} -> {}", name, previous, newBufferSize.get());
+      }
+    }
+  }
 
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
@@ -206,6 +241,16 @@ public final class CodecBuffer implements AutoCloseable {
     return array;
   }
 
+  /** Does the content of this buffer start with the given prefix? */
+  public boolean startsWith(CodecBuffer prefix) {
+    Objects.requireNonNull(prefix, "prefix == null");
+    final int length = prefix.readableBytes();
+    if (this.readableBytes() < length) {
+      return false;
+    }
+    return buf.slice(buf.readerIndex(), length).equals(prefix.buf);
+  }
+
   /** @return an {@link InputStream} reading from this buffer. */
   public InputStream getInputStream() {
     return new ByteBufInputStream(buf.duplicate());
@@ -316,7 +361,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @throws E in case the source throws it.
    */
   <E extends Exception> Integer putFromSource(
-      CheckedFunction<ByteBuffer, Integer, E> source) throws E {
+      PutToByteBuffer<E> source) throws E {
     assertRefCnt(1);
     final int i = buf.writerIndex();
     final int writable = buf.writableBytes();
@@ -329,5 +374,16 @@ public final class CodecBuffer implements AutoCloseable {
       }
     }
     return size;
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName()
+        + "[" + buf.readerIndex()
+        + "<=" + buf.writerIndex()
+        + "<=" + buf.capacity()
+        + ": "
+        + StringUtils.bytes2Hex(asReadOnlyByteBuffer(), 10)
+        + "]";
   }
 }

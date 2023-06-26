@@ -54,6 +54,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
@@ -309,6 +310,8 @@ public class OMDBInsightEndpoint {
         deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
     Table<String, RepeatedOmKeyInfo> deletedTable =
         omMetadataManager.getDeletedTable();
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             RepeatedOmKeyInfo>>
@@ -345,6 +348,10 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
+      // Create the keysSummary for deleted keys
+      createKeysSummaryForDeletedKey(keysSummary);
+      // Set the keysSummary and lastKey in the response
+      deletedKeyAndDirInsightInfo.setKeysSummary(keysSummary);
       deletedKeyAndDirInsightInfo.setLastKey(lastKey);
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
@@ -421,6 +428,30 @@ public class OMDBInsightEndpoint {
         deletedKeyInsightInfo);
     return Response.ok(deletedKeyInsightInfo).build();
   }
+
+  /**
+   * Creates a keys summary for deleted keys and updates the provided
+   * keysSummary map. Calculates the total number of deleted keys, replicated
+   * data size, and unreplicated data size.
+   *
+   * @param keysSummary A map to store the keys summary information.
+   */
+  private void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
+    // Fetch the necessary metrics for deleted keys
+    Long replicatedSizeDeleted = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(DELETED_TABLE)));
+    Long unreplicatedSizeDeleted = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(DELETED_TABLE)));
+    Long deletedKeyCount = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(DELETED_TABLE)));
+
+    // Calculate the total number of deleted keys
+    keysSummary.put("totalDeletedKeys", deletedKeyCount);
+    // Calculate the total replicated and unreplicated sizes
+    keysSummary.put("totalReplicatedDataSize", replicatedSizeDeleted);
+    keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeDeleted);
+  }
+
 
   private void getPendingForDeletionDirInfo(
       int limit, String prevKey,

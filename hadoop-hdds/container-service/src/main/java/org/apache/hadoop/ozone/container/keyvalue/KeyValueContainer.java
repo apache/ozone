@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -109,7 +110,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container are synchronous.
   private Set<Long> pendingPutBlockCache;
 
-  private final boolean bCheckChunksFilePath;
+  private boolean bCheckChunksFilePath;
 
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
@@ -126,12 +127,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
     }
-    bCheckChunksFilePath =
-        ozoneConfig.getBoolean(
-            DatanodeConfiguration.
-                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
-            DatanodeConfiguration.
-                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
+    DatanodeConfiguration dnConf =
+        config.getObject(DatanodeConfiguration.class);
+    bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
+  }
+
+  @VisibleForTesting
+  public void setCheckChunksFilePath(boolean bCheckChunksDirFilePath) {
+    this.bCheckChunksFilePath = bCheckChunksDirFilePath;
   }
 
   @Override

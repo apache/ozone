@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -62,6 +63,9 @@ public abstract class StorageVolume
 
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolume.class);
+
+  // The name of the directory used for temporary files on the volume.
+  public static final String TMP_DIR_NAME = "tmp";
 
   /**
    * Type for StorageVolume.
@@ -105,12 +109,13 @@ public abstract class StorageVolume
   private ConfigurationSource conf;
 
   private final File storageDir;
+  private String workingDirName;
+  private File tmpDir;
 
   private final Optional<VolumeInfo> volumeInfo;
 
   private final VolumeSet volumeSet;
 
-  private String workingDir;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
@@ -180,19 +185,43 @@ public abstract class StorageVolume
   }
 
   /**
-   * Create working directory for cluster io loads.
-   * @param workingDirName scmID or clusterID according to SCM HA config
-   * @param dbVolumeSet optional dbVolumes
+   * Create the working directory for the volume at
+   * <volume>/<hdds>/<workingDirName>.
+   * Creates necessary subdirectories of the working directory as well. This
+   * includes the tmp directory at <volume>/<hdds>/<workingDirName>/tmp.
+   * Child classes may override this method to add volume specific
+   * subdirectories, but they should call the parent method first to make
+   * sure initial directories are constructed.
+   *
+   * @param dirName scmID or clusterID according to SCM HA
+   *    layout feature upgrade finalization status.
    * @throws IOException
    */
-  public void createWorkingDir(String workingDirName,
-      MutableVolumeSet dbVolumeSet) throws IOException {
-    File idDir = new File(getStorageDir(), workingDirName);
-    if (!idDir.mkdir()) {
+  public void createWorkingDir(String dirName, MutableVolumeSet dbVolumeSet)
+      throws IOException {
+    File idDir = new File(getStorageDir(), dirName);
+    if (!idDir.exists() && !idDir.mkdir()) {
       throw new IOException("Unable to create ID directory " + idDir +
           " for datanode.");
     }
-    this.workingDir = workingDirName;
+    this.workingDirName = dirName;
+  }
+
+  public void createTmpDirs(String workDirName) throws IOException {
+    this.tmpDir =
+        new File(new File(getStorageDir(), workDirName), TMP_DIR_NAME);
+    Files.createDirectories(tmpDir.toPath());
+  }
+
+  /**
+   * Create a subdirectory within this volume's tmp directory.
+   * This subdirectory can be used as a work space for temporary filesystem
+   * operations before they are moved to their final destination.
+   */
+  protected final File createTmpSubdirIfNeeded(String name) throws IOException {
+    File newDir = new File(tmpDir, name);
+    Files.createDirectories(newDir.toPath());
+    return newDir;
   }
 
   private VolumeState analyzeVolumeState() {
@@ -392,8 +421,12 @@ public abstract class StorageVolume
     return this.storageDir;
   }
 
-  public String getWorkingDir() {
-    return this.workingDir;
+  public String getWorkingDirName() {
+    return this.workingDirName;
+  }
+
+  public File getTmpDir() {
+    return this.tmpDir;
   }
 
   public void refreshVolumeInfo() {

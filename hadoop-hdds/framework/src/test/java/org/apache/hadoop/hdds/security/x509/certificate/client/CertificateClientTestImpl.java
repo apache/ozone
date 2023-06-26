@@ -45,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
@@ -72,7 +72,6 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 
 public class CertificateClientTestImpl implements CertificateClient {
 
-  private final OzoneConfiguration config;
   private final SecurityConfig securityConfig;
   private KeyPair keyPair;
   private X509Certificate x509Certificate;
@@ -98,10 +97,9 @@ public class CertificateClientTestImpl implements CertificateClient {
     certificateMap = new ConcurrentHashMap<>();
     securityConfig = new SecurityConfig(conf);
     rootCerts = new HashSet<>();
-    keyGen = new HDDSKeyGenerator(securityConfig.getConfiguration());
+    keyGen = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGen.generateKey();
     rootKeyPair = keyGen.generateKey();
-    config = conf;
     LocalDateTime start = LocalDateTime.now();
     String rootCACertDuration = conf.get(HDDS_X509_MAX_DURATION,
         HDDS_X509_MAX_DURATION_DEFAULT);
@@ -115,7 +113,7 @@ public class CertificateClientTestImpl implements CertificateClient {
             .setClusterID("cluster1")
             .setKey(rootKeyPair)
             .setSubject("rootCA@localhost")
-            .setConfiguration(config)
+            .setConfiguration(securityConfig)
             .setScmID("scm1")
             .makeCA();
     rootCert = new JcaX509CertificateConverter().getCertificate(
@@ -130,7 +128,7 @@ public class CertificateClientTestImpl implements CertificateClient {
         new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(keyPair)
-        .setConfiguration(config)
+        .setConfiguration(securityConfig)
         .setScmID("scm1")
         .setClusterID("cluster1")
         .setSubject("localhost")
@@ -300,9 +298,8 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   public void renewRootCA() throws Exception {
     LocalDateTime start = LocalDateTime.now();
-    String rootCACertDuration = config.get(HDDS_X509_MAX_DURATION,
-        HDDS_X509_MAX_DURATION_DEFAULT);
-    LocalDateTime end = start.plus(Duration.parse(rootCACertDuration));
+    Duration rootCACertDuration = securityConfig.getMaxCertificateDuration();
+    LocalDateTime end = start.plus(rootCACertDuration);
     rootKeyPair = keyGen.generateKey();
     SelfSignedCertificate.Builder builder =
         SelfSignedCertificate.newBuilder()
@@ -311,7 +308,7 @@ public class CertificateClientTestImpl implements CertificateClient {
             .setClusterID("cluster1")
             .setKey(rootKeyPair)
             .setSubject("rootCA-new@localhost")
-            .setConfiguration(config)
+            .setConfiguration(securityConfig)
             .setScmID("scm1")
             .makeCA(BigInteger.ONE.add(BigInteger.ONE));
     rootCert = new JcaX509CertificateConverter().getCertificate(
@@ -326,19 +323,18 @@ public class CertificateClientTestImpl implements CertificateClient {
         new CertificateSignRequest.Builder();
     // Get host name.
     csrBuilder.setKey(newKeyPair)
-        .setConfiguration(config)
+        .setConfiguration(securityConfig)
         .setScmID("scm1")
         .setClusterID("cluster1")
         .setSubject("localhost")
         .setDigitalSignature(true);
 
-    String certDuration = config.get(HDDS_X509_DEFAULT_DURATION,
-        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    Duration certDuration = securityConfig.getDefaultCertDuration();
     Date start = new Date();
     X509CertificateHolder certificateHolder =
         approver.sign(securityConfig, rootKeyPair.getPrivate(),
             new X509CertificateHolder(rootCert.getEncoded()), start,
-            new Date(start.getTime() + Duration.parse(certDuration).toMillis()),
+            new Date(start.getTime() + certDuration.toMillis()),
             csrBuilder.build(), "scm1", "cluster1");
     X509Certificate newX509Certificate =
         new JcaX509CertificateConverter().getCertificate(certificateHolder);
