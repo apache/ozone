@@ -152,7 +152,7 @@ public class DBCheckpointServlet extends HttpServlet
 
     boolean flush = false;
     String flushParam =
-      request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
+        request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
     if (StringUtils.isNotEmpty(flushParam)) {
       flush = Boolean.parseBoolean(flushParam);
     }
