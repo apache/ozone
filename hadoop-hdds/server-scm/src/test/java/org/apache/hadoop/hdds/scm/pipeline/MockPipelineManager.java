@@ -71,7 +71,7 @@ public class MockPipelineManager implements PipelineManager {
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException, TimeoutException {
-    Pipeline pipeline = buildPipeline(replicationConfig, excludedNodes,
+    Pipeline pipeline = buildECPipeline(replicationConfig, excludedNodes,
         favoredNodes);
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
@@ -80,7 +80,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public Pipeline buildPipeline(ReplicationConfig replicationConfig,
+  public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException, TimeoutException {
     final List<DatanodeDetails> nodes = Stream.generate(
@@ -97,7 +97,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void addPipeline(Pipeline pipeline)
+  public void addEcPipeline(Pipeline pipeline)
       throws IOException, TimeoutException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION));

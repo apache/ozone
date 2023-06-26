@@ -207,9 +207,12 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws IOException
    */
   @Override
-  public Pipeline buildPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes) throws IOException {
+  public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
+    if (replicationConfig.getReplicationType() != ReplicationType.EC) {
+      throw new IllegalArgumentException("Replication type must be EC");
+    }
     checkIfPipelineCreationIsAllowed(replicationConfig);
     return pipelineFactory.create(replicationConfig, excludedNodes,
         favoredNodes);
@@ -223,8 +226,13 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws TimeoutException
    */
   @Override
-  public void addPipeline(Pipeline pipeline)
+  public void addEcPipeline(Pipeline pipeline)
       throws IOException, TimeoutException {
+    if (pipeline.getReplicationConfig().getReplicationType()
+        != ReplicationType.EC) {
+      throw new IllegalArgumentException(
+          "Pipeline replication type must be EC");
+    }
     checkIfPipelineCreationIsAllowed(pipeline.getReplicationConfig());
     addPipelineToManager(pipeline);
   }
@@ -278,13 +286,13 @@ public class PipelineManagerImpl implements PipelineManager {
 
   private void addPipelineToManager(Pipeline pipeline)
       throws IOException, TimeoutException {
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
     acquireWriteLock();
     try {
-      stateManager.addPipeline(pipeline.getProtobufMessage(
-          ClientVersion.CURRENT_VERSION));
+      stateManager.addPipeline(pipelineProto);
     } catch (IOException | TimeoutException ex) {
-      LOG.debug("Failed to add pipeline with replicationConfig {}.",
-          pipeline.getReplicationConfig(), ex);
+      LOG.debug("Failed to add pipeline {}.", pipeline, ex);
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {

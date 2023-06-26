@@ -196,10 +196,10 @@ public class TestPipelineManagerImpl {
     Assertions.assertEquals(2, pipelineManager.getPipelines().size());
     Assertions.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
 
-    Pipeline builtPipeline = pipelineManager.buildPipeline(
+    Pipeline builtPipeline = pipelineManager.buildECPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         Collections.emptyList(), Collections.emptyList());
-    pipelineManager.addPipeline(builtPipeline);
+    pipelineManager.addEcPipeline(builtPipeline);
 
     Assertions.assertEquals(3, pipelineManager.getPipelines().size());
     Assertions.assertTrue(pipelineManager.containsPipeline(
