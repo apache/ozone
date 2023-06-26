@@ -1338,7 +1338,7 @@ public class KeyValueHandler extends Handler {
         try {
           KeyValueContainerUtil.moveToDeletedContainerDir(keyValueContainerData,
               hddsVolume);
-        } catch (IOException ioe){
+        } catch (IOException ioe) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeletedContainerDir());
           String errorMsg =
