@@ -109,6 +109,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -584,6 +585,12 @@ public class TestOmSnapshot {
     key1 = createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
+
+    // When from and to snapshots are same, it returns empty response.
+    SnapshotDiffReportOzone
+        diff0 = getSnapDiffReport(volume, bucket, snap1, snap1);
+    assertTrue(diff0.getDiffList().isEmpty());
+
     // Do nothing, take another snapshot
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap2);
@@ -797,38 +804,6 @@ public class TestOmSnapshot {
   }
 
   @Test
-  public void testSnapDiffValidationFailure() throws Exception {
-    String volume = "vol-" + counter.incrementAndGet();
-    String bucket = "buck-" + counter.incrementAndGet();
-    store.createVolume(volume);
-    OzoneVolume volume1 = store.getVolume(volume);
-    volume1.createBucket(bucket);
-    OzoneBucket bucket1 = volume1.getBucket(bucket);
-    // Create Key1 and take snapshot
-    String key1 = "key-1-";
-    createFileKeyWithPrefix(bucket1, key1);
-    String snap1 = "snap" + counter.incrementAndGet();
-    createSnapshot(volume, bucket, snap1);
-    String snap2 = "snap" + counter.incrementAndGet();
-    createSnapshot(volume, bucket, snap2);
-
-    OMException sameSnapshotException = assertThrows(OMException.class, () ->
-        store.snapshotDiff(volume, bucket, snap1, snap1, null, 0, false, false)
-    );
-
-    assertEquals(INTERNAL_ERROR, sameSnapshotException.getResult());
-    assertEquals("fromSnapshot:" + snap1 + " and toSnapshot:" + snap1 +
-        " are same.", sameSnapshotException.getMessage());
-    OMException newerSnapshotException = assertThrows(OMException.class, () ->
-        store.snapshotDiff(volume, bucket, snap2, snap1, null, 0, false, false)
-    );
-
-    assertEquals(INTERNAL_ERROR, newerSnapshotException.getResult());
-    assertEquals("fromSnapshot:" + snap2 + " should be older than to " +
-        "toSnapshot:" + snap1, newerSnapshotException.getMessage());
-  }
-
-  @Test
   public void testSnapDiffNoSnapshot() throws Exception {
     String volume = "vol-" + counter.incrementAndGet();
     String bucket = "buck-" + counter.incrementAndGet();
@@ -842,16 +817,28 @@ public class TestOmSnapshot {
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     String snap2 = "snap" + counter.incrementAndGet();
+
     // Destination snapshot is invalid
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
+    OMException omException = assertThrows(OMException.class,
             () -> store.snapshotDiff(volume, bucket, snap1, snap2,
                 null, 0, false, false));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
     // From snapshot is invalid
-    LambdaTestUtils.intercept(OMException.class,
-        "KEY_NOT_FOUND",
+    omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap2, snap1,
             null, 0, false, false));
+
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
+
+    createSnapshot(volume, bucket, snap2);
+
+    omException = assertThrows(OMException.class, () ->
+        store.snapshotDiff(volume, bucket, snap2, snap1, null, 0, false, false)
+    );
+
+    assertEquals(INTERNAL_ERROR, omException.getResult());
+    assertEquals("fromSnapshot:" + snap2 + " should be older than to " +
+        "toSnapshot:" + snap1, omException.getMessage());
   }
 
   @Test
