@@ -105,6 +105,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEF
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DATASTREAM_MIN_LENGTH_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DATASTREAM_MIN_LENGTH_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
@@ -149,6 +151,7 @@ public class ObjectEndpoint extends EndpointBase {
   private int bufferSize;
   private int chunkSize;
   private boolean datastreamEnabled;
+  private long datastreamMinLength;
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
@@ -176,6 +179,9 @@ public class ObjectEndpoint extends EndpointBase {
     datastreamEnabled = ozoneConfiguration.getBoolean(
         DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+    datastreamMinLength = (long) ozoneConfiguration.getStorageSize(
+        OZONE_S3G_DATASTREAM_MIN_LENGTH_KEY,
+        OZONE_S3G_DATASTREAM_MIN_LENGTH_DEFAULT, StorageUnit.BYTES);
   }
 
   /**
@@ -256,7 +262,7 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
       long putLength = 0;
-      if (datastreamEnabled && !enableEC) {
+      if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
         getMetrics().updatePutKeyMetadataStats(startNanos);
         putLength = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,

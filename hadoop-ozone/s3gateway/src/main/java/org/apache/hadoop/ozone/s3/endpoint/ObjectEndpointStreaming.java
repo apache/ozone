@@ -96,27 +96,17 @@ final class ObjectEndpointStreaming {
                                           InputStream body, int bufferSize,
                                           long length)
       throws IOException {
-    byte[] buffer = new byte[bufferSize];
-    ByteBuffer writeByteBuffer;
-    long total = 0;
-    do {
-      int realBufferSize = (int) (length - total);
-      if (realBufferSize > 0 && realBufferSize < bufferSize) {
-        buffer = new byte[realBufferSize];
-      }
-      int nn = body.read(buffer);
-      if (nn == -1) {
+    final byte[] buffer = new byte[bufferSize];
+    long n = 0;
+    while (n < length) {
+      final int toRead = Math.toIntExact(Math.min(bufferSize, length - n));
+      final int readLength = body.read(buffer, 0, toRead);
+      if (readLength == -1) {
         break;
-      } else if (nn != bufferSize) {
-        byte[] subBuffer = new byte[nn];
-        System.arraycopy(buffer, 0, subBuffer, 0, nn);
-        writeByteBuffer = ByteBuffer.wrap(subBuffer, 0, nn);
-      } else {
-        writeByteBuffer = ByteBuffer.wrap(buffer, 0, nn);
       }
-      streamOutput.write(writeByteBuffer, 0, nn);
-      total += nn;
-    } while (total != length);
-    return total;
+      streamOutput.write(ByteBuffer.wrap(buffer, 0, readLength));
+      n += readLength;
+    }
+    return n;
   }
 }
