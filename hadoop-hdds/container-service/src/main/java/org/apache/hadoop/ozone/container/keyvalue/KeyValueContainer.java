@@ -754,7 +754,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             containerData.getContainerID());
   }
 
-  static File getContainerFile(String metadataPath, long containerId) {
+  public static File getContainerFile(String metadataPath, long containerId) {
     return new File(metadataPath,
         containerId + OzoneConsts.CONTAINER_EXTENSION);
   }

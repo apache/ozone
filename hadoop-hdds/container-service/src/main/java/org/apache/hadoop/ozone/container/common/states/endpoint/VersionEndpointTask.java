@@ -17,12 +17,14 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -126,35 +128,10 @@ public class VersionEndpointTask implements
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());
-
-        if (result) {
-          // Clean <HddsVolume>/tmp/container_delete_service dir.
-          if (volume instanceof HddsVolume) {
-            HddsVolume hddsVolume = (HddsVolume) volume;
-            try {
-              // move container to tmp directory which can be cleaned up down
-              ozoneContainer.getContainerSet().getContainerMap().entrySet()
-                  .forEach(e -> {
-                    if (e.getValue().getContainerState()
-                        == ContainerProtos.ContainerDataProto.State.DELETED) {
-                      if (e.getValue() instanceof KeyValueContainer) {
-                        KeyValueContainerUtil.ContainerDeleteDirectory
-                            .moveToTmpDeleteDirectory(
-                                ((KeyValueContainer) e.getValue())
-                                    .getContainerData(), hddsVolume);
-                      }
-                    }
-                  });
-              // cleanup all containers in tmp directory
-              KeyValueContainerUtil.ContainerDeleteDirectory
-                  .cleanTmpDir(hddsVolume, ozoneContainer);
-            } catch (IOException ex) {
-              LOG.error("Error while cleaning tmp delete directory " +
-                  "under {}", hddsVolume.getWorkingDir(), ex);
-            }
-          }
-        } else {
+        if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
+        } else {
+          cleanupDeletedContainer((HddsVolume) volume);
         }
       }
       if (volumeSet.getVolumesList().size() == 0) {
@@ -164,6 +141,29 @@ public class VersionEndpointTask implements
       }
     } finally {
       volumeSet.writeUnlock();
+    }
+  }
+
+  private void cleanupDeletedContainer(HddsVolume volume) {
+    // cleanup deleted container in startup
+    Map<Long, Container<?>> containerMap = ozoneContainer.getContainerSet()
+        .getContainerMap();
+    for (Map.Entry<Long, Container<?>> e : containerMap.entrySet()) {
+      if (e.getValue().getContainerState()
+          == ContainerProtos.ContainerDataProto.State.DELETED) {
+        if (e.getValue() instanceof KeyValueContainer) {
+          try {
+            KeyValueContainerUtil.moveToDeletedContainerDir(
+                ((KeyValueContainer) e.getValue())
+                    .getContainerData(), volume);
+            ozoneContainer.getContainerSet().removeContainer(e.getKey());
+            e.getValue().delete();
+          } catch (IOException ex) {
+            LOG.warn("Failed to remove container {} in DELETED state.",
+                e.getKey(), ex);
+          }
+        }
+      }
     }
   }
 }

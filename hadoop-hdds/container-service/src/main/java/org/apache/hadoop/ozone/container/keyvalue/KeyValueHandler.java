@@ -1324,14 +1324,14 @@ public class KeyValueHandler extends Handler {
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Rename container location
-        container.markContainerForDelete();
-        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
-            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
-
-        if (!success) {
-          LOG.error("Failed to move container under " +
-              hddsVolume.getDeleteServiceDirPath());
-          throw new StorageContainerException("Moving container failed",
+        try {
+          container.markContainerForDelete();
+          KeyValueContainerUtil.moveToDeletedContainerDir(
+              keyValueContainerData, hddsVolume);
+        } catch (IOException ex) {
+          LOG.error("Failed to move deleted container under {}",
+              hddsVolume.getDeletedContainerDir(), ex);
+          throw new StorageContainerException("Moving deleted container failed",
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -1340,8 +1340,8 @@ public class KeyValueHandler extends Handler {
               .getContainerPath();
           File containerDir = new File(containerPath);
 
-          LOG.debug("Container {} has been successfuly moved under {}",
-              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+          LOG.debug("Container {} has been successfully moved under {}",
+              containerDir.getName(), hddsVolume.getDeletedContainerDir());
         }
       }
       long containerId = container.getContainerData().getContainerID();
