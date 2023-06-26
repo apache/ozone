@@ -103,6 +103,8 @@ public abstract class ContainerData {
 
   private boolean isEmpty;
 
+  private int replicaIndex;
+
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
    * eg. in prior versions). */
@@ -194,6 +196,14 @@ public abstract class ContainerData {
    */
   public synchronized ContainerDataProto.State getState() {
     return state;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 
   /**
