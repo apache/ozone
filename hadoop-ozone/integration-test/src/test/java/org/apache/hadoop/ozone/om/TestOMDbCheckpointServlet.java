@@ -384,6 +384,7 @@ public class TestOMDbCheckpointServlet {
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
       DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
       return checkpoint;
     });
