@@ -124,6 +124,7 @@ public class TestBackgroundContainerMetadataScanner extends
   }
 
   @Test
+  @Override
   public void testUnhealthyContainerNotRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
     when(unhealthy.scanMetaData()).thenReturn(false);
