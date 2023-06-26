@@ -38,6 +38,7 @@ public class OMUnknownRequestResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
                               BatchOperation batchOperation)
       throws IOException {
+    // Overrides the addToDBBatch method to prevent a db/cache update.
     return;
   }
 }

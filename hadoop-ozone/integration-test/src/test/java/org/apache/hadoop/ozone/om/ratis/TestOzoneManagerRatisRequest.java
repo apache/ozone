@@ -26,8 +26,11 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -35,13 +38,14 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
 /**
- * Test: Creating a client request for a bucket which doesn't exist.
+ * Test OM Ratis request handling.
  */
 public class TestOzoneManagerRatisRequest {
   @Rule public TemporaryFolder folder = new TemporaryFolder();
@@ -49,10 +53,15 @@ public class TestOzoneManagerRatisRequest {
   private OzoneManager ozoneManager;
   private OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
   private OMMetadataManager omMetadataManager;
+  private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
+      ((response, transactionIndex) -> {
+        return null;
+      });
 
   @Test(timeout = 300_000)
   public void testRequestWithNonExistentBucket()
       throws Exception {
+    // Test: Creating a client request for a bucket which doesn't exist.
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
@@ -86,5 +95,27 @@ public class TestOzoneManagerRatisRequest {
       Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
           oe.getResult());
     }
+  }
+
+  @Test
+  public void testUnknownRequestHandling() throws IOException {
+    // Create an instance of OMRequest with an unknown command type.
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CustomUnknownCommand)
+            .setClientId("test-client-id")
+            .build();
+
+    OMClientRequest omClientRequest =
+        OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+
+    OMClientResponse omClientResponse =
+        omClientRequest.validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        omClientResponse.getOMResponse();
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.UNKNOWN_REQUEST,
+        omResponse.getStatus());
   }
 }
