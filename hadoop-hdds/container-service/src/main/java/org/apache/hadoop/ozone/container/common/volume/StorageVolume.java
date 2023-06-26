@@ -153,7 +153,16 @@ public abstract class StorageVolume
    * otherwise returns with IOException.
    * @throws IOException
    */
-  protected void initialize() throws IOException {
+  protected final void initialize() throws IOException {
+    try {
+      initializeImpl();
+    } catch (Exception e) {
+      shutdown();
+      throw e;
+    }
+  }
+
+  protected void initializeImpl() throws IOException {
     VolumeState intialVolumeState = analyzeVolumeState();
     switch (intialVolumeState) {
     case NON_EXISTENT:

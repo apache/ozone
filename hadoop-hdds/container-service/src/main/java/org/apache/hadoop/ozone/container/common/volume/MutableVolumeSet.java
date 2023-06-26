@@ -166,10 +166,11 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     for (String locationString : rawLocations) {
+      StorageVolume volume = null;
       try {
         StorageLocation location = StorageLocation.parse(locationString);
 
-        StorageVolume volume = volumeFactory.createVolume(
+        volume = volumeFactory.createVolume(
             location.getUri().getPath(), location.getStorageType());
 
         LOG.info("Added Volume : {} to VolumeSet",
@@ -183,8 +184,11 @@ public class MutableVolumeSet implements VolumeSet {
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
       } catch (IOException e) {
-        StorageVolume volume =
-            volumeFactory.createFailedVolume(locationString);
+        if (volume != null) {
+          volume.shutdown();
+        }
+
+        volume = volumeFactory.createFailedVolume(locationString);
         failedVolumeMap.put(locationString, volume);
         LOG.error("Failed to parse the storage location: " + locationString, e);
       }
