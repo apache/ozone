@@ -199,10 +199,7 @@ public class MutableVolumeSet implements VolumeSet {
     checkAllVolumes();
 
     // Ensure volume threads are stopped and scm df is saved during shutdown.
-    shutdownHook = () -> {
-      saveVolumeSetUsed();
-    };
-    ShutdownHookManager.get().addShutdownHook(shutdownHook,
+    ShutdownHookManager.get().addShutdownHook(this::shutdown,
         SHUTDOWN_HOOK_PRIORITY);
   }
 
@@ -416,27 +413,17 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   /**
-   * This method, call shutdown on each volume to shutdown volume usage
-   * thread and write scmUsed on each volume.
-   */
-
-  private synchronized void saveVolumeSetUsed() {
-    for (StorageVolume hddsVolume : volumeMap.values()) {
-      try {
-        hddsVolume.shutdown();
-      } catch (Exception ex) {
-        LOG.error("Failed to shutdown volume : " + hddsVolume.getStorageDir(),
-            ex);
-      }
-    }
-    volumeMap.clear();
-  }
-
-  /**
    * Shutdown the volumeset.
    */
   public void shutdown() {
-    saveVolumeSetUsed();
+    for (StorageVolume volume : volumeMap.values()) {
+      try {
+        volume.shutdown();
+      } catch (Exception ex) {
+        LOG.error("Failed to shutdown volume : " + volume.getStorageDir(), ex);
+      }
+    }
+    volumeMap.clear();
   }
 
   @Override

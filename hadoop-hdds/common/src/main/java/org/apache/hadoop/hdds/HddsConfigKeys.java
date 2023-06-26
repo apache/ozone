@@ -201,8 +201,21 @@ public final class HddsConfigKeys {
       "hdds.x509.renew.grace.duration";
 
   public static final String HDDS_X509_RENEW_GRACE_DURATION_DEFAULT = "P28D";
+  public static final String HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED =
+      "hdds.x509.grace.duration.token.checks.enabled";
+  public static final boolean
+      HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT = true;
   public static final String HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX = "-next";
   public static final String HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX = "-previous";
+  public static final String HDDS_X509_CA_ROTATION_CHECK_INTERNAL =
+      "hdds.x509.ca.rotation.check.interval";
+  public static final String HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT =
+      "P1D";
+  public static final String HDDS_X509_CA_ROTATION_TIME_OF_DAY =
+      "hdds.x509.ca.rotation.time-of-day";
+  // format hh:mm:ss, representing hour, minute, and second
+  public static final String HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT =
+      "02:00:00";
 
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";
@@ -223,6 +236,28 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT =
       "";
+
+  public static final String HDDS_SECRET_KEY_FILE =
+      "hdds.secret.key.file.name";
+  public static final String HDDS_SECRET_KEY_FILE_DEFAULT = "secret_keys.json";
+
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
+      "hdds.secret.key.expiry.duration";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
+      "hdds.secret.key.rotate.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_DURATION_DEFAULT = "1d";
+
+  public static final String HDDS_SECRET_KEY_ALGORITHM =
+      "hdds.secret.key.algorithm";
+  public static final String HDDS_SECRET_KEY_ALGORITHM_DEFAULT =
+      "HmacSHA256";
+
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION =
+      "hdds.secret.key.rotate.check.duration";
+  public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
+      = "10m";
 
   /**
    * Do not instantiate.
@@ -272,6 +307,18 @@ public final class HddsConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String HDDS_SECURITY_CLIENT_SCM_CERTIFICATE_PROTOCOL_ACL =
       "hdds.security.client.scm.certificate.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_OM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.om.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_SCM_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.scm.protocol.acl";
+
+  public static final String
+      HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL =
+      "hdds.security.client.scm.secretkey.datanode.protocol.acl";
 
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests

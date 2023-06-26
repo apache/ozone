@@ -19,7 +19,8 @@ package org.apache.hadoop.ozone.recon.security;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -54,10 +55,11 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   public ReconCertificateClient(
       SecurityConfig config,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       ReconStorageConfig storage,
       Consumer<String> saveCertIdCallback,
       Runnable shutdownCallback) {
-    super(config, LOG, storage.getReconCertSerialId(),
+    super(config, scmSecurityClient, LOG, storage.getReconCertSerialId(),
         COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
     this.clusterID = storage.getClusterID();
     this.reconID = storage.getReconId();
@@ -75,7 +77,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
       builder.setCA(false)
           .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
-          .setConfiguration(getConfig())
+          .setConfiguration(getSecurityConfig())
           .setSubject(subject);
 
       return builder;

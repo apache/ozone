@@ -34,10 +34,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -65,6 +64,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import org.apache.ratis.rpc.RpcType;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -88,7 +88,7 @@ public class TestContainerServer {
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
-    caClient = new DNCertificateClient(new SecurityConfig(CONF),
+    caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
         null, null, null, null);
   }
 
@@ -108,11 +108,6 @@ public class TestContainerServer {
         (dn, conf) -> new XceiverServerGrpc(datanodeDetails, conf,
             new TestContainerDispatcher(), caClient), (dn, p) -> {
         });
-  }
-
-  @FunctionalInterface
-  interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
-    OUT apply(LEFT left, RIGHT right) throws THROWABLE;
   }
 
   @Test
@@ -147,7 +142,7 @@ public class TestContainerServer {
       int numDatanodes,
       CheckedBiConsumer<Pipeline, OzoneConfiguration, IOException> initConf,
       CheckedBiFunction<Pipeline, OzoneConfiguration, XceiverClientSpi,
-          IOException> createClient,
+                IOException> createClient,
       CheckedBiFunction<DatanodeDetails, OzoneConfiguration, XceiverServerSpi,
           IOException> createServer,
       CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer)
@@ -180,7 +175,7 @@ public class TestContainerServer {
       if (client != null) {
         client.close();
       }
-      servers.stream().forEach(XceiverServerSpi::stop);
+      servers.forEach(XceiverServerSpi::stop);
     }
   }
 
@@ -265,7 +260,7 @@ public class TestContainerServer {
 
     @Override
     public void validateContainerCommand(
-        ContainerCommandRequestProto msg) throws StorageContainerException {
+        ContainerCommandRequestProto msg) {
     }
 
     @Override

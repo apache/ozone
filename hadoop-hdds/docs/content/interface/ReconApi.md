@@ -247,6 +247,289 @@ Returns the UnhealthyContainerMetadata objects for the containers in the given s
 Possible unhealthy container states are `MISSING`, `MIS_REPLICATED`,`UNDER_REPLICATED`, `OVER_REPLICATED`.
 The response structure is same as `/containers/unhealthy`.
 
+
+### GET /api/v1/containers/mismatch
+
+**Returns**
+
+Returns the list of mis-matched containers between OM and SCM
+* Containers are present in OM, but not in SCM.
+* Containers are present in SCM, but not in OM.
+
+```json
+[
+  {
+    "containerId" : 1,
+    "numberOfKeys" : 3,
+    "pipelines" : [
+      "pipelineId" : "1423ghjds832403232",
+      "pipelineId" : "32vds94943fsdh4443",
+      "pipelineId" : "32vds94943fsdhs443"
+    ],
+    "existsAt" : "OM"
+  }
+  ...
+]
+```
+
+### GET /api/v1/containers/mismatch/deleted
+
+
+**Parameters**
+
+* prevKey (optional)
+
+   Returns the set of deleted containers in SCM which are present in OM to find out
+   list of keys mapped to such DELETED state containers after the given prevKey (ContainerId).
+   Example: prevKey=5, skip containers till it seeks correctly to the previous containerId.
+
+* limit (optional)
+
+   Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+Returns the set of deleted containers in SCM which are present in OM to find out
+list of keys mapped to such DELETED state containers.
+
+```json
+[
+  {
+    "containerId": 2,
+    "numberOfKeys": 2,
+    "pipelines": []
+  }
+  ...
+]
+```
+
+### GET /api/v1/keys/open
+
+
+**Parameters**
+
+* prevKey (optional)
+
+    Returns the set of keys/files which are open and present after the given prevKey id.
+    Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly to the given prevKey.
+
+* limit (optional)
+
+    Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+Returns set of keys/files which are open.
+
+```json
+{
+  "lastKey": "/vol1/fso-bucket/dir1/dir2/file2",
+  "replicatedTotal": 13824,
+  "unreplicatedTotal": 4608,
+  "entities": [
+    {
+      "path": "/vol1/bucket1/key1",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 1024,
+      "replicatedSize": 3072,
+      "unreplicatedSize": 1024,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
+    {
+      "path": "/vol1/bucket1/key2",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 512,
+      "replicatedSize": 1536,
+      "unreplicatedSize": 512,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
+    {
+      "path": "/vol1/fso-bucket/dir1/file1",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 1024,
+      "replicatedSize": 3072,
+      "unreplicatedSize": 1024,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    },
+    {
+      "path": "/vol1/fso-bucket/dir1/dir2/file2",
+      "keyState": "Open",
+      "inStateSince": 1667564193026,
+      "size": 2048,
+      "replicatedSize": 6144,
+      "unreplicatedSize": 2048,
+      "replicationType": "RATIS",
+      "replicationFactor": "THREE"
+    }
+  ]
+}
+```
+
+### GET /api/v1/keys/deletePending
+
+
+**Parameters**
+
+* prevKey (optional)
+
+  Returns the set of keys/files pending for deletion that are present after the given prevKey id.
+  Example: prevKey=/vol1/bucket1/key1, this will skip keys till it seeks correctly to the given prevKey.
+
+* limit (optional)
+
+  Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+Returns set of keys/files pending for deletion.
+
+```json
+{
+  "lastKey": "sampleVol/bucketOne/key_one",
+  "replicatedTotal": -1530804718628866300,
+  "unreplicatedTotal": -1530804718628866300,
+  "deletedkeyinfo": [
+    {
+      "omKeyInfoList": [
+        {
+          "metadata": {},
+          "objectID": 0,
+          "updateID": 0,
+          "parentObjectID": 0,
+          "volumeName": "sampleVol",
+          "bucketName": "bucketOne",
+          "keyName": "key_one",
+          "dataSize": -1530804718628866300,
+          "keyLocationVersions": [],
+          "creationTime": 0,
+          "modificationTime": 0,
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "STANDALONE"
+          },
+          "fileChecksum": null,
+          "fileName": "key_one",
+          "acls": [],
+          "path": "0/key_one",
+          "file": false,
+          "latestVersionLocations": null,
+          "replicatedSize": -1530804718628866300,
+          "fileEncryptionInfo": null,
+          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
+          "updateIDset": false
+        }
+      ]
+    }
+  ],
+  "status": "OK"
+}
+```
+
+### GET /api/v1/keys/deletePending/dirs
+
+
+**Parameters**
+
+* prevKey (optional)
+
+   Returns the set of directories pending for deletion that are present after the given prevKey id.
+   Example: prevKey=/vol1/bucket1/bucket1/dir1, this will skip directories till it seeks correctly to the given prevKey.
+
+* limit (optional)
+
+   Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+   Returns set of directories pending for deletion.
+
+```json
+{
+  "lastKey": "vol1/bucket1/bucket1/dir1",
+  "replicatedTotal": -1530804718628866300,
+  "unreplicatedTotal": -1530804718628866300,
+  "deletedkeyinfo": [
+    {
+      "omKeyInfoList": [
+        {
+          "metadata": {},
+          "objectID": 0,
+          "updateID": 0,
+          "parentObjectID": 0,
+          "volumeName": "sampleVol",
+          "bucketName": "bucketOne",
+          "keyName": "key_one",
+          "dataSize": -1530804718628866300,
+          "keyLocationVersions": [],
+          "creationTime": 0,
+          "modificationTime": 0,
+          "replicationConfig": {
+            "replicationFactor": "ONE",
+            "requiredNodes": 1,
+            "replicationType": "STANDALONE"
+          },
+          "fileChecksum": null,
+          "fileName": "key_one",
+          "acls": [],
+          "path": "0/key_one",
+          "file": false,
+          "latestVersionLocations": null,
+          "replicatedSize": -1530804718628866300,
+          "fileEncryptionInfo": null,
+          "objectInfo": "OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='-1530804718628866186', creationTime='0', objectID='0', parentID='0', replication='STANDALONE/ONE', fileChecksum='null}",
+          "updateIDset": false
+        }
+      ]
+    }
+  ],
+  "status": "OK"
+}
+```
+
+## Blocks Metadata (admin only)
+### GET /api/v1/blocks/deletePending
+
+
+**Parameters**
+
+* prevKey (optional)
+
+  Only returns the list of blocks pending for deletion, that are present after the given block id (prevKey).
+  Example: prevKey=4, this will skip deletedBlocks table key to skip records before prevKey.
+
+* limit (optional)
+
+  Only returns the limited number of results. The default limit is 1000.
+
+**Returns**
+
+Returns list of blocks pending for deletion.
+
+```json
+{
+  "OPEN": [
+    {
+      "containerId": 100,
+      "localIDList": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "localIDCount": 4,
+      "txID": 1
+    }
+  ]
+}
+```
+
 ## Namespace Metadata (admin only)
 
 ### GET /api/v1/namespace/summary

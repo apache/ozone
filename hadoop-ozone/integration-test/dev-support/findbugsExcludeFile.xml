@@ -93,6 +93,11 @@
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.TestCpuMetrics"/>
+    <Method name="testCpuMetrics"/>
+    <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData"/>
     <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>

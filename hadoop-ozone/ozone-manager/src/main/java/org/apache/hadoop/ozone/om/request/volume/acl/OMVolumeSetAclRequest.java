@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -49,12 +48,8 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMVolumeSetAclRequest.class);
 
-  private static CheckedBiFunction<List<OzoneAcl>,
-      OmVolumeArgs, IOException> volumeSetAclOp;
-
-  static {
-    volumeSetAclOp = (acls, volArgs) -> volArgs.setAcls(acls);
-  }
+  private static final VolumeAclOp VOLUME_SET_ACL_OP =
+      (acls, volArgs) -> volArgs.setAcls(acls);
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -69,12 +64,12 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
         .build();
   }
 
-  private List<OzoneAcl> ozoneAcls;
-  private String volumeName;
-  private OzoneObj obj;
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
 
   public OMVolumeSetAclRequest(OMRequest omRequest) {
-    super(omRequest, volumeSetAclOp);
+    super(omRequest, VOLUME_SET_ACL_OP);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
     Preconditions.checkNotNull(setAclRequest);

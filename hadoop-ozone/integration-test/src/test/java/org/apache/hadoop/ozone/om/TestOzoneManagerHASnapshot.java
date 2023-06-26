@@ -113,7 +113,7 @@ public class TestOzoneManagerHASnapshot {
 
     SnapshotDiffResponse response =
         store.snapshotDiff(volumeName, bucketName,
-            snapshot1, snapshot2, null, 0, false);
+            snapshot1, snapshot2, null, 0, false, false);
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
@@ -131,18 +131,18 @@ public class TestOzoneManagerHASnapshot {
     if (Objects.equals(oldLeader, newLeader)) {
       // If old leader becomes leader again. Job should be done by this time.
       response = store.snapshotDiff(volumeName, bucketName,
-          snapshot1, snapshot2, null, 0, false);
+          snapshot1, snapshot2, null, 0, false, false);
       assertEquals(DONE, response.getJobStatus());
       assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
     } else {
       // If new leader is different from old leader. SnapDiff request will be
       // new to OM, and job status should be IN_PROGRESS.
       response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-          snapshot2, null, 0, false);
+          snapshot2, null, 0, false, false);
       assertEquals(IN_PROGRESS, response.getJobStatus());
       while (true) {
         response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-                snapshot2, null, 0, false);
+                snapshot2, null, 0, false, false);
         if (DONE == response.getJobStatus()) {
           assertEquals(100,
               response.getSnapshotDiffReport().getDiffList().size());
@@ -161,7 +161,7 @@ public class TestOzoneManagerHASnapshot {
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
-    List<String> snapshotIds = new ArrayList<>();
+    List<UUID> snapshotIds = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
       await().atMost(Duration.ofSeconds(120))
@@ -178,7 +178,7 @@ public class TestOzoneManagerHASnapshot {
             }
 
             if (snapshotInfo != null) {
-              snapshotIds.add(snapshotInfo.getSnapshotID());
+              snapshotIds.add(snapshotInfo.getSnapshotId());
             }
             return snapshotInfo != null;
           });

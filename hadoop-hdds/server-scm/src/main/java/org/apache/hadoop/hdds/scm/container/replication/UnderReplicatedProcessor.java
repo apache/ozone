@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the ReplicationManager under replicated
@@ -27,9 +29,9 @@ import java.io.IOException;
 public class UnderReplicatedProcessor extends UnhealthyReplicationProcessor
         <ContainerHealthResult.UnderReplicatedHealthResult> {
 
-  public UnderReplicatedProcessor(ReplicationManager replicationManager,
-                                  long intervalInMillis) {
-    super(replicationManager, intervalInMillis);
+  UnderReplicatedProcessor(ReplicationManager replicationManager,
+      Supplier<Duration> interval) {
+    super(replicationManager, interval);
   }
 
   @Override

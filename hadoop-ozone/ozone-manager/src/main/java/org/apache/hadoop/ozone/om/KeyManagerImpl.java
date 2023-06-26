@@ -58,10 +58,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -93,7 +91,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -106,6 +103,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
@@ -330,14 +328,6 @@ public class KeyManagerImpl implements KeyManager {
     return metadataManager.getBucketTable().get(bucketKey);
   }
 
-  /* Optimize ugi lookup for RPC operations to avoid a trip through
-   * UGI.getCurrentUser which is synch'ed.
-   */
-  public static UserGroupInformation getRemoteUser() throws IOException {
-    UserGroupInformation ugi = Server.getRemoteUser();
-    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
   private EncryptedKeyVersion generateEDEK(
       final String ezKeyName) throws IOException {
     if (ezKeyName == null) {
@@ -459,9 +449,9 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo getOmKeyInfoFSO(String volumeName, String bucketName,
                                    String keyName) throws IOException {
-    OzoneFileStatus fileStatus =
-            OMFileRequest.getOMKeyInfoIfExists(metadataManager,
-                    volumeName, bucketName, keyName, scmBlockSize);
+    OzoneFileStatus fileStatus = OMFileRequest.getOMKeyInfoIfExists(
+        metadataManager, volumeName, bucketName, keyName, scmBlockSize,
+        ozoneManager.getDefaultReplicationConfig());
     if (fileStatus == null) {
       return null;
     }
@@ -609,7 +599,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<BlockGroup> getPendingDeletionKeys(final int count)
+  public PendingKeysDeletion getPendingDeletionKeys(final int count)
       throws IOException {
     OmMetadataManagerImpl omMetadataManager =
         (OmMetadataManagerImpl) metadataManager;
@@ -1274,7 +1264,8 @@ public class KeyManagerImpl implements KeyManager {
       }
 
       fileStatus = OMFileRequest.getOMKeyInfoIfExists(metadataManager,
-              volumeName, bucketName, keyName, scmBlockSize);
+          volumeName, bucketName, keyName, scmBlockSize,
+          ozoneManager.getDefaultReplicationConfig());
 
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
@@ -1487,7 +1478,8 @@ public class KeyManagerImpl implements KeyManager {
       Preconditions.checkArgument(!recursive);
       OzoneListStatusHelper statusHelper =
           new OzoneListStatusHelper(metadataManager, scmBlockSize,
-              this::getOzoneFileStatusFSO);
+              this::getOzoneFileStatusFSO,
+              ozoneManager.getDefaultReplicationConfig());
       Collection<OzoneFileStatus> statuses =
           statusHelper.listStatusFSO(args, startKey, numEntries,
           clientAddress, allowPartialPrefixes);
@@ -1698,7 +1690,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private String getNextGreaterString(String volumeName, String bucketName,
-      String keyPrefix) {
+      String keyPrefix) throws IOException {
     // Increment the last character of the string and return the new ozone key.
     Preconditions.checkArgument(!Strings.isNullOrEmpty(keyPrefix),
         "Key prefix is null or empty");

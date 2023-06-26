@@ -72,6 +72,7 @@ public abstract class TestMisReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
+  private ReplicationManagerMetrics metrics;
 
   protected void setup(ReplicationConfig repConfig)
       throws NodeNotFoundException, CommandTargetOverloadedException,
@@ -89,6 +90,8 @@ public abstract class TestMisReplicationHandler {
         conf.getObject(ReplicationManagerConfiguration.class);
     Mockito.when(replicationManager.getConfig())
         .thenReturn(rmConf);
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendDatanodeCommand(
@@ -105,6 +108,10 @@ public abstract class TestMisReplicationHandler {
 
   protected ReplicationManager getReplicationManager() {
     return replicationManager;
+  }
+
+  protected ReplicationManagerMetrics getMetrics() {
+    return metrics;
   }
 
   protected void setThrowThrottledException(boolean showThrow) {

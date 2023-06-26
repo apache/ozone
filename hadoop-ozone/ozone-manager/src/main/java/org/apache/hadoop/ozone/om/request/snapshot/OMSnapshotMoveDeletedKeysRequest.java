@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -85,7 +86,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
               fromSnapshot.getBucketName(),
               getSnapshotPrefix(fromSnapshot.getName()), true);
 
-      nextSnapshot = getNextActiveSnapshot(fromSnapshot,
+      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
 
       // Get next non-deleted snapshot.
@@ -120,33 +121,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     }
 
     return omClientResponse;
-  }
-
-  /**
-   * Get the next non deleted snapshot in the snapshot chain.
-   */
-  private SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
-      throws IOException {
-    while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotID())) {
-
-      String nextPathSnapshot =
-          chainManager.nextPathSnapshot(
-              snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-
-      String tableKey = chainManager.getTableKey(nextPathSnapshot);
-      SnapshotInfo nextSnapshotInfo =
-          omSnapshotManager.getSnapshotInfo(tableKey);
-
-      if (nextSnapshotInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-        return nextSnapshotInfo;
-      }
-
-      snapInfo = nextSnapshotInfo;
-    }
-    return null;
   }
 }
 

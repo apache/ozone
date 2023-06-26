@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -103,15 +104,62 @@ public class TestHddsVolume {
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
 
-    // Create a working directory
-    // tmp directory should be initialized.
-    volume.createWorkingDir(CLUSTER_ID, null);
-
-    File tmpDir = new File(volume.getTmpDirPath().toString());
-    assertTrue(tmpDir.exists());
-
     // Shutdown the volume.
     volume.shutdown();
+  }
+
+  @Test
+  public void testCreateVolumeTmpDirs() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    // All temp directories should have been created.
+    assertTrue(volume.getTmpDir().exists());
+    assertTrue(volume.getDeletedContainerDir().exists());
+
+    volume.shutdown();
+    // tmp directories should still exist after shutdown. This is not
+    // checking their contents.
+    assertTrue(volume.getTmpDir().exists());
+    assertTrue(volume.getDeletedContainerDir().exists());
+  }
+
+  @Test
+  public void testClearVolumeTmpDirs() throws Exception {
+    // Set up volume.
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    File tmpDir = volume.getHddsRootDir().toPath()
+        .resolve(Paths.get(CLUSTER_ID, StorageVolume.TMP_DIR_NAME)).toFile();
+    File tmpDeleteDir = new File(tmpDir,
+        HddsVolume.TMP_CONTAINER_DELETE_DIR_NAME);
+    // Simulate a container that failed to delete fully from the deleted
+    // containers directory.
+    File leftoverContainer = new File(tmpDeleteDir, "1");
+    assertTrue(leftoverContainer.mkdirs());
+
+    // Check that tmp dirs are created with expected names.
+    volume.createWorkingDir(CLUSTER_ID, null);
+    volume.createTmpDirs(CLUSTER_ID);
+    assertEquals(tmpDir, volume.getTmpDir());
+    assertEquals(tmpDeleteDir, volume.getDeletedContainerDir());
+
+    // Cleanup should have removed the partial container without removing the
+    // delete directory itself.
+    assertFalse(leftoverContainer.exists());
+    assertTrue(tmpDeleteDir.exists());
+
+    // Re-create the partial container.
+    assertTrue(leftoverContainer.mkdir());
+
+    volume.shutdown();
+    // It should be cleared again on shutdown.
+    assertFalse(leftoverContainer.exists());
+    assertTrue(tmpDeleteDir.exists());
   }
 
   @Test
