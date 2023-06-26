@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.UUID;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
@@ -132,7 +130,8 @@ public class TestHddsDatanodeService {
   @ParameterizedTest
   @ValueSource(strings = {OzoneConsts.SCHEMA_V1,
       OzoneConsts.SCHEMA_V2, OzoneConsts.SCHEMA_V3})
-  public void testTmpDirOnShutdown(String schemaVersion) throws IOException {
+  public void testDeletedContainersClearedOnShutdown(String schemaVersion)
+      throws IOException {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     LOG.info("SchemaV3_enabled: " +
         conf.get(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED));
@@ -155,20 +154,23 @@ public class TestHddsDatanodeService {
         clusterId, conf, LOG, null);
     // Create a container and move it under the tmp delete dir.
     KeyValueContainer container = ContainerTestUtils
-        .setUpTestContainerUnderTmpDir(
+        .addContainerToDeletedDir(
             hddsVolume, clusterId, conf, schemaVersion);
     assertTrue(container.getContainerFile().exists());
     assertTrue(container.getContainerDBFile().exists());
+    File[] deletedContainersAfterShutdown =
+        hddsVolume.getDeletedContainerDir().listFiles();
+    assertNotNull(deletedContainersAfterShutdown);
+    assertEquals(1, deletedContainersAfterShutdown.length);
 
     service.stop();
     service.join();
     service.close();
 
-    ListIterator<File> deleteLeftoverIt = KeyValueContainerUtil
-        .ContainerDeleteDirectory.getDeleteLeftovers(hddsVolume);
-    assertFalse(deleteLeftoverIt.hasNext());
-
-    volumeSet.shutdown();
+    deletedContainersAfterShutdown =
+        hddsVolume.getDeletedContainerDir().listFiles();
+    assertNotNull(deletedContainersAfterShutdown);
+    assertEquals(0, deletedContainersAfterShutdown.length);
   }
 
   static class MockService implements ServicePlugin {

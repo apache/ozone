@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1459,7 +1460,8 @@ public class TestOzoneShellHA {
         BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
 
     // Create OBS bucket in volx
-    String[] args = new String[]{"bucket", "create", volume1 + "/bucketobs"};
+    String[] args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1475,7 +1477,8 @@ public class TestOzoneShellHA {
     out.reset();
 
     // Create Legacy bucket in volx
-    args = new String[]{"bucket", "create", volume1 + "/bucketlegacy"};
+    args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1503,5 +1506,84 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     LambdaTestUtils.intercept(ExecutionException.class,
         "VOLUME_NOT_FOUND", () -> execute(ozoneShell, args1));
+  }
+  
+  @Test
+  public void testRecursiveVolumeDelete()
+      throws Exception {
+    String volume1 = "volume10";
+    String volume2 = "volume20";
+
+    // Create volume volume1
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert some keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        "/bucketfso",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create another volume  volume2 with bucket and some keys into it.
+    generateKeys(OZONE_URI_DELIMITER + volume2,
+        "/bucket2",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volume1
+    String[] args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 + "/bucketobs" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volume1
+    args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + "/bucketlegacy" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Try volume delete without recursive
+    // It should fail as volume is not empty
+    final String[] args1 = new String[] {"volume", "delete", volume1};
+    LambdaTestUtils.intercept(ExecutionException.class,
+        "VOLUME_NOT_EMPTY", () -> execute(ozoneShell, args1));
+    out.reset();
+
+    // volume1 should still exist
+    Assert.assertEquals(client.getObjectStore().getVolume(volume1)
+        .getName(), volume1);
+
+    // Delete volume1(containing OBS, FSO and Legacy buckets) recursively
+    args =
+        new String[] {"volume", "delete", volume1, "-r", "--yes",
+            "-id", omServiceId};
+
+    execute(ozoneShell, args);
+    out.reset();
+    // volume2 should still exist
+    Assert.assertEquals(client.getObjectStore().getVolume(volume2)
+        .getName(), volume2);
+
+    // volume1 should not exist
+    LambdaTestUtils.intercept(OMException.class,
+        "VOLUME_NOT_FOUND", () -> client.getObjectStore().getVolume(volume1));
   }
 }
