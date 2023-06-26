@@ -388,14 +388,14 @@ public class TestOMDbCheckpointServlet {
       return checkpoint;
     });
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-                                                                  any(DBStore.class),
-                                                                  any(DBCheckpointMetrics.class),
+                                                                  any(),
+                                                                  any(),
                                                                   eq(false),
-                                                                  any(Collection.class),
-                                                                  any(Collection.class),
+                                                                  any(),
+                                                                  any(),
 eq(false));
     // omDbCheckpointServletMock.init();
-       doInit(om, spyDbStore);
+    doInit(om, spyDbStore);
     this.method = "GET";
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
