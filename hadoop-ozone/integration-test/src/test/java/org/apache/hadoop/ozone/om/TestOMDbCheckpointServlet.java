@@ -221,8 +221,8 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
         responseMock);
-    doCallRealMethod().when(omDbCheckpointServletMock).doPost(any(HttpServletRequest.class),
-        any(HttpServletResponse.class));
+    doCallRealMethod().when(omDbCheckpointServletMock).doPost(requestMock,
+        responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
@@ -394,11 +394,12 @@ public class TestOMDbCheckpointServlet {
                                                                   any(Collection.class),
                                                                   any(Collection.class),
 eq(false));
-    doInit(om, spyDbStore);
+    // omDbCheckpointServletMock.init();
+       doInit(om, spyDbStore);
     this.method = "GET";
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    doEndpoint();
     dbCheckpoint = realCheckpoint.get();
 //    when(realCheckpoint.get().cleanupCheckpoint())
     // Untar the file into a temp folder to be examined.
@@ -466,10 +467,10 @@ eq(false));
         "expected snapshot files not found");
   }
 
-  private void doInit(OzoneManager om, DBStore spyDbstore)
+  private void doInit(OzoneManager om, DBStore spyDbStore)
       throws ServletException {
     omDbCheckpointServletMock.initialize(
-                                         spyDbstore,
+                                         spyDbStore,
         om.getMetrics().getDBCheckpointMetrics(),
                                          false,
         om.getOmAdminUsernames(),
