@@ -72,6 +72,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -194,6 +195,16 @@ public class TestPipelineManagerImpl {
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE));
     Assertions.assertEquals(2, pipelineManager.getPipelines().size());
     Assertions.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
+
+    Pipeline builtPipeline = pipelineManager.buildECPipeline(
+        new ECReplicationConfig(3, 2),
+        Collections.emptyList(), Collections.emptyList());
+    pipelineManager.addEcPipeline(builtPipeline);
+
+    Assertions.assertEquals(3, pipelineManager.getPipelines().size());
+    Assertions.assertTrue(pipelineManager.containsPipeline(
+        builtPipeline.getId()));
+
     buffer1.close();
     pipelineManager.close();
 
@@ -203,11 +214,11 @@ public class TestPipelineManagerImpl {
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
     Assertions.assertFalse(pipelineManager2.getPipelines().isEmpty());
-    Assertions.assertEquals(2, pipelineManager.getPipelines().size());
+    Assertions.assertEquals(3, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     buffer2.close();
-    Assertions.assertEquals(3, pipelineManager2.getPipelines().size());
+    Assertions.assertEquals(4, pipelineManager2.getPipelines().size());
     Assertions.assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
     pipelineManager2.close();
