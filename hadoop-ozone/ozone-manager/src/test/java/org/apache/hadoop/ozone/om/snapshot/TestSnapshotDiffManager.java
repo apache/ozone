@@ -96,6 +96,7 @@ import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -163,6 +164,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -459,22 +461,78 @@ public class TestSnapshotDiffManager {
                 });
             return null;
           });
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
       UUID snap1 = UUID.randomUUID();
       UUID snap2 = UUID.randomUUID();
       if (!useFullDiff) {
-        Set<String> randomStrings = Collections.emptySet();
         when(differ.getSSTDiffListWithFullPath(
             any(DifferSnapshotInfo.class),
             any(DifferSnapshotInfo.class),
             anyString()))
-            .thenReturn(Lists.newArrayList(randomStrings));
+            .thenReturn(Collections.emptyList());
       }
 
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
       when(jobTableIterator.isValid()).thenReturn(false);
-      Set<String> deltaFiles = spy.getDeltaFiles(
+      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
+          snapshotCache.get(snap1.toString()),
+          snapshotCache.get(snap2.toString()),
+          Arrays.asList("cf1", "cf2"),
+          fromSnapshotInfo,
+          toSnapshotInfo,
+          false,
+          Collections.emptyMap(),
+          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
+              .toString());
+      assertEquals(deltaStrings, deltaFiles);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
+  public void testGetDeltaFilesWithDifferThrowException(int numberOfFiles)
+      throws ExecutionException, RocksDBException, IOException {
+    try (MockedStatic<RdbUtil> mockedRdbUtil =
+             Mockito.mockStatic(RdbUtil.class);
+         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
+             Mockito.mockStatic(RocksDiffUtils.class)) {
+      Set<String> deltaStrings = new HashSet<>();
+
+      mockedRdbUtil.when(
+              () -> RdbUtil.getSSTFilesForComparison(anyString(), anyList()))
+          .thenAnswer((Answer<Set<String>>) invocation -> {
+            Set<String> retVal = IntStream.range(0, numberOfFiles)
+                .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
+                .collect(Collectors.toSet());
+            deltaStrings.addAll(retVal);
+            return retVal;
+          });
+
+      mockedRocksDiffUtils.when(() ->
+              RocksDiffUtils.filterRelevantSstFiles(anySet(), anyMap()))
+          .thenAnswer((Answer<Void>) invocationOnMock -> {
+            invocationOnMock.getArgument(0, Set.class).stream()
+                .findAny().ifPresent(val -> {
+                  assertTrue(deltaStrings.contains(val));
+                  invocationOnMock.getArgument(0, Set.class).remove(val);
+                  deltaStrings.remove(val);
+                });
+            return null;
+          });
+      UUID snap1 = UUID.randomUUID();
+      UUID snap2 = UUID.randomUUID();
+
+      doThrow(new FileNotFoundException("File not found exception."))
+          .when(differ)
+          .getSSTDiffListWithFullPath(
+              any(DifferSnapshotInfo.class),
+              any(DifferSnapshotInfo.class),
+              anyString());
+
+      SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
+      SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
+      when(jobTableIterator.isValid()).thenReturn(false);
+      Set<String> deltaFiles = snapshotDiffManager.getDeltaFiles(
           snapshotCache.get(snap1.toString()),
           snapshotCache.get(snap2.toString()),
           Arrays.asList("cf1", "cf2"),

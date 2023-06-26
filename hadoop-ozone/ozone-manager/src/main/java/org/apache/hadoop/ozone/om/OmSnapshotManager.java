@@ -776,6 +776,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapInfo, toSnapInfo)) {
+      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
+          " and toSnapshot:" + toSnapInfo.getName() + " are same.");
+    }
+
     // Check snapshot creation time
     if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +

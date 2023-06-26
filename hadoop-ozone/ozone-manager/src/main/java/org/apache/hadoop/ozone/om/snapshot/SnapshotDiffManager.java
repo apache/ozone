@@ -1200,9 +1200,14 @@ public class SnapshotDiffManager implements AutoCloseable {
           getDSIFromSI(tsInfo, toSnapshot, volume, bucket);
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
-      List<String> sstDiffList =
-          differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
-      deltaFiles.addAll(sstDiffList);
+      try {
+        List<String> sstDiffList =
+            differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
+        deltaFiles.addAll(sstDiffList);
+      } catch (Exception exception) {
+        LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
+            "It will fallback to full diff now.", exception);
+      }
     }
 
     if (useFullDiff || deltaFiles.isEmpty()) {
