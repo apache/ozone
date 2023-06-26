@@ -99,7 +99,7 @@ public class TestHddsVolumeUtil {
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
       hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDirs(clusterId, null);
+      hddsVolume.createWorkingDir(clusterId, null);
     }
 
     // Reinitialize all the volumes to simulate a DN restart.
@@ -124,14 +124,14 @@ public class TestHddsVolumeUtil {
     for (DbVolume dbVolume : StorageVolumeUtil.getDbVolumesList(
         dbVolumeSet.getVolumesList())) {
       dbVolume.format(clusterId);
-      dbVolume.createWorkingDirs(clusterId, null);
+      dbVolume.createWorkingDir(clusterId, null);
     }
 
     // Create db instances for all HddsVolumes.
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
       hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDirs(clusterId, dbVolumeSet);
+      hddsVolume.createWorkingDir(clusterId, dbVolumeSet);
     }
 
     // Reinitialize all the volumes to simulate a DN restart.
@@ -158,14 +158,14 @@ public class TestHddsVolumeUtil {
     for (DbVolume dbVolume : StorageVolumeUtil.getDbVolumesList(
         dbVolumeSet.getVolumesList())) {
       dbVolume.format(clusterId);
-      dbVolume.createWorkingDirs(clusterId, null);
+      dbVolume.createWorkingDir(clusterId, null);
     }
 
     // Create db instances for all HddsVolumes.
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
       hddsVolume.format(clusterId);
-      hddsVolume.createWorkingDirs(clusterId, dbVolumeSet);
+      hddsVolume.createWorkingDir(clusterId, dbVolumeSet);
     }
 
     // Pick a dbVolume and make it fail,

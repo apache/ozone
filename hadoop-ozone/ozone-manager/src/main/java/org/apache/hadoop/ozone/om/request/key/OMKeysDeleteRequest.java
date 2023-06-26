@@ -137,8 +137,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey =
             omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
-        OmKeyInfo omKeyInfo =
-            getOmKeyInfo(omMetadataManager, volumeName, bucketName, keyName);
+        OmKeyInfo omKeyInfo = getOmKeyInfo(ozoneManager, omMetadataManager,
+            volumeName, bucketName, keyName);
 
         if (omKeyInfo == null) {
           deleteStatus = false;
@@ -154,9 +154,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
               IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY,
               volumeOwner);
+          OzoneFileStatus fileStatus = getOzoneKeyStatus(
+              ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
           addKeyToAppropriateList(omKeyInfoList, omKeyInfo, dirList,
-              getOzoneKeyStatus(omMetadataManager, volumeName, bucketName,
-                  keyName));
+              fileStatus);
         } catch (Exception ex) {
           deleteStatus = false;
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
@@ -241,8 +242,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   protected OzoneFileStatus getOzoneKeyStatus(
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      String keyName) throws IOException {
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName) throws IOException {
     // implemented in child class
     return null;
   }
@@ -287,12 +288,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     omKeyInfoList.add(omKeyInfo);
   }
 
-  protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
+  protected OmKeyInfo getOmKeyInfo(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
       String volume, String bucket, String key) throws IOException {
     String objectKey = omMetadataManager.getOzoneKey(volume, bucket, key);
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(objectKey);
-    return omKeyInfo;
+    return omMetadataManager.getKeyTable(getBucketLayout()).get(objectKey);
   }
 
   /**

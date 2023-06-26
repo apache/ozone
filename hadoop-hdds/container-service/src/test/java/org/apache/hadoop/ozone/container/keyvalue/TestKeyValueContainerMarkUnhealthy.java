@@ -98,7 +98,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
         .toString()).build();
     hddsVolume.format(scmId);
-    hddsVolume.createWorkingDirs(scmId, null);
+    hddsVolume.createWorkingDir(scmId, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);

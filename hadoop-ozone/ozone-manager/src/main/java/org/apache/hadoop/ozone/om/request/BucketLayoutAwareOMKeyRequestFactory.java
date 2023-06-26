@@ -204,7 +204,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
    * @param volumeName   volume name
    * @param bucketName   bucket name
    * @param omRequest    OMRequest object
-   * @param ozoneManager ozone manager instance
+   * @param omMetadataManager ozone metadata manager instance
    * @return OMKeyRequest object
    * @throws IOException if the request type is not supported.
    */

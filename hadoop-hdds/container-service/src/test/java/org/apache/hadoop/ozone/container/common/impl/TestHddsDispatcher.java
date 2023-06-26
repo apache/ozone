@@ -460,7 +460,7 @@ public class TestHddsDispatcher {
     volumeSet.getVolumesList().stream().forEach(v -> {
       try {
         v.format(scmId.toString());
-        v.createWorkingDirs(scmId.toString(), null);
+        v.createWorkingDir(scmId.toString(), null);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

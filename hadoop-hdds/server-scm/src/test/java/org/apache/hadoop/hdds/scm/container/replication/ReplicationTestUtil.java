@@ -160,6 +160,7 @@ public final class ReplicationTestUtil {
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
     builder.setOriginNodeId(originNodeId);
+    builder.setEmpty(keyCount == 0);
     return builder.build();
   }
 

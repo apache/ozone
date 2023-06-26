@@ -589,6 +589,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (stream == null) {
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "DataStream is null"));
+    } else if (!(stream instanceof LocalStream)) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataStream " + stream.getClass()));
     }
     final DataChannel dataChannel = stream.getDataChannel();
     if (dataChannel.isOpen()) {
@@ -596,16 +599,36 @@ public class ContainerStateMachine extends BaseStateMachine {
           "DataStream: " + stream + " is not closed properly"));
     }
 
-    final ContainerCommandRequestProto request;
-    if (dataChannel instanceof KeyValueStreamDataChannel) {
-      request = ((KeyValueStreamDataChannel) dataChannel).getPutBlockRequest();
-    } else {
+    if (!(dataChannel instanceof KeyValueStreamDataChannel)) {
       return JavaUtils.completeExceptionally(new IllegalStateException(
           "Unexpected DataChannel " + dataChannel.getClass()));
     }
-    return runCommandAsync(request, entry).whenComplete(
-        (res, e) -> LOG.debug("link {}, entry: {}, request: {}",
-            res.getResult(), entry, request));
+
+    final KeyValueStreamDataChannel kvStreamDataChannel =
+        (KeyValueStreamDataChannel) dataChannel;
+
+    final ContainerCommandRequestProto request =
+        kvStreamDataChannel.getPutBlockRequest();
+
+    return runCommandAsync(request, entry).whenComplete((response, e) -> {
+      if (e != null) {
+        LOG.warn("Failed to link logEntry {} for request {}",
+            TermIndex.valueOf(entry), request, e);
+      }
+      if (response != null) {
+        final ContainerProtos.Result result = response.getResult();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{} to link logEntry {} for request {}, response: {}",
+              result, TermIndex.valueOf(entry), request, response);
+        }
+        if (result == ContainerProtos.Result.SUCCESS) {
+          kvStreamDataChannel.setLinked();
+          return;
+        }
+      }
+      // failed to link, cleanup
+      kvStreamDataChannel.cleanUp();
+    });
   }
 
   private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {

@@ -147,16 +147,20 @@ public class HddsVolume extends StorageVolume {
   }
 
   @Override
-  public void createWorkingDirs(String dirName,
-      MutableVolumeSet dbVolumeSet) throws IOException {
-    super.createWorkingDirs(dirName, dbVolumeSet);
+  public void createWorkingDir(String dirName, MutableVolumeSet dbVolumeSet)
+      throws IOException {
+    super.createWorkingDir(dirName, dbVolumeSet);
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
         HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
       createDbStore(dbVolumeSet);
     }
+  }
 
+  @Override
+  public void createTmpDirs(String workDirName) throws IOException {
+    super.createTmpDirs(workDirName);
     deletedContainerDir =
         createTmpSubdirIfNeeded(TMP_CONTAINER_DELETE_DIR_NAME);
     cleanDeletedContainerDir();

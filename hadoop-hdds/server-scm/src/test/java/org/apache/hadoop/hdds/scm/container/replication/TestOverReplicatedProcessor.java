@@ -55,7 +55,7 @@ public class TestOverReplicatedProcessor {
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
-        replicationManager, rmConf.getOverReplicatedInterval());
+        replicationManager, rmConf::getOverReplicatedInterval);
     Mockito.when(replicationManager.shouldRun()).thenReturn(true);
 
     // Even through the limit has been exceeded, it should not stop over-rep

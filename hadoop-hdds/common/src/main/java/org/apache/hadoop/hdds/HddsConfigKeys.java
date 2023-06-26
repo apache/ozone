@@ -207,6 +207,15 @@ public final class HddsConfigKeys {
       HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT = true;
   public static final String HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX = "-next";
   public static final String HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX = "-previous";
+  public static final String HDDS_X509_CA_ROTATION_CHECK_INTERNAL =
+      "hdds.x509.ca.rotation.check.interval";
+  public static final String HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT =
+      "P1D";
+  public static final String HDDS_X509_CA_ROTATION_TIME_OF_DAY =
+      "hdds.x509.ca.rotation.time-of-day";
+  // format hh:mm:ss, representing hour, minute, and second
+  public static final String HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT =
+      "02:00:00";
 
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";

@@ -55,7 +55,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -96,6 +96,7 @@ public class TestDefaultCertificateClient {
   private HDDSKeyGenerator keyGenerator;
   private Path dnMetaDirPath;
   private SecurityConfig dnSecurityConfig;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private KeyCodec dnKeyCodec;
 
@@ -117,6 +118,7 @@ public class TestDefaultCertificateClient {
     Files.createDirectories(dnSecurityConfig.getKeyLocation(DN_COMPONENT));
     x509Certificate = generateX509Cert(null);
     certSerialId = x509Certificate.getSerialNumber().toString();
+    scmSecurityClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
     getCertClient();
   }
 
@@ -124,7 +126,8 @@ public class TestDefaultCertificateClient {
     if (dnCertClient != null) {
       dnCertClient.close();
     }
-    dnCertClient = new DNCertificateClient(dnSecurityConfig,
+
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, scmSecurityClient,
         MockDatanodeDetails.randomDatanodeDetails(), certSerialId, null,
         () -> System.exit(1));
   }
@@ -276,6 +279,10 @@ public class TestDefaultCertificateClient {
     X509Certificate cert1 = generateX509Cert(keyPair);
     X509Certificate cert2 = generateX509Cert(keyPair);
     X509Certificate cert3 = generateX509Cert(keyPair);
+    X509Certificate rootCa1 = generateX509Cert(keyPair);
+    X509Certificate rootCa2 = generateX509Cert(keyPair);
+    X509Certificate subCa1 = generateX509Cert(keyPair);
+    X509Certificate subCa2 = generateX509Cert(keyPair);
 
     Path certPath = dnSecurityConfig.getCertificateLocation(DN_COMPONENT);
     CertificateCodec codec = new CertificateCodec(dnSecurityConfig,
@@ -300,12 +307,24 @@ public class TestDefaultCertificateClient {
         getPEMEncodedString(cert2));
     codec.writeCertificate(certPath, "3.crt",
         getPEMEncodedString(cert3));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(rootCa1));
+    codec.writeCertificate(certPath,
+        CAType.ROOT.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(rootCa2));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "1.crt",
+        getPEMEncodedString(subCa1));
+    codec.writeCertificate(certPath,
+        CAType.SUBORDINATE.getFileNamePrefix() + "2.crt",
+        getPEMEncodedString(subCa2));
 
     // Re instantiate DN client which will load certificates from filesystem.
     if (dnCertClient != null) {
       dnCertClient.close();
     }
-    dnCertClient = new DNCertificateClient(dnSecurityConfig, null,
+    dnCertClient = new DNCertificateClient(dnSecurityConfig, null, null,
         certSerialId, null, null);
 
     assertNotNull(dnCertClient.getCertificate(cert1.getSerialNumber()
@@ -315,6 +334,12 @@ public class TestDefaultCertificateClient {
     assertNotNull(dnCertClient.getCertificate(cert3.getSerialNumber()
         .toString()));
 
+    assertEquals(2, dnCertClient.getAllCaCerts().size());
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa1));
+    assertTrue(dnCertClient.getAllCaCerts().contains(subCa2));
+    assertEquals(2, dnCertClient.getAllRootCaCerts().size());
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa1));
+    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa2));
   }
 
   @Test
@@ -441,7 +466,7 @@ public class TestDefaultCertificateClient {
     when(mockCert.getNotAfter()).thenReturn(expiration);
 
     try (DefaultCertificateClient client =
-        new DefaultCertificateClient(config, mockLogger, certId, compName,
+        new DefaultCertificateClient(config, null, mockLogger, certId, compName,
             null, null) {
           @Override
           public PrivateKey getPrivateKey() {
@@ -502,10 +527,7 @@ public class TestDefaultCertificateClient {
     certCodec.writeCertificate(
         new X509CertificateHolder(x509Certificate.getEncoded()));
 
-    SCMSecurityProtocolClientSideTranslatorPB scmClient =
-        mock(SCMSecurityProtocolClientSideTranslatorPB.class);
     X509Certificate newCert = generateX509Cert(null);
-    dnCertClient.setSecureScmClient(scmClient);
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
         SCMSecurityProtocolProtos.SCMGetCertResponseProto
@@ -514,7 +536,7 @@ public class TestDefaultCertificateClient {
             .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
+    when(scmSecurityClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     String certID = dnCertClient.getCertificate().getSerialNumber().toString();
@@ -593,7 +615,7 @@ public class TestDefaultCertificateClient {
     Logger logger = mock(Logger.class);
     String certId = cert.getSerialNumber().toString();
     DefaultCertificateClient client = new DefaultCertificateClient(
-        conf, logger, certId, compName, null, null
+        conf, null, logger, certId, compName, null, null
     ) {
 
       @Override

@@ -44,8 +44,11 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -54,6 +57,12 @@ import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpoint
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
@@ -151,6 +160,92 @@ public class TestEndPoint {
 
       // Now rpcEndpoint should remember the version it got from SCM
       Assertions.assertNotNull(rpcEndPoint.getVersion());
+    }
+  }
+
+
+  /**
+   * Writing data to tmp dir and checking if it has been cleaned.
+   * Add some entries to DatanodeStore.MetadataTable and check
+   * that they have been deleted during tmp dir cleanup.
+   */
+  @Test
+  public void testDeletedContainersClearedOnStartup() throws Exception {
+    // TODO HDDS-8770. If cleanup of RocksDB is no longer required on tmp dir
+    //  cleanup, this test can be removed.
+
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+        true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      OzoneContainer ozoneContainer = new OzoneContainer(
+          datanodeDetails, conf, getContext(datanodeDetails));
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+
+      String clusterId = scmServerImpl.getClusterId();
+
+      MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+      ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
+          clusterId, clusterId, conf);
+      // VolumeSet for this test, contains only 1 volume
+      Assertions.assertEquals(1, volumeSet.getVolumesList().size());
+      StorageVolume volume = volumeSet.getVolumesList().get(0);
+
+      // Check instanceof and typecast
+      Assertions.assertTrue(volume instanceof HddsVolume);
+      HddsVolume hddsVolume = (HddsVolume) volume;
+
+      // Write some data before calling versionTask.call()
+      // Create a container and move it under the tmp delete dir.
+      KeyValueContainer container = ContainerTestUtils.
+          addContainerToDeletedDir(hddsVolume, clusterId,
+              conf, OzoneConsts.SCHEMA_V3);
+      File containerDBFile = container.getContainerDBFile();
+
+      Assertions.assertTrue(container.getContainerFile().exists());
+      Assertions.assertTrue(containerDBFile.exists());
+
+      KeyValueContainerData containerData = container.getContainerData();
+
+      // Get DBHandle
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+
+        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+            dbHandle.getStore();
+        Table<String, Long> metadataTable = store.getMetadataTable();
+
+        // DB MetadataTable is empty
+        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+
+        // Add some keys to MetadataTable
+        metadataTable.put(containerData.getBytesUsedKey(), 0L);
+        metadataTable.put(containerData.getBlockCountKey(), 0L);
+        metadataTable.put(containerData.getPendingDeleteBlockCountKey(), 0L);
+
+        // The new keys should have been added in the MetadataTable
+        Assertions.assertEquals(3, metadataTable.getEstimatedKeyCount());
+
+        // versionTask.call() cleans the tmp dir and removes container from DB
+        VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+            conf, ozoneContainer);
+        EndpointStateMachine.EndPointStates newState = versionTask.call();
+
+        Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+            newState);
+
+        // assert that tmp dir is empty
+        File[] leftoverContainers =
+            hddsVolume.getDeletedContainerDir().listFiles();
+        Assertions.assertNotNull(leftoverContainers);
+        Assertions.assertEquals(0, leftoverContainers.length);
+        // All DB keys have been deleted, MetadataTable should be empty
+        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+      }
     }
   }
 

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.rpc;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -465,6 +466,32 @@ public class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(bucket, 3);
   }
 
+  @Test
+  public void testMPUwithOneStreamPart() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 1, true);
+  }
+
+  @Test
+  public void testMPUwithTwoStreamParts() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 2, true);
+  }
+
+  @Test
+  public void testMPUwithThreeStreamPartsOverride() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    testMultipartUploadWithEncryption(bucket, 3);
+
+    // override the key and check content
+    testMultipartUploadWithEncryption(bucket, 3, true);
+  }
 
   @Test
   public void testMPUwithLinkBucket() throws Exception {
@@ -481,6 +508,11 @@ public class TestOzoneAtRestEncryption {
 
   public void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts) throws Exception {
+    testMultipartUploadWithEncryption(bucket, numParts, false);
+  }
+
+  public void testMultipartUploadWithEncryption(OzoneBucket bucket,
+      int numParts, boolean isStream) throws Exception {
     String keyName = "mpu_test_key_" + numParts;
 
     // Initiate multipart upload
@@ -499,7 +531,14 @@ public class TestOzoneAtRestEncryption {
       int partSize = (MPU_PART_MIN_SIZE * i) +
           RANDOM.nextInt(DEFAULT_CRYPTO_BUFFER_SIZE - 1) + 1;
       byte[] data = generateRandomData(partSize);
-      String partName = uploadPart(bucket, keyName, uploadID, i, data);
+
+      String partName;
+      if (isStream) {
+        partName = uploadStreamPart(bucket, keyName, uploadID, i, data);
+      } else {
+        partName = uploadPart(bucket, keyName, uploadID, i, data);
+      }
+
       partsMap.put(i, partName);
       partsData.add(data);
       keySize += data.length;
@@ -579,6 +618,26 @@ public class TestOzoneAtRestEncryption {
     String uploadID = multipartInfo.getUploadID();
     Assert.assertNotNull(uploadID);
     return uploadID;
+  }
+
+  private String uploadStreamPart(OzoneBucket bucket, String keyName,
+      String uploadID, int partNumber, byte[] data) throws Exception {
+    final int length = data.length;
+
+    OzoneDataStreamOutput multipartStreamKey =
+        bucket.createMultipartStreamKey(keyName,
+            length, partNumber, uploadID);
+
+    ByteBuffer dataBuffer = ByteBuffer.wrap(data);
+    multipartStreamKey.write(dataBuffer, 0, length);
+    multipartStreamKey.close();
+
+    OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+        multipartStreamKey.getCommitUploadPartInfo();
+
+    Assert.assertNotNull(omMultipartCommitUploadPartInfo);
+    Assert.assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
+    return omMultipartCommitUploadPartInfo.getPartName();
   }
 
   private String uploadPart(OzoneBucket bucket, String keyName,

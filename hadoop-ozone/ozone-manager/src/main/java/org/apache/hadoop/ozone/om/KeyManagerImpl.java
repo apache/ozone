@@ -60,7 +60,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -450,9 +449,9 @@ public class KeyManagerImpl implements KeyManager {
    */
   private OmKeyInfo getOmKeyInfoFSO(String volumeName, String bucketName,
                                    String keyName) throws IOException {
-    OzoneFileStatus fileStatus =
-            OMFileRequest.getOMKeyInfoIfExists(metadataManager,
-                    volumeName, bucketName, keyName, scmBlockSize);
+    OzoneFileStatus fileStatus = OMFileRequest.getOMKeyInfoIfExists(
+        metadataManager, volumeName, bucketName, keyName, scmBlockSize,
+        ozoneManager.getDefaultReplicationConfig());
     if (fileStatus == null) {
       return null;
     }
@@ -600,7 +599,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<BlockGroup> getPendingDeletionKeys(final int count)
+  public PendingKeysDeletion getPendingDeletionKeys(final int count)
       throws IOException {
     OmMetadataManagerImpl omMetadataManager =
         (OmMetadataManagerImpl) metadataManager;
@@ -1265,7 +1264,8 @@ public class KeyManagerImpl implements KeyManager {
       }
 
       fileStatus = OMFileRequest.getOMKeyInfoIfExists(metadataManager,
-              volumeName, bucketName, keyName, scmBlockSize);
+          volumeName, bucketName, keyName, scmBlockSize,
+          ozoneManager.getDefaultReplicationConfig());
 
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
@@ -1478,7 +1478,8 @@ public class KeyManagerImpl implements KeyManager {
       Preconditions.checkArgument(!recursive);
       OzoneListStatusHelper statusHelper =
           new OzoneListStatusHelper(metadataManager, scmBlockSize,
-              this::getOzoneFileStatusFSO);
+              this::getOzoneFileStatusFSO,
+              ozoneManager.getDefaultReplicationConfig());
       Collection<OzoneFileStatus> statuses =
           statusHelper.listStatusFSO(args, startKey, numEntries,
           clientAddress, allowPartialPrefixes);

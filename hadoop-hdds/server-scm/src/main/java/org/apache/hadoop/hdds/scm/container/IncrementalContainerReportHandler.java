@@ -66,7 +66,7 @@ public class IncrementalContainerReportHandler extends
           dnFromReport.getUuid());
     }
     DatanodeDetails dd =
-        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+        nodeManager.getNodeByUuid(dnFromReport.getUuid());
     if (dd == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);

@@ -227,6 +227,13 @@ public final class StorageVolumeUtil {
       // volume's working directory, depending on the datanode's layout version.
       workingDirName = VersionedDatanodeFeatures.ScmHA
           .chooseContainerPathID(conf, scmId, clusterId);
+      try {
+        volume.createWorkingDir(workingDirName, dbVolumeSet);
+      } catch (IOException e) {
+        logger.error("Prepare working dir failed for volume {}.",
+            volumeRootPath, e);
+        success = false;
+      }
     } else if (rootFiles.length == 2) {
       // The two files are the version file and an existing working directory.
       // If the working directory matches the cluster ID, we do not need to
@@ -234,9 +241,16 @@ public final class StorageVolumeUtil {
       // If the working directory matches the SCM ID and SCM HA has been
       // finalized, the volume may have been unhealthy during finalization and
       // been skipped. In that case create the cluster ID symlink now.
+      // If the working directory matches the SCM ID and SCM HA is not yet
+      // finalized, use that as the working directory.
       success = VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(volume, clusterId);
-      workingDirName = clusterId;
+      try {
+        workingDirName = VersionedDatanodeFeatures.ScmHA
+            .chooseContainerPathID(volume, clusterId);
+      } catch (IOException ex) {
+        success = false;
+      }
     } else {
       // If there are more files in this directory, we only care that a
       // working directory named after our cluster ID is present for us to use.
@@ -252,13 +266,13 @@ public final class StorageVolumeUtil {
       }
     }
 
-    // Once the correct working directory name is identified, create it and
-    // its subdirectories.
+    // Once the correct working directory name is identified, create the
+    // volume level tmp directories under it.
     if (success) {
       try {
-        volume.createWorkingDirs(workingDirName, dbVolumeSet);
+        volume.createTmpDirs(workingDirName);
       } catch (IOException e) {
-        logger.error("Prepare working dir failed for volume {}.",
+        logger.error("Prepare tmp dir failed for volume {}.",
             volumeRootPath, e);
         success = false;
       }

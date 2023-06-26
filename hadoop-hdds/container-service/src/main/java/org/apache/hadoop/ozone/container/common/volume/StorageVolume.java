@@ -104,7 +104,7 @@ public abstract class StorageVolume
     NOT_INITIALIZED
   }
 
-  private VolumeState state;
+  private volatile VolumeState state;
 
   // VERSION file properties
   private String storageID;       // id of the file system
@@ -226,7 +226,7 @@ public abstract class StorageVolume
    *    layout feature upgrade finalization status.
    * @throws IOException
    */
-  public void createWorkingDirs(String dirName, MutableVolumeSet dbVolumeSet)
+  public void createWorkingDir(String dirName, MutableVolumeSet dbVolumeSet)
       throws IOException {
     File idDir = new File(getStorageDir(), dirName);
     if (!idDir.exists() && !idDir.mkdir()) {
@@ -234,7 +234,11 @@ public abstract class StorageVolume
           " for datanode.");
     }
     this.workingDirName = dirName;
-    this.tmpDir = new File(idDir, TMP_DIR_NAME);
+  }
+
+  public void createTmpDirs(String workDirName) throws IOException {
+    this.tmpDir =
+        new File(new File(getStorageDir(), workDirName), TMP_DIR_NAME);
     Files.createDirectories(tmpDir.toPath());
     diskCheckDir = createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);
     cleanTmpDiskCheckDir();
@@ -245,7 +249,7 @@ public abstract class StorageVolume
    * This subdirectory can be used as a work space for temporary filesystem
    * operations before they are moved to their final destination.
    */
-  protected File createTmpSubdirIfNeeded(String name) throws IOException {
+  protected final File createTmpSubdirIfNeeded(String name) throws IOException {
     File newDir = new File(tmpDir, name);
     Files.createDirectories(newDir.toPath());
     return newDir;

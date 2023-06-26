@@ -223,7 +223,7 @@ public class TestSstFilteringService {
     List<String> processedSnapshotIds = Files
         .readAllLines(Paths.get(dbSnapshots, OzoneConsts.FILTERED_SNAPSHOTS));
     Assert.assertTrue(
-        processedSnapshotIds.contains(snapshotInfo.getSnapshotID()));
+        processedSnapshotIds.contains(snapshotInfo.getSnapshotId().toString()));
 
     long count;
     // Prevent the new snapshot from being filtered

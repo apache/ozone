@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.conf;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.ReconfigurableBase;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -49,14 +50,24 @@ public class ReconfigurationHandler extends ReconfigurableBase
 
   public ReconfigurationHandler(String name, OzoneConfiguration config,
       CheckedConsumer<String, IOException> requireAdminPrivilege) {
+    super(config);
     this.name = name;
     this.requireAdminPrivilege = requireAdminPrivilege;
-    setConf(config);
   }
 
   public ReconfigurationHandler register(
       String property, UnaryOperator<String> reconfigureFunction) {
     properties.put(property, reconfigureFunction);
+    return this;
+  }
+
+  public ReconfigurationHandler register(ReconfigurableConfig config) {
+    config.reconfigurableProperties().forEach(
+        prop -> properties.put(prop, newValue -> {
+          config.reconfigureProperty(prop, newValue);
+          return newValue;
+        })
+    );
     return this;
   }
 
@@ -71,9 +82,15 @@ public class ReconfigurationHandler extends ReconfigurableBase
   }
 
   @Override
-  public String reconfigurePropertyImpl(String property, String newValue) {
-    return properties.getOrDefault(property, identity())
-        .apply(newValue);
+  public String reconfigurePropertyImpl(String property, String newValue)
+      throws ReconfigurationException {
+    final String oldValue = getConf().get(property);
+    try {
+      return properties.getOrDefault(property, identity())
+          .apply(newValue);
+    } catch (Exception e) {
+      throw new ReconfigurationException(property, newValue, oldValue, e);
+    }
   }
 
   @Override

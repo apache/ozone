@@ -98,13 +98,9 @@ public class DatanodeConfiguration {
   public static final String
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
-
-  public static final String
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE =
-      "hdds.datanode.check.empty.container.delete";
   public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT =
-      true;
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT =
+      false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -458,6 +454,20 @@ public class DatanodeConfiguration {
   )
   private int autoCompactionSmallSstFileNum = 512;
 
+  /**
+   * Whether to check container directory or not to determine
+   * container is empty.
+   */
+  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = { DATANODE },
+      description = "Boolean Flag to decide whether to check container " +
+          "directory or not to determine container is empty"
+  )
+  private boolean bCheckEmptyContainerDir =
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -633,6 +643,10 @@ public class DatanodeConfiguration {
 
   public void getVolumeHealthCheckFileSize(int fileSizeBytes) {
     this.volumeHealthCheckFileSize = fileSizeBytes;
+  }
+
+  public boolean getCheckEmptyContainerDir() {
+    return bCheckEmptyContainerDir;
   }
 
   public Duration getDiskCheckMinGap() {

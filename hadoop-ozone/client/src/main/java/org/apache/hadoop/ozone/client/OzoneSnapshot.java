@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.client;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
 
+import java.util.UUID;
+
 /**
  * A class that encapsulates OzoneSnapshot.
  */
@@ -29,7 +31,7 @@ public class OzoneSnapshot {
   private final String name;
   private final long creationTime;
   private final SnapshotStatus snapshotStatus;
-  private final String snapshotID;  // UUID
+  private final UUID snapshotId;  // UUID
   private final String snapshotPath; // snapshot mask
   private final String checkpointDir;
 
@@ -40,22 +42,25 @@ public class OzoneSnapshot {
    * @param name Name of the snapshot.
    * @param creationTime Creation time of the snapshot.
    * @param snapshotStatus Status of the snapshot.
-   * @param snapshotID ID of the snapshot.
+   * @param snapshotId ID of the snapshot.
    * @param snapshotPath Path of the snapshot.
    * @param checkpointDir Snapshot checkpoint directory.
    */
   @SuppressWarnings("parameternumber")
-  public OzoneSnapshot(String volumeName, String bucketName,
-                       String name, long creationTime,
+  public OzoneSnapshot(String volumeName,
+                       String bucketName,
+                       String name,
+                       long creationTime,
                        SnapshotStatus snapshotStatus,
-                       String snapshotID, String snapshotPath,
+                       UUID snapshotId,
+                       String snapshotPath,
                        String checkpointDir) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = name;
     this.creationTime = creationTime;
     this.snapshotStatus = snapshotStatus;
-    this.snapshotID = snapshotID;
+    this.snapshotId = snapshotId;
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
   }
@@ -110,8 +115,8 @@ public class OzoneSnapshot {
    *
    * @return snapshotID
    */
-  public String getSnapshotID() {
-    return snapshotID;
+  public UUID getSnapshotId() {
+    return snapshotId;
   }
 
   /**
@@ -138,7 +143,7 @@ public class OzoneSnapshot {
         snapshotInfo.getName(),
         snapshotInfo.getCreationTime(),
         snapshotInfo.getSnapshotStatus(),
-        snapshotInfo.getSnapshotID(),
+        snapshotInfo.getSnapshotId(),
         snapshotInfo.getSnapshotPath(),
         snapshotInfo.getCheckpointDir());
   }

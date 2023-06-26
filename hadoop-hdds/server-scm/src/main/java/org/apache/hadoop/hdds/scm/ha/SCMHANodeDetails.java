@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,7 +30,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,7 +173,8 @@ public class SCMHANodeDetails {
               : "SCM is running in Non-HA without Ratis")
               + " Ratis SCM -> Non Ratis SCM or " +
               "Non HA SCM -> HA SCM is not supported";
-      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
+      if (StringUtils.isNotEmpty(
+          conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
         throw new ConfigurationException(String.format("Invalid Config %s " +
                 "Provided ConfigValue: %s, Expected Config Value: %s. %s",
             ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAEnabled,

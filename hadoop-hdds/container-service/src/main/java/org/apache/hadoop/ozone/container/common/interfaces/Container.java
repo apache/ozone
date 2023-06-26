@@ -58,11 +58,11 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   void delete() throws StorageContainerException;
 
   /**
-   * Returns true if container is empty.
-   * @return true of container is empty
+   * Returns true if container has some block.
+   * @return true if container has some block.
    * @throws IOException if was unable to check container status.
    */
-  boolean isEmpty() throws IOException;
+  boolean hasBlocks() throws IOException;
 
   /**
    * Update the container.

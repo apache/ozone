@@ -94,8 +94,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
@@ -472,31 +470,6 @@ public final class HddsServerUtil {
             ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
   }
 
-  public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
-      throws IOException {
-    // As for OM during init, we need to wait for specific duration so that
-    // we can give response to user performed operation init in a definite
-    // period, instead of stuck for ever.
-    OzoneConfiguration configuration = new OzoneConfiguration(conf);
-    long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
-        OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
-    int retryCount =
-        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
-
-    // If duration is set to lesser value, fall back to actual default
-    // retry count.
-    if (retryCount > scmClientConfig.getRetryCount()) {
-      scmClientConfig.setRetryCount(retryCount);
-      configuration.setFromObject(scmClientConfig);
-    }
-
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        new SCMSecurityProtocolFailoverProxyProvider(configuration,
-            UserGroupInformation.getCurrentUser()));
-  }
-
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
@@ -576,6 +549,7 @@ public final class HddsServerUtil {
       JvmMetrics.create(serverName,
           configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
+      CpuMetrics.create();
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
