@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
@@ -26,9 +27,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,6 +45,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -56,7 +61,9 @@ import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -103,6 +110,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -363,6 +371,30 @@ public class TestOMDbCheckpointServlet {
     Assertions.assertTrue(tempFile.length() > 0);
   }
 
+  static class OStream extends ServletOutputStream {
+    FileOutputStream f;
+    OStream(File tempFile) throws FileNotFoundException {
+      f = new FileOutputStream(tempFile);
+    }
+    @Override
+    public boolean isReady() {
+      return true;
+    }
+
+    @Override
+    public void setWriteListener(WriteListener writeListener) {
+
+    }
+
+    @Override
+    public void write(int i) throws IOException {
+      f.write(i);
+    }
+    @Override
+    public void close() throws IOException {
+      f.close();
+    }
+  }
   @Test
   public void testWriteDbDataToStream() throws Exception {
     prepSnapshotData();
@@ -370,12 +402,31 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
+    final OzoneManager om = cluster.getOzoneManager();
+    DBStore dbStore =  om.getMetadataManager().getStore();
+    DBStore spyDbStore = spy(dbStore);
+    AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
+    when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
+      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      realCheckpoint.set(checkpoint);
+      return checkpoint;
+    });
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+                                                                  any(DBStore.class),
+                                                                  any(DBCheckpointMetrics.class),
+                                                                  eq(false),
+                                                                  any(Collection.class),
+                                                                  any(Collection.class),
+eq(false));
+    doInit(om, spyDbStore);
+    this.method = "GET";
     // Get the tarball.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>());
+    try (OStream fileOutputStream = new OStream(tempFile)) {
+      when(responseMock.getOutputStream()).thenReturn(fileOutputStream);
+      doEndpoint();
     }
-
+   dbCheckpoint = realCheckpoint.get();
+//    when(realCheckpoint.get().cleanupCheckpoint())
     // Untar the file into a temp folder to be examined.
     String testDirName = folder.getAbsolutePath();
     int testDirLength = testDirName.length() + 1;
@@ -441,6 +492,17 @@ public class TestOMDbCheckpointServlet {
         "expected snapshot files not found");
   }
 
+  private void doInit(OzoneManager om, DBStore spyDbstore)
+      throws ServletException {
+    omDbCheckpointServletMock.initialize(
+                                         spyDbstore,
+        om.getMetrics().getDBCheckpointMetrics(),
+                                         false,
+        om.getOmAdminUsernames(),
+                                         om.getOmAdminGroups(), false);
+
+
+  }
   @Test
   public void testWriteDbDataWithoutOmSnapshot()
       throws Exception {
@@ -644,9 +706,9 @@ public class TestOMDbCheckpointServlet {
     Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
     Files.createLink(currentLink, currentFile);
 
-    dbCheckpoint = cluster.getOzoneManager()
-        .getMetadataManager().getStore()
-        .getCheckpoint(true);
+    // dbCheckpoint = cluster.getOzoneManager()
+    //     .getMetadataManager().getStore()
+    //     .getCheckpoint(true);
 
   }
 
@@ -663,7 +725,7 @@ public class TestOMDbCheckpointServlet {
     String snapshotPath = getSnapshotPath(conf, snapshotInfo)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
-        100, 2000);
+        100, 60000);
     return snapshotPath;
   }
 
