@@ -197,7 +197,7 @@ public class TestPipelineManagerImpl {
     Assertions.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
 
     Pipeline builtPipeline = pipelineManager.buildECPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        new ECReplicationConfig(3, 2),
         Collections.emptyList(), Collections.emptyList());
     pipelineManager.addEcPipeline(builtPipeline);
 
