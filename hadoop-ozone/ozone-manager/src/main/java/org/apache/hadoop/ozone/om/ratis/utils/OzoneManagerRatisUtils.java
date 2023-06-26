@@ -80,6 +80,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
+import org.apache.hadoop.ozone.om.request.util.OMUnknownRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
@@ -320,8 +321,7 @@ public final class OzoneManagerRatisUtils {
       bucketName = keyArgs.getBucketName();
       break;
     default:
-      throw new IllegalStateException("Unrecognized write command " +
-          "type request" + cmdType);
+      return new OMUnknownRequest(omRequest);
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
