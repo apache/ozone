@@ -151,18 +151,22 @@ public abstract class Handler {
    * Marks the container Unhealthy. Moves the container to UNHEALTHY state.
    *
    * @param container container to update
+   * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public abstract void markContainerUnhealthy(Container container)
+  public abstract void markContainerUnhealthy(Container container,
+                                              String reason)
       throws IOException;
 
   /**
    * Moves the Container to QUASI_CLOSED state.
    *
    * @param container container to be quasi closed
+   * @param reason The reason the container was quasi closed, for logging
+   *               purposes.
    * @throws IOException
    */
-  public abstract void quasiCloseContainer(Container container)
+  public abstract void quasiCloseContainer(Container container, String reason)
       throws IOException;
 
   /**
