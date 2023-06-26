@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om;
 
 import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
@@ -27,11 +26,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -45,7 +42,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -61,7 +57,6 @@ import com.google.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -110,7 +105,6 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -136,7 +130,6 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
-  private BootstrapStateHandler.Lock lock;
   private File metaDir;
   private String snapshotDirName;
   private String snapshotDirName2;
@@ -201,7 +194,8 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
 
-    lock = new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
+    BootstrapStateHandler.Lock lock =
+        new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
 
     requestMock = mock(HttpServletRequest.class);
@@ -378,37 +372,32 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
-    final OzoneManager om = cluster.getOzoneManager();
+    // Create a "spy" dbstore keep track of the checkpoint.
+    OzoneManager om = cluster.getOzoneManager();
     DBStore dbStore =  om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
       DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      // Don't delete the checkpoint, because we need to compare it
+      // with the snapshot data.
       doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
       return checkpoint;
     });
-    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
-                                                                  any(),
-                                                                  any(),
-                                                                  eq(false),
-                                                                  any(),
-                                                                  any(),
-eq(false));
-    // omDbCheckpointServletMock.init();
-    omDbCheckpointServletMock.initialize(
-                                         spyDbStore,
-        om.getMetrics().getDBCheckpointMetrics(),
-                                         false,
-        om.getOmAdminUsernames(),
-                                         om.getOmAdminGroups(), false);
 
-    this.method = "GET";
+    // Init the mock with the spyDbstore
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        any(), any(), eq(false), any(), any(), eq(false));
+    omDbCheckpointServletMock.initialize(
+        spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
+        false, om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
+
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
-    doEndpoint();
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
     dbCheckpoint = realCheckpoint.get();
-//    when(realCheckpoint.get().cleanupCheckpoint())
+
     // Untar the file into a temp folder to be examined.
     String testDirName = folder.getAbsolutePath();
     int testDirLength = testDirName.length() + 1;
@@ -838,7 +827,7 @@ eq(false));
     // Confirm that servlet takes the lock when none of the other
     //  handlers have it.
     Future<Boolean> servletTest = checkLock(spyServlet, executorService);
-    Assert.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
+    Assertions.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 
