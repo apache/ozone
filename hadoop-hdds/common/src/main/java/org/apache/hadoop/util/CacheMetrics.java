@@ -67,7 +67,7 @@ public final class CacheMetrics implements MetricsSource {
   private CacheMetrics(Cache<?, ?> cache, String name) {
     this.cache = cache;
     this.name = name;
-    sourceName = SOURCE_NAME + ":" + name;
+    sourceName = SOURCE_NAME + "-" + name;
   }
 
   public static CacheMetrics create(Cache<?, ?> cache, Object owner) {
