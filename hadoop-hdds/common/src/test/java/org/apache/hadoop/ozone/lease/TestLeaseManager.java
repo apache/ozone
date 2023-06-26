@@ -185,7 +185,6 @@ public class TestLeaseManager {
     DummyResource resourceOne = new DummyResource("one");
     Lease<DummyResource> leaseOne = manager.acquire(resourceOne, () -> {
       leaseStatus.put(resourceOne, "lease expired");
-      System.out.println("lease expired");
       return null;
     });
     leaseStatus.put(resourceOne, "lease in use");
@@ -200,7 +199,6 @@ public class TestLeaseManager {
     Assertions.assertTrue(leaseOne.hasExpired());
     Assertions.assertThrowsExactly(LeaseNotFoundException.class,
         () -> manager.get(resourceOne), "Resource: " + resourceOne);
-    System.out.println(leaseOne.hasExpired());
     // check if callback has been executed
     Assertions.assertEquals("lease expired", leaseStatus.get(resourceOne));
   }
