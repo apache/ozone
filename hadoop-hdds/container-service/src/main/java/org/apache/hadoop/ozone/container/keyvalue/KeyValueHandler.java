@@ -1367,10 +1367,10 @@ public class KeyValueHandler extends Handler {
       LOG.error("Could not determine if the container {} is empty",
           container.getContainerData().getContainerID(), e);
       String errorMsg =
-          "Could not determine if the container " + container.getContainerData()
-              .getContainerID() + "is empty";
+          "Failed to read container dir" + container.getContainerData()
+              .getContainerID();
       triggerVolumeScanAndThrowException(container, errorMsg,
-          DELETE_ON_NON_EMPTY_CONTAINER);
+          CONTAINER_INTERNAL_ERROR);
     } finally {
       container.writeUnlock();
     }
