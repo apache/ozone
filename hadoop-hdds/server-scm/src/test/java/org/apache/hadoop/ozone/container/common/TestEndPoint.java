@@ -286,7 +286,8 @@ public class TestEndPoint {
           kvContainer.getContainerData(), hddsVolume);
       KeyValueContainer container = ContainerTestUtils.
           addContainerToVolumeDir(hddsVolume, scmServerImpl.getClusterId(),
-              conf, OzoneConsts.SCHEMA_V3, kvContainer.getContainerData().getContainerID());
+              conf, OzoneConsts.SCHEMA_V3,
+              kvContainer.getContainerData().getContainerID());
       ozoneContainer.getContainerSet().addContainer(container);
 
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
