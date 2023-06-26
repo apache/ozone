@@ -60,8 +60,6 @@ public final class CacheMetrics implements MetricsSource {
   public static final String SOURCE_NAME =
       CacheMetrics.class.getSimpleName();
 
-  public static final String NAME = CacheMetrics.class.getSimpleName();
-
   private final Cache<?, ?> cache;
   private final String name;
   private final String sourceName;
@@ -69,7 +67,7 @@ public final class CacheMetrics implements MetricsSource {
   private CacheMetrics(Cache<?, ?> cache, String name) {
     this.cache = cache;
     this.name = name;
-    sourceName = NAME + ":" + name;
+    sourceName = SOURCE_NAME + ":" + name;
   }
 
   public static CacheMetrics create(Cache<?, ?> cache, Object owner) {
