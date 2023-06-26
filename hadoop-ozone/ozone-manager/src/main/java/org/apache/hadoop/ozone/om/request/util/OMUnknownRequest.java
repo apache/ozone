@@ -46,6 +46,7 @@ public class OMUnknownRequest extends OMClientRequest {
 
     OMClientResponse omClientResponse = new OMUnknownRequestResponse(
         omResponse.setStatus(OzoneManagerProtocolProtos.Status.UNKNOWN_REQUEST)
+            .setSuccess(false)
             .setMessage("Unrecognized write command type request" +
                 getOmRequest().getCmdType())
             .build());
