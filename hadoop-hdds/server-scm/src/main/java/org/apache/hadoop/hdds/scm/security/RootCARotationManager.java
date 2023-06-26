@@ -650,11 +650,10 @@ public class RootCARotationManager implements SCMService {
         int numFromHADetails =
             scm.getSCMHANodeDetails().getPeerNodeDetails().size() + 1;
         int numFromRatisServer = scm.getScmHAManager().getRatisServer()
-            .getDivision().getGroup().getPeers().size();
+            .getDivision().getRaftConf().getCurrentPeers().size();
         LOG.info("numFromHADetails {}, numFromRatisServer {}",
             numFromHADetails, numFromRatisServer);
-        if (handler.rotationPrepareAcks() ==
-            (Math.max(numFromHADetails, numFromRatisServer))) {
+        if (handler.rotationPrepareAcks() == numFromRatisServer) {
           // all acks are received.
           try {
             waitAckTimeoutTask.cancel(false);
