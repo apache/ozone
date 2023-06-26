@@ -20,9 +20,12 @@
 package org.apache.hadoop.ozone.om.service;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.util.Time;
@@ -89,5 +92,45 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     Assert.assertTrue(obsUpdateBucketInfo.getUsedBytes() == 30000);
     Assert.assertTrue(fsoUpdateBucketInfo.getUsedNamespace() == 13);
     Assert.assertTrue(fsoUpdateBucketInfo.getUsedBytes() == 10000);
+  }
+
+  @Test
+  public void testQuotaRepairForOldVersionVolumeBucket() throws Exception {
+    // add volume with -2 value
+    OmVolumeArgs omVolumeArgs =
+        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+            .setVolume(volumeName).setAdminName(volumeName)
+            .setOwnerName(volumeName).setQuotaInBytes(-2)
+            .setQuotaInNamespace(-2).build();
+    omMetadataManager.getVolumeTable().put(
+        omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
+    omMetadataManager.getVolumeTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+        CacheValue.get(1L, omVolumeArgs));
+    
+    // add bucket with -2 value
+    OMRequestTestUtils.addBucketToDB(volumeName, bucketName,
+        omMetadataManager, -2);
+
+    // pre check for quota flag
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertTrue(bucketInfo.getQuotaInBytes() == -2);
+    
+    omVolumeArgs = omMetadataManager.getVolumeTable().get(
+        omMetadataManager.getVolumeKey(volumeName));
+    Assert.assertTrue(omVolumeArgs.getQuotaInBytes() == -2);
+    Assert.assertTrue(omVolumeArgs.getQuotaInNamespace() == -2);
+
+    QuotaRepairTask quotaRepairTask = new QuotaRepairTask(omMetadataManager);
+    quotaRepairTask.repair();
+
+    bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    Assert.assertTrue(bucketInfo.getQuotaInBytes() == -1);
+    OmVolumeArgs volArgsVerify = omMetadataManager.getVolumeTable()
+        .get(omMetadataManager.getVolumeKey(volumeName));
+    Assert.assertTrue(volArgsVerify.getQuotaInBytes() == -1);
+    Assert.assertTrue(volArgsVerify.getQuotaInNamespace() == -1);
   }
 }
