@@ -1230,7 +1230,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
             .setForceFullDiff(forceFullDiff)
-            .setCancel(cancel);
+            .setCancel(cancel)
             .setForceNonNativeDiff(forceNonNativeDiff);
 
     if (!StringUtils.isBlank(token)) {

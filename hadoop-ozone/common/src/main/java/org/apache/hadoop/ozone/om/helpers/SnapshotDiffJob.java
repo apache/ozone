@@ -209,6 +209,7 @@ public class SnapshotDiffJob {
         .setFromSnapshot(fromSnapshot)
         .setToSnapshot(toSnapshot)
         .setForceFullDiff(forceFullDiff)
+        .setForceNonNativeDiff(forceNonNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
         .build();
   }
@@ -224,6 +225,7 @@ public class SnapshotDiffJob {
         diffJobProto.getFromSnapshot(),
         diffJobProto.getToSnapshot(),
         diffJobProto.getForceFullDiff(),
+        diffJobProto.getForceNonNativeDiff(),
         diffJobProto.getTotalDiffEntries());
   }
 

@@ -743,7 +743,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
-            0, 0, false);
+            0, 0, false, false);
 
     Assertions.assertEquals(JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
@@ -757,7 +757,7 @@ public class TestSnapshotDiffManager {
     snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
-            0, 0, false);
+            0, 0, false, false);
 
     Assertions.assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
@@ -772,7 +772,7 @@ public class TestSnapshotDiffManager {
     snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
-            0, 0, false);
+            0, 0, false, false);
 
     Assertions.assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
@@ -831,7 +831,7 @@ public class TestSnapshotDiffManager {
     String jobId = UUID.randomUUID().toString();
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0L,
         jobId, jobStatus, volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, true, 10);
+        fromSnapshotName, toSnapshotName, true, false, 10);
 
     snapDiffJobTable.put(diffJobKey, snapshotDiffJob);
 
@@ -931,7 +931,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
         .getSnapshotDiffReport(volumeName, bucketName,
             fromSnapshotName, toSnapshotName,
-            0, 0, false);
+            0, 0, false, false);
 
     Assertions.assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
@@ -977,7 +977,7 @@ public class TestSnapshotDiffManager {
     // SnapshotDiffReport
     snapshotDiffManager.getSnapshotDiffReport(volumeName, bucketName,
         fromSnapshotName, toSnapshotName,
-        0, 0, false);
+        0, 0, false, false);
 
     // Invalid status, without listAll true, results in an exception.
     Assertions.assertThrows(IOException.class, () -> snapshotDiffManager

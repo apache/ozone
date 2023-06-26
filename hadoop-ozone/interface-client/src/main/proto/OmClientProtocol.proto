@@ -815,6 +815,7 @@ message SnapshotDiffJobProto {
   optional string toSnapshot = 7;
   optional bool forceFullDiff = 8;
   optional uint64 totalDiffEntries = 9;
+  optional bool forceNonNativeDiff = 10;
 }
 
 message OzoneObj {

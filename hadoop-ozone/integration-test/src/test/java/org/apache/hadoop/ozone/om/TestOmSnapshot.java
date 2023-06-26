@@ -41,10 +41,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -116,11 +114,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelRes
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult.JOB_ALREADY_CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult.JOB_NOT_CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult.NEW_JOB;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.awaitility.Awaitility.with;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -638,7 +632,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)));
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
   }
 
   /**
@@ -675,7 +669,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)));
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
@@ -722,9 +716,9 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 2);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1),
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1),
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.CREATE, key1)));
+            SnapshotDiffReport.DiffType.CREATE, OZONE_URI_DELIMITER + key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
@@ -737,13 +731,13 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)));
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap2, snap4);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)));
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
   }
 
 
@@ -790,7 +784,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)
     ));
   }
 
@@ -851,7 +845,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, key1)
+            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)
     ));
   }
 
@@ -894,7 +888,9 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.RENAME, key1, renamedKey)
+            SnapshotDiffReport.DiffType.RENAME,
+            OZONE_URI_DELIMITER + key1,
+            OZONE_URI_DELIMITER + renamedKey)
     ));
   }
 
@@ -971,7 +967,7 @@ public class TestOmSnapshot {
         key1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.MODIFY, key1)));
+            SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key1)));
   }
 
   /**
@@ -1009,19 +1005,23 @@ public class TestOmSnapshot {
 
     List<SnapshotDiffReport.DiffReportEntry> diffEntries;
     if (bucketLayout.isFileSystemOptimized()) {
-      diffEntries = Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
-          SnapshotDiffReport.DiffType.RENAME, key1, key1 + "_renamed"),
+      diffEntries = Lists.newArrayList(
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "dir1"),
+          SnapshotDiffReport.DiffType.RENAME, OZONE_URI_DELIMITER + key1,
+              "/dir1/dir2/" + key1 + "_renamed"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "dir2"));
+              SnapshotDiffReport.DiffType.CREATE, "/dir1"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "/dir1/dir2"));
     } else {
-      diffEntries = Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.RENAME, key1, key1 + "_renamed"),
+      diffEntries = Lists.newArrayList(
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "dir2"),
+              SnapshotDiffReport.DiffType.RENAME,
+              OZONE_URI_DELIMITER + key1, "/dir1/dir2/" + key1 + "_renamed"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "dir1"));
+              SnapshotDiffReport.DiffType.CREATE, "/dir1/dir2"),
+          SnapshotDiffReportOzone.getDiffReportEntry(
+              SnapshotDiffReport.DiffType.CREATE, "/dir1"));
     }
     Assert.assertEquals(diff.getDiffList(), diffEntries);
   }
@@ -1037,9 +1037,8 @@ public class TestOmSnapshot {
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
     volume.createBucket(testBucketName);
-    String rootPath = String.format("%s://%s.%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
-        "om-service-test1");
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName);
     try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
       String snap1 = "snap1";
       String key = "/dir1/dir2/key1";
@@ -1061,7 +1060,7 @@ public class TestOmSnapshot {
         p = fileStatuses[0].getPath();
         Assertions.assertEquals(diff.getDiffList().get(idx),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.CREATE, p.getName()));
+                SnapshotDiffReport.DiffType.CREATE, p.toUri().getPath()));
         if (fileStatuses[0].isFile()) {
           break;
         }
@@ -1080,9 +1079,8 @@ public class TestOmSnapshot {
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
     volume.createBucket(testBucketName);
-    String rootPath = String.format("%s://%s.%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
-        "om-service-test1");
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName);
     try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
       String snap1 = "snap1";
       String key = "/dir1/dir2/key1";
@@ -1120,9 +1118,8 @@ public class TestOmSnapshot {
     store.createVolume(testVolumeName);
     OzoneVolume volume = store.getVolume(testVolumeName);
     volume.createBucket(testBucketName);
-    String rootPath = String.format("%s://%s.%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName,
-        "om-service-test1");
+    String rootPath = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, testBucketName, testVolumeName);
     try (FileSystem fs = FileSystem.get(new URI(rootPath), cluster.getConf())) {
       String snap1 = "snap1";
       String key = "/dir1/dir2/key1";
@@ -1137,17 +1134,17 @@ public class TestOmSnapshot {
       if (bucketLayout.isFileSystemOptimized()) {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "dir1"),
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "dir2"),
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "dir3")));
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2/dir3")));
       } else {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "key1"),
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2/key1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "dir2")));
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2")));
       }
     }
   }
@@ -1282,13 +1279,13 @@ public class TestOmSnapshot {
 
     SnapshotDiffResponse response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
-        null, 0, false, false);
+        null, 0, false, false, forceNonNativeSnapshotDiff);
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, false, true, forceNonNativeSnapshotDiff);
 
     // Job status should be updated to CANCELLED.
     assertEquals(CANCELLED, response.getJobStatus());
@@ -1300,7 +1297,7 @@ public class TestOmSnapshot {
     // and removed from the snapDiffJobTable.
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, false, true, forceNonNativeSnapshotDiff);
     assertEquals(CANCELLED, response.getJobStatus());
     assertEquals(JOB_ALREADY_CANCELLED, response.getJobCancelResult());
 
@@ -1349,7 +1346,7 @@ public class TestOmSnapshot {
     // New job that doesn't exist, cancel fails.
     SnapshotDiffResponse response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, false, true, forceNonNativeSnapshotDiff);
 
     Assert.assertEquals(NEW_JOB, response.getJobCancelResult());
     Assert.assertTrue(response.toString()
@@ -1359,7 +1356,7 @@ public class TestOmSnapshot {
     // Submit new job.
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, false);
+        null, 0, false, false, forceNonNativeSnapshotDiff);
 
     Assert.assertEquals(JOB_NOT_CANCELLED, response.getJobCancelResult());
     Assert.assertEquals(IN_PROGRESS, response.getJobStatus());
@@ -1369,7 +1366,7 @@ public class TestOmSnapshot {
     // Cancel success.
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, forceFullSnapshotDiff, true, forceNonNativeSnapshotDiff);
 
     Assert.assertEquals(CANCELLATION_SUCCESS, response.getJobCancelResult());
     Assert.assertEquals(CANCELLED, response.getJobStatus());
@@ -1379,7 +1376,7 @@ public class TestOmSnapshot {
     // Job already cancelled.
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, true);
+        null, 0, forceFullSnapshotDiff, true, forceNonNativeSnapshotDiff);
 
     Assert.assertEquals(JOB_ALREADY_CANCELLED, response.getJobCancelResult());
     Assert.assertEquals(CANCELLED, response.getJobStatus());
@@ -1498,7 +1495,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Lists.newArrayList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.MODIFY, key1)));
+            SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key1)));
   }
 
   @Test
@@ -1608,7 +1605,8 @@ public class TestOmSnapshot {
     String snap2 = "snap-2-" + RandomStringUtils.randomNumeric(5);
     createSnapshot(volume, bucket, snap2);
 
-    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0, true, false);
+    store.snapshotDiff(volume, bucket, snap1, snap2, null, 0,
+        forceFullSnapshotDiff, false, forceNonNativeSnapshotDiff);
 
     String invalidStatus = "invalid";
     String statusErrorMessage = "Invalid job status: " + invalidStatus;
@@ -1830,44 +1828,6 @@ public class TestOmSnapshot {
       return true;
     }, 1000, 30000);
     return path;
-  }
-
-  @Test
-  public void testUniqueSnapshotId() throws Exception {
-    createFileKeyWithPrefix(ozoneBucket, "key");
-
-    String snapshotName = UUID.randomUUID().toString();
-    store.createSnapshot(volumeName, bucketName, snapshotName);
-    List<OzoneManager> ozoneManagers = ((MiniOzoneHAClusterImpl) cluster)
-        .getOzoneManagersList();
-    List<String> snapshotIds = new ArrayList<>();
-
-    for (OzoneManager om : ozoneManagers) {
-      GenericTestUtils.waitFor(
-          () -> {
-            SnapshotInfo snapshotInfo;
-            try {
-              snapshotInfo = om.getMetadataManager()
-                  .getSnapshotInfoTable()
-                  .get(
-                      SnapshotInfo.getTableKey(volumeName,
-                          bucketName,
-                          snapshotName)
-                  );
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-
-            if (snapshotInfo != null) {
-              snapshotIds.add(snapshotInfo.getSnapshotId().toString());
-            }
-            return snapshotInfo != null;
-          },
-          1000,
-          120000);
-    }
-
-    assertEquals(1, snapshotIds.stream().distinct().count());
   }
 
   @Test
