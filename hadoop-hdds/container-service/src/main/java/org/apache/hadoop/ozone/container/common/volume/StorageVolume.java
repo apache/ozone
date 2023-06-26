@@ -130,8 +130,10 @@ public abstract class StorageVolume
   during a volume check. If this number crosses a configured threshold,
   the volume will be failed. A passing check will reset this counter.
    */
-  private volatile int consecutiveIOFailureCount;
-  private int consecutiveIOFailureTolerance;
+  private final int ioTestCount;
+  private final int ioFailureTolerance;
+  private volatile int currentIOTestCount;
+  private volatile int currentIOFailureCount;
   private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
@@ -148,19 +150,22 @@ public abstract class StorageVolume
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.conf = b.conf;
-      this.consecutiveIOFailureCount = 0;
+
       DatanodeConfiguration dnConf =
           conf.getObject(DatanodeConfiguration.class);
-      this.consecutiveIOFailureTolerance =
-          dnConf.getConsecutiveVolumeIOFailuresTolerated();
-      this.healthCheckFileSize =
-          dnConf.getVolumeHealthCheckFileSize();
+      this.ioTestCount = dnConf.getVolumeIOTestCount();
+      this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
+      this.currentIOTestCount = 0;
+      this.currentIOFailureCount = 0;
+      this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
       this.volumeInfo = Optional.empty();
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
+      this.ioTestCount = 0;
+      this.ioFailureTolerance = 0;
     }
   }
 
@@ -585,20 +590,33 @@ public abstract class StorageVolume
       return VolumeCheckResult.FAILED;
     }
 
+    // If IO test count is set to 0, IO tests for disk health are disabled.
+    if (ioTestCount == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
     // Since IO errors may be intermittent, volume remains healthy until the
-    // threshold of consecutive failures is crossed.
+    // threshold of failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
         diskCheckDir, healthCheckFileSize);
-    if (diskChecksPassed) {
-      // Reset consecutive IO failure count when IO succeeds.
-      // Volume remains healthy.
-      consecutiveIOFailureCount = 0;
-    } else {
-      consecutiveIOFailureCount++;
-      if (consecutiveIOFailureCount >= consecutiveIOFailureTolerance) {
-        // After too many repeated IO failures, the volume should be failed.
-        return VolumeCheckResult.FAILED;
-      }
+    currentIOTestCount++;
+    if (!diskChecksPassed) {
+      currentIOFailureCount++;
+    }
+
+    // If the failure threshold has been crossed, fail the volume without
+    // further scans.
+    // Once the volume is failed, it will not be checked anymore.
+    // The failure counts can be left as is.
+    if (currentIOFailureCount > ioFailureTolerance) {
+      return VolumeCheckResult.FAILED;
+    }
+
+    // If we have completed the required number of volume checks without too
+    // many IO failures, reset the counters for future iterations.
+    if (currentIOTestCount == ioTestCount) {
+      currentIOFailureCount = 0;
+      currentIOTestCount = 0;
     }
 
     return VolumeCheckResult.HEALTHY;
