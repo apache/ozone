@@ -685,7 +685,7 @@ public class TestOMDbCheckpointServlet {
     String snapshotPath = getSnapshotPath(conf, snapshotInfo)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
-        100, 60000);
+        100, 2000);
     return snapshotPath;
   }
 
