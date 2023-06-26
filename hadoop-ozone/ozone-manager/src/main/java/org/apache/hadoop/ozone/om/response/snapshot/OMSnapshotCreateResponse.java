@@ -81,11 +81,12 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
     OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
         snapshotInfo);
 
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    // try {
+    //   Thread.sleep(1000);
+    //   System.out.println("gbjnext");
+    // } catch (InterruptedException e) {
+    //   e.printStackTrace();
+    // }
 
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
