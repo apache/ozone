@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.slf4j.Logger;
@@ -37,11 +38,17 @@ public abstract class CommonCertificateClient extends DefaultCertificateClient {
 
   private final Logger log;
 
-  public CommonCertificateClient(SecurityConfig securityConfig, Logger log,
-      String certSerialId, String component,
-      Consumer<String> saveCertIdCallback, Runnable shutdownCallback) {
-    super(securityConfig, log, certSerialId, component, saveCertIdCallback,
-        shutdownCallback);
+  public CommonCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
+      Logger log,
+      String certSerialId,
+      String component,
+      Consumer<String> saveCertIdCallback,
+      Runnable shutdownCallback
+  ) {
+    super(securityConfig, scmSecurityClient, log, certSerialId, component,
+        saveCertIdCallback, shutdownCallback);
     this.log = log;
   }
 

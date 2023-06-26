@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -76,6 +77,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
+  private OmSnapshotManager omSnapshotManager;
   private AuditLogger auditLogger;
 
   private String volumeName;
@@ -112,6 +114,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(omMetadataReader);
+    omSnapshotManager = new OmSnapshotManager(ozoneManager);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();

@@ -285,6 +285,34 @@ public class TestOzoneFsSnapshot {
     Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
   }
 
+  @Test
+  public void testSnapshotDeleteSuccess() throws Exception {
+    String snapshotName = createSnapshot();
+    // Delete the created snapshot
+    int res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
+    // Asserts that delete request succeeded
+    Assertions.assertEquals(0, res);
+
+    // Wait for the snapshot to be marked deleted.
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+
+    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
+        200, 10000);
+  }
+
+  @Test
+  public void testSnapshotDeleteFailure() throws Exception {
+    // Delete snapshot that doesn't exist
+    String deleteSnapshotOut = execShellCommandAndGetOutput(1,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, "testsnap"});
+    Assertions.assertTrue(deleteSnapshotOut
+        .contains("Snapshot does not exist"));
+  }
+
   /**
    * Execute a shell command with provided arguments
    * and return a string of the output.

@@ -71,6 +71,12 @@ class NavBar extends React.Component<INavBarProps> {
     });
   };
 
+  refresh = () => {
+    console.log("refresh");
+    this.props.history.push('/Heatmap');
+    window.location.reload();
+    }
+
   render() {
     const {location} = this.props;
     return (
@@ -126,7 +132,7 @@ class NavBar extends React.Component<INavBarProps> {
               <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
-                <Link to='/Heatmap' />
+                <Link to='/Heatmap' onClick={this.refresh}/>
               </Menu.Item> : ""
           }
         </Menu>

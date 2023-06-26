@@ -1013,6 +1013,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.lock.stripes</name>
+    <value>512</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The number of stripes created for the container state manager lock.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.address</name>
     <value/>
     <tag>OZONE, MANAGEMENT</tag>
@@ -2033,7 +2041,7 @@
   </property>
   <property>
     <name>ozone.om.snapshot.provider.request.timeout</name>
-    <value>5000ms</value>
+    <value>300000ms</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
     <description>
       Connection request timeout for HTTP call made by OM Snapshot Provider to
@@ -3913,6 +3921,19 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.db.max.open.files</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files for each snapshot db present in the snapshot cache.
+      Essentially sets `max_open_files` config for RocksDB instances opened for Ozone snapshots.
+      This will limit the total number of files opened by a snapshot db thereby limiting the total number of
+      open file handles by snapshot dbs.
+      Max total number of open handles = (snapshot cache size * max open files)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.force.full.diff</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
@@ -4060,6 +4081,16 @@
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at
       https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.upgrade.quota.recalculate.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      quota recalculation trigger when upgrade to the layout version QUOTA.
+      while upgrade, re-calculation of quota used will block write operation
+      to existing buckets till this operation is completed.
     </description>
   </property>
 </configuration>

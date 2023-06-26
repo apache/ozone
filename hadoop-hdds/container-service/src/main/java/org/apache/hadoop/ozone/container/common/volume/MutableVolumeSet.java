@@ -165,10 +165,11 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     for (String locationString : rawLocations) {
+      StorageVolume volume = null;
       try {
         StorageLocation location = StorageLocation.parse(locationString);
 
-        StorageVolume volume = volumeFactory.createVolume(
+        volume = volumeFactory.createVolume(
             location.getUri().getPath(), location.getStorageType());
 
         LOG.info("Added Volume : {} to VolumeSet",
@@ -182,8 +183,11 @@ public class MutableVolumeSet implements VolumeSet {
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
       } catch (IOException e) {
-        StorageVolume volume =
-            volumeFactory.createFailedVolume(locationString);
+        if (volume != null) {
+          volume.shutdown();
+        }
+
+        volume = volumeFactory.createFailedVolume(locationString);
         failedVolumeMap.put(locationString, volume);
         LOG.error("Failed to parse the storage location: " + locationString, e);
       }
@@ -409,27 +413,17 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   /**
-   * This method, call shutdown on each volume to shutdown volume usage
-   * thread and write scmUsed on each volume.
-   */
-
-  private synchronized void saveVolumeSetUsed() {
-    for (StorageVolume hddsVolume : volumeMap.values()) {
-      try {
-        hddsVolume.shutdown();
-      } catch (Exception ex) {
-        LOG.error("Failed to shutdown volume : " + hddsVolume.getStorageDir(),
-            ex);
-      }
-    }
-    volumeMap.clear();
-  }
-
-  /**
    * Shutdown the volumeset.
    */
   public void shutdown() {
-    saveVolumeSetUsed();
+    for (StorageVolume volume : volumeMap.values()) {
+      try {
+        volume.shutdown();
+      } catch (Exception ex) {
+        LOG.error("Failed to shutdown volume : " + volume.getStorageDir(), ex);
+      }
+    }
+    volumeMap.clear();
   }
 
   @Override

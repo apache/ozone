@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -198,6 +199,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationToke
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1215,7 +1217,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean cancel)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1225,7 +1228,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
-            .setForceFullDiff(forceFullDiff);
+            .setForceFullDiff(forceFullDiff)
+            .setCancel(cancel);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);
@@ -1242,7 +1246,37 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new SnapshotDiffResponse(SnapshotDiffReportOzone.fromProtobuf(
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
-        diffResponse.getWaitTimeInMs());
+        diffResponse.getWaitTimeInMs(),
+        JobCancelResult.fromProtobuf(diffResponse.getJobCancelResult()));
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
+                                                    String bucketName,
+                                                    String jobStatus,
+                                                    boolean listAll)
+      throws IOException {
+    final OzoneManagerProtocolProtos
+        .ListSnapshotDiffJobRequest.Builder requestBuilder =
+        OzoneManagerProtocolProtos
+            .ListSnapshotDiffJobRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setJobStatus(jobStatus)
+            .setListAll(listAll);
+
+    final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
+        .setListSnapshotDiffJobRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    return omResponse.getListSnapshotDiffJobResponse()
+        .getSnapshotDiffJobList().stream()
+        .map(SnapshotDiffJob::getFromProtoBuf)
+        .collect(Collectors.toList());
   }
 
   /**

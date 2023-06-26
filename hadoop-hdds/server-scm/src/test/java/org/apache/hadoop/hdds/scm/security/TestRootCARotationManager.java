@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -49,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -73,8 +75,10 @@ public class TestRootCARotationManager {
     ozoneConfig = new OzoneConfiguration();
     testDir = GenericTestUtils.getTestDir(
         TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    ozoneConfig.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        testDir.getAbsolutePath());
+    ozoneConfig
+        .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    ozoneConfig
+        .setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     scm = Mockito.mock(StorageContainerManager.class);
     scmCertClient = Mockito.mock(CertificateClient.class);
     scmServiceManager = new SCMServiceManager();
@@ -206,9 +210,14 @@ public class TestRootCARotationManager {
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);
     return new JcaX509CertificateConverter().getCertificate(
-        SelfSignedCertificate.newBuilder().setBeginDate(start)
-            .setEndDate(end).setClusterID("cluster").setKey(keyPair)
-            .setSubject("localhost").setConfiguration(conf).setScmID("test")
+        SelfSignedCertificate.newBuilder()
+            .setBeginDate(start)
+            .setEndDate(end)
+            .setClusterID("cluster")
+            .setKey(keyPair)
+            .setSubject("localhost")
+            .setConfiguration(new SecurityConfig(conf))
+            .setScmID("test")
             .build());
   }
 }
