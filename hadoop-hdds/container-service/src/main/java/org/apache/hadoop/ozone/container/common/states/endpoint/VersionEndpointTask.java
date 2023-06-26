@@ -131,7 +131,9 @@ public class VersionEndpointTask implements
         if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
         } else {
-          cleanupDeletedContainer((HddsVolume) volume);
+          if (volume instanceof HddsVolume) {
+            cleanupDeletedContainer((HddsVolume) volume);
+          }
         }
       }
       if (volumeSet.getVolumesList().size() == 0) {
