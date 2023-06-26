@@ -2255,11 +2255,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.security.service.address</name>
-    <value/>
-    <tag>OZONE, HDDS, SECURITY</tag>
-  </property>
-  <property>
     <name>hdds.x509.rootca.client.polling.frequency</name>
     <value>PT2h</value>
     <description>Frequency to use for polling in certificate clients for a new

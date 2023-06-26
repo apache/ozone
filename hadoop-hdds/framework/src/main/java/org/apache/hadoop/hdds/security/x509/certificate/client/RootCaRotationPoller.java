@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -25,9 +26,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,6 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Poller mechanism for Root Ca Rotation for clients.
@@ -64,13 +68,22 @@ public class RootCaRotationPoller implements Runnable, Closeable {
     try {
       List<String> pemEncodedRootCaList =
           scmSecureClient.getAllRootCaCertificates();
-      List<X509Certificate> scmRootCaCerts =
+      List<X509Certificate> rootCAsFromSCM =
           OzoneSecurityUtil.convertToX509(pemEncodedRootCaList);
-      if (!knownRootCerts.containsAll(scmRootCaCerts)) {
-        rootCaListConsumers.forEach(c -> c.accept(scmRootCaCerts));
-        knownRootCerts = new HashSet<>();
-        knownRootCerts.addAll(scmRootCaCerts);
+      List<X509Certificate> scmCertsWithoutKnownCerts
+          = new ArrayList<>(rootCAsFromSCM);
+      scmCertsWithoutKnownCerts.removeAll(knownRootCerts);
+      if (scmCertsWithoutKnownCerts.isEmpty()) {
+        return;
       }
+      LOG.info("Some root CAs are not known to the client out of the root " +
+          "CAs known to the SCMs. Root CA Cert ids known to the client: " +
+          getPrintableCertIds(knownRootCerts) + ". Root CA Cert ids from " +
+          "SCM not known by the client: " +
+          getPrintableCertIds(scmCertsWithoutKnownCerts));
+      rootCaListConsumers.forEach(c -> c.accept(rootCAsFromSCM));
+      knownRootCerts = new HashSet<>(rootCAsFromSCM);
+
     } catch (IOException e) {
       LOG.error("Error while trying to rotate root ca certificate", e);
     }
@@ -99,12 +112,19 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         executor.shutdownNow();
       }
       if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-        LOG.error("Unable to shutdown state machine properly.");
+        LOG.error("Unable to shutdown root ca certificate rotation poller.");
       }
     } catch (InterruptedException e) {
       LOG.error("Error attempting to shutdown.", e);
       executor.shutdownNow();
       Thread.currentThread().interrupt();
     }
+  }
+
+  private String getPrintableCertIds(Collection<X509Certificate> certs) {
+    return StringUtils.join(certs.stream()
+        .map(X509Certificate::getSerialNumber)
+        .map(BigInteger::toString)
+        .collect(Collectors.toList()), ", ");
   }
 }
