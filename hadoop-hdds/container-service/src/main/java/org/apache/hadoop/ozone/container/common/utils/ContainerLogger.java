@@ -43,31 +43,11 @@ public class ContainerLogger {
   private static final String FIELD_SEPARATOR = " | ";
 
   /**
-   * Represents the valid roles a datanode can play in container replication 
-   * or reconstruction.
-   */
-  private enum DatanodeRoles {
-    SOURCES("Sources"),
-    DESTINATION("Destination");
-    
-    private final String name;
-
-    DatanodeRoles(String name) {
-      this.name = name;
-    }
-    
-    @Override
-    public String toString() {
-      return name;
-    }
-  }
-
-  /**
    * Logged when an open container is first created.
    *
    * @param containerData The container that was created and opened.
    */
-  public void logOpen(ContainerData containerData) {
+  public static void logOpen(ContainerData containerData) {
     LOG.info(getMessage(containerData));
   }
 
@@ -76,7 +56,7 @@ public class ContainerLogger {
    *
    * @param containerData The container that was marked as closing.
    */
-  public void logClosing(ContainerData containerData) {
+  public static void logClosing(ContainerData containerData) {
     LOG.info(getMessage(containerData));
   }
 
@@ -86,7 +66,7 @@ public class ContainerLogger {
    * @param containerData The container that was quasi-closed.
    * @param message The reason the container was quasi-closed, if known.
    */
-  public void logQuasiClosed(ContainerData containerData, String message) {
+  public static void logQuasiClosed(ContainerData containerData, String message) {
     LOG.warn(getMessage(containerData, message));
   }
 
@@ -95,7 +75,7 @@ public class ContainerLogger {
    *
    * @param containerData The container that was closed.
    */
-  public void logClosed(ContainerData containerData) {
+  public static void logClosed(ContainerData containerData) {
     LOG.info(getMessage(containerData));
   }
 
@@ -105,7 +85,7 @@ public class ContainerLogger {
    * @param containerData The container that was marked unhealthy.
    * @param message The reason the container was marked unhealthy.
    */
-  public void logUnhealthy(ContainerData containerData, String message) {
+  public static void logUnhealthy(ContainerData containerData, String message) {
     LOG.error(getMessage(containerData, message));
   }
 
@@ -117,7 +97,7 @@ public class ContainerLogger {
    * @param containerData The container that was lost.
    * @param message The reason the container was lost.
    */
-  public void logLost(ContainerData containerData, String message) {
+  public static void logLost(ContainerData containerData, String message) {
     LOG.error(getMessage(containerData, message));
   }
 
@@ -126,66 +106,47 @@ public class ContainerLogger {
    *
    * @param containerData The container that was deleted.
    */
-  public void logDeletedEmpty(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
-  }
-
-  /**
-   * Logged when a non-empty container is force deleted. This is usually due
-   * to over-replication.
-   *
-   * @param containerData The container that was deleted.
-   * @param message The reason the container was force deleted.
-   */
-  public void logForceDeleted(ContainerData containerData, String message) {
-    LOG.info(getMessage(containerData, message));
+  public static void logDeleted(ContainerData containerData, boolean force) {
+    if (force) {
+      LOG.info(getMessage(containerData, "Container force deleted"));
+    } else {
+      LOG.info(getMessage(containerData, "Container is empty"));
+    }
   }
 
   /**
    * Logged when a container is copied in to this datanode.
    *
    * @param containerData The container that was imported to this datanode.
-   * @param source The datanode that this replica was imported from.
    */
-  public void logImported(ContainerData containerData, DatanodeDetails source) {
-    LOG.info(getMessage(containerData, DatanodeRoles.SOURCES, source));
+  public static void logImported(ContainerData containerData) {
+    LOG.info(getMessage(containerData));
   }
 
   /**
    * Logged when a container is copied from this datanode.
    *
    * @param containerData The container that was exported from this datanode.
-   * @param destination The datanode that this replica was exported to.
    */
-  public void logExported(ContainerData containerData, DatanodeDetails destination) {
-    LOG.info(getMessage(containerData, DatanodeRoles.DESTINATION, destination));
+  public static void logExported(ContainerData containerData) {
+    LOG.info(getMessage(containerData));
   }
 
   /**
    * Logged when a container is recovered using EC offline reconstruction.
    *
    * @param containerData The container that was recovered on this datanode.
-   * @param sources The datanode replicas that were used to reconstruct this
-   *                container.
    */
-  public void logRecovered(ContainerData containerData,
-      DatanodeDetails... sources) {
-    LOG.info(getMessage(containerData, DatanodeRoles.SOURCES, sources));
+  public static void logRecovered(ContainerData containerData) {
+    LOG.info(getMessage(containerData));
   }
 
-  private String getMessage(ContainerData containerData,
-      DatanodeRoles datanodeRole, DatanodeDetails... datanodes) {
-    return getMessage(containerData, datanodeRole + "=" +
-        String.join(", ", Arrays.stream(datanodes)
-            .map(DatanodeDetails::toString)
-            .toArray(String[]::new)));
-  }
-
-  private String getMessage(ContainerData containerData, String message) {
+  private static String getMessage(ContainerData containerData,
+                                   String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);
   }
 
-  private String getMessage(ContainerData containerData) {
+  private static String getMessage(ContainerData containerData) {
     return String.join(FIELD_SEPARATOR,
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
