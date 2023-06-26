@@ -862,6 +862,19 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    */
   public File getContainerDBFile() {
     return KeyValueContainerLocationUtil.getContainerDBFile(containerData);
+
+  }
+
+  @Override
+  public boolean shouldScanMetadata() {
+    boolean shouldScan =
+        getContainerState() != ContainerDataProto.State.UNHEALTHY;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its metadata " +
+              "scanned.",
+          containerData.getContainerID(), containerData.getState());
+    }
+    return shouldScan;
   }
 
   @Override
@@ -876,12 +889,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public boolean shouldScanData() {
     boolean shouldScan =
-        containerData.getState() == ContainerDataProto.State.CLOSED
-        || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
+        getContainerState() == ContainerDataProto.State.CLOSED
+        || getContainerState() == ContainerDataProto.State.QUASI_CLOSED;
     if (!shouldScan && LOG.isDebugEnabled()) {
       LOG.debug("Container {} in state {} should not have its data scanned.",
           containerData.getContainerID(), containerData.getState());
     }
+
     return shouldScan;
   }
 

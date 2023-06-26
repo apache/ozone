@@ -124,7 +124,6 @@ public abstract class StorageVolume
 
   private final VolumeSet volumeSet;
 
-
   /*
   The number of consecutive times this volume encountered an IO error
   during a volume check. If this number crosses a configured threshold,
@@ -182,7 +181,16 @@ public abstract class StorageVolume
    * otherwise returns with IOException.
    * @throws IOException
    */
-  protected void initialize() throws IOException {
+  protected final void initialize() throws IOException {
+    try {
+      initializeImpl();
+    } catch (Exception e) {
+      shutdown();
+      throw e;
+    }
+  }
+
+  protected void initializeImpl() throws IOException {
     VolumeState intialVolumeState = analyzeVolumeState();
     switch (intialVolumeState) {
     case NON_EXISTENT:
