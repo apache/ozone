@@ -122,7 +122,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
 
-    cacheMetrics = CacheMetrics.create(clientCache, "xceiverClientCache");
+    cacheMetrics = CacheMetrics.create(clientCache, this);
   }
 
   @VisibleForTesting

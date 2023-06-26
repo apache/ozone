@@ -25,11 +25,13 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.ratis.util.JavaUtils;
 
 /**
  * Reusable component that emits cache metrics for a particular cache.
  */
 public final class CacheMetrics implements MetricsSource {
+
   enum CacheMetricsInfo implements MetricsInfo {
     CacheName("Cache Metrics."),
     Size("Size of the cache."),
@@ -62,16 +64,24 @@ public final class CacheMetrics implements MetricsSource {
 
   private final Cache<?, ?> cache;
   private final String name;
+  private final String sourceName;
 
   private CacheMetrics(Cache<?, ?> cache, String name) {
     this.cache = cache;
     this.name = name;
+    sourceName = NAME + ":" + name;
+  }
+
+  public static CacheMetrics create(Cache<?, ?> cache, Object owner) {
+    final String name = JavaUtils.getClassSimpleName(owner.getClass())
+        + "@" + Integer.toHexString(owner.hashCode());
+    return create(cache, name);
   }
 
   public static CacheMetrics create(Cache<?, ?> cache, String name) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "Cache Metrics",
-        new CacheMetrics(cache, name));
+    CacheMetrics source = new CacheMetrics(cache, name);
+    return ms.register(source.sourceName, "Cache Metrics", source);
   }
 
   @Override
@@ -98,6 +108,6 @@ public final class CacheMetrics implements MetricsSource {
 
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(NAME);
+    ms.unregisterSource(sourceName);
   }
 }
