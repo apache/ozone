@@ -395,7 +395,13 @@ public class TestOMDbCheckpointServlet {
                                                                   any(),
 eq(false));
     // omDbCheckpointServletMock.init();
-    doInit(om, spyDbStore);
+    omDbCheckpointServletMock.initialize(
+                                         spyDbStore,
+        om.getMetrics().getDBCheckpointMetrics(),
+                                         false,
+        om.getOmAdminUsernames(),
+                                         om.getOmAdminGroups(), false);
+
     this.method = "GET";
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
@@ -467,17 +473,6 @@ eq(false));
         "expected snapshot files not found");
   }
 
-  private void doInit(OzoneManager om, DBStore spyDbStore)
-      throws ServletException {
-    omDbCheckpointServletMock.initialize(
-                                         spyDbStore,
-        om.getMetrics().getDBCheckpointMetrics(),
-                                         false,
-        om.getOmAdminUsernames(),
-                                         om.getOmAdminGroups(), false);
-
-
-  }
   @Test
   public void testWriteDbDataWithoutOmSnapshot()
       throws Exception {
