@@ -21,6 +21,8 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -30,13 +32,17 @@ import org.mockito.verification.VerificationMode;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -68,7 +74,11 @@ public abstract class TestContainerScannersAbstract {
   protected ContainerScannerConfiguration conf;
   protected ContainerController controller;
 
+
+  private Collection<Container<?>> containers;
+
   public void setup() {
+    containers = new ArrayList<>();
     conf = newInstanceOf(ContainerScannerConfiguration.class);
     conf.setMetadataScanInterval(0);
     conf.setDataScanInterval(0);
@@ -100,6 +110,9 @@ public abstract class TestContainerScannersAbstract {
   @Test
   public abstract void testWithVolumeFailure() throws Exception;
 
+  @Test
+  public abstract void testUnhealthyContainerNotRescanned() throws Exception;
+
   // HELPER METHODS
 
   protected void setScannedTimestampOld(Container<ContainerData> container) {
@@ -123,10 +136,45 @@ public abstract class TestContainerScannersAbstract {
   }
 
   protected void verifyContainerMarkedUnhealthy(
-      Container<ContainerData> container, VerificationMode invocationTimes)
+      Container<?> container, VerificationMode invocationTimes)
       throws Exception {
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         container.getContainerData().getContainerID());
+  }
+
+  /**
+   * Mock a KeyValueContainer implementation instead of a container
+   * interface like ContainerTestUtils#setupMockContainer.
+   * This allows testing that the shouldScanData method skips unhealthy
+   * containers.
+   */
+  protected Container<?> mockKeyValueContainer() {
+    KeyValueContainer unhealthy = Mockito.mock(KeyValueContainer.class);
+
+    KeyValueContainerData data = mock(KeyValueContainerData.class);
+    when(data.getContainerID()).thenReturn(CONTAINER_SEQ_ID.incrementAndGet());
+    when(unhealthy.getContainerData()).thenReturn(data);
+    when(unhealthy.getContainerState()).thenReturn(CLOSED);
+    // The above mocks should be enough for the scanners to call this method
+    // and test it.
+    when(unhealthy.shouldScanData()).thenCallRealMethod();
+    assertTrue(unhealthy.shouldScanData());
+    when(unhealthy.shouldScanMetadata()).thenCallRealMethod();
+    assertTrue(unhealthy.shouldScanMetadata());
+
+    when(unhealthy.getContainerData().getVolume()).thenReturn(vol);
+
+    return unhealthy;
+  }
+
+  /**
+   * Add a container to be returned by the mock ContainerController.
+   */
+  protected void setContainers(Container<?>... containers) {
+    this.containers = Arrays.stream(containers).collect(Collectors.toList());
+    when(controller.getContainers(vol))
+        .thenAnswer(i -> this.containers.iterator());
+    when(controller.getContainers()).thenReturn(this.containers);
   }
 
   private ContainerController mockContainerController() {
@@ -147,8 +195,7 @@ public abstract class TestContainerScannersAbstract {
     ContainerTestUtils.setupMockContainer(openCorruptMetadata,
         false, false, false, CONTAINER_SEQ_ID, vol);
 
-    Collection<Container<?>> containers = Arrays.asList(
-        healthy, corruptData, openCorruptMetadata);
+    containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata));
     ContainerController mock = mock(ContainerController.class);
     when(mock.getContainers(vol)).thenReturn(containers.iterator());
     when(mock.getContainers()).thenReturn(containers);

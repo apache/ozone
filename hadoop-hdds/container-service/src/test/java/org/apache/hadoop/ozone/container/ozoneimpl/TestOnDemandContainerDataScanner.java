@@ -20,8 +20,9 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import org.apache.commons.compress.utils.Lists;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,13 +39,17 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for the on-demand container scanner.
@@ -217,7 +222,43 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
-  private void scanContainer(Container<ContainerData> container)
+  @Test
+  @Override
+  public void testUnhealthyContainerNotRescanned() throws Exception {
+    Container<?> unhealthy = mockKeyValueContainer();
+    when(unhealthy.scanMetaData()).thenReturn(true);
+    when(unhealthy.scanData(
+        any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(false);
+
+    // First iteration should find the unhealthy container.
+    scanContainer(unhealthy);
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+
+    // The unhealthy container should have been moved to the unhealthy state.
+    Mockito.verify(unhealthy.getContainerData(), atMostOnce())
+        .setState(UNHEALTHY);
+    // Update the mock to reflect this.
+    Mockito.when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    assertFalse(unhealthy.shouldScanData());
+
+    // Clear metrics to check the next run.
+    metrics.resetNumContainersScanned();
+    metrics.resetNumUnhealthyContainers();
+
+    scanContainer(unhealthy);
+    // The only invocation of unhealthy on this container should have been from
+    // the previous scan.
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    // This iteration should skip the already unhealthy container.
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+  }
+
+  private void scanContainer(Container<?> container)
       throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =

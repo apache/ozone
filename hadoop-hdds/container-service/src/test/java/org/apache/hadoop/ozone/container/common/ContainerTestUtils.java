@@ -180,6 +180,7 @@ public final class ContainerTestUtils {
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
         .thenReturn(scanDataSuccess);
+    when(c.shouldScanMetadata()).thenReturn(true);
     Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
     when(c.getContainerData().getVolume()).thenReturn(vol);
   }
