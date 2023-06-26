@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.security;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -31,12 +30,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
-import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.security.cert.X509Certificate;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,7 +85,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       throws IOException, TimeoutException {
     LOG.info("Received rotation prepare command of root certificate {}",
         rootCertId);
-    if (shouldSkipRootCert(rootCertId)) {
+    if (rotationManager.shouldSkipRootCert(rootCertId)) {
       return;
     }
 
@@ -107,7 +103,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
 
     // Only leader count the acks
     if (rotationManager.isRunning()) {
-      if (shouldSkipRootCert(rootCertId)) {
+      if (rotationManager.shouldSkipRootCert(rootCertId)) {
         return;
       }
       if (rootCertId.equals(newRootCACertId.get())) {
@@ -121,7 +117,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       throws IOException, TimeoutException {
     LOG.info("Received rotation commit command of root certificate {}",
         rootCertId);
-    if (shouldSkipRootCert(rootCertId)) {
+    if (rotationManager.shouldSkipRootCert(rootCertId)) {
       return;
     }
 
@@ -175,7 +171,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       throws IOException, TimeoutException {
     LOG.info("Received rotation committed command of root certificate {}",
         rootCertId);
-    if (shouldSkipRootCert(rootCertId)) {
+    if (rotationManager.shouldSkipRootCert(rootCertId)) {
       return;
     }
 
@@ -213,25 +209,6 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
   public void setSubCACertId(String subCACertId) {
     newSubCACertId.set(subCACertId);
     LOG.info("Scm sub CA new certificate is {}", subCACertId);
-  }
-
-  public String getSubCACertId() {
-    return newSubCACertId.get();
-  }
-
-  private boolean shouldSkipRootCert(String newRootCertId) throws IOException {
-    List<X509Certificate> scmCertChain = scmCertClient.getTrustChain();
-    Preconditions.checkArgument(scmCertChain.size() > 1);
-    X509Certificate rootCert = scmCertChain.get(scmCertChain.size() - 1);
-    if (rootCert.getSerialNumber().compareTo(new BigInteger(newRootCertId))
-        >= 0) {
-      // usually this will happen when reapply RAFT log during SCM start
-      LOG.info("Sub CA certificate {} is already signed by root " +
-              "certificate {} or a newer root certificate.",
-          scmCertChain.get(0).getSerialNumber().toString(), newRootCertId);
-      return true;
-    }
-    return false;
   }
 
   /**

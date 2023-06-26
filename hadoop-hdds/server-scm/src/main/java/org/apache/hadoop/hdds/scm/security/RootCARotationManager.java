@@ -58,6 +58,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -517,6 +518,13 @@ public class RootCARotationManager implements SCMService {
         LOG.info("SubCARotationPrepareTask[rootCertId = {}] - started.",
             rootCACertId);
 
+        if (shouldSkipRootCert(rootCACertId)) {
+          // Send ack to rotationPrepare request
+          sendRotationPrepareAck(rootCACertId,
+              scmCertClient.getCertificate().getSerialNumber().toString());
+          return;
+        }
+
         SecurityConfig securityConfig =
             scmCertClient.getSecurityConfig();
         String progressComponent = SCMCertificateClient.COMPONENT_NAME +
@@ -597,34 +605,39 @@ public class RootCARotationManager implements SCMService {
         }
 
         // Send ack to rotationPrepare request
-        try {
-          handler.rotationPrepareAck(rootCACertId, newCertSerialId,
-              scm.getScmId());
-          LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
-              "rotation prepare ack sent out, new scm certificate {}",
-              rootCACertId, newCertSerialId);
-        } catch (Exception e) {
-          LOG.error("Failed to send ack to rotationPrepare request", e);
-          String message = "Terminate SCM, encounter exception(" +
-              e.getMessage() + ") when sending out rotationPrepare ack";
-          scm.shutDown(message);
-        }
-
-        handler.setSubCACertId(newCertSerialId);
-
-        releaseLockOnTimeoutTask = executorService.schedule(() -> {
-          // If no rotation commit request received after rotation prepare
-          LOG.warn("Failed to have enough rotation acks from SCM. This " +
-              " time root rotation {} is failed. Release the lock.",
-              rootCACertId);
-          releaseLock();
-        }, ackTimeout.toMillis(), TimeUnit.MILLISECONDS);
-
+        sendRotationPrepareAck(rootCACertId, newCertSerialId);
       } catch (Throwable e) {
         LOG.error("Unexpected error happen", e);
         scm.shutDown("Unexpected error happen, " + e.getMessage());
       }
     }
+  }
+
+  private void sendRotationPrepareAck(String newRootCACertId,
+      String newSubCACertId) {
+    // Send ack to rotationPrepare request
+    try {
+      handler.rotationPrepareAck(newRootCACertId, newSubCACertId,
+          scm.getScmId());
+      LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
+              "rotation prepare ack sent out, new scm certificate {}",
+          newRootCACertId, newSubCACertId);
+    } catch (Exception e) {
+      LOG.error("Failed to send ack to rotationPrepare request", e);
+      String message = "Terminate SCM, encounter exception(" +
+          e.getMessage() + ") when sending out rotationPrepare ack";
+      scm.shutDown(message);
+    }
+
+    handler.setSubCACertId(newSubCACertId);
+
+    releaseLockOnTimeoutTask = executorService.schedule(() -> {
+      // If no rotation commit request received after rotation prepare
+      LOG.warn("Failed to have enough rotation acks from SCM. This " +
+              " time root rotation {} is failed. Release the lock.",
+          newRootCACertId);
+      releaseLock();
+    }, ackTimeout.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -707,5 +720,20 @@ public class RootCARotationManager implements SCMService {
   @VisibleForTesting
   public void setRootCARotationHandler(RootCARotationHandler newHandler) {
     handler = newHandler;
+  }
+
+  public boolean shouldSkipRootCert(String newRootCertId) throws IOException {
+    List<X509Certificate> scmCertChain = scmCertClient.getTrustChain();
+    Preconditions.checkArgument(scmCertChain.size() > 1);
+    X509Certificate rootCert = scmCertChain.get(scmCertChain.size() - 1);
+    if (rootCert.getSerialNumber().compareTo(new BigInteger(newRootCertId))
+        >= 0) {
+      // usually this will happen when reapply RAFT log during SCM start
+      LOG.info("Sub CA certificate {} is already signed by root " +
+              "certificate {} or a newer root certificate.",
+          scmCertChain.get(0).getSerialNumber().toString(), newRootCertId);
+      return true;
+    }
+    return false;
   }
 }

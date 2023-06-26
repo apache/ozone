@@ -55,6 +55,4 @@ public interface RootCARotationHandler {
   void resetRotationPrepareAcks();
 
   void setSubCACertId(String subCACertId);
-
-  String getSubCACertId();
 }
