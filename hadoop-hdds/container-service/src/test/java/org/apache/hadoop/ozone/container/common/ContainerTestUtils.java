@@ -188,9 +188,33 @@ public final class ContainerTestUtils {
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
+    KeyValueContainer container = addContainerToVolumeDir(volume, clusterId,
+        conf, schemaVersion);
+
+    // For testing, we are moving the container
+    // under the tmp directory, in order to delete
+    // it from there, during datanode startup or shutdown
+    KeyValueContainerUtil
+        .moveToDeletedContainerDir(container.getContainerData(), volume);
+
+    return container;
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion)
+      throws IOException {
+    long containerId = ContainerTestHelper.getTestContainerID();
+    return addContainerToVolumeDir(volume, clusterId, conf, schemaVersion,
+        containerId);
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion, long containerId)
+      throws IOException {
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
-    long containerId = ContainerTestHelper.getTestContainerID();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
@@ -205,12 +229,6 @@ public final class ContainerTestUtils {
     container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
 
     container.close();
-
-    // For testing, we are moving the container
-    // under the tmp directory, in order to delete
-    // it from there, during datanode startup or shutdown
-    KeyValueContainerUtil
-        .moveToDeletedContainerDir(keyValueContainerData, volume);
 
     return container;
   }

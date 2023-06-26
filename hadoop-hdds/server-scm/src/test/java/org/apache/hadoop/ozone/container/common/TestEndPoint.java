@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -182,69 +184,132 @@ public class TestEndPoint {
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(datanodeDetails));
+      OzoneContainer ozoneContainer = createVolume(conf);
+      HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
+          .getVolumesList().get(0);
+      KeyValueContainer kvContainer = addContainerAndDBEntry(conf, hddsVolume);
+      // For testing, we are moving the container under the tmp directory,
+      // in order to delete during datanode startup or shutdown
+      KeyValueContainerUtil.moveToDeletedContainerDir(
+          kvContainer.getContainerData(), hddsVolume);
+
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
 
-      String clusterId = scmServerImpl.getClusterId();
+      // versionTask.call() cleans the tmp dir and removes container from DB
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      EndpointStateMachine.EndPointStates newState = versionTask.call();
 
-      MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
-      ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
-          clusterId, clusterId, conf);
-      // VolumeSet for this test, contains only 1 volume
-      Assertions.assertEquals(1, volumeSet.getVolumesList().size());
-      StorageVolume volume = volumeSet.getVolumesList().get(0);
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
 
-      // Check instanceof and typecast
-      Assertions.assertTrue(volume instanceof HddsVolume);
-      HddsVolume hddsVolume = (HddsVolume) volume;
-
-      // Write some data before calling versionTask.call()
-      // Create a container and move it under the tmp delete dir.
-      KeyValueContainer container = ContainerTestUtils.
-          addContainerToDeletedDir(hddsVolume, clusterId,
-              conf, OzoneConsts.SCHEMA_V3);
-      File containerDBFile = container.getContainerDBFile();
-
-      Assertions.assertTrue(container.getContainerFile().exists());
-      Assertions.assertTrue(containerDBFile.exists());
-
-      KeyValueContainerData containerData = container.getContainerData();
-
-      // Get DBHandle
-      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
-
+      // assert that tmp dir is empty
+      File[] leftoverContainers =
+          hddsVolume.getDeletedContainerDir().listFiles();
+      Assertions.assertNotNull(leftoverContainers);
+      Assertions.assertEquals(0, leftoverContainers.length);
+      // All DB keys have been deleted, MetadataTable should be empty
+      try (DBHandle dbHandle = BlockUtils.getDB(
+          kvContainer.getContainerData(), conf)) {
         DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
             dbHandle.getStore();
-        Table<String, Long> metadataTable = store.getMetadataTable();
+        Assertions.assertEquals(0, store.getMetadataTable()
+            .getEstimatedKeyCount());
+      }
+    }
+  }
 
-        // DB MetadataTable is empty
-        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+  @Test
+  public void testMarkedDeletedContainerClearedOnStartup() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+        true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      OzoneContainer ozoneContainer = createVolume(conf);
+      HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
+          .getVolumesList().get(0);
+      KeyValueContainer kvContainer = addContainerAndDBEntry(conf, hddsVolume);
+      ozoneContainer.getContainerSet().addContainer(kvContainer);
 
-        // Add some keys to MetadataTable
-        metadataTable.put(containerData.getBytesUsedKey(), 0L);
-        metadataTable.put(containerData.getBlockCountKey(), 0L);
-        metadataTable.put(containerData.getPendingDeleteBlockCountKey(), 0L);
+      // mark container for delete, and during start, container should remove
+      kvContainer.markContainerForDelete();
 
-        // The new keys should have been added in the MetadataTable
-        Assertions.assertEquals(3, metadataTable.getEstimatedKeyCount());
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
 
-        // versionTask.call() cleans the tmp dir and removes container from DB
-        VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-            conf, ozoneContainer);
-        EndpointStateMachine.EndPointStates newState = versionTask.call();
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      EndpointStateMachine.EndPointStates newState = versionTask.call();
 
-        Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
-            newState);
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
 
-        // assert that tmp dir is empty
-        File[] leftoverContainers =
-            hddsVolume.getDeletedContainerDir().listFiles();
-        Assertions.assertNotNull(leftoverContainers);
-        Assertions.assertEquals(0, leftoverContainers.length);
-        // All DB keys have been deleted, MetadataTable should be empty
-        Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+      // assert that tmp dir is empty
+      File[] leftoverContainers =
+          hddsVolume.getDeletedContainerDir().listFiles();
+      Assertions.assertNotNull(leftoverContainers);
+      Assertions.assertEquals(0, leftoverContainers.length);
+      Assertions.assertEquals(0, ozoneContainer.getContainerSet()
+          .getContainerMap().size());
+      // All DB keys have been deleted, MetadataTable should be empty
+      try (DBHandle dbHandle = BlockUtils.getDB(
+          kvContainer.getContainerData(), conf)) {
+        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+            dbHandle.getStore();
+        Assertions.assertEquals(0, store.getMetadataTable()
+            .getEstimatedKeyCount());
+      }
+    }
+  }
+
+  @Test
+  public void testClearTmpContainerButKeepDbReferNormalContainerStartup()
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+        true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
+    conf.setFromObject(new ReplicationConfig().setPort(0));
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      OzoneContainer ozoneContainer = createVolume(conf);
+      HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
+          .getVolumesList().get(0);
+      KeyValueContainer kvContainer = addContainerAndDBEntry(conf, hddsVolume);
+
+      // move container for delete and add another container
+      KeyValueContainerUtil.moveToDeletedContainerDir(
+          kvContainer.getContainerData(), hddsVolume);
+      KeyValueContainer container = ContainerTestUtils.
+          addContainerToVolumeDir(hddsVolume, scmServerImpl.getClusterId(),
+              conf, OzoneConsts.SCHEMA_V3, kvContainer.getContainerData().getContainerID());
+      ozoneContainer.getContainerSet().addContainer(container);
+
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      EndpointStateMachine.EndPointStates newState = versionTask.call();
+
+      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
+          newState);
+
+      // assert that tmp dir is empty
+      File[] leftoverContainers =
+          hddsVolume.getDeletedContainerDir().listFiles();
+      Assertions.assertNotNull(leftoverContainers);
+      Assertions.assertEquals(0, leftoverContainers.length);
+      // All DB keys have been deleted, MetadataTable should be empty
+      try (DBHandle dbHandle = BlockUtils.getDB(
+          kvContainer.getContainerData(), conf)) {
+        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+            dbHandle.getStore();
+        Assertions.assertEquals(3, store.getMetadataTable()
+            .getEstimatedKeyCount());
       }
     }
   }
@@ -636,6 +701,59 @@ public class TestEndPoint {
     Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
     Mockito.when(context.getParent()).thenReturn(stateMachine);
     return context;
+  }
+
+  private OzoneContainer createVolume(OzoneConfiguration conf)
+      throws IOException {
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    OzoneContainer ozoneContainer = new OzoneContainer(
+        datanodeDetails, conf, getContext(datanodeDetails));
+
+    String clusterId = scmServerImpl.getClusterId();
+
+    MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+    ContainerTestUtils.createDbInstancesForTestIfNeeded(volumeSet,
+        clusterId, clusterId, conf);
+    // VolumeSet for this test, contains only 1 volume
+    Assertions.assertEquals(1, volumeSet.getVolumesList().size());
+    StorageVolume volume = volumeSet.getVolumesList().get(0);
+
+    // Check instanceof and typecast
+    Assertions.assertTrue(volume instanceof HddsVolume);
+    return ozoneContainer;
+  }
+
+  private KeyValueContainer addContainerAndDBEntry(
+      OzoneConfiguration conf, HddsVolume hddsVolume)
+      throws IOException {
+    String clusterId = scmServerImpl.getClusterId();
+    KeyValueContainer container = ContainerTestUtils.
+        addContainerToVolumeDir(hddsVolume, clusterId,
+            conf, OzoneConsts.SCHEMA_V3);
+    File containerDBFile = container.getContainerDBFile();
+    Assertions.assertTrue(container.getContainerFile().exists());
+    Assertions.assertTrue(containerDBFile.exists());
+    KeyValueContainerData containerData = container.getContainerData();
+
+    // Get DBHandle
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, Long> metadataTable = store.getMetadataTable();
+
+      // DB MetadataTable is empty
+      Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
+
+      // Add some keys to MetadataTable
+      metadataTable.put(containerData.getBytesUsedKey(), 0L);
+      metadataTable.put(containerData.getBlockCountKey(), 0L);
+      metadataTable.put(containerData.getPendingDeleteBlockCountKey(), 0L);
+
+      // The new keys should have been added in the MetadataTable
+      Assertions.assertEquals(3, metadataTable.getEstimatedKeyCount());
+    }
+    return container;
   }
 
 }
