@@ -39,6 +39,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -340,19 +341,33 @@ public class TestOmSnapshotManager {
    * should be copied, linked, or excluded from the tarball entirely.
    */
   @Test
-  public void testProcessFile() {
+  public void testProcessFile() throws IOException {
+    new File(testDir.toString(), "snap1").mkdirs();
+    new File(testDir.toString(), "snap2").mkdirs();
     Path copyFile = Paths.get(testDir.toString(),
         "snap1/copyfile.sst");
+    Files.write(copyFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
     Path excludeFile = Paths.get(testDir.toString(),
         "snap1/excludeFile.sst");
+    Files.write(excludeFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
     Path linkToExcludedFile = Paths.get(testDir.toString(),
         "snap2/excludeFile.sst");
+    Files.write(linkToExcludedFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
     Path linkToCopiedFile = Paths.get(testDir.toString(),
         "snap2/copyfile.sst");
+    Files.write(linkToCopiedFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
     Path addToCopiedFiles = Paths.get(testDir.toString(),
         "snap1/copyfile2.sst");
+    Files.write(addToCopiedFiles,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
     Path addNonSstToCopiedFiles = Paths.get(testDir.toString(),
         "snap1/nonSst");
+    Files.write(addNonSstToCopiedFiles,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
 
     Set<Path> toExcludeFiles = new HashSet<>(
         Collections.singletonList(excludeFile));
