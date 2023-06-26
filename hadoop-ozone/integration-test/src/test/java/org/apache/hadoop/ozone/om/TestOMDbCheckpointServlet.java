@@ -145,7 +145,7 @@ public class TestOMDbCheckpointServlet {
   private String method;
   private File folder;
   private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
-
+  private FileOutputStream fileOutputStream;
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -161,7 +161,7 @@ public class TestOMDbCheckpointServlet {
     tempFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+    fileOutputStream = new FileOutputStream(tempFile);
 
     servletOutputStream = new ServletOutputStream() {
       @Override
@@ -221,8 +221,8 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).doGet(requestMock,
         responseMock);
-    doCallRealMethod().when(omDbCheckpointServletMock).doPost(requestMock,
-        responseMock);
+    doCallRealMethod().when(omDbCheckpointServletMock).doPost(any(HttpServletRequest.class),
+        any(HttpServletResponse.class));
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
@@ -371,30 +371,6 @@ public class TestOMDbCheckpointServlet {
     Assertions.assertTrue(tempFile.length() > 0);
   }
 
-  static class OStream extends ServletOutputStream {
-    FileOutputStream f;
-    OStream(File tempFile) throws FileNotFoundException {
-      f = new FileOutputStream(tempFile);
-    }
-    @Override
-    public boolean isReady() {
-      return true;
-    }
-
-    @Override
-    public void setWriteListener(WriteListener writeListener) {
-
-    }
-
-    @Override
-    public void write(int i) throws IOException {
-      f.write(i);
-    }
-    @Override
-    public void close() throws IOException {
-      f.close();
-    }
-  }
   @Test
   public void testWriteDbDataToStream() throws Exception {
     prepSnapshotData();
@@ -421,11 +397,9 @@ eq(false));
     doInit(om, spyDbStore);
     this.method = "GET";
     // Get the tarball.
-    try (OStream fileOutputStream = new OStream(tempFile)) {
-      when(responseMock.getOutputStream()).thenReturn(fileOutputStream);
-      doEndpoint();
-    }
-   dbCheckpoint = realCheckpoint.get();
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    dbCheckpoint = realCheckpoint.get();
 //    when(realCheckpoint.get().cleanupCheckpoint())
     // Untar the file into a temp folder to be examined.
     String testDirName = folder.getAbsolutePath();
@@ -706,9 +680,9 @@ eq(false));
     Path currentLink = Paths.get(compactionDirPath.toString(), "CURRENT");
     Files.createLink(currentLink, currentFile);
 
-    // dbCheckpoint = cluster.getOzoneManager()
-    //     .getMetadataManager().getStore()
-    //     .getCheckpoint(true);
+    dbCheckpoint = cluster.getOzoneManager()
+        .getMetadataManager().getStore()
+        .getCheckpoint(true);
 
   }
 
