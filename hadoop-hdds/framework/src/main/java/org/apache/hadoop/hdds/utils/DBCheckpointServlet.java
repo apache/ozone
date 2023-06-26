@@ -149,28 +149,29 @@ public class DBCheckpointServlet extends HttpServlet
     }
 
     DBCheckpoint checkpoint = null;
+
+    boolean flush = false;
+    String flushParam =
+      request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
+    if (StringUtils.isNotEmpty(flushParam)) {
+      flush = Boolean.parseBoolean(flushParam);
+    }
+
+    List<String> receivedSstList = new ArrayList<>();
+    List<String> excludedSstList = new ArrayList<>();
+    String[] sstParam = isFormData ?
+        parseFormDataParameters(request) : request.getParameterValues(
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
+    if (sstParam != null) {
+      receivedSstList.addAll(
+          Arrays.stream(sstParam)
+              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct()
+              .collect(Collectors.toList()));
+      LOG.info("Received excluding SST {}", receivedSstList);
+    }
+
     try  (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-      boolean flush = false;
-      String flushParam =
-          request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
-      if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.parseBoolean(flushParam);
-      }
-
-      List<String> receivedSstList = new ArrayList<>();
-      List<String> excludedSstList = new ArrayList<>();
-      String[] sstParam = isFormData ?
-          parseFormDataParameters(request) : request.getParameterValues(
-          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-      if (sstParam != null) {
-        receivedSstList.addAll(
-            Arrays.stream(sstParam)
-            .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
-            .distinct()
-            .collect(Collectors.toList()));
-        LOG.info("Received excluding SST {}", receivedSstList);
-      }
-
       checkpoint = dbStore.getCheckpoint(flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
