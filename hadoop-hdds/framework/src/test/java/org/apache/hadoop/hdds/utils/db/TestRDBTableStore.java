@@ -114,7 +114,7 @@ public class TestRDBTableStore {
       TableConfig newConfig = new TableConfig(name, cfOptions);
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet,
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
   }
 
@@ -327,6 +327,8 @@ public class TestRDBTableStore {
         .getBytes(StandardCharsets.UTF_8);
     byte[] value = RandomStringUtils.random(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
+    final byte[] zeroSizeKey = {(byte) (key[0] + 1)};
+    final byte[] zeroSizeValue = {};
 
     final String tableName = families.get(0);
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
@@ -339,6 +341,11 @@ public class TestRDBTableStore {
       testTable.delete(key);
       Assertions.assertFalse(testTable.isExist(key));
 
+      // Test a key with zero size value.
+      Assertions.assertNull(testTable.get(zeroSizeKey));
+      testTable.put(zeroSizeKey, zeroSizeValue);
+      Assertions.assertEquals(0, testTable.get(zeroSizeKey).length);
+
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns false for a key that is definitely not present.
@@ -347,6 +354,7 @@ public class TestRDBTableStore {
       RDBMetrics rdbMetrics = rdbStore.getMetrics();
       Assertions.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
@@ -357,9 +365,40 @@ public class TestRDBTableStore {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable(tableName)) {
       // Verify isExist works with key not in block cache.
       Assertions.assertTrue(testTable.isExist(key));
+      Assertions.assertEquals(0, testTable.get(zeroSizeKey).length);
+      Assertions.assertTrue(testTable.isExist(zeroSizeKey));
+
+      RDBMetrics rdbMetrics = rdbStore.getMetrics();
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyMayExistChecks());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyMayExistMisses());
+      Assertions.assertEquals(2, rdbMetrics.getNumDBKeyGets());
     }
   }
 
+  @Test
+  public void testGetByteBuffer() throws Exception {
+    final StringCodec codec = StringCodec.get();
+    final String tableName = families.get(0);
+    try (RDBTable testTable = rdbStore.getTable(tableName)) {
+      final TypedTable<String, String> typedTable = new TypedTable<>(
+          testTable, CodecRegistry.newBuilder().build(),
+          String.class, String.class);
+
+      for (int i = 0; i < 20; i++) {
+        final int valueSize = TypedTable.BUFFER_SIZE_DEFAULT * i / 4;
+        final String key = "key" + i;
+        final byte[] keyBytes = codec.toPersistedFormat(key);
+        final String value = RandomStringUtils.random(valueSize, true, false);
+        final byte[] valueBytes = codec.toPersistedFormat(value);
+
+        testTable.put(keyBytes, valueBytes);
+        final byte[] got = testTable.get(keyBytes);
+        Assertions.assertArrayEquals(valueBytes, got);
+        Assertions.assertEquals(value, codec.fromPersistedFormat(got));
+        Assertions.assertEquals(value, typedTable.get(key));
+      }
+    }
+  }
 
   @Test
   public void testGetIfExist() throws Exception {
@@ -389,7 +428,7 @@ public class TestRDBTableStore {
 
       Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
 
-      Assertions.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
+      Assertions.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistGets());
 
       // Reinsert key for further testing.
       testTable.put(key, value);
@@ -428,9 +467,10 @@ public class TestRDBTableStore {
     // Remove without next removes first entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.removeFromDB();
+      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+          testTable.iterator()) {
+        iterator.removeFromDB();
+      }
       Assertions.assertNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNotNull(testTable.get(bytesOf[3]));
@@ -439,10 +479,11 @@ public class TestRDBTableStore {
     // Remove after seekToLast removes lastEntry
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seekToLast();
-      iterator.removeFromDB();
+      try (TableIterator<?, ? extends Table.KeyValue<?, ?>> iterator =
+               testTable.iterator()) {
+        iterator.seekToLast();
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNull(testTable.get(bytesOf[3]));
@@ -451,10 +492,11 @@ public class TestRDBTableStore {
     // Remove after seek deletes that entry.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seek(bytesOf[3]);
-      iterator.removeFromDB();
+      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+               testTable.iterator()) {
+        iterator.seek(bytesOf[3]);
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNotNull(testTable.get(bytesOf[2]));
       Assertions.assertNull(testTable.get(bytesOf[3]));
@@ -463,11 +505,12 @@ public class TestRDBTableStore {
     // Remove after next() deletes entry that was returned by next.
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
       writeToTable(testTable, 3);
-      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
-          testTable.iterator();
-      iterator.seek(bytesOf[2]);
-      iterator.next();
-      iterator.removeFromDB();
+      try (TableIterator<byte[], ? extends Table.KeyValue<?, ?>> iterator =
+          testTable.iterator()) {
+        iterator.seek(bytesOf[2]);
+        iterator.next();
+        iterator.removeFromDB();
+      }
       Assertions.assertNotNull(testTable.get(bytesOf[1]));
       Assertions.assertNull(testTable.get(bytesOf[2]));
       Assertions.assertNotNull(testTable.get(bytesOf[3]));

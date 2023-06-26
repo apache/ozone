@@ -45,14 +45,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -97,6 +99,7 @@ import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.After;
 
 import static org.junit.Assert.assertEquals;
@@ -118,6 +121,7 @@ public class TestSecureContainerServer {
       = GenericTestUtils.getTestDir("dfs").getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static CertificateClientTestImpl caClient;
+  private static SecretKeyClient secretKeyClient;
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
   private static ContainerTokenSecretManager containerTokenSecretManager;
 
@@ -129,17 +133,15 @@ public class TestSecureContainerServer {
     CONF.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
+    secretKeyClient = new SecretKeyTestClient();
 
-    SecurityConfig secConf = new SecurityConfig(CONF);
     long tokenLifetime = TimeUnit.HOURS.toMillis(1);
 
-    blockTokenSecretManager = new OzoneBlockTokenSecretManager(
-        secConf, tokenLifetime);
-    blockTokenSecretManager.start(caClient);
+    blockTokenSecretManager = new OzoneBlockTokenSecretManager(tokenLifetime,
+        secretKeyClient);
 
     containerTokenSecretManager = new ContainerTokenSecretManager(
-        secConf, tokenLifetime);
-    containerTokenSecretManager.start(caClient);
+        tokenLifetime, secretKeyClient);
   }
 
   @AfterClass
@@ -149,8 +151,6 @@ public class TestSecureContainerServer {
 
   @After
   public void cleanUp() throws IOException {
-    containerTokenSecretManager.stop();
-    blockTokenSecretManager.stop();
     FileUtils.deleteQuietly(new File(CONF.get(HDDS_DATANODE_DIR_KEY)));
   }
 
@@ -194,14 +194,9 @@ public class TestSecureContainerServer {
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
-        TokenVerifier.create(new SecurityConfig((conf)), caClient));
+        TokenVerifier.create(new SecurityConfig(conf), secretKeyClient));
     hddsDispatcher.setClusterId(scmId.toString());
     return hddsDispatcher;
-  }
-
-  @FunctionalInterface
-  interface CheckedBiFunction<LEFT, RIGHT, OUT, THROWABLE extends Throwable> {
-    OUT apply(LEFT left, RIGHT right) throws THROWABLE;
   }
 
   @Test
@@ -241,7 +236,7 @@ public class TestSecureContainerServer {
       int numDatanodes,
       CheckedBiConsumer<Pipeline, OzoneConfiguration, IOException> initConf,
       CheckedBiFunction<Pipeline, OzoneConfiguration, XceiverClientSpi,
-          IOException> createClient,
+                IOException> createClient,
       CheckedBiFunction<DatanodeDetails, OzoneConfiguration, XceiverServerSpi,
           IOException> createServer,
       CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer,

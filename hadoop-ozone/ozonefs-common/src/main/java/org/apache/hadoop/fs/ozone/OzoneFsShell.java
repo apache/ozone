@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.shell.CommandFactory;
@@ -25,8 +26,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.ToolRunner;
-
-import java.util.concurrent.Callable;
 
 /** Provide command line access to a Ozone FileSystem. */
 @InterfaceAudience.Private
@@ -60,6 +59,8 @@ public class OzoneFsShell extends FsShell {
     // commands, and then this method can be abstract
     if (this.getClass().equals(OzoneFsShell.class)) {
       factory.registerCommands(FsCommand.class);
+      // ozone delete rm command registration supersedes fs delete
+      factory.registerCommands(OzoneFsDelete.class);
     }
   }
 
@@ -81,7 +82,7 @@ public class OzoneFsShell extends FsShell {
     conf.setQuietMode(false);
     shell.setConf(conf);
     int res = TracingUtil.executeInNewSpan("main",
-        (Callable<Integer>) () -> shell.execute(argv));
+        () -> shell.execute(argv));
     System.exit(res);
   }
 
@@ -96,5 +97,12 @@ public class OzoneFsShell extends FsShell {
   // TODO: this should be abstract in a base class
   protected static OzoneFsShell newShellInstance() {
     return new OzoneFsShell();
+  }
+
+  // for testing purposes, ensure that ozone specific
+  // added fs commands are visible
+  @VisibleForTesting
+  public CommandFactory getCommandFactory() {
+    return commandFactory;
   }
 }

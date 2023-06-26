@@ -28,15 +28,34 @@ import org.apache.ratis.util.TimeDuration;
  * Ozone Manager Constants.
  */
 public final class OMConfigKeys {
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE =
+      "ozone.om.snapshot.sst_dumptool.pool.size";
+  public static final int
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
+      "ozone.om.snapshot.sst_dumptool.buffer.size";
+  public static final String
+      OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT = "8KB";
+
   /**
    * Never constructed.
    */
   private OMConfigKeys() {
   }
 
+  public static final String OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY =
+      "ozone.filesystem.snapshot.enabled";
+  public static final boolean OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT = true;
+
   // Location where the OM stores its DB files. In the future we may support
   // multiple entries for performance (sharding)..
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
+
+  // SCM DB directory permission
+  public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
+      "ozone.om.db.dirs.permissions";
 
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
@@ -61,6 +80,19 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
   public static final String OZONE_OM_GRPC_PORT_KEY =
       "ozone.om.grpc.port";
+
+  public static final String OZONE_OM_GRPC_BOSSGROUP_SIZE_KEY =
+      "ozone.om.grpc.bossgroup.size";
+  public static final int OZONE_OM_GRPC_BOSSGROUP_SIZE_DEFAULT = 8;
+
+  public static final String OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY =
+      "ozone.om.grpc.workergroup.size";
+  public static final int OZONE_OM_GRPC_WORKERGROUP_SIZE_DEFAULT = 32;
+
+  public static final String OZONE_OM_GRPC_READ_THREAD_NUM_KEY =
+      "ozone.om.grpc.read.thread.num";
+  public static final int OZONE_OM_GRPC_READ_THREAD_NUM_DEFAULT = 32;
+
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -218,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -356,7 +388,13 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
-      false;
+      true;
+
+  public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
+      "ozone.om.namespace.s3.strict";
+  public static final boolean OZONE_OM_NAMESPACE_STRICT_S3_DEFAULT =
+      true;
+
   /**
    * Configuration properties for OMAdminProtcol service.
    */
@@ -441,6 +479,69 @@ public final class OMConfigKeys {
       = "ozone.om.enable.ofs.shared.tmp.dir";
   public static final boolean OZONE_OM_ENABLE_OFS_SHARED_TMP_DIR_DEFAULT
       = false;
+
+  public static final String OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE =
+      "ozone.om.snapshot.cache.max.size";
+  public static final int OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT = 10;
+
+  public static final String OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF =
+      "ozone.om.snapshot.force.full.diff";
+
+  public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
+
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
       = "ozone.om.snapshot.diff.db.dir";
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
+      = "ozone.om.snapshot.diff.max.page.size";
+
+  public static final String OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES
+      = "ozone.om.snapshot.db.max.open.files";
+  public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+      = 100;
+  public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
+      = 1000;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
+      = "ozone.om.snapshot.diff.thread.pool.size";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT
+      = 10;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME
+      = "ozone.om.snapshot.diff.job.default.wait.time";
+  public static final long OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT
+      = TimeUnit.MINUTES.toMillis(1);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK
+      = "ozone.om.snapshot.diff.max.jobs.purge.per.task";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT
+      = 100;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME
+      = "ozone.om.snapshot.diff.job.report.persistent.time";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT
+      = TimeUnit.DAYS.toMillis(7);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL
+      = "ozone.om.snapshot.diff.cleanup.service.run.internal";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.HOURS.toMillis(1);
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.snapshot.diff.cleanup.service.timeout";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
+
+  public static final String
+      OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB
+      = "ozone.om.snapshot.diff.max.allowed.keys.changed.per.job";
+  public static final long
+      OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
+      = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
 }

@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -42,9 +44,11 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles OMSnapshotMoveDeletedKeys Request.
+ * This is an OM internal request. Does not need @RequireSnapshotFeatureState.
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
@@ -56,6 +60,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   }
 
   @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
@@ -79,9 +84,9 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       OmSnapshot omFromSnapshot = (OmSnapshot) omSnapshotManager
           .checkForSnapshot(fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),
-              getSnapshotPrefix(fromSnapshot.getName()));
+              getSnapshotPrefix(fromSnapshot.getName()), true);
 
-      nextSnapshot = getNextActiveSnapshot(fromSnapshot,
+      nextSnapshot = SnapshotUtils.getNextActiveSnapshot(fromSnapshot,
           snapshotChainManager, omSnapshotManager);
 
       // Get next non-deleted snapshot.
@@ -100,7 +105,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
         omNextSnapshot = (OmSnapshot) omSnapshotManager
             .checkForSnapshot(nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),
-                getSnapshotPrefix(nextSnapshot.getName()));
+                getSnapshotPrefix(nextSnapshot.getName()), true);
       }
 
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
@@ -116,31 +121,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     }
 
     return omClientResponse;
-  }
-
-  /**
-   * Get the next non deleted snapshot in the snapshot chain.
-   */
-  private SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
-      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
-      throws IOException {
-    while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotID())) {
-
-      String nextPathSnapshot =
-          chainManager.nextPathSnapshot(
-              snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
-
-      String tableKey = chainManager.getTableKey(nextPathSnapshot);
-      SnapshotInfo nextSnapshotInfo =
-          omSnapshotManager.getSnapshotInfo(tableKey);
-
-      if (nextSnapshotInfo.getSnapshotStatus().equals(
-          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-        return nextSnapshotInfo;
-      }
-    }
-    return null;
   }
 }
 

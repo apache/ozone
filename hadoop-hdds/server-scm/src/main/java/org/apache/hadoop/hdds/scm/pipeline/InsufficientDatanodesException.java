@@ -23,21 +23,30 @@ import java.io.IOException;
 /**
  * Exception thrown when there are not enough Datanodes to create a pipeline.
  */
-public class InsufficientDatanodesException extends IOException {
+public final class InsufficientDatanodesException extends IOException {
 
+  private final int required;
+  private final int available;
 
-  public InsufficientDatanodesException() {
-    super();
-  }
-
-  public InsufficientDatanodesException(String message) {
+  public InsufficientDatanodesException(int required, int available,
+      String message) {
     super(message);
+    this.required = required;
+    this.available = available;
   }
 
   public InsufficientDatanodesException(int required, int available) {
-    super("Not enough datanodes" +
+    this(required, available, "Not enough datanodes" +
         ", requested: " + required +
         ", found: " + available
     );
+  }
+
+  public int getRequiredNodes() {
+    return required;
+  }
+
+  public int getAvailableNodes() {
+    return available;
   }
 }

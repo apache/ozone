@@ -56,3 +56,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 no_proxy=om1,om2,om3,scm,s3g,kdc,localhost,127.0.0.1
 
 OM_SERVICE_ID=omservice
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+# Does not take effect on Ozone versions < 1.4.0
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

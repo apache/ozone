@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
+import org.rocksdb.KeyMayExist;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -45,9 +46,11 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -72,7 +75,7 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
  * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase {
+public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
@@ -80,6 +83,7 @@ public final class RocksDatabase {
   private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
       new HashMap<>();
 
+  private final StackTraceElement[] stackTrace;
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
@@ -302,6 +306,11 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut array key {}", bytes2String(key));
+        LOG.debug("batchPut array value {}", bytes2String(value));
+      }
+
       assertClosed();
       try {
         counter.incrementAndGet();
@@ -312,7 +321,26 @@ public final class RocksDatabase {
         counter.decrementAndGet();
       }
     }
-    
+
+    public void batchPut(ManagedWriteBatch writeBatch, ByteBuffer key,
+        ByteBuffer value) throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
+        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+      }
+
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.put(getHandle(), key.duplicate(), value);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchPut ByteBuffer key "
+            + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
     public void markClosed() {
       isClosed.set(true);
     }
@@ -351,8 +379,10 @@ public final class RocksDatabase {
     this.descriptors = descriptors;
     this.columnFamilies = columnFamilies;
     this.counter = counter;
+    this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
+  @Override
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
       // Wait for all background work to be cancelled first. e.g. RDB compaction
@@ -432,6 +462,20 @@ public final class RocksDatabase {
   }
 
   public void put(ColumnFamily family, byte[] key, byte[] value)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().put(family.getHandle(), writeOptions, key, value);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "put " + bytes2String(key), e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void put(ColumnFamily family, ByteBuffer key, ByteBuffer value)
       throws IOException {
     assertClose();
     try {
@@ -602,34 +646,47 @@ public final class RocksDatabase {
   }
 
   /**
-   * @return false if the key definitely does not exist in the database;
-   *         otherwise, return true.
-   * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
-   */
-  public boolean keyMayExist(ColumnFamily family, byte[] key)
-      throws IOException {
-    assertClose();
-    try {
-      counter.incrementAndGet();
-      return db.get().keyMayExist(family.getHandle(), key, null);
-    } finally {
-      counter.decrementAndGet();
-    }
-  }
-
-  /**
+   * - When the key definitely does not exist in the database,
+   *   this method returns null.
+   * - When the key is found in memory,
+   *   this method returns a supplier
+   *   and {@link Supplier#get()}} returns the value.
+   * - When this method returns a supplier
+   *   but {@link Supplier#get()} returns null,
+   *   the key may or may not exist in the database.
+   *
    * @return the null if the key definitely does not exist in the database;
    *         otherwise, return a {@link Supplier}.
    * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
-  public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
-      byte[] key) throws IOException {
+  Supplier<byte[]> keyMayExist(ColumnFamily family, byte[] key)
+      throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
       final Holder<byte[]> out = new Holder<>();
       return db.get().keyMayExist(family.getHandle(), key, out) ?
           out::getValue : null;
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  Supplier<Integer> keyMayExist(ColumnFamily family,
+      ByteBuffer key, ByteBuffer out) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      final KeyMayExist result = db.get().keyMayExist(
+          family.getHandle(), key, out);
+      switch (result.exists) {
+      case kNotExist: return null;
+      case kExistsWithValue: return () -> result.valueLength;
+      case kExistsWithoutValue: return () -> null;
+      default:
+        throw new IllegalStateException(
+            "Unexpected KeyMayExistEnum case " + result.exists);
+      }
     } finally {
       counter.decrementAndGet();
     }
@@ -643,11 +700,43 @@ public final class RocksDatabase {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
-  public byte[] get(ColumnFamily family, byte[] key) throws IOException {
+  byte[] get(ColumnFamily family, byte[] key) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
       return db.get().get(family.getHandle(), key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * Get the value mapped to the given key.
+   *
+   * @param family the table to get from.
+   * @param key the buffer containing the key.
+   * @param outValue the buffer to store the output value.
+   *                 When the buffer size is smaller than the size of the value,
+   *                 partial result will be written.
+   * @return null if the key is not found;
+   *         otherwise, return the size (possibly 0) of the value.
+   * @throws IOException if the db is closed or the db throws an exception.
+   * @see org.rocksdb.RocksDB#get(ColumnFamilyHandle, org.rocksdb.ReadOptions,
+   *                              ByteBuffer, ByteBuffer)
+   */
+  Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
+      throws IOException {
+    assertClose();
+    try (ManagedReadOptions options = new ManagedReadOptions()) {
+      counter.incrementAndGet();
+      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      LOG.debug("get: size={}, remaining={}",
+          size, outValue.asReadOnlyBuffer().remaining());
+      return size == ManagedRocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
       closeOnError(e, true);
       final String message = "get " + bytes2String(key) + " from " + family;
@@ -799,6 +888,20 @@ public final class RocksDatabase {
     }
   }
 
+  public void delete(ColumnFamily family, ByteBuffer key) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().delete(family.getHandle(), writeOptions, key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
       throws IOException {
     assertClose();
@@ -885,5 +988,17 @@ public final class RocksDatabase {
     return dbNameToCfHandleMap;
   }
 
-
+  @Override
+  protected void finalize() throws Throwable {
+    if (!isClosed()) {
+      String warning = "RocksDatabase is not closed properly.";
+      if (LOG.isDebugEnabled()) {
+        String debugMessage = String.format("%n StackTrace for unclosed " +
+            "RocksDatabase instance: %s", Arrays.toString(stackTrace));
+        warning = warning.concat(debugMessage);
+      }
+      LOG.warn(warning);
+    }
+    super.finalize();
+  }
 }

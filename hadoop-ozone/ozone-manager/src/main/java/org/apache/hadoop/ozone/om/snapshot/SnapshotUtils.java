@@ -18,13 +18,23 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.io.IOException;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 
 /**
@@ -48,20 +58,98 @@ public final class SnapshotUtils {
   }
 
   public static SnapshotInfo getSnapshotInfo(final OzoneManager ozoneManager,
-                                             final String key)
+                                             final String snapshotKey)
       throws IOException {
     SnapshotInfo snapshotInfo;
     try {
       snapshotInfo = ozoneManager.getMetadataManager()
           .getSnapshotInfoTable()
-          .get(key);
+          .get(snapshotKey);
     } catch (IOException e) {
-      LOG.error("Snapshot {}: not found: {}", key, e);
+      LOG.error("Snapshot '{}' is not found.", snapshotKey, e);
       throw e;
     }
     if (snapshotInfo == null) {
       throw new OMException(KEY_NOT_FOUND);
     }
     return snapshotInfo;
+  }
+
+  public static void dropColumnFamilyHandle(
+      final ManagedRocksDB rocksDB,
+      final ColumnFamilyHandle columnFamilyHandle) {
+
+    if (columnFamilyHandle == null) {
+      return;
+    }
+
+    try {
+      rocksDB.get().dropColumnFamily(columnFamilyHandle);
+    } catch (RocksDBException exception) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(exception);
+    }
+  }
+
+  /**
+   * Throws OMException FILE_NOT_FOUND if snapshot directory does not exist.
+   * @param checkpoint Snapshot checkpoint directory
+   */
+  public static void checkSnapshotDirExist(File checkpoint)
+      throws IOException {
+    if (!checkpoint.exists()) {
+      throw new OMException("Unable to load snapshot. " +
+          "Snapshot checkpoint directory '" + checkpoint.getAbsolutePath() +
+          "' does not exists.", FILE_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Throws OMException FILE_NOT_FOUND if snapshot is not in active status.
+   * @param snapshotTableKey snapshot table key
+   */
+  public static void checkSnapshotActive(OzoneManager ozoneManager,
+                                         String snapshotTableKey)
+      throws IOException {
+    checkSnapshotActive(getSnapshotInfo(ozoneManager, snapshotTableKey), false);
+  }
+
+  public static void checkSnapshotActive(SnapshotInfo snapInfo,
+                                         boolean skipCheck)
+      throws OMException {
+
+    if (!skipCheck &&
+        snapInfo.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) {
+      throw new OMException("Unable to load snapshot. " +
+          "Snapshot with table key '" + snapInfo.getTableKey() +
+          "' is no longer active", FILE_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Get the next non deleted snapshot in the snapshot chain.
+   */
+  public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
+      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+      throws IOException {
+    while (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
+        snapInfo.getSnapshotId())) {
+
+      UUID nextPathSnapshot =
+          chainManager.nextPathSnapshot(
+              snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
+
+      String tableKey = chainManager.getTableKey(nextPathSnapshot);
+      SnapshotInfo nextSnapshotInfo =
+          omSnapshotManager.getSnapshotInfo(tableKey);
+
+      if (nextSnapshotInfo.getSnapshotStatus().equals(
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
+        return nextSnapshotInfo;
+      }
+
+      snapInfo = nextSnapshotInfo;
+    }
+    return null;
   }
 }

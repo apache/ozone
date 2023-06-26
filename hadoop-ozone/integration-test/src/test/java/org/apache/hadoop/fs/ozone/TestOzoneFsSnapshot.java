@@ -29,6 +29,7 @@ import com.google.common.base.Strings;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
@@ -76,6 +77,8 @@ public class TestOzoneFsSnapshot {
   @BeforeAll
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Start the cluster
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
@@ -280,6 +283,34 @@ public class TestOzoneFsSnapshot {
     String listSnapKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", snapshotPath});
     Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
+  }
+
+  @Test
+  public void testSnapshotDeleteSuccess() throws Exception {
+    String snapshotName = createSnapshot();
+    // Delete the created snapshot
+    int res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
+    // Asserts that delete request succeeded
+    Assertions.assertEquals(0, res);
+
+    // Wait for the snapshot to be marked deleted.
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+
+    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
+        200, 10000);
+  }
+
+  @Test
+  public void testSnapshotDeleteFailure() throws Exception {
+    // Delete snapshot that doesn't exist
+    String deleteSnapshotOut = execShellCommandAndGetOutput(1,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, "testsnap"});
+    Assertions.assertTrue(deleteSnapshotOut
+        .contains("Snapshot does not exist"));
   }
 
   /**

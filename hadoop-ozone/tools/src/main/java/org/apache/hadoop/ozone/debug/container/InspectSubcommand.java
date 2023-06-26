@@ -52,7 +52,7 @@ public class InspectSubcommand implements Callable<Void> {
     final KeyValueContainerMetadataInspector inspector
         = new KeyValueContainerMetadataInspector(
             KeyValueContainerMetadataInspector.Mode.INSPECT);
-    for (Container<?> container : parent.getController().getContainerSet()) {
+    for (Container<?> container : parent.getController().getContainers()) {
       final ContainerData data = container.getContainerData();
       if (!(data instanceof KeyValueContainerData)) {
         continue;

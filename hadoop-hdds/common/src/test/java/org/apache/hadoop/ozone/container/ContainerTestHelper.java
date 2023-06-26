@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -542,14 +542,11 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID) {
-    // Add 2ms delay so that localID based on UtcTime
-    // won't collide.
-    sleep(2);
-    return new BlockID(containerID, HddsUtils.getTime());
+    return new BlockID(containerID, UniqueId.next());
   }
 
   public static long getTestContainerID() {
-    return HddsUtils.getTime();
+    return UniqueId.next();
   }
 
   public static String getFixedLengthString(String string, int length) {

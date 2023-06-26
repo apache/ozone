@@ -85,7 +85,8 @@ public class TestPipelinePlacementFactory {
     conf = new OzoneConfiguration();
   }
 
-  private void setupRacks(int datanodeCount, int nodesPerRack)
+  private void setupRacks(int datanodeCount, int nodesPerRack,
+                          boolean firstRackLessNode)
       throws Exception {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         1, StorageUnit.BYTES);
@@ -100,7 +101,8 @@ public class TestPipelinePlacementFactory {
     for (int i = 0; i < datanodeCount; i++) {
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-              hostname + i, rack + (i / nodesPerRack));
+              hostname + i, firstRackLessNode ?
+                  rack + ((i + 1) / nodesPerRack) : rack + (i / nodesPerRack));
 
       datanodes.add(datanodeDetails);
       cluster.add(datanodeDetails);
@@ -159,7 +161,7 @@ public class TestPipelinePlacementFactory {
         SCMContainerPlacementRackScatter.class.getCanonicalName());
     // for this test, rack setup does not matter, just
     // need a non-null NetworkTopologyMap within the nodeManager
-    setupRacks(6, 3);
+    setupRacks(6, 3, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
     Assertions.assertSame(SCMContainerPlacementRackScatter.class,
@@ -171,7 +173,7 @@ public class TestPipelinePlacementFactory {
   // on separate rack
   @Test
   public void testDefaultPipelineProviderRackPlacement() throws Exception {
-    setupRacks(6, 2);
+    setupRacks(6, 2, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
 
@@ -194,7 +196,7 @@ public class TestPipelinePlacementFactory {
     conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementRackScatter.class.getCanonicalName());
 
-    setupRacks(6, 2);
+    setupRacks(6, 2, false);
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(nodeManager, stateManager, conf);
 
@@ -211,5 +213,145 @@ public class TestPipelinePlacementFactory {
         datanodeDetails.get(1)));
     Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
+  }
+
+  @Test
+  public void testPipelineProviderRackPlacementAnchorChange()
+      throws Exception {
+    // rack0: Node0
+    // rack1: Node1, Node2
+    // rack2: Node3, Node4
+    // rack3: Node5
+    setupRacks(6, 2, true);
+
+    PlacementPolicy policy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
+
+    int nodeNum = 3;
+    List<DatanodeDetails> datanodeDetails =
+        policy.chooseDatanodes(null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // First anchor will be Node0, Since there is no more node available
+    // on rack0, Anchor will change to Node1 and then Node2 will be selected
+    // which is same rack as Node1.
+    Assertions.assertTrue(cluster.isSameParent(datanodeDetails.get(1),
+        datanodeDetails.get(2)));
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+        datanodeDetails.get(1)));
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+        datanodeDetails.get(2)));
+  }
+
+  @Test
+  public void testPipelineProviderRackPlacementWithUsedNodes()
+      throws Exception {
+    // 3 nodes per rack
+    setupRacks(9, 3, false);
+
+    PlacementPolicy policy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+
+    // 1 Used node
+    usedNodes.add(datanodes.get(0));
+    int nodeNum = 2;
+    List<DatanodeDetails> datanodeDetails =
+        policy.chooseDatanodes(usedNodes, null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    Assertions.assertTrue(cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(0)) || cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(1)));
+
+    // 2 usedNodes in same rack
+    usedNodes.clear();
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+
+    nodeNum = 1;
+    datanodeDetails =
+        policy.chooseDatanodes(usedNodes, null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // Node return by policy should have different parent as node0 and node1
+    Assertions.assertFalse(cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(0)) && cluster.isSameParent(usedNodes.get(1),
+        datanodeDetails.get(0)));
+
+    // 2 usedNodes in different rack
+    usedNodes.clear();
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(3));
+
+    nodeNum = 1;
+    datanodeDetails =
+        policy.chooseDatanodes(usedNodes, null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // Node return by policy should have same parent as node0 or node3
+    Assertions.assertTrue(cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(0)) || cluster.isSameParent(usedNodes.get(3),
+        datanodeDetails.get(0)));
+
+    // 0 usedNode
+    usedNodes.clear();
+    nodeNum = 3;
+    datanodeDetails =
+        policy.chooseDatanodes(usedNodes, null, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+  }
+
+  @Test
+  public void testPipelineProviderRackPlacementWithUsedAndExcludeNodes()
+      throws Exception {
+    // 2 nodes per rack
+    setupRacks(8, 2, false);
+
+    PlacementPolicy policy = PipelinePlacementPolicyFactory
+        .getPolicy(nodeManager, stateManager, conf);
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    List<DatanodeDetails> excludeNodes = new ArrayList<>();
+
+    // 1 Used node
+    usedNodes.add(datanodes.get(0));
+    excludeNodes.add(datanodes.get(2));
+    excludeNodes.add(datanodes.get(3));
+    int nodeNum = 2;
+    List<DatanodeDetails> datanodeDetails =
+        policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // policy should not return any of excluded node
+    Assertions.assertNotSame(datanodeDetails.get(0).getUuid(),
+        excludeNodes.get(0).getUuid());
+    Assertions.assertNotSame(datanodeDetails.get(0).getUuid(),
+        excludeNodes.get(1).getUuid());
+    Assertions.assertNotSame(datanodeDetails.get(1).getUuid(),
+        excludeNodes.get(0).getUuid());
+    Assertions.assertNotSame(datanodeDetails.get(1).getUuid(),
+        excludeNodes.get(1).getUuid());
+    // One of the node should be in same rack as Node0
+    Assertions.assertTrue(cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(0)) || cluster.isSameParent(usedNodes.get(0),
+        datanodeDetails.get(1)));
+
+    // 2 Used node
+    usedNodes.clear();
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(4));
+    excludeNodes.add(datanodes.get(1));
+    excludeNodes.add(datanodes.get(2));
+    nodeNum = 1;
+    datanodeDetails =
+        policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // policy should not return any of excluded node
+    Assertions.assertNotSame(datanodeDetails.get(0).getUuid(),
+        excludeNodes.get(0).getUuid());
+    Assertions.assertNotSame(datanodeDetails.get(0).getUuid(),
+        excludeNodes.get(1).getUuid());
+    // Since rack0 has not enough node (node0 is used and node1 is excluded),
+    // Anchor will change to node4(rack2) and will return another node
+    // from rack2
+    Assertions.assertTrue(cluster.isSameParent(usedNodes.get(1),
+        datanodeDetails.get(0)));
   }
 }

@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
@@ -46,6 +47,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -66,7 +68,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMI
  * all the irrelevant and safe to delete sst files that don't correspond
  * to the bucket on which the snapshot was taken.
  */
-public class SstFilteringService extends BackgroundService {
+public class SstFilteringService extends BackgroundService
+    implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SstFilteringService.class);
@@ -102,6 +105,9 @@ public class SstFilteringService extends BackgroundService {
     snapshotFilteredCount = new AtomicLong(0);
   }
 
+  private final BootstrapStateHandler.Lock lock =
+      new BootstrapStateHandler.Lock();
+
   private class SstFilteringTask implements BackgroundTask {
 
     @Override
@@ -121,6 +127,7 @@ public class SstFilteringService extends BackgroundService {
           Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
+          UUID snapshotId = snapshotInfo.getSnapshotId();
 
           File omMetadataDir =
               OMStorage.getOmDbDir(ozoneManager.getConfiguration());
@@ -132,7 +139,8 @@ public class SstFilteringService extends BackgroundService {
           // it has already undergone filtering.
           if (Files.exists(filePath)) {
             List<String> processedSnapshotIds = Files.readAllLines(filePath);
-            if (processedSnapshotIds.contains(snapshotInfo.getSnapshotID())) {
+            if (snapshotId != null &&
+                processedSnapshotIds.contains(snapshotId.toString())) {
               continue;
             }
           }
@@ -150,13 +158,17 @@ public class SstFilteringService extends BackgroundService {
           try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
               .loadDB(ozoneManager.getConfiguration(),
                       new File(snapshotCheckpointDir),
-                      dbName, true, Optional.of(Boolean.TRUE), false)) {
+                      dbName, true, Optional.of(Boolean.TRUE),
+                      Optional.empty(), false, false)) {
             RocksDatabase db = rdbStore.getDb();
-            db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            try (BootstrapStateHandler.Lock lock =
+                getBootstrapStateLock().lock()) {
+              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            }
           }
 
           // mark the snapshot as filtered by writing to the file
-          String content = snapshotInfo.getSnapshotID() + "\n";
+          String content = snapshotInfo.getSnapshotId() + "\n";
           Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
               StandardOpenOption.CREATE, StandardOpenOption.APPEND);
           snapshotLimit--;
@@ -215,4 +227,8 @@ public class SstFilteringService extends BackgroundService {
     return snapshotFilteredCount;
   }
 
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
 }

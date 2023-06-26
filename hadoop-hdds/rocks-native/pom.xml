@@ -27,11 +27,35 @@
     <dependencies>
         <dependency>
             <groupId>org.apache.ozone</groupId>
+            <artifactId>hdds-test-utils</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ozone</groupId>
             <artifactId>hdds-managed-rocksdb</artifactId>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-io</artifactId>
+        </dependency>
+      <dependency>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-annotations</artifactId>
+        <scope>compile</scope>
+      </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <properties>
@@ -265,7 +289,7 @@
                             </execution>
                             <execution>
                                 <id>build-rocksjava</id>
-                                <phase>process-resources</phase>
+                                <phase>generate-resources</phase>
                                 <configuration>
                                     <tasks>
                                         <exec executable="chmod" failonerror="true">
@@ -317,7 +341,7 @@
                             </execution>
                             <execution>
                                 <id>copy-lib-file</id>
-                                <phase>prepare-package</phase>
+                                <phase>process-classes</phase>
                                 <configuration>
                                     <tasks>
                                         <copy toDir="${project.build.outputDirectory}">
@@ -343,6 +367,14 @@
                                 <include>**/lib*.jnilib</include>
                                 <include>**/lib*.dll</include>
                             </includes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>native</groups>
+                            <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -384,13 +416,31 @@
         <profile>
             <id>java-11</id>
             <activation>
-                <jdk>11</jdk>
+                <jdk>[11,]</jdk>
                 <property>
                     <name>rocks_tools_native</name>
                 </property>
             </activation>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-jars</id>
+                                <phase>process-sources</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
@@ -404,8 +454,8 @@
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
-                                        <argument>-classpath</argument>
-                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>-cp</argument>
+                                        <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
                                         <argument>-h</argument>
                                         <argument>${project.build.directory}/native/javah</argument>
                                         <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -61,7 +63,7 @@ public class TestDeleteContainerCommandHandler {
 
   @Test
   public void testExpiredCommandsAreNotProcessed() throws IOException {
-    DeleteContainerCommandHandler handler = createSubject(clock);
+    DeleteContainerCommandHandler handler = createSubject(clock, 1000);
 
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
     command1.setDeadline(clock.millis() + 10000);
@@ -123,13 +125,50 @@ public class TestDeleteContainerCommandHandler {
         .deleteContainer(1L, false);
   }
 
-  private static DeleteContainerCommandHandler createSubject() {
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    return createSubject(clock);
+  @Test
+  public void testQueueSize() throws IOException {
+    DeleteContainerCommandHandler handler = createSubjectWithPoolSize(
+        clock, 1);
+    DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
+    Lock lock = new ReentrantLock();
+    Mockito.doAnswer(invocation -> {
+      try {
+        lock.lock();
+      } finally {
+        lock.unlock();
+      }
+      return null;
+    }).when(controller).deleteContainer(1, false);
+
+    lock.lock();
+    try {
+      for (int i = 0; i < 50; ++i) {
+        handler.handle(command1, ozoneContainer, null, null);
+      }
+    
+      // one is waiting in execution as thread count 1, so count 1
+      // and one in queue, others ignored
+      Mockito.verify(controller, times(1))
+          .deleteContainer(1L, false);
+    } finally {
+      lock.unlock();
+    }
   }
 
-  private static DeleteContainerCommandHandler createSubject(TestClock clock) {
-    return new DeleteContainerCommandHandler(clock, newDirectExecutorService());
+  private static DeleteContainerCommandHandler createSubject() {
+    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    return createSubject(clock, 1000);
+  }
+
+  private static DeleteContainerCommandHandler createSubject(
+      TestClock clock, int queueSize) {
+    return new DeleteContainerCommandHandler(clock,
+        newDirectExecutorService(), queueSize);
+  }
+
+  private static DeleteContainerCommandHandler createSubjectWithPoolSize(
+      TestClock clock, int queueSize) {
+    return new DeleteContainerCommandHandler(1, clock, queueSize);
   }
 
 }

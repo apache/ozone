@@ -132,7 +132,8 @@ public class TestReconIncrementalContainerReportHandler
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
-      when(nodeManagerMock.getNodeByUuid(any())).thenReturn(datanodeDetails);
+      when(nodeManagerMock.getNodeByUuid(any(UUID.class)))
+          .thenReturn(datanodeDetails);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())

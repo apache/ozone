@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
@@ -103,8 +103,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -129,11 +127,12 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -198,8 +197,7 @@ public class TestStorageContainerManager {
       SCMClientProtocolServer mockClientServer = Mockito.spy(
           cluster.getStorageContainerManager().getClientProtocolServer());
 
-      when(mockClientServer.getRemoteUser()).thenReturn(
-          UserGroupInformation.createRemoteUser(fakeRemoteUsername));
+      mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
 
       try {
         mockClientServer.deleteContainer(
@@ -803,16 +801,15 @@ public class TestStorageContainerManager {
 
       cluster.restartStorageContainerManager(false);
       scm = cluster.getStorageContainerManager();
+
+      ReplicationManager rm = scm.getReplicationManager();
+
+      NodeManager nodeManager = mock(NodeManager.class);
+      setInternalState(rm, "nodeManager", nodeManager);
+
       EventPublisher publisher = mock(EventPublisher.class);
-      LegacyReplicationManager replicationManager =
-          scm.getReplicationManager().getLegacyReplicationManager();
-      Field f = LegacyReplicationManager.class.
-          getDeclaredField("eventPublisher");
-      f.setAccessible(true);
-      Field modifiersField = Field.class.getDeclaredField("modifiers");
-      modifiersField.setAccessible(true);
-      modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
-      f.set(replicationManager, publisher);
+      setInternalState(rm.getLegacyReplicationManager(),
+          "eventPublisher", publisher);
 
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
@@ -820,9 +817,6 @@ public class TestStorageContainerManager {
       CloseContainerCommand closeContainerCommand =
           new CloseContainerCommand(selectedContainer.getContainerID(),
               selectedContainer.getPipelineID(), false);
-
-      CommandForDatanode commandForDatanode = new CommandForDatanode(
-          dnUuid, closeContainerCommand);
 
       GenericTestUtils.waitFor(() -> {
         SCMContext scmContext
@@ -837,8 +831,14 @@ public class TestStorageContainerManager {
           .getReplicationManager().processAll();
       Thread.sleep(5000);
 
-      verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
-          CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
+      if (rm.getConfig().isLegacyEnabled()) {
+        CommandForDatanode commandForDatanode = new CommandForDatanode(
+            dnUuid, closeContainerCommand);
+        verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
+            CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
+      } else {
+        verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
+      }
     } finally {
       cluster.shutdown();
     }

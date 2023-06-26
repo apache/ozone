@@ -131,6 +131,7 @@ public class OzoneBucket extends WithMetadata {
 
   private String sourceVolume;
   private String sourceBucket;
+  private boolean sourcePathExist = true;
 
   /**
    * Quota of bytes allocated for the bucket.
@@ -887,6 +888,28 @@ public class OzoneBucket extends WithMetadata {
     boolean result = proxy.setBucketOwner(volumeName, name, userName);
     this.owner = userName;
     return result;
+  }
+
+  /**
+   * Builder for OmBucketInfo.
+   /**
+   * Set time to a key in this bucket.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   * @throws IOException
+   */
+  public void setTimes(String keyName, long mtime, long atime)
+      throws IOException {
+    proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
+  public void setSourcePathExist(boolean b) {
+    this.sourcePathExist = b;
+  }
+
+  public boolean isSourcePathExist() {
+    return this.sourcePathExist;
   }
 
   public static Builder newBuilder(ConfigurationSource conf,

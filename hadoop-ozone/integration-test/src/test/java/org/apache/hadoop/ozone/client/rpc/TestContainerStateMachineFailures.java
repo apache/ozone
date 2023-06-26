@@ -92,6 +92,7 @@ import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import static org.hamcrest.core.Is.is;
 
+import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import static org.junit.Assert.assertThat;
@@ -179,6 +180,9 @@ public class TestContainerStateMachineFailures {
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
+    if (xceiverClientManager != null) {
+      xceiverClientManager.close();
+    }
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -421,11 +425,11 @@ public class TestContainerStateMachineFailures {
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     stateMachine.takeSnapshot();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    final FileInfo snapshot = getSnapshotFileInfo(storage);
+    final Path parentPath = snapshot.getPath();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    FileInfo snapshot = storage.findLatestSnapshot().getFile();
     Assert.assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     // delete the container db file
@@ -449,6 +453,8 @@ public class TestContainerStateMachineFailures {
       Assert.fail("Expected exception not thrown");
     } catch (IOException e) {
       // Exception should be thrown
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
     }
     // Make sure the container is marked unhealthy
     Assert.assertTrue(dn.getDatanodeStateMachine()
@@ -465,7 +471,7 @@ public class TestContainerStateMachineFailures {
     if (snapshot.getPath().toFile().exists()) {
       // Make sure the latest snapshot is same as the previous one
       try {
-        FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
+        final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
         Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
       } catch (Throwable e) {
         Assert.assertFalse(snapshot.getPath().toFile().exists());
@@ -507,10 +513,10 @@ public class TestContainerStateMachineFailures {
                     omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    final FileInfo snapshot = getSnapshotFileInfo(storage);
+    final Path parentPath = snapshot.getPath();
     stateMachine.takeSnapshot();
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    FileInfo snapshot = storage.findLatestSnapshot().getFile();
     Assert.assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
@@ -540,8 +546,10 @@ public class TestContainerStateMachineFailures {
       stateMachine.takeSnapshot();
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown");
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
     }
-    FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
+    final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
     Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
   }
 
@@ -582,12 +590,12 @@ public class TestContainerStateMachineFailures {
                     omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
+    final FileInfo snapshot = getSnapshotFileInfo(storage);
+    final Path parentPath = snapshot.getPath();
     stateMachine.takeSnapshot();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
     Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    FileInfo snapshot = storage.findLatestSnapshot().getFile();
     Assert.assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
@@ -636,42 +644,47 @@ public class TestContainerStateMachineFailures {
       }
     };
 
-    List<Thread> threadList = new ArrayList<>();
-
-    for (int i = 0; i < 100; i++) {
-      count++;
-      Thread r = new Thread(r2);
-      r.start();
-      threadList.add(r);
-    }
-
-    Thread closeContainerThread = new Thread(r1);
-    closeContainerThread.start();
-    threadList.add(closeContainerThread);
-    latch.await(600, TimeUnit.SECONDS);
-    for (int i = 0; i < 101; i++) {
-      threadList.get(i).join();
-    }
-
-    if (failCount.get() > 0) {
-      fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
-    }
-    Assert.assertTrue(
-            TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
-                    .getDatanodeStateMachine()
-                    .getContainer().getContainerSet().getContainer(containerID)
-                    .getContainerState()
-                    == ContainerProtos.ContainerDataProto.State.CLOSED);
-    Assert.assertTrue(stateMachine.isStateMachineHealthy());
     try {
-      stateMachine.takeSnapshot();
-    } catch (IOException ioe) {
-      Assert.fail("Exception should not be thrown");
-    }
-    FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
-    Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+      List<Thread> threadList = new ArrayList<>();
 
-    r2.run();
+      for (int i = 0; i < 100; i++) {
+        count++;
+        Thread r = new Thread(r2);
+        r.start();
+        threadList.add(r);
+      }
+
+      Thread closeContainerThread = new Thread(r1);
+      closeContainerThread.start();
+      threadList.add(closeContainerThread);
+      latch.await(600, TimeUnit.SECONDS);
+      for (int i = 0; i < 101; i++) {
+        threadList.get(i).join();
+      }
+
+      if (failCount.get() > 0) {
+        fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
+      }
+      Assert.assertTrue(
+          TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
+              .getDatanodeStateMachine()
+              .getContainer().getContainerSet().getContainer(containerID)
+              .getContainerState()
+              == ContainerProtos.ContainerDataProto.State.CLOSED);
+      Assert.assertTrue(stateMachine.isStateMachineHealthy());
+      try {
+        stateMachine.takeSnapshot();
+      } catch (IOException ioe) {
+        Assert.fail("Exception should not be thrown");
+      }
+
+      final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
+      Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+
+      r2.run();
+    } finally {
+      xceiverClientManager.releaseClient(xceiverClient, false);
+    }
   }
 
   @Test
@@ -803,5 +816,10 @@ public class TestContainerStateMachineFailures {
     } catch (IOException e) {
       Assert.fail("Exception not expected " + e.getMessage());
     }
+  }
+
+  static FileInfo getSnapshotFileInfo(SimpleStateMachineStorage storage)
+      throws IOException {
+    return StatemachineImplTestUtil.findLatestSnapshot(storage).getFile();
   }
 }

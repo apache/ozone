@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -35,6 +34,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -100,7 +101,6 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECContainerOperationClient containerOperationClient;
 
   private final ByteBufferPool byteBufferPool;
-  private final CertificateClient certificateClient;
 
   private final ExecutorService ecReconstructExecutor;
 
@@ -110,15 +110,14 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
 
-  public ECReconstructionCoordinator(ConfigurationSource conf,
-      CertificateClient certificateClient,
-      StateContext context,
+  public ECReconstructionCoordinator(
+      ConfigurationSource conf, CertificateClient certificateClient,
+      SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
-    this.certificateClient = certificateClient;
     this.ecReconstructExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
             conf.getObject(OzoneClientConfig.class)
@@ -128,7 +127,7 @@ public class ECReconstructionCoordinator implements Closeable {
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
-    tokenHelper = new TokenHelper(conf, certificateClient);
+    tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.clientMetrics = ContainerClientMetrics.acquire();
     this.metrics = metrics;
   }
@@ -154,7 +153,9 @@ public class ECReconstructionCoordinator implements Closeable {
       for (Map.Entry<Integer, DatanodeDetails> indexDnPair : targetNodeMap
           .entrySet()) {
         DatanodeDetails dn = indexDnPair.getValue();
-        Integer index = indexDnPair.getKey();
+        int index = indexDnPair.getKey();
+        LOG.debug("Creating container {} on datanode {} for index {}",
+            containerID, dn, index);
         containerOperationClient
             .createRecoveringContainer(containerID, dn, repConfig,
                 containerToken, index);
@@ -172,6 +173,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
       // 3. Close containers
       for (DatanodeDetails dn: recoveringContainersCreatedDNs) {
+        LOG.debug("Closing container {} on datanode {}", containerID, dn);
         containerOperationClient
             .closeContainer(containerID, dn, repConfig, containerToken);
       }
@@ -209,16 +211,17 @@ public class ECReconstructionCoordinator implements Closeable {
 
   }
 
-  ECBlockOutputStream getECBlockOutputstream(
+  private ECBlockOutputStream getECBlockOutputStream(
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
-      ECReplicationConfig repConfig, int replicaIndex, BufferPool bufferPool,
+      ECReplicationConfig repConfig, int replicaIndex,
       OzoneClientConfig configuration) throws IOException {
-    return new ECBlockOutputStream(blockLocationInfo.getBlockID(),
-            this.containerOperationClient.getXceiverClientManager(),
-            this.containerOperationClient
-                    .singleNodePipeline(datanodeDetails, repConfig,
-                            replicaIndex), bufferPool, configuration,
-            blockLocationInfo.getToken(), clientMetrics);
+    return new ECBlockOutputStream(
+        blockLocationInfo.getBlockID(),
+        containerOperationClient.getXceiverClientManager(),
+        containerOperationClient.singleNodePipeline(datanodeDetails,
+            repConfig, replicaIndex),
+        BufferPool.empty(), configuration,
+        blockLocationInfo.getToken(), clientMetrics);
   }
 
   @VisibleForTesting
@@ -264,20 +267,13 @@ public class ECReconstructionCoordinator implements Closeable {
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
       OzoneClientConfig configuration = new OzoneClientConfig();
-      // TODO: Let's avoid unnecessary bufferPool creation. This pool actually
-      //  not used in EC flows, but there are some dependencies on buffer pool.
-      BufferPool bufferPool =
-          new BufferPool(configuration.getStreamBufferSize(),
-              (int) (configuration.getStreamBufferMaxSize() / configuration
-                  .getStreamBufferSize()),
-              ByteStringConversion.createByteBufferConversion(false));
       try {
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails =
               targetMap.get(replicaIndex);
-          targetBlockStreams[i] = getECBlockOutputstream(blockLocationInfo,
-              datanodeDetails, repConfig, replicaIndex, bufferPool,
+          targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo,
+              datanodeDetails, repConfig, replicaIndex,
               configuration);
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
           // Make sure it's clean. Don't want to reuse the erroneously returned
@@ -390,7 +386,6 @@ public class ECReconstructionCoordinator implements Closeable {
     if (containerOperationClient != null) {
       containerOperationClient.close();
     }
-    tokenHelper.stop();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
@@ -439,6 +434,36 @@ public class ECReconstructionCoordinator implements Closeable {
             new BlockData[repConfig.getRequiredNodes()]);
         blkDataArr[index - 1] = blockData;
         resultMap.put(blockID.getLocalID(), blkDataArr);
+      }
+    }
+    // When a stripe is written, the put block is sent to all nodes even if
+    // that nodes has zero bytes written to it. If the
+    // client does not get an ACK from all nodes, it will abandon the stripe,
+    // which can leave incomplete stripes on the DNs. Therefore, we should check
+    // that all blocks in the result map have an entry for all nodes. If they
+    // do not, it means this is an abandoned stripe and we should not attempt
+    // to reconstruct it.
+    // Note that if some nodes report different values for the block length,
+    // it also indicate garbage data at the end of the block. A different part
+    // of the code handles this and only reconstructs the valid part of the
+    // block, ie the minimum length reported by the nodes.
+    Iterator<Map.Entry<Long, BlockData[]>> resultIterator
+        = resultMap.entrySet().iterator();
+    while (resultIterator.hasNext()) {
+      Map.Entry<Long, BlockData[]> entry = resultIterator.next();
+      BlockData[] blockDataArr = entry.getValue();
+      for (Map.Entry<Integer, DatanodeDetails> e : sourceNodeMap.entrySet()) {
+        // There should be an entry in the Array for each keyset node. If there
+        // is not, this is an orphaned stripe and we should remove it from the
+        // result.
+        if (blockDataArr[e.getKey() - 1] == null) {
+          LOG.warn("In container {} block {} does not have a putBlock entry " +
+              "for index {} on datanode {} making it an orphan block / " +
+              "stripe. It will not be reconstructed", containerID,
+              entry.getKey(), e.getKey(), e.getValue());
+          resultIterator.remove();
+          break;
+        }
       }
     }
     return resultMap;

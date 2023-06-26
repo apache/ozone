@@ -62,11 +62,12 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   }
 
   @Override
-  protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
+  protected OmKeyInfo getOmKeyInfo(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName)
       throws IOException {
-    OzoneFileStatus keyStatus =
-        getOzoneKeyStatus(omMetadataManager, volumeName, bucketName, keyName);
+    OzoneFileStatus keyStatus = getOzoneKeyStatus(
+        ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
     return keyStatus != null ? keyStatus.getKeyInfo() : null;
   }
 
@@ -82,12 +83,11 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @Override
   protected OzoneFileStatus getOzoneKeyStatus(
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      String keyName) throws IOException {
-    OzoneFileStatus keyStatus = OMFileRequest
-        .getOMKeyInfoIfExists(omMetadataManager, volumeName, bucketName,
-            keyName, 0);
-    return keyStatus;
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName) throws IOException {
+    return OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+        volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
   }
 
   @Override

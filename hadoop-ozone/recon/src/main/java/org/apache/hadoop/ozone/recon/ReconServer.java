@@ -25,10 +25,12 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -46,6 +48,7 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,10 +56,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -67,6 +73,7 @@ public class ReconServer extends GenericCli {
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
   private Injector injector;
 
+  private JvmPauseMonitor jvmPauseMonitor;
   private ReconHttpServer httpServer;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
@@ -116,11 +123,12 @@ public class ReconServer extends GenericCli {
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
               "Initializing certificate.");
-          initializeCertificateClient(configuration);
+          initializeCertificateClient();
         }
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
       }
+      jvmPauseMonitor = newJvmPauseMonitor("Recon");
       this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
@@ -142,8 +150,10 @@ public class ReconServer extends GenericCli {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
-      LOG.info("Recon server initialized successfully!");
 
+      LOG.info("Initializing support of Recon Features...");
+      FeatureProvider.initFeatureSupport(configuration);
+      LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
     }
@@ -165,11 +175,14 @@ public class ReconServer extends GenericCli {
   /**
    * Initializes secure Recon.
    * */
-  private void initializeCertificateClient(OzoneConfiguration conf)
+  private void initializeCertificateClient()
       throws IOException {
     LOG.info("Initializing secure Recon.");
-    certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-        reconStorage, this::saveNewCertId, null);
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
+    SecurityConfig secConf = new SecurityConfig(configuration);
+    certClient = new ReconCertificateClient(secConf, scmSecurityClient,
+        reconStorage, this::saveNewCertId, this::terminateRecon);
 
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
@@ -177,7 +190,7 @@ public class ReconServer extends GenericCli {
       certClient.close();
       reconStorage.unsetReconCertSerialId();
       reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(new SecurityConfig(configuration),
+      certClient = new ReconCertificateClient(secConf, scmSecurityClient,
           reconStorage, this::saveNewCertId, this::terminateRecon);
       response = certClient.init();
     }
@@ -234,7 +247,9 @@ public class ReconServer extends GenericCli {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
-      reconTaskStatusMetrics.register();
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.register();
+      }
       if (httpServer != null) {
         httpServer.start();
       }
@@ -243,6 +258,9 @@ public class ReconServer extends GenericCli {
       }
       if (reconStorageContainerManager != null) {
         reconStorageContainerManager.start();
+      }
+      if (jvmPauseMonitor != null) {
+        jvmPauseMonitor.start();
       }
     }
   }
@@ -287,6 +305,9 @@ public class ReconServer extends GenericCli {
       } catch (IOException ioe) {
         LOG.error("Failed to close certificate client.", ioe);
       }
+    }
+    if (jvmPauseMonitor != null) {
+      jvmPauseMonitor.stop();
     }
   }
 

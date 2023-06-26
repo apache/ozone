@@ -33,6 +33,7 @@ share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/commons-fileupload.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
 share/ozone/lib/derby.jar
@@ -216,6 +217,7 @@ share/ozone/lib/ozone-interface-storage.jar
 share/ozone/lib/ozone-manager.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-recon.jar
+share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
 share/ozone/lib/perfmark-api.jar
@@ -259,6 +261,7 @@ share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/stax-ex.jar
 share/ozone/lib/txw2.jar
+share/ozone/lib/vault-java-driver.jar
 share/ozone/lib/weld-servlet-shaded.Final.jar
 share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar

@@ -21,9 +21,12 @@ package org.apache.hadoop.fs.ozone;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -52,7 +55,8 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -68,6 +72,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -127,7 +132,6 @@ public class TestHSync {
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testO3fsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
@@ -143,7 +147,6 @@ public class TestHSync {
   }
 
   @Test
-  @Flaky("HDDS-8024")
   public void testOfsHSync() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
@@ -157,6 +160,59 @@ public class TestHSync {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
         runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
+  public void testUncommittedBlocks() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    final byte[] data = new byte[1];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "file");
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.hsync();
+        outputStream.write(data);
+        outputStream.hsync();
+        assertTrue(cluster.getOzoneManager().getMetadataManager()
+            .getDeletedTable().isEmpty());
+      }
+    }
+  }
+
+  @Test
+  public void testOverwriteHSyncFile() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "fileoverwrite");
+      try (FSDataOutputStream os = fs.create(file, false)) {
+        os.hsync();
+        UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+            "user2", new String[] {"group1"});
+        assertThrows(FileAlreadyExistsException.class,
+            () -> ugi.doAs((PrivilegedExceptionAction<Void>) () -> {
+              try (FSDataOutputStream os1 = fs.create(file, false)) {
+                os1.hsync();
+              }
+              return null;
+            }));
+        os.hsync();
       }
     }
   }
@@ -227,6 +283,81 @@ public class TestHSync {
       }
     }
     assertEquals(data.length, offset);
+  }
+
+  private void runConcurrentWriteHSync(Path file,
+      final FSDataOutputStream out, int initialDataSize)
+      throws InterruptedException, IOException {
+    final byte[] data = new byte[initialDataSize];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    AtomicReference<IOException> writerException = new AtomicReference<>();
+    AtomicReference<IOException> syncerException = new AtomicReference<>();
+
+    LOG.info("runConcurrentWriteHSync {} with size {}",
+        file, initialDataSize);
+
+    final long start = Time.monotonicNow();
+    // two threads: write and hsync
+    Runnable writer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.write(data);
+        } catch (IOException e) {
+          writerException.set(e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Runnable syncer = () -> {
+      while ((Time.monotonicNow() - start < 10000)) {
+        try {
+          out.hsync();
+        } catch (IOException e) {
+          syncerException.set(e);
+          throw new RuntimeException(e);
+        }
+      }
+    };
+
+    Thread writerThread = new Thread(writer);
+    writerThread.start();
+    Thread syncThread = new Thread(syncer);
+    syncThread.start();
+    writerThread.join();
+    syncThread.join();
+
+    if (writerException.get() != null) {
+      throw writerException.get();
+    }
+    if (syncerException.get() != null) {
+      throw syncerException.get();
+    }
+  }
+
+  @Test
+  public void testConcurrentWriteHSync()
+      throws IOException, InterruptedException {
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path(dir, "file" + i);
+        try (FSDataOutputStream out =
+            fs.create(file, true)) {
+          int initialDataSize = 1 << i;
+          runConcurrentWriteHSync(file, out, initialDataSize);
+        }
+
+        fs.delete(file, false);
+      }
+    }
   }
 
   @Test

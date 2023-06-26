@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -54,6 +55,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
@@ -87,6 +89,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
@@ -157,6 +160,11 @@ public class TestKeyValueContainer {
         datanodeId.toString());
 
     keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
+  }
+
+  @After
+  public void after() {
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -369,6 +377,23 @@ public class TestKeyValueContainer {
     populate(keyValueContainer, numberOfKeysToWrite);
   }
 
+  private void populateWithoutBlock(KeyValueContainer container,
+                                    long numberOfKeysToWrite)
+      throws IOException {
+    KeyValueContainerData cData = container.getContainerData();
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, CONF)) {
+      // Just update metdata, and don't insert in block table
+      // As for test, we are doing manually so adding key count to DB.
+      metadataStore.getStore().getMetadataTable()
+          .put(cData.getBlockCountKey(), numberOfKeysToWrite);
+    }
+
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("key1", "value1");
+    container.update(metadata, true);
+  }
+
+
   /**
    * Set container state to CLOSED.
    */
@@ -455,7 +480,7 @@ public class TestKeyValueContainer {
     assertFalse("Container File still exists",
         keyValueContainer.getContainerFile().exists());
 
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertTrue(keyValueContainer.getContainerDBFile().exists());
     } else {
       assertFalse("Container DB file still exists",
@@ -626,7 +651,7 @@ public class TestKeyValueContainer {
     }
 
     // DBOtions should be different, except SCHEMA-V3
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       Assert.assertEquals(
           outProfile1.getDBOptions().compactionReadaheadSize(),
           outProfile2.getDBOptions().compactionReadaheadSize());
@@ -666,7 +691,8 @@ public class TestKeyValueContainer {
 
   @Test
   public void testAutoCompactionSmallSstFile() throws IOException {
-    Assume.assumeTrue(schemaVersion.equals(OzoneConsts.SCHEMA_V3));
+    Assume.assumeTrue(
+        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     HddsVolume newVolume = new HddsVolume.Builder(
         folder.newFolder().getAbsolutePath())
@@ -758,6 +784,95 @@ public class TestKeyValueContainer {
             new File(c.getContainerData().getContainerPath());
         FileUtils.deleteDirectory(directory);
       }
+    }
+  }
+
+  @Test
+  public void testIsEmptyContainerStateWhileImport() throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 1;
+    closeContainer();
+    populate(numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = folder.newFile("export.tar");
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
+
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
+
+      //delete the original one
+      keyValueContainer.delete();
+
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+      container.populatePathFields(scmId, containerVolume);
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      }
+
+      // After import check whether isEmpty flag is false
+      Assert.assertFalse(container.getContainerData().isEmpty());
+    }
+  }
+
+  @Test
+  public void testIsEmptyContainerStateWhileImportWithoutBlock()
+      throws Exception {
+    long containerId = keyValueContainer.getContainerData().getContainerID();
+    createContainer();
+    long numberOfKeysToWrite = 1;
+    closeContainer();
+    populateWithoutBlock(keyValueContainer, numberOfKeysToWrite);
+
+    //destination path
+    File folderToExport = folder.newFile("export.tar");
+    for (CopyContainerCompression compr : CopyContainerCompression.values()) {
+      TarContainerPacker packer = new TarContainerPacker(compr);
+
+      //export the container
+      try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
+        keyValueContainer
+            .exportContainerData(fos, packer);
+      }
+
+      //delete the original one
+      keyValueContainer.delete();
+      //create a new one
+      KeyValueContainerData containerData =
+          new KeyValueContainerData(containerId,
+              keyValueContainerData.getLayoutVersion(),
+              keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+              datanodeId.toString());
+      containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+      KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+
+      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+      container.populatePathFields(scmId, containerVolume);
+      try (FileInputStream fis = new FileInputStream(folderToExport)) {
+        container.importContainerData(fis, packer);
+      }
+
+      // After import check whether isEmpty flag is true
+      // since there are no blocks in rocksdb
+      Assert.assertTrue(container.getContainerData().isEmpty());
     }
   }
 }

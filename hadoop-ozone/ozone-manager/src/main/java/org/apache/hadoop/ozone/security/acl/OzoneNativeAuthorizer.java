@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -32,10 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -47,24 +46,29 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneNativeAuthorizer.class);
+
+  private static final Predicate<UserGroupInformation> NO_ADMIN = any -> false;
+
   private VolumeManager volumeManager;
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManager prefixManager;
-  private OzoneAdmins ozAdmins;
+  private Predicate<UserGroupInformation> adminCheck = NO_ADMIN;
+  private Predicate<UserGroupInformation> readOnlyAdminCheck = NO_ADMIN;
   private boolean allowListAllVolumes;
 
   public OzoneNativeAuthorizer() {
+    // required for instantiation in OmMetadataReader#getACLAuthorizerInstance
   }
 
-  public OzoneNativeAuthorizer(VolumeManager volumeManager,
+  OzoneNativeAuthorizer(VolumeManager volumeManager,
       BucketManager bucketManager, KeyManager keyManager,
       PrefixManager prefixManager, OzoneAdmins ozoneAdmins) {
     this.volumeManager = volumeManager;
     this.bucketManager = bucketManager;
     this.keyManager = keyManager;
     this.prefixManager = prefixManager;
-    this.ozAdmins = ozoneAdmins;
+    this.adminCheck = ozoneAdmins::isAdmin;
   }
 
   /**
@@ -92,8 +96,15 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     }
 
     // bypass all checks for admin
-    boolean isAdmin = isAdmin(context.getClientUgi());
-    if (isAdmin) {
+    if (adminCheck.test(context.getClientUgi())) {
+      return true;
+    }
+
+    // bypass read checks for read only admin users
+    if (readOnlyAdminCheck.test(context.getClientUgi())
+        && (context.getAclRights() == ACLType.READ
+        || context.getAclRights() == ACLType.READ_ACL
+        || context.getAclRights() == ACLType.LIST)) {
       return true;
     }
 
@@ -106,7 +117,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
     ACLType parentAclRight = OzoneAclUtils.getParentNativeAcl(
         context.getAclRights(), objInfo.getResourceType());
-    
+
     parentContext = RequestContext.newBuilder()
         .setClientUgi(context.getClientUgi())
         .setIp(context.getIp())
@@ -127,9 +138,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
         // only admin is allowed to create volume and list all volumes
         return false;
       }
-      boolean volumeAccess =  isOwner ||
-          volumeManager.checkAccess(objInfo, context);
-      return volumeAccess;
+      return isOwner || volumeManager.checkAccess(objInfo, context);
     case BUCKET:
       LOG.trace("Checking access for bucket: {}", objInfo);
       // Skip check for volume owner
@@ -191,12 +200,22 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.prefixManager = prefixManager;
   }
 
-  public void setOzoneAdmins(OzoneAdmins ozoneAdmins) {
-    this.ozAdmins = ozoneAdmins;
+  @VisibleForTesting
+  void setOzoneAdmins(OzoneAdmins admins) {
+    setAdminCheck(admins::isAdmin);
   }
 
-  public OzoneAdmins getOzoneAdmins() {
-    return ozAdmins;
+  @VisibleForTesting
+  void setOzoneReadOnlyAdmins(OzoneAdmins readOnlyAdmins) {
+    setReadOnlyAdminCheck(readOnlyAdmins::isAdmin);
+  }
+
+  public void setAdminCheck(Predicate<UserGroupInformation> check) {
+    adminCheck = Objects.requireNonNull(check, "admin check");
+  }
+
+  public void setReadOnlyAdminCheck(Predicate<UserGroupInformation> check) {
+    readOnlyAdminCheck = Objects.requireNonNull(check, "read-only admin check");
   }
 
   public void setAllowListAllVolumes(boolean allowListAllVolumes) {
@@ -207,23 +226,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     return allowListAllVolumes;
   }
 
-  private boolean isOwner(UserGroupInformation callerUgi, String ownerName) {
-    if (ownerName == null) {
-      return false;
-    }
-    if (callerUgi.getShortUserName().equals(ownerName)) {
-      return true;
-    }
-    return false;
-  }
-
-  private boolean isAdmin(UserGroupInformation callerUgi) {
-    Preconditions.checkNotNull(callerUgi, "callerUgi should not be null!");
-
-    if (ozAdmins == null) {
-      return false;
-    }
-
-    return ozAdmins.isAdmin(callerUgi);
+  private static boolean isOwner(UserGroupInformation ugi, String ownerName) {
+    return ownerName != null && ownerName.equals(ugi.getShortUserName());
   }
 }

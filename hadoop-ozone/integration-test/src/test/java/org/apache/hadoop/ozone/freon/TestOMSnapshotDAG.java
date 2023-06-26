@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -98,6 +99,8 @@ public class TestOMSnapshotDAG {
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Set DB CF write buffer to a much lower value so that flush and compaction
     // happens much more frequently without having to create a lot of keys.
@@ -147,7 +150,7 @@ public class TestOMSnapshotDAG {
 
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
-    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
+    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
         getTablePrefixes(omMetadataManager, volumeName, bucketName));
   }
@@ -197,7 +200,7 @@ public class TestOMSnapshotDAG {
         !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
         .collect(Collectors.toList()).get(0).getVolume();
     List<OmBucketInfo> bucketList =
-        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10);
+        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10, false);
     LOG.debug("List of all buckets under the first volume: {}", bucketList);
     final String bucketName = bucketList.get(0).getBucketName();
 

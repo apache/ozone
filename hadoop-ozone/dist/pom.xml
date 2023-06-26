@@ -28,8 +28,9 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20230104-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20230503-1</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>apache/ozone-testkrb5:20230318-1</docker.ozone-testkr5b.image>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
   </properties>
 
   <build>
@@ -75,7 +76,7 @@
               <includes>*.classpath</includes>
               <includeArtifactIds>
                 hdds-server-scm,ozone-common,ozone-csi,ozone-datanode,ozone-httpfsgateway,
-                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native
+                ozone-insight,ozone-manager,ozone-recon,ozone-s3gateway,ozone-tools,hdds-rocks-native,ozone-s3-secret-store
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -230,6 +231,10 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-s3-secret-store</artifactId>
     </dependency>
   </dependencies>
   <profiles>

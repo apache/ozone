@@ -73,6 +73,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>junit-jupiter-params</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-rocks-native</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -187,6 +196,25 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   </build>
                 </image>
               </images>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>native-testing</id>
+      <activation>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.parent.basedir}/rocks-native/target/native/rocksdb</argLine>
             </configuration>
           </plugin>
         </plugins>

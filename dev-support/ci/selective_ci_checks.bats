@@ -165,6 +165,30 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "native only" {
+  run dev-support/ci/selective_ci_checks.sh 5b1319a8c2
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "native test in other module" {
+  run dev-support/ci/selective_ci_checks.sh 7d01cc14a6
+
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","native","unit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
 @test "kubernetes only" {
   run dev-support/ci/selective_ci_checks.sh 5336bb9bd
 
@@ -252,7 +276,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","rat","unit"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -264,7 +288,19 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","rat","unit"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","rat","unit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
+}
+
+@test "CI workflow change (ci.yaml)" {
+  run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
+
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","rat","unit"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -301,6 +337,18 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh 4f0bd4ae3
 
   assert_output -p 'basic-checks=["rat","bats"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "compose README" {
+  run dev-support/ci/selective_ci_checks.sh 85a0700980
+
+  assert_output -p 'basic-checks=["rat"]'
   assert_output -p needs-build=false
   assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false

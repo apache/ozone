@@ -143,9 +143,13 @@ public final class OzoneConsts {
       "flushBeforeCheckpoint";
   public static final String OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA =
       "includeSnapshotData";
+  public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
+      "toExcludeSST";
 
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
+
+  public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
   /**
    * Supports Bucket Versioning.
@@ -289,9 +293,6 @@ public final class OzoneConsts {
   // but have containerID as key prefixes.
   public static final String SCHEMA_V3 = "3";
 
-  public static final String[] SCHEMA_VERSIONS =
-      new String[] {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
-
   // Supported store types.
   public static final String OZONE = "ozone";
   public static final String S3 = "s3";
@@ -323,6 +324,7 @@ public final class OzoneConsts {
   public static final String ADD_ACLS = "addAcls";
   public static final String REMOVE_ACLS = "removeAcls";
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
+  public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String TO_KEY_NAME = "toKeyName";
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
@@ -457,6 +459,10 @@ public final class OzoneConsts {
   public static final String SCM_RATIS_SNAPSHOT_DIR = "snapshot";
 
   public static final long DEFAULT_OM_UPDATE_ID = -1L;
+
+  // RocksDB snapshot
+  public static final String SNAPSHOT_CANDIDATE_DIR = ".candidate";
+  public static final String ROCKSDB_SST_SUFFIX = ".sst";
 
   // SCM default service Id and node Id in non-HA where config is not defined
   // in non-HA style.

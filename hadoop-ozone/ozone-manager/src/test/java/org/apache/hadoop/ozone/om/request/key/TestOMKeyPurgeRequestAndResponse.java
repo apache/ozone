@@ -186,7 +186,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-          omResponse, deletedKeyNames, null);
+          omResponse, deletedKeyNames, null, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.
@@ -214,7 +214,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
     OmSnapshot omSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
-            getSnapshotPrefix("snap1"));
+            getSnapshotPrefix("snap1"), true);
 
     // The keys should be present in the snapshot's deletedTable
     for (String deletedKey : deletedKeyNames) {
@@ -243,7 +243,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
              omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-          omResponse, deletedKeyNames, omSnapshot);
+          omResponse, deletedKeyNames, omSnapshot, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.

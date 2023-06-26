@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -92,7 +93,8 @@ public class TestCreatePipelineCommandHandler {
         .thenReturn(false);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler((leader, tls) -> raftClient);
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient,
+            MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 
@@ -124,7 +126,8 @@ public class TestCreatePipelineCommandHandler {
         .thenReturn(true);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(new OzoneConfiguration());
+        new CreatePipelineCommandHandler(new OzoneConfiguration(),
+            MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 

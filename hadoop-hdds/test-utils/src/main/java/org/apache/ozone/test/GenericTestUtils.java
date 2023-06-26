@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -46,6 +45,7 @@ import org.junit.Assert;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -60,7 +60,8 @@ public abstract class GenericTestUtils {
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
   /**
-   * Error string used in {@link GenericTestUtils#waitFor(Supplier, int, int)}.
+   * Error string used in
+   * {@link GenericTestUtils#waitFor(BooleanSupplier, int, int)}.
    */
   public static final String ERROR_MISSING_ARGUMENT =
       "Input supplier interface should be initialized";
@@ -211,18 +212,18 @@ public abstract class GenericTestUtils {
    *                              time
    * @throws InterruptedException if the method is interrupted while waiting
    */
-  public static void waitFor(Supplier<Boolean> check, int checkEveryMillis,
+  public static void waitFor(BooleanSupplier check, int checkEveryMillis,
       int waitForMillis) throws TimeoutException, InterruptedException {
     Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
 
     long st = monotonicNow();
-    boolean result = check.get();
+    boolean result = check.getAsBoolean();
 
     while (!result && (monotonicNow() - st < waitForMillis)) {
       Thread.sleep(checkEveryMillis);
-      result = check.get();
+      result = check.getAsBoolean();
     }
 
     if (!result) {

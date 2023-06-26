@@ -86,13 +86,9 @@ public class DatanodeConfiguration {
   public static final String
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
-
-  public static final String
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE =
-      "hdds.datanode.check.empty.container.delete";
   public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT =
-      true;
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT =
+      false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -146,12 +142,25 @@ public class DatanodeConfiguration {
    */
   @Config(key = "block.delete.queue.limit",
       type = ConfigType.INT,
-      defaultValue = "1440",
+      defaultValue = "5",
       tags = {DATANODE},
       description = "The maximum number of block delete commands queued on " +
           " a datanode"
   )
-  private int blockDeleteQueueLimit = 60 * 24;
+  private int blockDeleteQueueLimit = 5;
+
+  /**
+   * The maximum number of commands in queued list.
+   * if the commands limit crosses limit, then command will be ignored.
+   */
+  @Config(key = "command.queue.limit",
+      type = ConfigType.INT,
+      defaultValue = "5000",
+      tags = {DATANODE},
+      description = "The default maximum number of commands in the queue " +
+          "and command type's sub-queue on a datanode"
+  )
+  private int cmdQueueLimit = 5000;
 
   @Config(key = "block.deleting.service.interval",
           defaultValue = "60s",
@@ -399,6 +408,20 @@ public class DatanodeConfiguration {
   )
   private int autoCompactionSmallSstFileNum = 512;
 
+  /**
+   * Whether to check container directory or not to determine
+   * container is empty.
+   */
+  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = { DATANODE },
+      description = "Boolean Flag to decide whether to check container " +
+          "directory or not to determine container is empty"
+  )
+  private boolean bCheckEmptyContainerDir =
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
+
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -518,6 +541,10 @@ public class DatanodeConfiguration {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
   }
 
+  public boolean getCheckEmptyContainerDir() {
+    return bCheckEmptyContainerDir;
+  }
+
   public Duration getDiskCheckMinGap() {
     return Duration.ofMillis(diskCheckMinGap);
   }
@@ -548,6 +575,14 @@ public class DatanodeConfiguration {
 
   public void setBlockDeleteQueueLimit(int queueLimit) {
     this.blockDeleteQueueLimit = queueLimit;
+  }
+
+  public int getCommandQueueLimit() {
+    return cmdQueueLimit;
+  }
+
+  public void setCommandQueueLimit(int queueLimit) {
+    this.cmdQueueLimit = queueLimit;
   }
 
   public boolean isChunkDataValidationCheck() {

@@ -103,7 +103,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         //make sure after DN is removed from topology,
         //DatanodeDetails instance returned from nodeStateManager has no parent.
         Preconditions.checkState(
-            nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+            nodeManager.getNodeByUuid(datanodeDetails.getUuid())
                 .getParent() == null);
       }
     } catch (NodeNotFoundException ex) {

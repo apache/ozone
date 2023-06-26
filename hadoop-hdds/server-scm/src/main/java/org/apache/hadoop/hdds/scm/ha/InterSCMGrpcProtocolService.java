@@ -25,7 +25,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -48,8 +48,8 @@ public class InterSCMGrpcProtocolService {
   private Server server;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
-  public InterSCMGrpcProtocolService(final ConfigurationSource conf,
-      final StorageContainerManager scm) {
+  InterSCMGrpcProtocolService(final ConfigurationSource conf,
+      final StorageContainerManager scm) throws IOException {
     Preconditions.checkNotNull(conf);
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);

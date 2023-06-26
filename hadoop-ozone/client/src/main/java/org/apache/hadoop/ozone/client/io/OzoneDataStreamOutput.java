@@ -16,17 +16,18 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
+import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 /**
  * OzoneDataStreamOutput is used to write data into Ozone.
- * It uses SCM's {@link KeyDataStreamOutput} for writing the data.
  */
-public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
+public class OzoneDataStreamOutput extends ByteBufferOutputStream {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
 
@@ -56,9 +57,20 @@ public class OzoneDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
-      return ((KeyDataStreamOutput)
-              byteBufferStreamOutput).getCommitUploadPartInfo();
+    if (byteBufferStreamOutput instanceof OzoneOutputStream) {
+      OutputStream outputStream =
+          ((OzoneOutputStream) byteBufferStreamOutput).getOutputStream();
+      if (outputStream instanceof KeyDataStreamOutput) {
+        return ((KeyDataStreamOutput)
+            outputStream).getCommitUploadPartInfo();
+      } else if (outputStream instanceof CryptoOutputStream) {
+        OutputStream wrappedStream =
+            ((CryptoOutputStream) outputStream).getWrappedStream();
+        if (wrappedStream instanceof KeyDataStreamOutput) {
+          return ((KeyDataStreamOutput) wrappedStream)
+              .getCommitUploadPartInfo();
+        }
+      }
     }
     // Otherwise return null.
     return null;
