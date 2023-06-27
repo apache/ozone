@@ -121,7 +121,7 @@ public class SnapshotDiffObject {
       return this;
     }
 
-    public SnapshotDiffObjectBuilder isDirectory(boolean directory) {
+    public SnapshotDiffObjectBuilder setIsDirectory(boolean directory) {
       isDirectory = directory;
       return this;
     }

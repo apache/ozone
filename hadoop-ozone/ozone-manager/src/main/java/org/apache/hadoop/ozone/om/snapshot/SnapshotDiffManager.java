@@ -1151,7 +1151,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       long objectId, String oldName, SnapshotDiffObject diffObject,
       boolean isDirectory) {
     SnapshotDiffObjectBuilder builder = new SnapshotDiffObjectBuilder(objectId)
-        .withOldKeyName(oldName).isDirectory(isDirectory);
+        .withOldKeyName(oldName).setIsDirectory(isDirectory);
     if (diffObject != null) {
       builder.withNewKeyName(diffObject.getNewKeyName());
     }
@@ -1163,7 +1163,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       boolean isDirectory) {
 
     SnapshotDiffObjectBuilder builder = new SnapshotDiffObjectBuilder(objectId)
-        .withNewKeyName(newName).isDirectory(isDirectory);
+        .withNewKeyName(newName).setIsDirectory(isDirectory);
     if (diffObject != null) {
       builder.withOldKeyName(diffObject.getOldKeyName());
     }
