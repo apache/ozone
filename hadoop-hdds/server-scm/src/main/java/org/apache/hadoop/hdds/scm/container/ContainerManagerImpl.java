@@ -19,19 +19,18 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -55,7 +54,9 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Comparator.reverseOrder;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
+import static org.apache.hadoop.hdds.utils.CollectionUtils.findTopN;
 
 /**
  * {@link ContainerManager} implementation in SCM server.
@@ -144,34 +145,14 @@ public class ContainerManagerImpl implements ContainerManager {
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    final List<ContainerID> containersIds =
-        new ArrayList<>(containerStateManager.getContainerIDs());
-    Collections.sort(containersIds);
-    List<ContainerInfo> containers;
-    lock.lock();
-    try {
-      containers = containersIds.stream()
-          .filter(id -> id.compareTo(startID) >= 0).limit(count)
-          .map(containerStateManager::getContainer)
-          .collect(Collectors.toList());
-    } finally {
-      lock.unlock();
-    }
-    return containers;
+    return toContainers(filterSortAndLimit(startID, count,
+        containerStateManager.getContainerIDs()));
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    List<ContainerInfo> containers;
-    lock.lock();
-    try {
-      containers = containerStateManager.getContainerIDs(state).stream()
-          .map(containerStateManager::getContainer)
-          .filter(Objects::nonNull).collect(Collectors.toList());
-    } finally {
-      lock.unlock();
-    }
-    return containers;
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return toContainers(containerStateManager.getContainerIDs(state));
   }
 
   @Override
@@ -179,20 +160,8 @@ public class ContainerManagerImpl implements ContainerManager {
                                            final int count,
                                            final LifeCycleState state) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    final List<ContainerID> containersIds =
-        new ArrayList<>(containerStateManager.getContainerIDs(state));
-    Collections.sort(containersIds);
-    List<ContainerInfo> containers;
-    lock.lock();
-    try {
-      containers = containersIds.stream()
-          .filter(id -> id.compareTo(startID) >= 0).limit(count)
-          .map(containerStateManager::getContainer)
-          .collect(Collectors.toList());
-    } finally {
-      lock.unlock();
-    }
-    return containers;
+    return toContainers(filterSortAndLimit(startID, count,
+        containerStateManager.getContainerIDs(state)));
   }
 
   @Override
@@ -431,17 +400,23 @@ public class ContainerManagerImpl implements ContainerManager {
   public void deleteContainer(final ContainerID cid)
       throws IOException, TimeoutException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
+
+    final boolean found;
     lock.lock();
     try {
-      if (containerExist(cid)) {
+      found = containerExist(cid);
+      if (found) {
         containerStateManager.removeContainer(protoId);
-        scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
-      } else {
-        scmContainerManagerMetrics.incNumFailureDeleteContainers();
-        throwContainerNotFoundException(cid);
       }
     } finally {
       lock.unlock();
+    }
+
+    if (found) {
+      scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
+    } else {
+      scmContainerManagerMetrics.incNumFailureDeleteContainers();
+      throwContainerNotFoundException(cid);
     }
   }
 
@@ -470,5 +445,34 @@ public class ContainerManagerImpl implements ContainerManager {
   @VisibleForTesting
   public SCMHAManager getSCMHAManager() {
     return haManager;
+  }
+
+  private static List<ContainerID> filterSortAndLimit(
+      ContainerID startID, int count, Set<ContainerID> set) {
+
+    if (ContainerID.MIN.equals(startID) && count >= set.size()) {
+      List<ContainerID> list = new ArrayList<>(set);
+      Collections.sort(list);
+      return list;
+    }
+
+    return findTopN(set, count, reverseOrder(),
+        id -> id.compareTo(startID) >= 0);
+  }
+
+  /**
+   * Returns a list of all containers identified by {@code ids}.
+   */
+  private List<ContainerInfo> toContainers(Collection<ContainerID> ids) {
+    List<ContainerInfo> containers = new ArrayList<>(ids.size());
+
+    for (ContainerID id : ids) {
+      ContainerInfo container = containerStateManager.getContainer(id);
+      if (container != null) {
+        containers.add(container);
+      }
+    }
+
+    return containers;
   }
 }
