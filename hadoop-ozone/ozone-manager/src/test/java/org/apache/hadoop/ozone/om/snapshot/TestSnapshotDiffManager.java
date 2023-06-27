@@ -721,9 +721,10 @@ public class TestSnapshotDiffManager {
             toSnapName);
 
     long totalDiffEntries = spy.generateDiffReport("jobId",
-        fromSnapTable, toSnapTable, objectIdToDiffObject, oldObjectIdKeyMap,
-        newObjectIdKeyMap, volumeName, bucketName, fromSnapName, toSnapName,
-        false, Optional.empty(), Optional.empty());
+        fromSnapTable, toSnapTable, null, null,
+        objectIdToDiffObject, oldObjectIdKeyMap, newObjectIdKeyMap, volumeName,
+        bucketName, fromSnapName, toSnapName, false, Optional.empty(),
+        Optional.empty());
 
     assertEquals(100, totalDiffEntries);
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
@@ -1101,6 +1102,8 @@ public class TestSnapshotDiffManager {
     long totalDiffEntries = snapshotDiffManager.generateDiffReport("jobId",
         keyInfoTable,
         keyInfoTable,
+        null,
+        null,
         objectIdToDiffObject,
         oldObjIdToKeyMap,
         newObjIdToKeyMap,
@@ -1140,6 +1143,8 @@ public class TestSnapshotDiffManager {
         () -> spy.generateDiffReport("jobId",
             keyInfoTable,
             keyInfoTable,
+            null,
+            null,
             objectIdToDiffObject,
             oldObjIdToKeyMap,
             newObjIdToKeyMap,
@@ -1411,8 +1416,9 @@ public class TestSnapshotDiffManager {
     doNothing().when(spy).checkReportsIntegrity(any(), anyInt(), anyInt());
 
     doReturn(10L).when(spy).generateDiffReport(anyString(),
-        any(), any(), any(), any(), any(), anyString(), anyString(),
-        anyString(), anyString(), anyBoolean(), any(), any());
+        any(), any(), any(), any(), any(), any(), any(),
+        anyString(), anyString(), anyString(), anyString(), anyBoolean(),
+        any(), any());
     doReturn(LEGACY).when(spy).getBucketLayout(VOLUME_NAME, BUCKET_NAME,
         omMetadataManager);
 
