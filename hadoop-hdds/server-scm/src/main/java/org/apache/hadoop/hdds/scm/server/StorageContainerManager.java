@@ -197,6 +197,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
@@ -268,7 +269,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private final String scmStarterUser;
   private final OzoneAdmins scmAdmins;
-  private OzoneAdmins scmReadOnlyAdmins;
+  private final OzoneAdmins scmReadOnlyAdmins;
 
   /**
    * SCM mxbean.
@@ -391,7 +392,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
-            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
+            .register(OZONE_READONLY_ADMINISTRATORS,
+                this::reconfOzoneReadOnlyAdmins);
 
     initializeSystemManagers(conf, configurator);
 
@@ -2092,12 +2095,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmAdmins.getAdminUsernames();
   }
 
+  public Collection<String> getScmReadOnlyAdminUsernames() {
+    return scmReadOnlyAdmins.getAdminUsernames();
+  }
+
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
         getConfiguration(), scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
+        newVal, admins);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneReadOnlyAdmins(String newVal) {
+    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
+    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
+        getConfiguration());
+    scmReadOnlyAdmins.setAdminUsernames(admins);
+    LOG.info("Load conf {} : {}, and now read only admins are: {}",
+        OZONE_READONLY_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
   }
