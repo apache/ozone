@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,12 +153,18 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     if (t instanceof ExecutionException) {
       return translateException(t.getCause());
     }
-    ResultCodes result = ResultCodes.INTERNAL_ERROR;
-    if (t instanceof IOException) {
-      result = ResultCodes.IO_EXCEPTION;
-    } else if (t instanceof TimeoutException) {
+
+    ResultCodes result;
+    if (t instanceof TimeoutException) {
       result = ResultCodes.TIMEOUT;
+    } else if (t instanceof NotLeaderException) {
+      result = ResultCodes.SCM_NOT_LEADER;
+    } else if (t instanceof IOException) {
+      result = ResultCodes.IO_EXCEPTION;
+    } else {
+      result = ResultCodes.INTERNAL_ERROR;
     }
+
     return new SCMException(t, result);
   }
 
