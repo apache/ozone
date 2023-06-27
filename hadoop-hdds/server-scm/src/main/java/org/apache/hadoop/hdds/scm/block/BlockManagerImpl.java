@@ -48,7 +48,6 @@ import org.apache.hadoop.util.StringUtils;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.LOCAL_ID;
 
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,7 +183,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @return AllocatedBlock
    */
   private AllocatedBlock newBlock(ContainerInfo containerInfo)
-      throws NotLeaderException, TimeoutException {
+      throws SCMException {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());

@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -607,7 +608,7 @@ public class LegacyReplicationManager {
       // Should not happen, but if it does, just remove the action as the
       // node somehow does not exist;
       remove = true;
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       LOG.error("Got exception while updating.", e);
     }
     return remove;
@@ -628,7 +629,7 @@ public class LegacyReplicationManager {
                    final boolean isNotInService,
                    final ContainerInfo container, final DatanodeDetails dn,
                    final boolean isInflightReplication)
-      throws ContainerNotFoundException, TimeoutException {
+      throws SCMException {
     // make sure inflightMove contains the container
     ContainerID id = container.containerID();
 
@@ -1325,7 +1326,7 @@ public class LegacyReplicationManager {
    */
   private void deleteSrcDnForMove(final ContainerInfo cif,
                    final Set<ContainerReplica> replicaSet)
-      throws TimeoutException {
+      throws SCMException {
     final ContainerID cid = cif.containerID();
     MoveDataNodePair movePair = moveScheduler.getMoveDataNodePair(cid);
     if (movePair == null) {
@@ -1688,7 +1689,7 @@ public class LegacyReplicationManager {
      */
     @Replicate
     void completeMove(HddsProtos.ContainerID contianerIDProto)
-        throws TimeoutException;
+        throws SCMException;
 
     /**
      * start a move action for a given container.
@@ -1889,7 +1890,7 @@ public class LegacyReplicationManager {
           //before reelection.here, we just try to send the command again.
           try {
             deleteSrcDnForMove(cif, replicas);
-          } catch (TimeoutException ex) {
+          } catch (Exception ex) {
             LOG.error("Exception while cleaning up excess replicas.", ex);
           }
         } else {
@@ -1909,7 +1910,7 @@ public class LegacyReplicationManager {
     for (HddsProtos.ContainerID containerID : needToRemove) {
       try {
         moveScheduler.completeMove(containerID);
-      } catch (TimeoutException ex) {
+      } catch (Exception ex) {
         LOG.error("Exception while moving container.", ex);
       }
     }
