@@ -79,7 +79,7 @@ public class DatanodeConfiguration {
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
   static final long DISK_CHECK_MIN_GAP_DEFAULT =
-      Duration.ofMinutes(15).toMillis();
+      Duration.ofMinutes(5).toMillis();
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
@@ -312,7 +312,7 @@ public class DatanodeConfiguration {
       VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
 
   @Config(key = "disk.check.min.gap",
-      defaultValue = "15m",
+      defaultValue = "5m",
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "The minimum gap between two successive checks of the same"
