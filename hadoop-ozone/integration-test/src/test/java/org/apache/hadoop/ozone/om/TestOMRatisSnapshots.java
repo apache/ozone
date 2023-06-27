@@ -97,7 +97,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 @Timeout(5000)
 @Flaky("HDDS-8876")
-@Disabled("HDDS-8880")
+//@Disabled("HDDS-8880")
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
