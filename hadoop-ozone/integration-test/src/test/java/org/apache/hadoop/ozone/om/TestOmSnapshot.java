@@ -20,8 +20,6 @@ import java.time.Duration;
 import java.util.List;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -590,8 +588,9 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap2);
     SnapshotDiffReportOzone diff = getSnapDiffReport(volume, bucket,
         snap1, snap2);
-    Assertions.assertEquals(Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
-        SnapshotDiffReport.DiffType.RENAME, "/dir1", "/dir1_rename")),
+    Assertions.assertEquals(Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, "/dir1", "/dir1_rename")),
         diff.getDiffList());
   }
 
