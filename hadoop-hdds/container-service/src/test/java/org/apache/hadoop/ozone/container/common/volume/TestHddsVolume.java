@@ -502,6 +502,8 @@ public class TestHddsVolume {
 
     result = volume.check(false);
     assertEquals(VolumeCheckResult.FAILED, result);
+
+    volume.shutdown();
   }
 
   private MutableVolumeSet createDbVolumeSet() throws IOException {
