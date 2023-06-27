@@ -154,7 +154,6 @@ public class TestOMRatisSnapshots {
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
-//        .setNumDatanodes(1)
         .setNumOfActiveOMs(2)
         .build();
     cluster.waitForClusterToBeReady();
@@ -1196,8 +1195,8 @@ public class TestOMRatisSnapshots {
       File tarball = getTarball(snapshotDir);
       if (count == 1) {
         assert tarball != null;
-        om.getConfiguration().setLong("ozone.om.maxsize", 1);
-         //   Files.size(tarball.toPath())/2);
+        om.getConfiguration().setLong("ozone.om.maxsize",
+            Files.size(tarball.toPath())/2);
         createDummyTarball(tarball);
       } else {
         sstSetList.add(getSstFilenames(tarball));
