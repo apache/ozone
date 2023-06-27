@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
     .DeleteBlockTransactionResult;
@@ -97,6 +98,20 @@ public interface DeletedBlockLog extends Closeable {
    */
   void commitTransactions(List<DeleteBlockTransactionResult> transactionResults,
       UUID dnID);
+
+  /**
+   * Commits DeleteBlocksCommand to update the DeleteBlocksCommand status
+   * by SCMDeleteBlocksCommandStatusManager.
+   * @param deleteBlockStatus the list of DeleteBlocksCommand
+   * @param dnID
+   */
+  void commitCommandStatus(List<CommandStatus> deleteBlockStatus, UUID dnID);
+
+  /**
+   * Get ScmDeleteBlocksCommandStatusManager.
+   * @return an Object of ScmDeleteBlocksCommandStatusManager
+   */
+  SCMDeleteBlocksCommandStatusManager getScmCommandStatusManager();
 
   /**
    * Creates block deletion transactions for a set of containers,

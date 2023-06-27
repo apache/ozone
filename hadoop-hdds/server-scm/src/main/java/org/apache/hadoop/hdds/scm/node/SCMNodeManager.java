@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -515,6 +516,17 @@ public class SCMNodeManager implements NodeManager {
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
       List<SCMCommand> commands =
           commandQueue.getCommand(datanodeDetails.getUuid());
+
+      // Update the SCMCommand of deleteBlocksCommand Status
+      for (SCMCommand command : commands) {
+        if (command.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
+          DeletedBlockLog scmBlockDeletingService = scmContext.getScm().
+              getScmBlockManager().getDeletedBlockLog();
+          scmBlockDeletingService.getScmCommandStatusManager()
+              .onSent(datanodeDetails.getUuid(), command.getId());
+        }
+      }
+
       if (queueReport != null) {
         processNodeCommandQueueReport(datanodeDetails, queueReport, summary);
       }

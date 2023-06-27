@@ -18,12 +18,14 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.Set;
 import java.util.Map;
-import java.util.LinkedHashSet;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
@@ -57,6 +59,7 @@ import com.google.common.collect.Lists;
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import org.slf4j.Logger;
@@ -91,6 +94,9 @@ public class DeletedBlockLogImpl
   private final SCMContext scmContext;
   private final SequenceIdGenerator sequenceIdGen;
   private final ScmBlockDeletingServiceMetrics metrics;
+  private final SCMDeleteBlocksCommandStatusManager
+      scmDeleteBlocksCommandStatusManager;
+  private final long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
 
@@ -114,6 +120,8 @@ public class DeletedBlockLogImpl
     // maps transaction to dns which have committed it.
     transactionToDNsCommitMap = new ConcurrentHashMap<>();
     transactionToRetryCountMap = new ConcurrentHashMap<>();
+    this.scmDeleteBlocksCommandStatusManager =
+        new SCMDeleteBlocksCommandStatusManager();
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
         .newBuilder()
         .setConfiguration(conf)
@@ -224,6 +232,42 @@ public class DeletedBlockLogImpl
         .addAllLocalID(blocks)
         .setCount(0)
         .build();
+  }
+
+  @Override
+  public SCMDeleteBlocksCommandStatusManager getScmCommandStatusManager() {
+    return scmDeleteBlocksCommandStatusManager;
+  }
+
+  @Override
+  public void commitCommandStatus(
+      List<CommandStatus> deleteBlockStatus, UUID dnID) {
+    lock.lock();
+    try {
+      processSCMCommandStatus(deleteBlockStatus, dnID);
+      getScmCommandStatusManager().cleanSCMCommandForDn(
+          dnID, scmCommandTimeoutMs);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void processSCMCommandStatus(
+      List<CommandStatus> deleteBlockStatus, UUID dnID) {
+    Map<Long, CommandStatus> lastStatus = new HashMap<>();
+    Map<Long, CommandStatus.Status> summary = new HashMap<>();
+
+    // The CommandStatus is ordered in the report. So we can focus only on the
+    // last status in the command report.
+    deleteBlockStatus.forEach(cmdStatus -> {
+      lastStatus.put(cmdStatus.getCmdId(), cmdStatus);
+      summary.put(cmdStatus.getCmdId(), cmdStatus.getStatus());
+    });
+    LOG.debug("CommandStatus {} from Datanode {} ", summary, dnID);
+    for (Map.Entry<Long, CommandStatus> entry : lastStatus.entrySet()) {
+      scmDeleteBlocksCommandStatusManager.updateStatusByDNCommandStatus(
+          dnID, entry.getKey(), entry.getValue().getStatus());
+    }
   }
 
   /**
@@ -404,7 +448,8 @@ public class DeletedBlockLogImpl
   private void getTransaction(
       DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
-      Set<DatanodeDetails> dnList) {
+      Set<DatanodeDetails> dnList,
+      Map<UUID, Map<Long, CmdStatus>> commandStatus) {
     try {
       DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
           .newBuilder(tx)
@@ -412,24 +457,48 @@ public class DeletedBlockLogImpl
           .build();
       Set<ContainerReplica> replicas = containerManager
           .getContainerReplicas(
-              ContainerID.valueOf(updatedTxn.getContainerID()));
+              ContainerID.valueOf(tx.getContainerID()));
       for (ContainerReplica replica : replicas) {
-        UUID dnID = replica.getDatanodeDetails().getUuid();
-        if (!dnList.contains(replica.getDatanodeDetails())) {
-          continue;
-        }
-        Set<UUID> dnsWithTransactionCommitted =
-            transactionToDNsCommitMap.get(updatedTxn.getTxID());
-        if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
-            .contains(dnID)) {
-          // Transaction need not be sent to dns which have
-          // already committed it
-          transactions.addTransactionToDN(dnID, updatedTxn);
+        DatanodeDetails details = replica.getDatanodeDetails();
+        if (shouldAddTransactionToDN(details,
+            updatedTxn.getTxID(), dnList, commandStatus)) {
+          transactions.addTransactionToDN(details.getUuid(), tx);
         }
       }
     } catch (IOException e) {
       LOG.warn("Got container info error.", e);
     }
+  }
+
+  private boolean shouldAddTransactionToDN(DatanodeDetails dnDetail, long tx,
+      Set<DatanodeDetails> dnLists,
+      Map<UUID, Map<Long, CmdStatus>> commandStatus) {
+    if (!dnLists.contains(dnDetail)) {
+      return false;
+    }
+    if (inProcessing(dnDetail.getUuid(), tx, commandStatus)) {
+      return false;
+    }
+    Set<UUID> dnsWithTransactionCommitted =
+        transactionToDNsCommitMap.get(tx);
+    if (dnsWithTransactionCommitted != null && dnsWithTransactionCommitted
+        .contains(dnDetail.getUuid())) {
+      // Transaction need not be sent to dns which have
+      // already committed it
+      return false;
+    }
+    return true;
+  }
+
+  private boolean inProcessing(UUID dnId, long deletedBlocksTxId,
+      Map<UUID, Map<Long, CmdStatus>> commandStatus) {
+    Map<Long, CmdStatus> deletedBlocksTxStatus = commandStatus.get(dnId);
+    if (deletedBlocksTxStatus == null ||
+        deletedBlocksTxStatus.get(deletedBlocksTxId) == null) {
+      return false;
+    }
+    return deletedBlocksTxStatus.get(deletedBlocksTxId) !=
+        CmdStatus.NEED_RESEND;
   }
 
   @Override
@@ -443,6 +512,11 @@ public class DeletedBlockLogImpl
       try (TableIterator<Long,
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
+        // Get the CmdStatus status of the aggregation, so that the current
+        // status of the specified transaction can be found faster
+        Map<UUID, Map<Long, CmdStatus>> commandStatus =
+            getScmCommandStatusManager().getCommandStatusByTxId(dnList.stream().
+                map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
@@ -461,7 +535,7 @@ public class DeletedBlockLogImpl
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              getTransaction(txn, transactions, dnList);
+              getTransaction(txn, transactions, dnList, commandStatus);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
             }
@@ -476,6 +550,10 @@ public class DeletedBlockLogImpl
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
         }
       }
+      // Here we can clean up the Datanode timeout command that no longer
+      // reports heartbeats
+      getScmCommandStatusManager().cleanAllTimeoutSCMCommand(
+          scmCommandTimeoutMs);
       return transactions;
     } finally {
       lock.unlock();
@@ -489,19 +567,24 @@ public class DeletedBlockLogImpl
       LOG.warn("Skip commit transactions since current SCM is not leader.");
       return;
     }
+    DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
 
-    CommandStatus.Status status = deleteBlockStatus.getCmdStatus().getStatus();
-    if (status == CommandStatus.Status.EXECUTED) {
-      ContainerBlocksDeletionACKProto ackProto =
-          deleteBlockStatus.getCmdStatus().getBlockDeletionAck();
-      commitTransactions(ackProto.getResultsList(),
-          UUID.fromString(ackProto.getDnId()));
-      metrics.incrBlockDeletionCommandSuccess();
-    } else if (status == CommandStatus.Status.FAILED) {
-      metrics.incrBlockDeletionCommandFailure();
-    } else {
-      LOG.error("Delete Block Command is not executed yet.");
-      return;
+    for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
+      CommandStatus.Status status = commandStatus.getStatus();
+      if (status == CommandStatus.Status.EXECUTED) {
+        ContainerBlocksDeletionACKProto ackProto =
+            commandStatus.getBlockDeletionAck();
+        commitTransactions(ackProto.getResultsList(),
+            UUID.fromString(ackProto.getDnId()));
+        metrics.incrBlockDeletionCommandSuccess();
+      } else if (status == CommandStatus.Status.FAILED) {
+        metrics.incrBlockDeletionCommandFailure();
+      } else {
+        LOG.debug("Delete Block Command {} is not executed on the Datanode {}.",
+            commandStatus.getCmdId(), details.getUuid());
+      }
+
+      commitCommandStatus(deleteBlockStatus.getCmdStatus(), details.getUuid());
     }
   }
 }

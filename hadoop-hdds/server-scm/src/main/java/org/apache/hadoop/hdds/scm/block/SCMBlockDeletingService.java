@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -57,6 +56,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.createScmTxStateMachine;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
@@ -176,13 +176,16 @@ public class SCMBlockDeletingService extends BackgroundService
             UUID dnId = entry.getKey();
             List<DeletedBlocksTransaction> dnTXs = entry.getValue();
             if (!dnTXs.isEmpty()) {
-              processedTxIDs.addAll(dnTXs.stream()
+              Set<Long> dnTxSet = dnTXs.stream()
                   .map(DeletedBlocksTransaction::getTxID)
-                  .collect(Collectors.toSet()));
-              SCMCommand<?> command = new DeleteBlocksCommand(dnTXs);
+                  .collect(Collectors.toSet());
+              processedTxIDs.addAll(dnTxSet);
+              DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
+              deletedBlockLog.getScmCommandStatusManager().recordScmCommand(
+                  createScmTxStateMachine(dnId, command.getId(), dnTxSet));
               metrics.incrBlockDeletionCommandSent();
               metrics.incrBlockDeletionTransactionSent(dnTXs.size());
               if (LOG.isDebugEnabled()) {
