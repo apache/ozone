@@ -27,7 +27,11 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.Set;
+
+import org.apache.commons.lang3.ClassUtils;
 
 import static java.util.stream.Collectors.toSet;
 
@@ -44,6 +48,18 @@ public class ReplicateAnnotationProcessor extends AbstractProcessor {
       "org.apache.hadoop.hdds.scm.metadata.Replicate";
   private static final String REQUIRED_EXCEPTION =
       "org.apache.hadoop.hdds.scm.exceptions.SCMException";
+
+  private static final Set<String> EXCEPTIONS;
+  static {
+    Set<String> set = ClassUtils.getAllSuperclasses(IOException.class)
+        .stream()
+        .filter(c -> Object.class != c)
+        .map(Class::getCanonicalName)
+        .collect(toSet());
+    set.add(IOException.class.getCanonicalName());
+    set.add(REQUIRED_EXCEPTION);
+    EXCEPTIONS = Collections.unmodifiableSet(set);
+  }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -69,15 +85,14 @@ public class ReplicateAnnotationProcessor extends AbstractProcessor {
       return;
     }
     final ExecutableElement executableElement = (ExecutableElement) element;
-    final Set<String> exceptions = executableElement.getThrownTypes().stream()
+    final boolean found = executableElement.getThrownTypes().stream()
         .map(TypeMirror::toString)
-        .collect(toSet());
+        .anyMatch(EXCEPTIONS::contains);
 
-    if (!exceptions.contains(REQUIRED_EXCEPTION)) {
-
+    if (!found) {
       processingEnv.getMessager().printMessage(Kind.ERROR,
           "Method with Replicate annotation should declare throwing " +
-              REQUIRED_EXCEPTION, executableElement);
+              REQUIRED_EXCEPTION + " or one of its parents", executableElement);
     }
   }
 }
