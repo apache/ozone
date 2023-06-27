@@ -229,9 +229,25 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
 
+      long signedChunksLength = -1;
+      boolean signed = false;
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+        signed = true;
         body = new SignedChunksInputStream(body);
+        //signedChunksLength = body2.readHeader();
+        String decodedContentLength = headers.
+            getHeaderString("x-amz-decoded-content-length");
+        if (decodedContentLength != null) {
+          signedChunksLength = Long.parseLong(decodedContentLength);
+        } else {
+          OS3Exception os3Exception = newError(S3ErrorTable.INVALID_REQUEST,
+              keyPath);
+          os3Exception.setErrorMessage("An error occurred (Missing Header) " +
+              "when calling the PutObject/MPU PartUpload operation: " +
+              " Necessary header 'x-amz-decoded-content-length' missing");
+          throw os3Exception;
+        }
       }
 
       output = getClientProtocol().createKey(volume.getName(), bucketName,
@@ -239,7 +255,7 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().updatePutKeyMetadataStats(startNanos);
       long putLength = IOUtils.copyLarge(body, output);
 
-      if (length != putLength) {
+      if ((signed?signedChunksLength:length) != putLength) {
         delete(bucketName,keyPath,uploadID);
         OS3Exception os3Exception = newError(S3ErrorTable.INVALID_LENGTH,
             keyPath);

@@ -153,6 +153,8 @@ public class TestObjectPut {
 
     when(headers.getHeaderString("x-amz-content-sha256"))
         .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+    when(headers.getHeaderString("x-amz-decoded-content-length"))
+        .thenReturn("15");
 
     //WHEN
     Response response = objectEndpoint.put(bucketName, keyName,
