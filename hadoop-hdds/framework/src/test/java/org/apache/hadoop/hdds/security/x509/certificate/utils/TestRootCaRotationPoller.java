@@ -40,9 +40,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CLIENT_POLLING_FREQUENCY;
 
@@ -55,8 +55,6 @@ public class TestRootCaRotationPoller {
 
   @Mock
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
-  @Mock
-  private Consumer<List<X509Certificate>> consumer;
 
   @BeforeEach
   public void setup() {
@@ -67,7 +65,7 @@ public class TestRootCaRotationPoller {
   }
 
   @Test
-  public void testPollerDoesNotInvokeConsumersPrematurely() throws IOException {
+  public void testPollerDoesNotInvokeRootCaProcessor() throws IOException {
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         new HashSet<>(), scmSecurityClient);
 
@@ -75,17 +73,22 @@ public class TestRootCaRotationPoller {
         .thenReturn(new ArrayList<>());
     AtomicBoolean atomicBoolean = new AtomicBoolean();
     atomicBoolean.set(false);
-    poller.addRootCaRotationConsumer(certificates -> atomicBoolean.set(true));
+    poller.addRootCARotationProcessor(
+        certificates -> CompletableFuture.supplyAsync(() -> {
+          atomicBoolean.set(true);
+          Assertions.assertEquals(certificates.size(), 2);
+          return null;
+        }));
     poller.run();
     Assertions.assertThrows(TimeoutException.class, () ->
         GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000));
   }
 
   @Test
-  public void testPollerInvokesConsumers() throws Exception {
-    X509Certificate knownCert = generateX509Cert(new OzoneConfiguration(),
+  public void testPollerInvokesRootCaProcessors() throws Exception {
+    X509Certificate knownCert = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
-    X509Certificate newRootCa = generateX509Cert(new OzoneConfiguration(),
+    X509Certificate newRootCa = generateX509Cert(
         LocalDateTime.now(), Duration.ofSeconds(50));
     HashSet<X509Certificate> knownCerts = new HashSet<>();
     knownCerts.add(knownCert);
@@ -99,17 +102,17 @@ public class TestRootCaRotationPoller {
         .thenReturn(certsFromScm);
     AtomicBoolean atomicBoolean = new AtomicBoolean();
     atomicBoolean.set(false);
-    poller.addRootCaRotationConsumer(
-        certificates -> {
+    poller.addRootCARotationProcessor(
+        certificates -> CompletableFuture.supplyAsync(() -> {
           atomicBoolean.set(true);
           Assertions.assertEquals(certificates.size(), 2);
-        });
+          return null;
+        }));
     GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
   }
 
   private X509Certificate generateX509Cert(
-      OzoneConfiguration conf, LocalDateTime startDate,
-      Duration certLifetime) throws Exception {
+      LocalDateTime startDate, Duration certLifetime) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
     LocalDateTime end = start.plus(certLifetime);

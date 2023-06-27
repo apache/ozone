@@ -34,11 +34,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -48,7 +49,8 @@ public class RootCaRotationPoller implements Runnable, Closeable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RootCaRotationPoller.class);
-  private final List<Consumer<List<X509Certificate>>> rootCaListConsumers;
+  private final List<Function<List<X509Certificate>, CompletableFuture<Void>>>
+      rootCARotationProcessors;
   private final ScheduledExecutorService poller;
   private final Duration pollingRate;
   private Set<X509Certificate> knownRootCerts;
@@ -61,7 +63,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
     this.knownRootCerts = initiallyKnownRootCaCerts;
     poller = Executors.newSingleThreadScheduledExecutor();
     pollingRate = securityConfig.getRootCaClientPollingFrequency();
-    rootCaListConsumers = new ArrayList<>();
+    rootCARotationProcessors = new ArrayList<>();
   }
 
   private void pollRootCas() {
@@ -81,17 +83,25 @@ public class RootCaRotationPoller implements Runnable, Closeable {
           getPrintableCertIds(knownRootCerts) + ". Root CA Cert ids from " +
           "SCM not known by the client: " +
           getPrintableCertIds(scmCertsWithoutKnownCerts));
-      rootCaListConsumers.forEach(c -> c.accept(rootCAsFromSCM));
-      knownRootCerts = new HashSet<>(rootCAsFromSCM);
 
+      CompletableFuture<Void> allRootCAProcessorFutures =
+          CompletableFuture.allOf(rootCARotationProcessors.stream()
+              .map(c -> c.apply(rootCAsFromSCM))
+              .toArray(CompletableFuture[]::new));
+
+      allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
+        if (throwable == null) {
+          knownRootCerts = new HashSet<>(rootCAsFromSCM);
+        }
+      });
     } catch (IOException e) {
       LOG.error("Error while trying to rotate root ca certificate", e);
     }
   }
 
-  public void addRootCaRotationConsumer(
-      Consumer<List<X509Certificate>> consumer) {
-    rootCaListConsumers.add(consumer);
+  public void addRootCARotationProcessor(
+      Function<List<X509Certificate>, CompletableFuture<Void>> processor) {
+    rootCARotationProcessors.add(processor);
   }
 
   @Override
