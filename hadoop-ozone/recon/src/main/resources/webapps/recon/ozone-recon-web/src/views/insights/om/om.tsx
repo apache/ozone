@@ -362,7 +362,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   existAtScmOmMenu = () => (
     <Menu
-      // defaultSelectedKeys={this.state.mismatchMissingState}
       onClick={e => this.handleExistsAtChange(e)}>
       <Menu.Item key='OM'>
         OM
