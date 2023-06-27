@@ -50,25 +50,25 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -369,6 +369,7 @@ public class TestKeyValueHandler {
           .build();
       hddsVolume.format(clusterId);
       hddsVolume.createWorkingDir(clusterId, null);
+      hddsVolume.createTmpDirs(clusterId);
 
       Mockito.when(volumeSet.getVolumesList())
           .thenReturn(Collections.singletonList(hddsVolume));
@@ -376,7 +377,7 @@ public class TestKeyValueHandler {
       List<HddsVolume> hddsVolumeList = StorageVolumeUtil
           .getHddsVolumesList(volumeSet.getVolumesList());
 
-      assertTrue(hddsVolumeList.size() == 1);
+      assertEquals(1, hddsVolumeList.size());
 
       final ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -407,8 +408,10 @@ public class TestKeyValueHandler {
       Assert.assertEquals(2, icrReceived.get());
       Assert.assertNull(containerSet.getContainer(containerID));
 
-      assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
-          .getDeleteLeftovers(hddsVolume).hasNext());
+      File[] deletedContainers =
+          hddsVolume.getDeletedContainerDir().listFiles();
+      assertNotNull(deletedContainers);
+      Assertions.assertEquals(0, deletedContainers.length);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

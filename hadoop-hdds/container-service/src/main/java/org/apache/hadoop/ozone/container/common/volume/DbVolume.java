@@ -66,8 +66,8 @@ public class DbVolume extends StorageVolume {
   }
 
   @Override
-  protected void initialize() throws IOException {
-    super.initialize();
+  protected void initializeImpl() throws IOException {
+    super.initializeImpl();
     scanForDbStorePaths();
   }
 

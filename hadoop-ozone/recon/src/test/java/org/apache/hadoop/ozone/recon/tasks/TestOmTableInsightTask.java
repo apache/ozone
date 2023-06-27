@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -25,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
@@ -36,13 +38,17 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeOpenFileToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
@@ -125,7 +131,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
 
   @Test
-  public void testReprocessForSize() throws Exception {
+  public void testReprocessForOpenKeyTable() throws Exception {
     // Populate the OpenKeys table in OM DB
     writeOpenKeyToOm(reconOMMetadataManager,
         "key1", "Bucket1", "Volume1", null, 1L);
@@ -134,6 +140,17 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     writeOpenKeyToOm(reconOMMetadataManager,
         "key1", "Bucket3", "Volume3", null, 3L);
 
+    Pair<String, Boolean> result =
+        omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.getRight());
+    assertEquals(3L, getCountForTable(OPEN_KEY_TABLE));
+    // Test for both replicated and unreplicated size for OPEN_KEY_TABLE
+    assertEquals(6L, getUnReplicatedSizeForTable(OPEN_KEY_TABLE));
+    assertEquals(18L, getReplicatedSizeForTable(OPEN_KEY_TABLE));
+  }
+
+  @Test
+  public void testReprocessForOpenFileTable() throws Exception {
     // Populate the OpenFile table in OM DB
     writeOpenFileToOm(reconOMMetadataManager,
         "file1", "Bucket1", "Volume1", "file1", 1, 0, 1, 1, null, 1L);
@@ -145,16 +162,35 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Pair<String, Boolean> result =
         omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
-    assertEquals(3L, getCountForTable(OPEN_KEY_TABLE));
     assertEquals(3L, getCountForTable(OPEN_FILE_TABLE));
-    // Test for both replicated and unreplicated size for OPEN_KEY_TABLE
-    assertEquals(6L, getUnReplicatedSizeForTable(OPEN_KEY_TABLE));
-    assertEquals(18L, getReplicatedSizeForTable(OPEN_KEY_TABLE));
     // Test for both replicated and unreplicated size for OPEN_FILE_TABLE
     assertEquals(6L, getUnReplicatedSizeForTable(OPEN_FILE_TABLE));
     assertEquals(18L, getReplicatedSizeForTable(OPEN_FILE_TABLE));
   }
 
+  @Test
+  public void testReprocessForDeletedTable() throws Exception {
+    // Populate the deletedKeys table in OM DB
+    // By default the size of each key is set to 100L
+    List<String> deletedKeysList1 = Arrays.asList("key1");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList1, "Bucket1", "Volume1");
+    List<String> deletedKeysList2 = Arrays.asList("key2", "key2");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList2, "Bucket2", "Volume2");
+    List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList3, "Bucket3", "Volume3");
+
+
+    Pair<String, Boolean> result =
+        omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.getRight());
+    assertEquals(6L, getCountForTable(DELETED_TABLE));
+    // Test for both replicated and unreplicated size for DELETED_TABLE
+    assertEquals(600L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(600L, getReplicatedSizeForTable(DELETED_TABLE));
+  }
 
   @Test
   public void testProcessForCount() {
@@ -178,8 +214,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(4L, getCountForTable(KEY_TABLE));
     assertEquals(4L, getCountForTable(VOLUME_TABLE));
     assertEquals(4L, getCountForTable(BUCKET_TABLE));
-    assertEquals(4L, getCountForTable(OPEN_KEY_TABLE));
-    assertEquals(4L, getCountForTable(DELETED_TABLE));
+    assertEquals(4L, getCountForTable(FILE_TABLE));
 
     // add a new key and simulate delete on non-existing item (value: null)
     ArrayList<OMDBUpdateEvent> newEvents = new ArrayList<>();
@@ -196,12 +231,11 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(5L, getCountForTable(KEY_TABLE));
     assertEquals(5L, getCountForTable(VOLUME_TABLE));
     assertEquals(5L, getCountForTable(BUCKET_TABLE));
-    assertEquals(5L, getCountForTable(OPEN_KEY_TABLE));
-    assertEquals(5L, getCountForTable(DELETED_TABLE));
+    assertEquals(5L, getCountForTable(FILE_TABLE));
   }
 
   @Test
-  public void testProcessForSize() {
+  public void testProcessForOpenKeyTableAndOpenFileTable() {
     // Prepare mock data size
     Long sizeToBeReturned = 1000L;
     OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
@@ -261,6 +295,78 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
       assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
+  }
+
+  @Test
+  public void testProcessForDeletedTable() {
+    // Prepare mock data size
+    ImmutablePair<Long, Long> sizeToBeReturned =
+        new ImmutablePair<>(1000L, 3000L);
+    ArrayList<OmKeyInfo> omKeyInfoList = new ArrayList<>();
+    // Add 5 OmKeyInfo objects to the list
+    for (int i = 0; i < 5; i++) {
+      OmKeyInfo omKeyInfo =
+          getOmKeyInfo("sampleVol", "non_fso_Bucket", "non_fso_key1", true);
+      // Set properties of OmKeyInfo object if needed
+      omKeyInfoList.add(omKeyInfo);
+    }
+    RepeatedOmKeyInfo repeatedOmKeyInfo = mock(RepeatedOmKeyInfo.class);
+    when(repeatedOmKeyInfo.getTotalSize()).thenReturn(sizeToBeReturned);
+    when(repeatedOmKeyInfo.getOmKeyInfoList()).thenReturn(omKeyInfoList);
+
+    // Test PUT events
+    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      putEvents.add(
+          getOMUpdateEvent("item" + i, repeatedOmKeyInfo, DELETED_TABLE, PUT,
+              null));
+    }
+    OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
+    omTableInsightTask.process(putEventBatch);
+    // Each of the 5 RepeatedOmKeyInfo object has 5 OmKeyInfo obj,
+    // so total deleted keys should be 5 * 5 = 25
+    assertEquals(25L, getCountForTable(DELETED_TABLE));
+    // After 5 PUTs, size should be 5 * 1000 = 5000 for each size-related table
+    assertEquals(5000L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(15000L, getReplicatedSizeForTable(DELETED_TABLE));
+
+
+    // Test DELETE events
+    ArrayList<OMDBUpdateEvent> deleteEvents = new ArrayList<>();
+    // Delete "item0"
+    deleteEvents.add(
+        getOMUpdateEvent("item0", repeatedOmKeyInfo, DELETED_TABLE, DELETE,
+            null));
+    OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
+    omTableInsightTask.process(deleteEventBatch);
+    // After deleting "item0" total deleted keys should be 20
+    assertEquals(20L, getCountForTable(DELETED_TABLE));
+    // After deleting "item0", size should be 4 * 1000 = 4000
+    assertEquals(4000L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(12000L, getReplicatedSizeForTable(DELETED_TABLE));
+
+
+    // Test UPDATE events
+    ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
+    // Update "item1" with new sizes
+    ImmutablePair<Long, Long> newSizesToBeReturned =
+        new ImmutablePair<>(500L, 1500L);
+    RepeatedOmKeyInfo newRepeatedOmKeyInfo = mock(RepeatedOmKeyInfo.class);
+    when(newRepeatedOmKeyInfo.getTotalSize()).thenReturn(newSizesToBeReturned);
+    when(newRepeatedOmKeyInfo.getOmKeyInfoList()).thenReturn(
+        omKeyInfoList.subList(1, 5));
+    OMUpdateEventBatch updateEventBatch = new OMUpdateEventBatch(updateEvents);
+    // For item1, newSize=500 and totalCount of deleted keys should be 4
+    updateEvents.add(
+        getOMUpdateEvent("item1", newRepeatedOmKeyInfo, DELETED_TABLE, UPDATE,
+            repeatedOmKeyInfo));
+    omTableInsightTask.process(updateEventBatch);
+    // Since one key has been deleted, total deleted keys should be 19
+    assertEquals(19L, getCountForTable(DELETED_TABLE));
+    // After updating "item1", size should be 4000 - 1000 + 500 = 3500
+    //  presentValue - oldValue + newValue = updatedValue
+    assertEquals(3500L, getUnReplicatedSizeForTable(DELETED_TABLE));
+    assertEquals(10500L, getReplicatedSizeForTable(DELETED_TABLE));
   }
 
 

@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.om.ratis_snapshot;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +41,9 @@ import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import org.apache.commons.io.FileUtils;
 
+import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -77,6 +81,17 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
+
+  public OmRatisSnapshotProvider(File snapshotDir,
+      Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
+      boolean spnegoEnabled, URLConnectionFactory connectionFactory) {
+    super(snapshotDir, OM_DB_NAME);
+    this.peerNodesMap = new ConcurrentHashMap<>(peerNodesMap);
+    this.httpPolicy = httpPolicy;
+    this.spnegoEnabled = spnegoEnabled;
+    this.connectionFactory = connectionFactory;
+  }
+
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
@@ -127,14 +142,21 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       throws IOException {
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
-        httpPolicy.isHttpEnabled(), true,
-        HAUtils.getExistingSstFiles(getCandidateDir()));
+        httpPolicy.isHttpEnabled(), true);
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
         "URL: {}", leaderNodeID, omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
       HttpURLConnection connection = (HttpURLConnection)
           connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
-      connection.setRequestMethod("GET");
+
+      connection.setRequestMethod("POST");
+      String contentTypeValue = "multipart/form-data; boundary=" +
+          MULTIPART_FORM_DATA_BOUNDARY;
+      connection.setRequestProperty("Content-Type", contentTypeValue);
+      connection.setDoOutput(true);
+      writeFormData(connection,
+          HAUtils.getExistingSstFiles(getCandidateDir()));
+
       connection.connect();
       int errorCode = connection.getResponseCode();
       if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
@@ -159,10 +181,52 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     });
   }
 
+  /**
+   * Writes form data to output stream as any HTTP client would for a
+   * multipart/form-data request.
+   * Proper form data includes separator, content disposition and value
+   * separated by a new line.
+   * Example:
+   * <pre>
+   * -----XXX
+   * Content-Disposition: form-data; name="field1"
+   *
+   * value1</pre>
+   * @param connection HTTP URL connection which output stream is used.
+   * @param sstFiles SST files for exclusion.
+   * @throws IOException if an exception occured during writing to output
+   * stream.
+   */
+  public static void writeFormData(HttpURLConnection connection,
+      List<String> sstFiles) throws IOException {
+    try (DataOutputStream out =
+             new DataOutputStream(connection.getOutputStream())) {
+      String toExcludeSstField =
+          "name=\"" + OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]" + "\"";
+      String crNl = "\r\n";
+      String contentDisposition =
+          "Content-Disposition: form-data; " + toExcludeSstField + crNl + crNl;
+      String separator = "--" + MULTIPART_FORM_DATA_BOUNDARY;
+
+      if (sstFiles.isEmpty()) {
+        out.writeBytes(separator + crNl);
+        out.writeBytes(contentDisposition);
+      }
+
+      for (String sstFile : sstFiles) {
+        out.writeBytes(separator + crNl);
+        out.writeBytes(contentDisposition);
+        out.writeBytes(sstFile + crNl);
+      }
+      out.writeBytes(separator + "--" + crNl);
+    }
+  }
+
   @Override
   public void close() throws IOException {
     if (connectionFactory != null) {
       connectionFactory.destroy();
     }
   }
+
 }

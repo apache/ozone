@@ -338,6 +338,25 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     VALUE getValue() throws IOException;
   }
 
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
+    return new KeyValue<K, V>() {
+      @Override
+      public K getKey() {
+        return key;
+      }
+
+      @Override
+      public V getValue() {
+        return value;
+      }
+
+      @Override
+      public String toString() {
+        return "(key=" + key + ", value=" + value + ")";
+      }
+    };
+  }
+
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {

@@ -217,7 +217,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this);
+    return iterator((byte[])null);
   }
 
   @Override
@@ -225,6 +225,12 @@ class RDBTable implements Table<byte[], byte[]> {
       throws IOException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
         prefix);
+  }
+
+  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+      CodecBuffer prefix) throws IOException {
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+        this, prefix);
   }
 
   @Override

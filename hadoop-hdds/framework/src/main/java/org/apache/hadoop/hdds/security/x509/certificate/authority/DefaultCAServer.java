@@ -24,8 +24,8 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
@@ -571,7 +571,7 @@ public class DefaultCAServer implements CertificateServer {
         .setBeginDate(beginDate)
         .setEndDate(endDate)
         .makeCA()
-        .setConfiguration(securityConfig.getConfiguration())
+        .setConfiguration(securityConfig)
         .setKey(key);
 
     builder.addInetAddresses();

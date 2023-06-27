@@ -128,6 +128,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.10.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
+    <commons-fileupload.version>1.5</commons-fileupload.version>
     <download-maven-plugin.version>1.6.8</download-maven-plugin.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>

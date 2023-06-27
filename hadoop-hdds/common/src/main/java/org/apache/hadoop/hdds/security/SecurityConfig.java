@@ -17,7 +17,7 @@
  *
  */
 
-package org.apache.hadoop.hdds.security.x509;
+package org.apache.hadoop.hdds.security;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,9 +29,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -84,22 +88,17 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
-import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslProvider;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A class that deals with all Security related configs in HDDS.
  * <p>
  * This class allows security configs to be read and used consistently across
- * all of security related code base.
+ * all security related code base.
  */
 public class SecurityConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecurityConfig.class);
   private static volatile Provider provider;
-  private final ConfigurationSource configuration;
   private final int size;
   private final String keyAlgo;
   private final String providerString;
@@ -110,6 +109,8 @@ public class SecurityConfig {
   private final Duration maxCertDuration;
   private final String x509SignatureAlgo;
   private final boolean blockTokenEnabled;
+  private final long blockTokenExpiryDurationMs;
+  private final boolean tokenSanityChecksEnabled;
   private final boolean containerTokenEnabled;
   private final String certificateDir;
   private final String certificateFileName;
@@ -118,7 +119,7 @@ public class SecurityConfig {
   private final Duration renewalGracePeriod;
   private final boolean isSecurityEnabled;
   private final String crlName;
-  private boolean grpcTlsUseTestCert;
+  private final boolean grpcTlsUseTestCert;
   private final String externalRootCaPublicKeyPath;
   private final String externalRootCaPrivateKeyPath;
   private final String externalRootCaCert;
@@ -126,6 +127,7 @@ public class SecurityConfig {
   private final String caRotationTimeOfDay;
   private final Pattern caRotationTimeOfDayPattern =
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
+  private final SslProvider grpcSSLProvider;
 
   /**
    * Constructs a SecurityConfig.
@@ -134,58 +136,67 @@ public class SecurityConfig {
    */
   public SecurityConfig(ConfigurationSource configuration) {
     Preconditions.checkNotNull(configuration, "Configuration cannot be null");
-    this.configuration = configuration;
-    this.size = this.configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
-    this.keyAlgo = this.configuration.get(HDDS_KEY_ALGORITHM,
+    this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
+    this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
-    this.providerString = this.configuration.get(HDDS_SECURITY_PROVIDER,
+    this.providerString = configuration.get(HDDS_SECURITY_PROVIDER,
         HDDS_DEFAULT_SECURITY_PROVIDER);
 
     // Please Note: To make it easy for our customers we will attempt to read
     // HDDS metadata dir and if that is not set, we will use Ozone directory.
-    this.metadataDir = this.configuration.get(HDDS_METADATA_DIR_NAME,
+    this.metadataDir = configuration.get(HDDS_METADATA_DIR_NAME,
         configuration.get(OZONE_METADATA_DIRS));
-    this.keyDir = this.configuration.get(HDDS_KEY_DIR_NAME,
+    this.keyDir = configuration.get(HDDS_KEY_DIR_NAME,
         HDDS_KEY_DIR_NAME_DEFAULT);
-    this.privateKeyFileName = this.configuration.get(HDDS_PRIVATE_KEY_FILE_NAME,
+    this.privateKeyFileName = configuration.get(HDDS_PRIVATE_KEY_FILE_NAME,
         HDDS_PRIVATE_KEY_FILE_NAME_DEFAULT);
-    this.publicKeyFileName = this.configuration.get(HDDS_PUBLIC_KEY_FILE_NAME,
+    this.publicKeyFileName = configuration.get(HDDS_PUBLIC_KEY_FILE_NAME,
         HDDS_PUBLIC_KEY_FILE_NAME_DEFAULT);
 
-    String durationString = this.configuration.get(HDDS_X509_MAX_DURATION,
+    String durationString = configuration.get(HDDS_X509_MAX_DURATION,
         HDDS_X509_MAX_DURATION_DEFAULT);
     this.maxCertDuration = Duration.parse(durationString);
-    this.x509SignatureAlgo = this.configuration.get(HDDS_X509_SIGNATURE_ALGO,
+    this.x509SignatureAlgo = configuration.get(HDDS_X509_SIGNATURE_ALGO,
         HDDS_X509_SIGNATURE_ALGO_DEFAULT);
-    this.certificateDir = this.configuration.get(HDDS_X509_DIR_NAME,
+    this.certificateDir = configuration.get(HDDS_X509_DIR_NAME,
         HDDS_X509_DIR_NAME_DEFAULT);
-    this.certificateFileName = this.configuration.get(HDDS_X509_FILE_NAME,
+    this.certificateFileName = configuration.get(HDDS_X509_FILE_NAME,
         HDDS_X509_FILE_NAME_DEFAULT);
 
-    this.blockTokenEnabled = this.configuration.getBoolean(
+    this.blockTokenEnabled = configuration.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
-    this.containerTokenEnabled = this.configuration.getBoolean(
+    this.blockTokenExpiryDurationMs = configuration.getTimeDuration(
+        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME,
+        HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    tokenSanityChecksEnabled = configuration.getBoolean(
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+
+    this.containerTokenEnabled = configuration.getBoolean(
         HDDS_CONTAINER_TOKEN_ENABLED,
         HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT);
 
-    this.grpcTlsEnabled = this.configuration.getBoolean(HDDS_GRPC_TLS_ENABLED,
+    this.grpcTlsEnabled = configuration.getBoolean(HDDS_GRPC_TLS_ENABLED,
         HDDS_GRPC_TLS_ENABLED_DEFAULT);
 
     if (grpcTlsEnabled) {
-      this.grpcTlsUseTestCert = this.configuration.getBoolean(
+      this.grpcTlsUseTestCert = configuration.getBoolean(
           HDDS_GRPC_TLS_TEST_CERT, HDDS_GRPC_TLS_TEST_CERT_DEFAULT);
+    } else {
+      this.grpcTlsUseTestCert = false;
     }
 
-    this.isSecurityEnabled = this.configuration.getBoolean(
+    this.isSecurityEnabled = configuration.getBoolean(
         OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
 
     String certDurationString =
-        this.configuration.get(HDDS_X509_DEFAULT_DURATION,
+        configuration.get(HDDS_X509_DEFAULT_DURATION,
             HDDS_X509_DEFAULT_DURATION_DEFAULT);
     defaultCertDuration = Duration.parse(certDurationString);
-    String renewalGraceDurationString = this.configuration.get(
+    String renewalGraceDurationString = configuration.get(
         HDDS_X509_RENEW_GRACE_DURATION,
         HDDS_X509_RENEW_GRACE_DURATION_DEFAULT);
     renewalGracePeriod = Duration.parse(renewalGraceDurationString);
@@ -209,18 +220,22 @@ public class SecurityConfig {
 
     validateCertificateValidityConfig();
 
-    this.externalRootCaCert = this.configuration.get(
+    this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
         HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
-    this.externalRootCaPublicKeyPath = this.configuration.get(
+    this.externalRootCaPublicKeyPath = configuration.get(
         HDDS_X509_ROOTCA_PUBLIC_KEY_FILE,
         HDDS_X509_ROOTCA_PUBLIC_KEY_FILE_DEFAULT);
-    this.externalRootCaPrivateKeyPath = this.configuration.get(
+    this.externalRootCaPrivateKeyPath = configuration.get(
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE,
         HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT);
 
-    this.crlName = this.configuration.get(HDDS_X509_CRL_NAME,
+    this.crlName = configuration.get(HDDS_X509_CRL_NAME,
         HDDS_X509_CRL_NAME_DEFAULT);
+
+    this.grpcSSLProvider = SslProvider.valueOf(
+        configuration.get(HDDS_GRPC_TLS_PROVIDER,
+            HDDS_GRPC_TLS_PROVIDER_DEFAULT));
 
     // First Startup -- if the provider is null, check for the provider.
     if (SecurityConfig.provider == null) {
@@ -276,6 +291,14 @@ public class SecurityConfig {
       throw new IllegalArgumentException("Property value of " +
           HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
           " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+    }
+
+    if (tokenSanityChecksEnabled
+        && blockTokenExpiryDurationMs > renewalGracePeriod.toMillis()) {
+      throw new IllegalArgumentException(" Certificate grace period " +
+          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+          " should be greater than maximum block/container token lifetime " +
+          HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME);
     }
   }
 
@@ -416,15 +439,6 @@ public class SecurityConfig {
   }
 
   /**
-   * Returns the Configuration used for initializing this SecurityConfig.
-   *
-   * @return Configuration
-   */
-  public ConfigurationSource getConfiguration() {
-    return configuration;
-  }
-
-  /**
    * Returns the maximum length a certificate can be valid in SCM. The default
    * value is 5 years. This can be changed by setting "hdds.x509.max.duration"
    * in configuration. The formats accepted are based on the ISO-8601 duration
@@ -443,6 +457,10 @@ public class SecurityConfig {
    */
   public boolean isBlockTokenEnabled() {
     return this.blockTokenEnabled;
+  }
+
+  public long getBlockTokenExpiryDurationMs() {
+    return blockTokenExpiryDurationMs;
   }
 
   /**
@@ -467,8 +485,7 @@ public class SecurityConfig {
    * @return the gRPC TLS Provider.
    */
   public SslProvider getGrpcSslProvider() {
-    return SslProvider.valueOf(configuration.get(HDDS_GRPC_TLS_PROVIDER,
-        HDDS_GRPC_TLS_PROVIDER_DEFAULT));
+    return grpcSSLProvider;
   }
 
   public String getExternalRootCaPrivateKeyPath() {
@@ -509,24 +526,12 @@ public class SecurityConfig {
    * @param providerName - name of the provider.
    */
   private Provider initSecurityProvider(String providerName) {
-    switch (providerName) {
-    case "BC":
+    if ("BC".equals(providerName)) {
       Security.addProvider(new BouncyCastleProvider());
       return Security.getProvider(providerName);
-    default:
-      LOG.error("Security Provider:{} is unknown", provider);
-      throw new SecurityException("Unknown security provider:" + provider);
     }
-  }
-
-  /**
-   * Returns max date for which S3 auth info objects will be valid.
-   */
-  public long getS3AuthInfoMaxDate() {
-    return getConfiguration().getTimeDuration(
-        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
-        TimeUnit.MICROSECONDS);
+    LOG.error("Security Provider:{} is unknown", provider);
+    throw new SecurityException("Unknown security provider:" + provider);
   }
 
   public boolean isTokenEnabled() {

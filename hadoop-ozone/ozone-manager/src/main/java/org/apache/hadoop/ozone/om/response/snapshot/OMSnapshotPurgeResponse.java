@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -49,11 +50,25 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
+  private final Map<String, SnapshotInfo> updatedSnapInfos;
 
   public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> snapshotDbKeys) {
+      @Nonnull List<String> snapshotDbKeys,
+      Map<String, SnapshotInfo> updatedSnapInfos) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
+    this.updatedSnapInfos = updatedSnapInfos;
+  }
+
+  /**
+   * Constructor for failed request.
+   * It should not be used for successful request.
+   */
+  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+    this.snapshotDbKeys = null;
+    this.updatedSnapInfos = null;
   }
 
   @Override
@@ -62,6 +77,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
+    updateSnapInfo(metadataManager, batchOperation);
     for (String dbKey: snapshotDbKeys) {
       SnapshotInfo snapshotInfo = omMetadataManager
           .getSnapshotInfoTable().get(dbKey);
@@ -77,6 +93,15 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation,
           dbKey);
+    }
+  }
+
+  private void updateSnapInfo(OmMetadataManagerImpl metadataManager,
+                              BatchOperation batchOp)
+      throws IOException {
+    for (Map.Entry<String, SnapshotInfo> entry : updatedSnapInfos.entrySet()) {
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp,
+          entry.getKey(), entry.getValue());
     }
   }
 

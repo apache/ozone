@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  *
  * @param <RAW> the raw type.
  */
-public abstract class RDBStoreAbstractIterator<RAW>
+abstract class RDBStoreAbstractIterator<RAW>
     implements TableIterator<RAW, Table.KeyValue<RAW, RAW>> {
 
   private static final Logger LOG =
@@ -48,7 +48,6 @@ public abstract class RDBStoreAbstractIterator<RAW>
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
-    seekToFirst();
   }
 
   /** @return the key for the current entry. */
@@ -150,7 +149,7 @@ public abstract class RDBStoreAbstractIterator<RAW>
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     rocksDBIterator.close();
   }
 }

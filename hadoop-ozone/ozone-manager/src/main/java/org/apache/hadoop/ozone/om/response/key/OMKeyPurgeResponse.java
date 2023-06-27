@@ -73,6 +73,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
       // Init Batch Operation for snapshot db.
       try (BatchOperation writeBatch = fromSnapshotStore.initBatchOperation()) {
         processKeys(writeBatch, fromSnapshot.getMetadataManager());
+        processKeysToUpdate(writeBatch, fromSnapshot.getMetadataManager());
         fromSnapshotStore.commitBatchOperation(writeBatch);
       }
     } else {

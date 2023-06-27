@@ -1013,6 +1013,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.lock.stripes</name>
+    <value>512</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The number of stripes created for the container state manager lock.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.address</name>
     <value/>
     <tag>OZONE, MANAGEMENT</tag>
@@ -3909,6 +3917,19 @@
       held.  The actual number of cached instance could exceed this limit if
       more than this number of snapshot instances are still in-use by snapDiff
       or other tasks.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.db.max.open.files</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files for each snapshot db present in the snapshot cache.
+      Essentially sets `max_open_files` config for RocksDB instances opened for Ozone snapshots.
+      This will limit the total number of files opened by a snapshot db thereby limiting the total number of
+      open file handles by snapshot dbs.
+      Max total number of open handles = (snapshot cache size * max open files)
     </description>
   </property>
 

@@ -178,13 +178,20 @@ public final class ContainerTestUtils {
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
-    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    when(c.shouldScanMetadata()).thenReturn(true);
     when(c.getContainerData().getVolume()).thenReturn(vol);
+
+    try {
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+          .thenReturn(scanDataSuccess);
+      Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    } catch (InterruptedException ex) {
+      // Mockito.when invocations will not throw this exception. It is just
+      // required for compilation.
+    }
   }
 
-  public static KeyValueContainer setUpTestContainerUnderTmpDir(
+  public static KeyValueContainer addContainerToDeletedDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
@@ -209,8 +216,8 @@ public final class ContainerTestUtils {
     // For testing, we are moving the container
     // under the tmp directory, in order to delete
     // it from there, during datanode startup or shutdown
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
+    KeyValueContainerUtil
+        .moveToDeletedContainerDir(keyValueContainerData, volume);
 
     return container;
   }
