@@ -78,7 +78,7 @@ public class SnapshotDiffJob {
     this.toSnapshot = toSnapshot;
     this.forceFullDiff = forceFullDiff;
     this.totalDiffEntries = totalDiffEntries;
-    this.reason = null;
+    this.reason = StringUtils.EMPTY;
   }
 
   public String getJobId() {

@@ -56,7 +56,7 @@ public class SnapshotDiffResponse {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
-    this.reason = null;
+    this.reason = StringUtils.EMPTY;
   }
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
