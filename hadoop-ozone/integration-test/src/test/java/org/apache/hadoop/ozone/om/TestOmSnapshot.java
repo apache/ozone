@@ -400,8 +400,8 @@ public class TestOmSnapshot {
   @Test
   public void checkKey() throws Exception {
     String s = "testData";
-    String dir1 = "dir1";
-    String key1 = dir1 + "/key1";
+    String dir1 = "dir1checkKey";
+    String key1 = dir1 + "/key1checkKey";
 
     // create key1
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key1,
@@ -413,16 +413,11 @@ public class TestOmSnapshot {
 
     String snapshotKeyPrefix = createSnapshot(volumeName, bucketName);
 
+    ozoneBucket.deleteKey(key1);
+
     GenericTestUtils.waitFor(() -> {
       try {
-        int keyCount = keyCount(ozoneBucket, key1);
-        if (keyCount == 0) {
-          return true;
-        }
-
-        ozoneBucket.deleteKey(key1);
-
-        return false;
+        return keyCount(ozoneBucket, key1) == 0;
       } catch (Exception e) {
         return  false;
       }
