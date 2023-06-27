@@ -14,29 +14,24 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       S3 gateway test with aws cli
-Library             OperatingSystem
-Library             String
-Library             BuiltIn
+Documentation       Test ozone s3 getsecret command
 Resource            ../commonlib.robot
-Resource            ./commonawslib.robot
 Test Timeout        2 minutes
-Suite Setup         Setup v4 headers
 
 *** Keywords ***
-Get-secret without om-service-id
-    ${output}=             Execute             ozone s3 getsecret -u testuser2
-    Should contain         ${output}           awsAccessKey
-    Should contain         ${output}           awsSecret
-
-Get-secret with om-service-id
-    ${output}=             Execute             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
+Verify output
+    [arguments]    ${output}
     Should contain         ${output}           awsAccessKey
     Should contain         ${output}           awsSecret
 
 *** Test Cases ***
-S3 without om-service-id
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Get-secret without om-service-id
+Without OM service ID
+    Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
+    ${output} =            Execute             ozone s3 getsecret -u testuser2
+    Verify output          ${output}
 
-S3 with om-service-id
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Get-secret with om-service-id
+With OM service ID
+    Pass Execution If      '${OM_HA_PARAM}' == '${EMPTY}'          duplicate test in non-HA env.
+    Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
+    ${output} =            Execute             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
+    Verify output          ${output}
