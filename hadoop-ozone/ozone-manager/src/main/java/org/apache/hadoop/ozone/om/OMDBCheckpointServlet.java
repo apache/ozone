@@ -371,7 +371,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     if (completed) {
-      // Create list of hard links.
+      // Only create the hard link list for the last tarball.
       Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
       includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
           archiveOutputStream);

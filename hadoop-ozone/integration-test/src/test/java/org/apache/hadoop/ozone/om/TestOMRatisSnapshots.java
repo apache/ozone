@@ -188,11 +188,10 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {2})
+  @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  public void testInstallSnapshot(int numSnapshotsToCreate)
-      throws Exception {
+  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -306,7 +305,10 @@ public class TestOMRatisSnapshots {
       sstFileCount += sstFiles.size();
       sstFileUnion.addAll(sstFiles);
     }
+    // Confirm that there were multiple tarballs.
     assertTrue(sstSetList.size() > 1);
+    // Confirm that there was no overlap of sst files
+    //  between the individual tarballs
     assertEquals(sstFileUnion.size(), sstFileCount);
   }
 
@@ -1086,7 +1088,7 @@ public class TestOMRatisSnapshots {
     FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
   }
 
-  private void createDummyTarball(File dummyTarFile)
+  private void createEmptyTarball(File dummyTarFile)
       throws IOException {
     FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
     try (TarArchiveOutputStream archiveOutputStream =
@@ -1094,13 +1096,14 @@ public class TestOMRatisSnapshots {
     }
   }
 
+  // Return a list of sst files in tarball.
   private Set<String> getSstFilenames(File tarball)
       throws IOException {
     Set<String> sstFilenames = new HashSet<>();
     TarArchiveInputStream tarInput =
         new TarArchiveInputStream(new FileInputStream(tarball));
     while (true) {
-      TarArchiveEntry entry=tarInput.getNextTarEntry();
+      TarArchiveEntry entry = tarInput.getNextTarEntry();
       if (entry == null) {
         break;
       }
@@ -1112,6 +1115,7 @@ public class TestOMRatisSnapshots {
     return sstFilenames;
   }
 
+  // Find the tarball in the snapshot dir
   private File getTarball(File snapshotDir) {
     for (File f : Objects.requireNonNull(snapshotDir.listFiles())) {
       if (f.getName().toLowerCase().endsWith(".tar")) {
@@ -1170,6 +1174,8 @@ public class TestOMRatisSnapshots {
     }
   }
 
+  // Interupts the tarball download process to excercise tarballs
+  // exceeding the max size.
   private class SnapshotMaxSizeInjector extends FaultInjector {
     OzoneManager om;
     int count;
@@ -1193,19 +1199,26 @@ public class TestOMRatisSnapshots {
     public void pause() throws IOException {
       count++;
       File tarball = getTarball(snapshotDir);
+      // First time through, untar tarball, get total
+      // size of sst files and reduce max size to
+      // get multiple tarballs
       if (count == 1) {
-        assert tarball != null;
         FileUtil.unTar(tarball, tempDir.toFile());
-        List<Path> paths = Files.walk(tempDir).filter(
+        List<Path> sstPaths = Files.walk(tempDir).filter(
             path -> path.toString().endsWith(".sst")).collect(Collectors.toList());
         long sstSize = 0;
-        for (Path path : paths) {
-          sstSize += Files.size(path);
+        for (Path sstPath : sstPaths) {
+          sstSize += Files.size(sstPath);
         }
         om.getConfiguration().setLong("ozone.om.maxsize",
                                       sstSize/2);
-        createDummyTarball(tarball);
+        // Now empty the tarball to restart the download
+        // process.
+        createEmptyTarball(tarball);
       } else {
+        // Each entry in the list is the set of sst
+        // files in this iteration; so the list will
+        // have one entry for each tarball.
         sstSetList.add(getSstFilenames(tarball));
       }
     }
