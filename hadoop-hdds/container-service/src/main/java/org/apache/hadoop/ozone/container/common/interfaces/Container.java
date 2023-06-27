@@ -174,7 +174,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    * @return true if the integrity checks pass
    * Scan the container metadata to detect corruption.
    */
-  boolean scanMetaData();
+  boolean scanMetaData() throws InterruptedException;
 
   /**
    * Return if the container data should be checksum verified to detect
@@ -193,6 +193,8 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    *                  I/O bandwidth throttling (e.g. for shutdown purpose).
    * @return true if the checksum verification succeeds
    *         false otherwise
+   * @throws InterruptedException if the scan is interrupted.
    */
-  boolean scanData(DataTransferThrottler throttler, Canceler canceler);
+  boolean scanData(DataTransferThrottler throttler, Canceler canceler)
+      throws InterruptedException;
 }

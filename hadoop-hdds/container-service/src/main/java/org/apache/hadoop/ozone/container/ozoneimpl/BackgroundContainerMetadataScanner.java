@@ -57,7 +57,8 @@ public class BackgroundContainerMetadataScanner extends
 
   @VisibleForTesting
   @Override
-  public void scanContainer(Container<?> container) throws IOException {
+  public void scanContainer(Container<?> container)
+      throws IOException, InterruptedException {
     // There is one background container metadata scanner per datanode.
     // If this container's volume has failed, skip the container.
     // The iterator returned by getContainerIterator may have stale results.

@@ -31,7 +31,10 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,7 +65,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
   @Test
   @Override
-  public void testRecentlyScannedContainerIsSkipped() {
+  public void testRecentlyScannedContainerIsSkipped() throws Exception {
     // If the last scan time is before than the configured gap, the container
     // should be scanned.
     setScannedTimestampRecent(healthy);
@@ -72,7 +75,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
   @Test
   @Override
-  public void testPreviouslyScannedContainerIsScanned() {
+  public void testPreviouslyScannedContainerIsScanned() throws Exception {
     setScannedTimestampOld(healthy);
     scanner.runIteration();
     Mockito.verify(healthy, atLeastOnce()).scanMetaData();
@@ -199,5 +202,26 @@ public class TestBackgroundContainerMetadataScanner extends
     Mockito.verify(openContainer, never()).scanMetaData();
     Mockito.verify(corruptData, never()).scanMetaData();
     Mockito.verify(openCorruptMetadata, never()).scanMetaData();
+  }
+
+  @Test
+  @Override
+  public void testShutdownDuringScan() throws Exception {
+    CountDownLatch latch = new CountDownLatch(1);
+
+    // Make the metadata scan block until interrupt.
+    Mockito.when(healthy.scanMetaData()).then(i -> {
+      latch.countDown();
+      Thread.sleep(Duration.ofDays(1).toMillis());
+      return null;
+    });
+
+    scanner.start();
+    // Wait for the scanner to reach the healthy container.
+    assertTrue(latch.await(5, TimeUnit.SECONDS));
+    // Terminate the scanner while it is blocked scanning the healthy container.
+    scanner.shutdown();
+    // The container should remain healthy.
+    verifyContainerMarkedUnhealthy(healthy, never());
   }
 }
