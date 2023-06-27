@@ -206,7 +206,8 @@ public class TestStorageVolume {
   public void testCheckIoFailureDefaultConfigs() {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     // Make sure default values are correct.
-    assertTrue(dnConf.getVolumeIOFailureTolerance() <= dnConf.getVolumeIOTestCount());
+    assertTrue(dnConf.getVolumeIOFailureTolerance() <=
+        dnConf.getVolumeIOTestCount());
   }
 
   /**
@@ -256,14 +257,14 @@ public class TestStorageVolume {
     // Negative test count should reset to default value.
     dnConf.setVolumeIOTestCount(-1);
     CONF.setFromObject(dnConf);
-    dnConf =CONF.getObject(DatanodeConfiguration .class);
+    dnConf = CONF.getObject(DatanodeConfiguration .class);
     assertEquals(DatanodeConfiguration.VOLUME_IO_TEST_COUNT_DEFAULT,
                dnConf.getVolumeIOTestCount());
 
     // Negative failure tolerance should reset to default value.
     dnConf.setVolumeIOFailureTolerance(-1);
     CONF.setFromObject(dnConf);
-    dnConf =CONF.getObject(DatanodeConfiguration .class);
+    dnConf = CONF.getObject(DatanodeConfiguration .class);
     assertEquals(DatanodeConfiguration.VOLUME_IO_FAILURES_TOLERATED_DEFAULT,
                dnConf.getVolumeIOFailureTolerance());
   }
