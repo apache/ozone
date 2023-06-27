@@ -84,9 +84,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private static final long MAX_COPY_SIZE = 100000;
+  private static final long MAX_COPY_SIZE = 10000000L;
   private transient BootstrapStateHandler.Lock lock;
-
+  private long max_copy_size = MAX_COPY_SIZE;
   @Override
   public void init() throws ServletException {
 
@@ -179,11 +179,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   List<String> excluded)
       throws IOException {
 
+    max_copy_size = getConf().getLong("ozone.om.maxsize", 10000000L);
+
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
-               new HashSet<>(), excluded, copySize);
+    if (!processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded, copySize)) {
+      return false;
+    }
 
     if (!includeSnapshotData) {
       return true;
@@ -261,7 +265,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           }
         } else {
           copySize.addAndGet(processFile(file, copyFiles, hardLinkFiles, toExcludeFiles, excluded));
-          if (copySize.get() > MAX_COPY_SIZE) {
+          if (copySize.get() > max_copy_size) {
             return false;
           }
         }

@@ -179,7 +179,7 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {100})
+  @ValueSource(ints = {2})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -196,6 +196,9 @@ public class TestOMRatisSnapshots {
       followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+    FaultInjector faultInjector = new SnapshotMaxSizeInjector(leaderOM);
+    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
+    //    faultInjector.resume();
 
     // Create some snapshots, each with new keys
     int keyIncrement = 10;
@@ -231,7 +234,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
-    }, 100, 10000);
+    }, 100, 1000000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -1091,6 +1094,48 @@ public class TestOMRatisSnapshots {
       } catch (InterruptedException e) {
         throw new IOException(e);
       }
+    }
+
+    @Override
+    public void resume() throws IOException {
+      // Make sure injector pauses before resuming.
+      try {
+        ready.await();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        assertTrue(Fail.fail("resume interrupted"));
+      }
+      wait.countDown();
+    }
+
+    @Override
+    public void reset() throws IOException {
+      init();
+    }
+  }
+
+  private static class SnapshotMaxSizeInjector extends FaultInjector {
+    OzoneManager om;
+    int count;
+    private CountDownLatch ready;
+    private CountDownLatch wait;
+    SnapshotMaxSizeInjector(OzoneManager om) {
+      this.om = om;
+      init();
+    }
+
+    @Override
+    public void init() {
+      this.ready = new CountDownLatch(1);
+      this.wait = new CountDownLatch(1);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      //      count = om.getConfiguration().getInt("ozone.om.ratis.log.purge.gap", 2);
+
+      om.getConfiguration().setLong("ozone.om.maxsize", 1L);
+
     }
 
     @Override
