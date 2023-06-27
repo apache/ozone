@@ -93,6 +93,8 @@ public final class DiskCheckUtil {
     private static final Logger LOG =
         LoggerFactory.getLogger(DiskCheckUtil.class);
 
+    private static final Random RANDOM = new Random();
+
     @Override
     public boolean checkExistence(File diskDir) {
       if (!diskDir.exists()) {
@@ -131,7 +133,7 @@ public final class DiskCheckUtil {
         File testFileDir, int numBytesToWrite) {
       File testFile = new File(testFileDir, "disk-check-" + UUID.randomUUID());
       byte[] writtenBytes = new byte[numBytesToWrite];
-      new Random().nextBytes(writtenBytes);
+      RANDOM.nextBytes(writtenBytes);
       try (FileOutputStream fos = new FileOutputStream(testFile)) {
         fos.write(writtenBytes);
         fos.getFD().sync();

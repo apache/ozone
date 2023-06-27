@@ -44,6 +44,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
@@ -131,8 +132,8 @@ public abstract class StorageVolume
    */
   private final int ioTestCount;
   private final int ioFailureTolerance;
-  private volatile int currentIOTestCount;
-  private volatile int currentIOFailureCount;
+  private AtomicInteger currentIOTestCount;
+  private AtomicInteger currentIOFailureCount;
   private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
@@ -154,8 +155,8 @@ public abstract class StorageVolume
           conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
       this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
-      this.currentIOTestCount = 0;
-      this.currentIOFailureCount = 0;
+      this.currentIOTestCount = new AtomicInteger(0);
+      this.currentIOFailureCount = new AtomicInteger();
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -618,13 +619,13 @@ public abstract class StorageVolume
     // threshold of failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
         diskCheckDir, healthCheckFileSize);
-    currentIOTestCount++;
+    currentIOTestCount.incrementAndGet();
     if (!diskChecksPassed) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("IO check of volume " + this +
             " interrupted.");
       }
-      currentIOFailureCount++;
+      currentIOFailureCount.incrementAndGet();
     }
 
     if (LOG.isDebugEnabled()) {
@@ -637,15 +638,15 @@ public abstract class StorageVolume
     // further scans.
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
-    if (currentIOFailureCount > ioFailureTolerance) {
+    if (currentIOFailureCount.get() > ioFailureTolerance) {
       return VolumeCheckResult.FAILED;
     }
 
     // If we have completed the required number of volume checks without too
     // many IO failures, reset the counters for future iterations.
-    if (currentIOTestCount == ioTestCount) {
-      currentIOFailureCount = 0;
-      currentIOTestCount = 0;
+    if (currentIOTestCount.get() == ioTestCount) {
+      currentIOFailureCount.set(0);
+      currentIOTestCount.set(0);
     }
 
     return VolumeCheckResult.HEALTHY;
