@@ -91,6 +91,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -108,6 +109,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertThrows;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -225,7 +227,7 @@ public class TestOmSnapshot {
 
   private static void expectFailurePreFinalization(LambdaTestUtils.
       VoidCallable eval) throws Exception {
-    OMException ex  = Assert.assertThrows(OMException.class,
+    OMException ex  = assertThrows(OMException.class,
             () -> eval.call());
     Assert.assertEquals(ex.getResult(),
             NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
@@ -583,6 +585,12 @@ public class TestOmSnapshot {
     key1 = createFileKeyWithPrefix(bucket1, key1);
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
+
+    // When from and to snapshots are same, it returns empty response.
+    SnapshotDiffReportOzone
+        diff0 = getSnapDiffReport(volume, bucket, snap1, snap1);
+    assertTrue(diff0.getDiffList().isEmpty());
+
     // Do nothing, take another snapshot
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap2);
@@ -809,16 +817,28 @@ public class TestOmSnapshot {
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
     String snap2 = "snap" + counter.incrementAndGet();
+
     // Destination snapshot is invalid
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
+    OMException omException = assertThrows(OMException.class,
             () -> store.snapshotDiff(volume, bucket, snap1, snap2,
                 null, 0, false, false));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
     // From snapshot is invalid
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap2, snap1,
-                null, 0, false, false));
+    omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volume, bucket, snap2, snap1,
+            null, 0, false, false));
+
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
+
+    createSnapshot(volume, bucket, snap2);
+
+    omException = assertThrows(OMException.class, () ->
+        store.snapshotDiff(volume, bucket, snap2, snap1, null, 0, false, false)
+    );
+
+    assertEquals(INTERNAL_ERROR, omException.getResult());
+    assertEquals("fromSnapshot:" + snap2 + " should be older than to " +
+        "toSnapshot:" + snap1, omException.getMessage());
   }
 
   @Test

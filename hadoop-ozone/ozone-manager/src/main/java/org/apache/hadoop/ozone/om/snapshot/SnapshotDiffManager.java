@@ -555,7 +555,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @NotNull
-  private static OFSPath getSnapshotRootPath(String volume, String bucket) {
+  public static OFSPath getSnapshotRootPath(String volume, String bucket) {
     org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);
     return new OFSPath(bucketPath, new OzoneConfiguration());
@@ -1200,9 +1200,14 @@ public class SnapshotDiffManager implements AutoCloseable {
           getDSIFromSI(tsInfo, toSnapshot, volume, bucket);
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
-      List<String> sstDiffList =
-          differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
-      deltaFiles.addAll(sstDiffList);
+      try {
+        List<String> sstDiffList =
+            differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
+        deltaFiles.addAll(sstDiffList);
+      } catch (Exception exception) {
+        LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
+            "It will fallback to full diff now.", exception);
+      }
     }
 
     if (useFullDiff || deltaFiles.isEmpty()) {
