@@ -42,7 +42,7 @@ public class DatanodeConfiguration {
       "hdds.datanode.container.delete.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
-  public static final String VOLUME_HEALTH_CHECK_FILE_SIZE_KEY =
+  public static final String DISK_CHECK_FILE_SIZE_KEY =
       "hdds.datanode.disk.check.file.size";
   public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
       "hdds.datanode.disk.check.io.test.count";
@@ -70,11 +70,11 @@ public class DatanodeConfiguration {
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
-  public static final int VOLUME_IO_TEST_COUNT_DEFAULT = 3;
+  public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
 
-  public static final int VOLUME_IO_FAILURES_TOLERATED_DEFAULT = 1;
+  public static final int DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT = 1;
 
-  public static final int VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT = 100;
+  public static final int DISK_CHECK_FILE_SIZE_DEFAULT = 100;
 
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
@@ -287,9 +287,9 @@ public class DatanodeConfiguration {
           "hdds.datanode.disk.check.io.test.failures.tolerated of the tests " +
           "failed. Set to 0 to disable disk IO checks."
   )
-  private int volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
+  private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
 
-  @Config(key = "disk.check.io.test.failures.tolerated",
+  @Config(key = "disk.check.io.failures.tolerated",
       defaultValue = "1",
       type = ConfigType.INT,
       tags = { DATANODE },
@@ -297,7 +297,7 @@ public class DatanodeConfiguration {
           ".io.test.count that are allowed to fail before the volume is " +
           "marked as failed."
   )
-  private int volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+  private int volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
 
   @Config(key = "disk.check.file.size",
       defaultValue = "100B",
@@ -309,7 +309,7 @@ public class DatanodeConfiguration {
           "file will be stored in memory during the duration of the check."
   )
   private int volumeHealthCheckFileSize =
-      VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+      DISK_CHECK_FILE_SIZE_DEFAULT;
 
   @Config(key = "disk.check.min.gap",
       defaultValue = "5m",
@@ -515,16 +515,16 @@ public class DatanodeConfiguration {
         LOG.warn("{} must be greater than 0 but was set to {}." +
                 "Defaulting to {}",
             DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-            VOLUME_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
       }
 
       if (volumeIOFailureTolerance < 0) {
         LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
                 "Defaulting to {}",
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-            VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
-        volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
       if (volumeIOFailureTolerance >= volumeIOTestCount) {
@@ -533,19 +533,19 @@ public class DatanodeConfiguration {
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
             DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            VOLUME_IO_FAILURES_TOLERATED_DEFAULT, DISK_CHECK_IO_TEST_COUNT_KEY,
-            VOLUME_IO_TEST_COUNT_DEFAULT);
-        volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
-        volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT, DISK_CHECK_IO_TEST_COUNT_KEY,
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
 
       if (volumeHealthCheckFileSize < 1) {
-        LOG.warn(VOLUME_HEALTH_CHECK_FILE_SIZE_KEY +
+        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
                 "must be at least 1 byte and was set to {}. Defaulting to {}",
             volumeHealthCheckFileSize,
-            VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT);
+            DISK_CHECK_FILE_SIZE_DEFAULT);
         volumeHealthCheckFileSize =
-            VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+            DISK_CHECK_FILE_SIZE_DEFAULT;
       }
     }
 
