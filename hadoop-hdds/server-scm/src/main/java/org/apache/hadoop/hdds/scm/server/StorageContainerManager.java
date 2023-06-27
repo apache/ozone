@@ -301,6 +301,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
+  private PipelineChoosePolicy ecPipelineChoosePolicy;
   private SecurityConfig securityConfig;
 
   private final SCMHANodeDetails scmHANodeDetails;
@@ -767,7 +768,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerReplicaPendingOps);
     }
 
-    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    pipelineChoosePolicy = PipelineChoosePolicyFactory
+        .getPolicy(scmConfig, false);
+    ecPipelineChoosePolicy = PipelineChoosePolicyFactory
+        .getPolicy(scmConfig, true);
     if (configurator.getWritableContainerFactory() != null) {
       writableContainerFactory = configurator.getWritableContainerFactory();
     } else {
@@ -2011,6 +2016,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public PipelineChoosePolicy getPipelineChoosePolicy() {
     return this.pipelineChoosePolicy;
+  }
+
+  public PipelineChoosePolicy getEcPipelineChoosePolicy() {
+    return this.ecPipelineChoosePolicy;
   }
 
   @Override
