@@ -123,13 +123,11 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
       RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
           candidateDir, true);
-      File incompleteFlag = new File(checkpoint.getCheckpointLocation().toString(), "incompleteFlag.txt");
-      if (!incompleteFlag.exists()) {
+      File hardLinkFile = new File(checkpoint.getCheckpointLocation().toString(), "hardLinkFile");
+      if (hardLinkFile.exists()) {
         LOG.info("Successfully untar the downloaded snapshot {} at {}.", targetFile,
             checkpoint.getCheckpointLocation());
         return checkpoint;
-      } else {
-        incompleteFlag.delete();
       }
     }
   }

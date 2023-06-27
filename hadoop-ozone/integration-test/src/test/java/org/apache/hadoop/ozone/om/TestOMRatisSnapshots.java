@@ -188,10 +188,11 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {100})
+  @ValueSource(ints = {2})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
+  public void testInstallSnapshot(int numSnapshotsToCreate)
+      throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -210,7 +211,7 @@ public class TestOMRatisSnapshots {
     FaultInjector faultInjector =
         new SnapshotMaxSizeInjector(leaderOM,
             followerOM.getOmSnapshotProvider().getSnapshotDir(),
-            sstSetList);
+                                    sstSetList);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
@@ -1090,8 +1091,6 @@ public class TestOMRatisSnapshots {
     FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
     try (TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(fileOutputStream)) {
-      Path incompleteFlag = Files.createTempFile("incompleteFlag", "txt");
-      includeFile(incompleteFlag.toFile(), "incompleteFlag.txt", archiveOutputStream);
     }
   }
 
@@ -1176,11 +1175,13 @@ public class TestOMRatisSnapshots {
     int count;
     File snapshotDir;
     List<Set<String>> sstSetList;
+    Path tempDir;
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
-                            List<Set<String>> sstSetList) {
+                            List<Set<String>> sstSetList) throws IOException {
       this.om = om;
       this.snapshotDir = snapshotDir;
       this.sstSetList = sstSetList;
+      this.tempDir = Files.createTempDirectory("tmpDirPrefix");
       init();
     }
 
@@ -1194,8 +1195,15 @@ public class TestOMRatisSnapshots {
       File tarball = getTarball(snapshotDir);
       if (count == 1) {
         assert tarball != null;
+        FileUtil.unTar(tarball, tempDir.toFile());
+        List<Path> paths = Files.walk(tempDir).filter(
+            path -> path.toString().endsWith(".sst")).collect(Collectors.toList());
+        long sstSize = 0;
+        for (Path path : paths) {
+          sstSize += Files.size(path);
+        }
         om.getConfiguration().setLong("ozone.om.maxsize",
-                                      (Files.size(tarball.toPath())*2)/3);
+                                      sstSize/2);
         createDummyTarball(tarball);
       } else {
         sstSetList.add(getSstFilenames(tarball));

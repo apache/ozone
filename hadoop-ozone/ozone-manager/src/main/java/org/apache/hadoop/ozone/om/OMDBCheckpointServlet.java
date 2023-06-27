@@ -264,9 +264,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             return false;
           }
         } else {
-          copySize.addAndGet(processFile(file, copyFiles, hardLinkFiles, toExcludeFiles, excluded));
-          if ((copySize.get() > max_copy_size) && containsSstFile(copyFiles)) {
+          long fileSize = processFile(file, copyFiles, hardLinkFiles, toExcludeFiles, excluded);
+          if (copySize.get() + fileSize > max_copy_size) {
             return false;
+          } else {
+            copySize.addAndGet(fileSize);
           }
         }
       }
@@ -318,7 +320,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       } else {
         // Not sst file.
         copyFiles.add(file);
-        fileSize = Files.size(file);
       }
     }
     return fileSize;
@@ -351,8 +352,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
     int truncateLength = metaDirPath.toString().length() + 1;
 
+    Set<Path> filteredCopyFiles = completed ? copyFiles :
+      copyFiles.stream().filter(path ->
+          path.getFileName().toString().toLowerCase().endsWith(".sst")).
+          collect(Collectors.toSet());
+
     // Go through each of the files to be copied and add to archive.
-    for (Path file : copyFiles) {
+    for (Path file : filteredCopyFiles) {
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
@@ -364,21 +370,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       includeFile(file.toFile(), fixedFile, archiveOutputStream);
     }
 
-    // Create list of hard links.
-    if (!hardLinkFiles.isEmpty()) {
+    if (completed) {
+      // Create list of hard links.
       Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
       includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
           archiveOutputStream);
     }
-    if (!completed) {
-      Path incompleteFlag = Files.createTempFile("incompleteFlag", "txt");
-      includeFile(incompleteFlag.toFile(), "incompleteFlag.txt", archiveOutputStream);
-    }
-  }
-
-  private boolean containsSstFile(Set<Path> copyFiles) {
-    return copyFiles.stream().anyMatch(path ->
-        path.getFileName().toString().toLowerCase().endsWith(".sst"));
   }
 
   private OzoneConfiguration getConf() {
