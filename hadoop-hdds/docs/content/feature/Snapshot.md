@@ -49,7 +49,7 @@ ozone sh snapshot delete [-hV] <bucket> <snapshotName>
 * Snapshot Diff: Given two snapshots, list all the keys that are different betwenn the them.
 ```shell
 ozone sh snapshot diff [-chV] [-p=<pageSize>] [-t=<continuation-token>] <bucket> <fromSnapshot> <toSnapshot>
-```shell
+```
 
 Snapshot diff is an asynchronous API. The first time the API is invoked, it starts a background process to calculate the Snapshot diff, and returns "Retry" with suggested duration for the retry operation. Once the snapshot diff is computed, this API returns the diffs in multiple Pages. With each Diff response, it also returns a continuation token to continue from the last page of diff results.  This API is safe to be called multiple times for a given Snapshot source and destination pair. Internally Ozone computes Snapdiff only once and stores it for future invocations of the same Snapshot Diff API. 
 
