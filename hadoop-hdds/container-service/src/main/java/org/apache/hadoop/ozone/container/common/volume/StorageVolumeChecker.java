@@ -344,8 +344,12 @@ public class StorageVolumeChecker {
           t.getCause() : t;
       LOG.warn("Exception running disk checks against volume {}",
           volume, exception);
-      markFailed();
-      cleanup();
+      // If the scan was interrupted, do not count it as a volume failure.
+      // This should only happen if the volume checker is being shut down.
+      if (!(t instanceof InterruptedException)) {
+        markFailed();
+        cleanup();
+      }
     }
 
     private void markHealthy() {

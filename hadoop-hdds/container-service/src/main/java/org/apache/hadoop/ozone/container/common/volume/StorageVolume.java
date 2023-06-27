@@ -588,17 +588,24 @@ public abstract class StorageVolume
    * Run a check on the current volume to determine if it is healthy.
    * @param unused context for the check, ignored.
    * @return result of checking the volume.
+   * @throws InterruptedException if there was an error during the volume
+   *    check because the thread was interrupted.
    * @throws Exception if an exception was encountered while running
-   *            the volume check.
+   *    the volume check and the thread was not interrupted.
    */
   @Override
-  public synchronized VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused)
+      throws Exception {
     boolean directoryChecksPassed =
         DiskCheckUtil.checkExistence(storageDir) &&
         DiskCheckUtil.checkPermissions(storageDir);
     // If the directory is not present or has incorrect permissions, fail the
     // volume immediately. This is not an intermittent error.
     if (!directoryChecksPassed) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Directory check of volume " + this +
+            " interrupted.");
+      }
       return VolumeCheckResult.FAILED;
     }
 
@@ -613,6 +620,10 @@ public abstract class StorageVolume
         diskCheckDir, healthCheckFileSize);
     currentIOTestCount++;
     if (!diskChecksPassed) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("IO check of volume " + this +
+            " interrupted.");
+      }
       currentIOFailureCount++;
     }
 
