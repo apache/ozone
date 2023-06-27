@@ -45,6 +45,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
                           List<DatanodeDetails> favoredNodes)
       throws IOException, TimeoutException;
 
+  Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+                           List<DatanodeDetails> excludedNodes,
+                           List<DatanodeDetails> favoredNodes)
+      throws IOException, TimeoutException;
+
+  void addEcPipeline(Pipeline pipeline) throws IOException, TimeoutException;
+
 
   Pipeline createPipeline(
       ReplicationConfig replicationConfig,
