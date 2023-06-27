@@ -719,7 +719,6 @@ public interface OzoneManagerProtocol
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  @SuppressWarnings("parameternumber")
   default SnapshotDiffResponse snapshotDiff(String volumeName,
                                             String bucketName,
                                             String fromSnapshot,
