@@ -54,7 +54,9 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Comparator.reverseOrder;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
+import static org.apache.hadoop.hdds.utils.CollectionUtils.findTopN;
 
 /**
  * {@link ContainerManager} implementation in SCM server.
@@ -448,18 +450,14 @@ public class ContainerManagerImpl implements ContainerManager {
   private static List<ContainerID> filterSortAndLimit(
       ContainerID startID, int count, Set<ContainerID> set) {
 
-    List<ContainerID> ids = new ArrayList<>(set);
-
-    // only filter if startID is not the minimum one
-    if (!startID.equals(ContainerID.MIN)) {
-      ids.removeIf(id -> id.compareTo(startID) < 0);
+    if (ContainerID.MIN.equals(startID) && count >= set.size()) {
+      List<ContainerID> list = new ArrayList<>(set);
+      Collections.sort(list);
+      return list;
     }
 
-    // sort after removing unnecessary items
-    Collections.sort(ids);
-
-    // limit
-    return ids.subList(0, Math.min(ids.size(), count));
+    return findTopN(set, count, reverseOrder(),
+        id -> id.compareTo(startID) >= 0);
   }
 
   /**
