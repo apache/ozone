@@ -137,7 +137,6 @@ enum Type {
   SetTimes = 120;
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
-  CustomUnknownCommand = 123;
 }
 
 message OMRequest {
