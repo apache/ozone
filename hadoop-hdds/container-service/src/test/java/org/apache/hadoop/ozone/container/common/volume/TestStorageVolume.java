@@ -137,84 +137,11 @@ public class TestStorageVolume {
     assertEquals(VolumeCheckResult.FAILED, result);
   }
 
-  @Test
-  public void testCheckIoFailureTolerance() throws Exception {
-    HddsVolume volume = volumeBuilder.build();
-    volume.format(CLUSTER_ID);
-
-    final int numIOTests = CONF.getObject(DatanodeConfiguration.class)
-        .getVolumeIOTestCount();
-    final int numFailuresTolerated = CONF.getObject(DatanodeConfiguration.class)
-        .getVolumeIOFailureTolerance();
-
-    // Trigger failures until just below the tolerance. Volume should remain
-    // healthy.
-    int numFailuresToInject = numFailuresTolerated;
-    for (int i = 0; i < numIOTests - numFailuresToInject; i++) {
-      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    }
-    DiskCheckUtil.setTestImpl(IO_FAILURE);
-    // Volume should still be healthy through all the checks.
-    for (int i = 0; i < numFailuresToInject; i++) {
-      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    }
-
-    DiskCheckUtil.clearTestImpl();
-
-    // Trigger failures just above the tolerance. Volume should be
-    // failed on the last run.
-    numFailuresToInject = numFailuresTolerated + 1;
-    for (int i = 0; i < numIOTests - numFailuresToInject; i++) {
-      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    }
-    DiskCheckUtil.setTestImpl(IO_FAILURE);
-    // Volume should still be healthy until the final check.
-    for (int i = 0; i < numFailuresToInject - 1; i++) {
-      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    }
-    assertEquals(VolumeCheckResult.FAILED, volume.check(false));
-  }
-
-  /**
-   * When the number of tolerated failures has been crossed, the volume
-   * should be failed without finishing the configured IO test count, since
-   * the result will be the same.
-   */
-  @Test
-  public void testCheckIoEarlyFailure() throws Exception {
-    HddsVolume volume = volumeBuilder.build();
-    volume.format(CLUSTER_ID);
-
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-
-    final int numFailuresTolerated = CONF.getObject(DatanodeConfiguration.class)
-        .getVolumeIOFailureTolerance();
-
-    // Trigger failures just above the tolerance in the first scans. Volume
-    // should be failed once the tolerance is crossed without waiting for the
-    // rest of the checks.
-    DiskCheckUtil.setTestImpl(IO_FAILURE);
-    int numFailuresToInject = numFailuresTolerated + 1;
-    // Volume should still be healthy until the final check.
-    for (int i = 0; i < numFailuresToInject - 1; i++) {
-      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-    }
-    assertEquals(VolumeCheckResult.FAILED, volume.check(false));
-  }
-
-  @Test
-  public void testCheckIoFailureDefaultConfigs() {
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    // Make sure default values are correct.
-    assertTrue(dnConf.getVolumeIOFailureTolerance() <=
-        dnConf.getVolumeIOTestCount());
-  }
-
   /**
    * Setting test count to 0 should disable IO tests.
    */
   @Test
-  public void testCheckIoDisabled() throws Exception {
+  public void testCheckIODisabled() throws Exception {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setVolumeIOTestCount(0);
     CONF.setFromObject(dnConf);
@@ -227,7 +154,16 @@ public class TestStorageVolume {
   }
 
   @Test
-  public void testCheckIoInvalidConfig() throws Exception {
+  public void testCheckIODefaultConfigs() {
+    CONF.clear();
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    // Make sure default values are not invalid.
+    assertTrue(dnConf.getVolumeIOFailureTolerance() <
+        dnConf.getVolumeIOTestCount());
+  }
+
+  @Test
+  public void testCheckIOInvalidConfig() throws Exception {
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
@@ -239,9 +175,9 @@ public class TestStorageVolume {
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
     assertEquals(dnConf.getVolumeIOTestCount(),
-        DatanodeConfiguration.VOLUME_IO_TEST_COUNT_DEFAULT);
+        DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT);
     assertEquals(dnConf.getVolumeIOFailureTolerance(),
-        DatanodeConfiguration.VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
+        DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
 
     // When test count and failure tolerance are set to the same value,
     // Default values should be used.
@@ -249,23 +185,84 @@ public class TestStorageVolume {
     dnConf.setVolumeIOFailureTolerance(2);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
-    assertEquals(DatanodeConfiguration.VOLUME_IO_TEST_COUNT_DEFAULT,
+    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
         dnConf.getVolumeIOTestCount());
-    assertEquals(DatanodeConfiguration.VOLUME_IO_FAILURES_TOLERATED_DEFAULT,
+    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
         dnConf.getVolumeIOFailureTolerance());
 
     // Negative test count should reset to default value.
     dnConf.setVolumeIOTestCount(-1);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration .class);
-    assertEquals(DatanodeConfiguration.VOLUME_IO_TEST_COUNT_DEFAULT,
-               dnConf.getVolumeIOTestCount());
+    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_TEST_COUNT_DEFAULT,
+        dnConf.getVolumeIOTestCount());
 
     // Negative failure tolerance should reset to default value.
     dnConf.setVolumeIOFailureTolerance(-1);
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration .class);
-    assertEquals(DatanodeConfiguration.VOLUME_IO_FAILURES_TOLERATED_DEFAULT,
-               dnConf.getVolumeIOFailureTolerance());
+    assertEquals(DatanodeConfiguration.DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
+        dnConf.getVolumeIOFailureTolerance());
+  }
+
+  @Test
+  public void testCheckIOInitiallyPassing() throws Exception {
+    testCheckIOUntilFailure(3, 1, true, true, true, false, true, false);
+  }
+
+  @Test
+  public void testCheckIOEarlyFailure() throws Exception {
+    testCheckIOUntilFailure(3, 1, false, false);
+  }
+
+  @Test
+  public void testCheckIOFailuresDiscarded() throws Exception {
+    testCheckIOUntilFailure(3, 1, false, true, true, true, false, false);
+  }
+
+  @Test
+  public void testCheckIOAlternatingFailures() throws Exception {
+    testCheckIOUntilFailure(3, 1, true, false, true, false);
+  }
+
+  /**
+   * Helper method to test the sliding window of IO checks before volume
+   * failure.
+   *
+   * @param ioTestCount The number of most recent tests whose results should
+   *    be considered.
+   * @param ioFailureTolerance The number of IO failures tolerated out of the
+   *    last {@param ioTestCount} tests.
+   * @param checkResults The result of the IO check for each run. Volume
+   *    should fail after the last IO check is completed.
+   */
+  private void testCheckIOUntilFailure(int ioTestCount, int ioFailureTolerance,
+      boolean... checkResults) throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setVolumeIOTestCount(ioTestCount);
+    dnConf.setVolumeIOFailureTolerance(ioFailureTolerance);
+    CONF.setFromObject(dnConf);
+    volumeBuilder.conf(CONF);
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    for (int i = 0; i < checkResults.length; i++) {
+      final boolean result = checkResults[i];
+      final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
+            @Override
+            public boolean checkReadWrite(File storageDir, File testDir,
+                int numBytesToWrite) {
+              return result;
+            }
+          };
+      DiskCheckUtil.setTestImpl(ioResult);
+      if (i < checkResults.length - 1) {
+        assertEquals("Unexpected IO failure in run " + i,
+            VolumeCheckResult.HEALTHY, volume.check(false));
+      } else {
+        assertEquals("Unexpected IO success in run " + i,
+            VolumeCheckResult.FAILED, volume.check(false));
+      }
+    }
   }
 }

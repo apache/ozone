@@ -40,9 +40,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
@@ -126,14 +128,14 @@ public abstract class StorageVolume
   private final VolumeSet volumeSet;
 
   /*
-  The number of consecutive times this volume encountered an IO error
-  during a volume check. If this number crosses a configured threshold,
-  the volume will be failed. A passing check will reset this counter.
+  Fields used to implement IO based disk health checks.
+  If more than ioFailureTolerance IO checks fail out of the last ioTestCount
+  tests run, then the volume is considered failed.
    */
   private final int ioTestCount;
   private final int ioFailureTolerance;
-  private AtomicInteger currentIOTestCount;
   private AtomicInteger currentIOFailureCount;
+  private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
@@ -155,8 +157,8 @@ public abstract class StorageVolume
           conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
       this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
-      this.currentIOTestCount = new AtomicInteger(0);
-      this.currentIOFailureCount = new AtomicInteger();
+      this.ioTestSlidingWindow = new LinkedList<>();
+      this.currentIOFailureCount = new AtomicInteger(0);
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
@@ -586,7 +588,14 @@ public abstract class StorageVolume
   }
 
   /**
-   * Run a check on the current volume to determine if it is healthy.
+   * Run a check on the current volume to determine if it is healthy. The
+   * check consists of a directory check and an IO check.
+   *
+   * If the directory check fails, the volume check fails immediately.
+   * The IO check is allows to fail up to {@code ioFailureTolerance} times
+   * out of the last {@code ioTestCount} IO checks before this volume check is
+   * failed. Each call to this method runs one IO check.
+   *
    * @param unused context for the check, ignored.
    * @return result of checking the volume.
    * @throws InterruptedException if there was an error during the volume
@@ -619,19 +628,23 @@ public abstract class StorageVolume
     // threshold of failures is crossed.
     boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
         diskCheckDir, healthCheckFileSize);
-    currentIOTestCount.incrementAndGet();
-    if (!diskChecksPassed) {
-      if (Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException("IO check of volume " + this +
-            " interrupted.");
-      }
-      currentIOFailureCount.incrementAndGet();
+    if (Thread.currentThread().isInterrupted()) {
+      // Thread interrupt may have caused IO operations to abort. Do not
+      // consider this a failure.
+      throw new InterruptedException("IO check of volume " + this +
+          " interrupted.");
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Volume {} ran IO test {} of {}. Seen {} of {} tolerated IO" +
-              "failures.", this, currentIOTestCount, ioTestCount,
-          currentIOFailureCount, ioFailureTolerance);
+    // Move the sliding window of IO test results forward 1 by adding the
+    // latest entry and removing the oldest entry from the window.
+    // Update the failure counter for the new window.
+    ioTestSlidingWindow.add(diskChecksPassed);
+    if (!diskChecksPassed) {
+      currentIOFailureCount.incrementAndGet();
+    }
+    if (ioTestSlidingWindow.size() > ioTestCount &&
+        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
+      currentIOFailureCount.decrementAndGet();
     }
 
     // If the failure threshold has been crossed, fail the volume without
@@ -639,14 +652,15 @@ public abstract class StorageVolume
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {
+      LOG.info("Failed IO test for volume {}: the last {} runs " +
+              "encountered {}/{} tolerated failures.", this,
+          ioTestSlidingWindow.size(), currentIOFailureCount,
+          ioFailureTolerance);
       return VolumeCheckResult.FAILED;
-    }
-
-    // If we have completed the required number of volume checks without too
-    // many IO failures, reset the counters for future iterations.
-    if (currentIOTestCount.get() == ioTestCount) {
-      currentIOFailureCount.set(0);
-      currentIOTestCount.set(0);
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("IO test results for volume {}: the last {} runs encountered " +
+              "{}/{} tolerated failures", this, ioTestSlidingWindow.size(),
+          currentIOFailureCount, ioFailureTolerance);
     }
 
     return VolumeCheckResult.HEALTHY;

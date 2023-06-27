@@ -281,11 +281,12 @@ public class DatanodeConfiguration {
       defaultValue = "3",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "The number of IO tests required to determine if the disk" +
-          " has failed. Each disk check does one IO test. Once this number of" +
-          " tests has been completed, the volume will be failed if more than " +
-          "hdds.datanode.disk.check.io.test.failures.tolerated of the tests " +
-          "failed. Set to 0 to disable disk IO checks."
+      description = "The number of IO tests required to determine if a disk " +
+          " has failed. Each disk check does one IO test. The volume will be " +
+          "failed if more than " +
+          "hdds.datanode.disk.check.io.failures.tolerated out of the last " +
+          "hdds.datanode.disk.check.io.test.count runs failed. Set to 0 " +
+          "to disable disk IO checks."
   )
   private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
 
@@ -293,11 +294,12 @@ public class DatanodeConfiguration {
       defaultValue = "1",
       type = ConfigType.INT,
       tags = { DATANODE },
-      description = "The number of IO tests out of hdds.datanode.disk.check" +
-          ".io.test.count that are allowed to fail before the volume is " +
-          "marked as failed."
+      description = "The number of IO tests out of the last hdds.datanode" +
+          ".disk.check.io.test.count test run that are allowed to fail before" +
+          " the volume is marked as failed."
   )
-  private int volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+  private int volumeIOFailureTolerance =
+      DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
 
   @Config(key = "disk.check.file.size",
       defaultValue = "100B",
@@ -533,8 +535,8 @@ public class DatanodeConfiguration {
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
             DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
             DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT, DISK_CHECK_IO_TEST_COUNT_KEY,
-            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
+            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
         volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
         volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
       }
