@@ -27,30 +27,32 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
-import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
+
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Annotation Processor that verifies if the methods that are marked with
  * Replicate annotation have proper method signature which throws
  * TimeoutException.
  */
-@SupportedAnnotationTypes("org.apache.hadoop.hdds.scm.metadata.Replicate")
+@SupportedAnnotationTypes(ReplicateAnnotationProcessor.ANNOTATION_NAME)
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class ReplicateAnnotationProcessor extends AbstractProcessor {
 
-  private static final String ANNOTATION_SIMPLE_NAME = "Replicate";
+  static final String ANNOTATION_NAME =
+      "org.apache.hadoop.hdds.scm.metadata.Replicate";
+  private static final String REQUIRED_EXCEPTION =
+      "org.apache.hadoop.hdds.scm.exceptions.SCMException";
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
                          RoundEnvironment roundEnv) {
     for (TypeElement annotation : annotations) {
-      if (!annotation.getSimpleName().contentEquals(ANNOTATION_SIMPLE_NAME)) {
-        continue;
+      if (ANNOTATION_NAME.contentEquals(annotation.getQualifiedName())) {
+        roundEnv.getElementsAnnotatedWith(annotation)
+            .forEach(this::checkMethodSignature);
       }
-      roundEnv.getElementsAnnotatedWith(annotation)
-          .forEach(this::checkMethodSignature);
     }
     return false;
   }
@@ -67,14 +69,15 @@ public class ReplicateAnnotationProcessor extends AbstractProcessor {
       return;
     }
     final ExecutableElement executableElement = (ExecutableElement) element;
-    final List<? extends TypeMirror> exceptions =
-        executableElement.getThrownTypes();
+    final Set<String> exceptions = executableElement.getThrownTypes().stream()
+        .map(TypeMirror::toString)
+        .collect(toSet());
 
-    if (exceptions.stream().map(TypeMirror::toString)
-        .noneMatch(TimeoutException.class.getName()::equals)) {
+    if (!exceptions.contains(REQUIRED_EXCEPTION)) {
+
       processingEnv.getMessager().printMessage(Kind.ERROR,
-          "Method with Replicate annotation should declare " +
-              "TimeoutException in its signature.");
+          "Method with Replicate annotation should declare throwing " +
+              REQUIRED_EXCEPTION, executableElement);
     }
   }
 }
