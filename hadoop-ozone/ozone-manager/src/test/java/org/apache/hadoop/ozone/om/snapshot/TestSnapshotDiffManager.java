@@ -291,7 +291,7 @@ public class TestSnapshotDiffManager {
 
       SnapshotDiffJob diffJob = new SnapshotDiffJob(System.currentTimeMillis(),
           UUID.randomUUID().toString(), jobStatus, VOLUME_NAME, BUCKET_NAME,
-          baseSnapshotName, targetSnapshotName, false, 0);
+          baseSnapshotName, targetSnapshotName, false, false, 0);
 
       snapshotNames.add(targetSnapshotName);
       snapshotInfoList.add(targetSnapshot);
@@ -727,7 +727,7 @@ public class TestSnapshotDiffManager {
 
     assertEquals(100, totalDiffEntries);
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
-        JobStatus.DONE, "vol", "buck", "fs", "ts",
+        JobStatus.DONE, "vol", "buck", "fs", "ts", false,
         true, diffMap.size());
     SnapshotDiffReportOzone snapshotDiffReportOzone =
         snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
@@ -788,11 +788,11 @@ public class TestSnapshotDiffManager {
     });
 
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
-        JobStatus.DONE, "vol", "buck", "fs", "ts",
+        JobStatus.DONE, "vol", "buck", "fs", "ts", false,
         true, totalNumberOfRecords);
 
     SnapshotDiffJob snapshotDiffJob2 = new SnapshotDiffJob(0, testJobId2,
-        JobStatus.DONE, "vol", "buck", "fs", "ts",
+        JobStatus.DONE, "vol", "buck", "fs", "ts", false,
         true, totalNumberOfRecords);
 
     db.get().put(snapDiffJobTable,
@@ -1180,7 +1180,7 @@ public class TestSnapshotDiffManager {
         }
     ).when(spy).generateSnapshotDiffReport(anyString(), anyString(),
         eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
-        eq(snapshotInfoList.get(1).getName()), eq(false));
+        eq(snapshotInfoList.get(1).getName()), eq(false), eq(false));
 
     spy.loadJobsOnStartUp();
 
@@ -1266,7 +1266,7 @@ public class TestSnapshotDiffManager {
           return null;
         }).when(spy).generateSnapshotDiffReport(anyString(), anyString(),
             eq(VOLUME_NAME), eq(BUCKET_NAME), eq(fromSnapshotName),
-            eq(toSnapshotName), eq(false));
+            eq(toSnapshotName), eq(false), eq(false));
       }
     }
 
@@ -1324,7 +1324,7 @@ public class TestSnapshotDiffManager {
                                          String toSnapshotName) {
     try {
       return diffManager.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
-          fromSnapshotName, toSnapshotName, 0, 1000, false);
+          fromSnapshotName, toSnapshotName, 0, 1000, false, false);
     } catch (IOException exception) {
       throw new RuntimeException(exception);
     }
@@ -1417,11 +1417,11 @@ public class TestSnapshotDiffManager {
         omMetadataManager);
 
     spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME, fromSnapInfo.getName(),
-        toSnapInfo.getName(), 0, 1000, false);
+        toSnapInfo.getName(), 0, 1000, false, false);
 
     Thread.sleep(1000L);
     spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME, fromSnapInfo.getName(),
-        toSnapInfo.getName(), 0, 1000, false);
+        toSnapInfo.getName(), 0, 1000, false, false);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(fromSnapInfo,
         toSnapInfo);
