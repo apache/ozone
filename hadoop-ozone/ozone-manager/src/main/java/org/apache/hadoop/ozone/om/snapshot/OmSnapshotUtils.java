@@ -117,6 +117,10 @@ public final class OmSnapshotUtils {
           String to = l.split("\t")[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           Path fullToPath = Paths.get(dbPath.toString(), to);
+          File toParent = fullToPath.getParent().toFile();
+          if (!toParent.exists()) {
+            toParent.mkdirs();
+          }
           Files.createLink(fullToPath, fullFromPath);
         }
         if (!hardLinkFile.delete()) {

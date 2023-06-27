@@ -127,7 +127,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       if (!incompleteFlag.exists()) {
         LOG.info("Successfully untar the downloaded snapshot {} at {}.", targetFile,
             checkpoint.getCheckpointLocation());
-        //        return checkpoint;
+        return checkpoint;
       } else {
         incompleteFlag.delete();
       }

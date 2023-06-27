@@ -16,6 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.ExitManager;
@@ -64,6 +67,9 @@ import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -71,8 +77,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -82,6 +90,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
@@ -145,6 +154,7 @@ public class TestOMRatisSnapshots {
         .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
+//        .setNumDatanodes(1)
         .setNumOfActiveOMs(2)
         .build();
     cluster.waitForClusterToBeReady();
@@ -196,7 +206,12 @@ public class TestOMRatisSnapshots {
       followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
-    FaultInjector faultInjector = new SnapshotMaxSizeInjector(leaderOM);
+
+    List<Set<String>> sstSetList = new ArrayList<>();
+    FaultInjector faultInjector =
+        new SnapshotMaxSizeInjector(leaderOM,
+            followerOM.getOmSnapshotProvider().getSnapshotDir(),
+            sstSetList);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
     //    faultInjector.resume();
 
@@ -286,6 +301,14 @@ public class TestOMRatisSnapshots {
      */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+    int sstFileCount = 0;
+    Set<String> sstFileUnion = new HashSet<>();
+    for (Set<String> sstFiles : sstSetList) {
+      sstFileCount += sstFiles.size();
+      sstFileUnion.addAll(sstFiles);
+    }
+    assertTrue(sstSetList.size() > 1);
+    assertEquals(sstFileUnion.size(), sstFileCount);
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
@@ -1064,6 +1087,42 @@ public class TestOMRatisSnapshots {
     FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
   }
 
+  private void createDummyTarball(File dummyTarFile)
+      throws IOException {
+    FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
+    try (TarArchiveOutputStream archiveOutputStream =
+             new TarArchiveOutputStream(fileOutputStream)) {
+      Path incompleteFlag = Files.createTempFile("incompleteFlag", "txt");
+      includeFile(incompleteFlag.toFile(), "incompleteFlag.txt", archiveOutputStream);
+    }
+  }
+
+  private Set<String> getSstFilenames(File tarball)
+      throws IOException {
+    Set<String> sstFilenames = new HashSet<>();
+    TarArchiveInputStream tarInput =
+        new TarArchiveInputStream(new FileInputStream(tarball));
+    while (true) {
+      TarArchiveEntry entry=tarInput.getNextTarEntry();
+      if (entry == null) {
+        break;
+      }
+      String name = entry.getName();
+      if (name.toLowerCase().endsWith(".sst")) {
+        sstFilenames.add(entry.getName());
+      }
+    }
+    return sstFilenames;
+  }
+
+  private File getTarball(File snapshotDir) {
+    for (File f : Objects.requireNonNull(snapshotDir.listFiles())) {
+      if (f.getName().toLowerCase().endsWith(".tar")) {
+        return f;
+      }
+    }
+    return null;
+  }
   private static class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
@@ -1114,40 +1173,39 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  private static class SnapshotMaxSizeInjector extends FaultInjector {
+  private class SnapshotMaxSizeInjector extends FaultInjector {
     OzoneManager om;
     int count;
-    private CountDownLatch ready;
-    private CountDownLatch wait;
-    SnapshotMaxSizeInjector(OzoneManager om) {
+    File snapshotDir;
+    List<Set<String>> sstSetList;
+    SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
+                            List<Set<String>> sstSetList) {
       this.om = om;
+      this.snapshotDir = snapshotDir;
+      this.sstSetList = sstSetList;
       init();
     }
 
     @Override
     public void init() {
-      this.ready = new CountDownLatch(1);
-      this.wait = new CountDownLatch(1);
     }
 
     @Override
     public void pause() throws IOException {
-      //      count = om.getConfiguration().getInt("ozone.om.ratis.log.purge.gap", 2);
-
-      om.getConfiguration().setLong("ozone.om.maxsize", 1L);
-
+      count++;
+      File tarball = getTarball(snapshotDir);
+      if (count == 1) {
+        assert tarball != null;
+        om.getConfiguration().setLong("ozone.om.maxsize", 1);
+         //   Files.size(tarball.toPath())/2);
+        createDummyTarball(tarball);
+      } else {
+        sstSetList.add(getSstFilenames(tarball));
+      }
     }
 
     @Override
     public void resume() throws IOException {
-      // Make sure injector pauses before resuming.
-      try {
-        ready.await();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        assertTrue(Fail.fail("resume interrupted"));
-      }
-      wait.countDown();
     }
 
     @Override
