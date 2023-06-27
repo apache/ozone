@@ -3432,25 +3432,6 @@
     "unreplicatedDataSize": 29291,
     "status": "OK"
   },
-  "blocksdeletePendingSummary": {
-    "totalCount": 1000,
-    "containerStateBlockInfoListMap": {
-      "OPEN": [
-        {
-          "containerId": 100,
-          "localIDList": [
-            1,
-            2,
-            3,
-            4
-          ],
-          "localIDCount": 4,
-          "txID": 1
-        }
-      ]
-    }
-  },
-  
   "omMismatch":{
       "lastKey":11,
       "containerDiscrepancyInfo": [

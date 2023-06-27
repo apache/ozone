@@ -379,10 +379,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         mismatchMissingState: 'SCM',
         prevKeyMismatch: 0,
         expandedRowData:{}
-      },() => {
+      },async() => {
         mismatchPrevKeyList=[0];
         console.log("before If fetchMismatchContainers OM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
+        await this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
       });
     }
     else {
@@ -390,10 +390,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         mismatchMissingState: 'OM',
         prevKeyMismatch: 0,
         expandedRowData:{}
-      },() => {
+      },async() => {
         mismatchPrevKeyList=[0];
         console.log("before fetchMismatchContainers SCM",this.state);
-        this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
+        await this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
       });
     }
   };
@@ -443,10 +443,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         includeFso: true,
         includeNonFso: false,
         prevKeyOpen: "",
-      },() => {
+      },async () => {
         openPrevKeyList =[""];
         console.log("If handlefsoNonfsoMenuChang before fetchOpenkeys",this.state);
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
+        await this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
       });
     }
     else {
@@ -454,10 +454,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         includeFso: false,
         includeNonFso: true,
         prevKeyOpen: "",
-      },() => {
+        openKeysDataSource: []
+      },async () => {
         openPrevKeyList =[""];
         console.log("else handlefsoNonfsoMenuChang nonfso before fetchOpenkeys--",this.state);
-        this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
+        await this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
       });
     }
   };
@@ -468,7 +469,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   fetchMismatchContainers = (limit: number, prevKeyMismatch: number, mismatchMissingState: any) => {
-    console.log("before setstate in fetchMismatchContainers", this.state);
     this.setState({
       loading: true,
       clickable: true,
@@ -479,6 +479,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
       if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
         //No Further Records may be last record
+        mismatchPrevKeyList = [0];
         this.setState({
           loading: false,
           clickable: false,
@@ -534,6 +535,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       }
 
       if (openKeysResponse && openKeysResponse.data && openKeysResponse.data.lastKey === "") {
+        //last key of api is null may be last record no further records
+        openPrevKeyList = [""];
         this.setState({
           loading: false,
           clickable: false,
@@ -601,6 +604,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       });
 
       if (deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.lastKey === "") {
+        //last key of api is empty may be last record no further records
+        keysPendingPrevList =[""];
         this.setState({
           loading: false,
           clickable: false,
@@ -641,6 +646,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       let deletedContainerKeys = [];
       deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
       if (deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey === null) {
+        // no more further records last key
+        deletedKeysPrevList = [0];
         this.setState({
           loading: false,
           clickable: false,
@@ -673,7 +680,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   changeTab = (activeKey: any) => {
     //when changing tab make empty all datasets and prevkey and deafult filtering to intial values
-    console.log("ChangeTab", this.state);
+    mismatchPrevKeyList = [0];
+    openPrevKeyList =[""];
+    keysPendingPrevList =[""];
+    deletedKeysPrevList =[0];
     this.setState({
       activeTab: activeKey,
       mismatchDataSource: [],
@@ -705,7 +715,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   fetchPreviousRecords = () => {
-    console.log("previous Records", this.state);
+    // to fetch previous call stored all prevkey in array and fetching in respective tabs
     if (this.state.activeTab === '2') {
       this.setState({
         prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]
@@ -732,7 +742,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   fetchNextRecords = () => {
     // To Call API for Page Level for each page fetch next records
-    console.log("In fetchnextrecord",this.state);
     if (this.state.activeTab === '2') {
       this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
     } else if (this.state.activeTab === '3') {
@@ -919,11 +928,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource } = this.state;
     console.log("Render--",this.state);
     const paginationConfig: PaginationConfig = {
+      pageSize:this.state.DEFAULT_LIMIT,
       defaultPageSize: this.state.DEFAULT_LIMIT,
       pageSizeOptions: ['10', '20', '30', '50'],
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
-      //onChange: this.onChangePagination,
       itemRender: this.itemRender
     };
 
