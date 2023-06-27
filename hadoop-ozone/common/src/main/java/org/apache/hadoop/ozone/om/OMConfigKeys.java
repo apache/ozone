@@ -527,7 +527,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
