@@ -507,39 +507,46 @@ public class DatanodeConfiguration {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
-    if (volumeIOTestCount < 0) {
-      LOG.warn("{} must be greater than 0 but was set to {}. Defaulting to {}",
-          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-          VOLUME_IO_TEST_COUNT_DEFAULT);
-      volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
-    }
+    if (volumeIOTestCount == 0) {
+      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
+          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
+    } else {
+      if (volumeIOTestCount < 0) {
+        LOG.warn("{} must be greater than 0 but was set to {}." +
+                "Defaulting to {}",
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            VOLUME_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
+      }
 
-    if (volumeIOFailureTolerance < 0) {
-      LOG.warn("{} must be greater than 0 but was set to {}. Defaulting to {}",
-          DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-          VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
-      volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
-    }
+      if (volumeIOFailureTolerance < 0) {
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
+                "Defaulting to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
+        volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+      }
 
-    if (volumeIOFailureTolerance >= volumeIOTestCount) {
-      LOG.warn("{} was set to {} but cannot be larger than {} set to {}. " +
-          "Defaulting {} to {} and {} to {}",
-          DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
-          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
-          DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
-          VOLUME_IO_FAILURES_TOLERATED_DEFAULT, DISK_CHECK_IO_TEST_COUNT_KEY,
-          VOLUME_IO_TEST_COUNT_DEFAULT);
-      volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
-      volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
-    }
+      if (volumeIOFailureTolerance >= volumeIOTestCount) {
+        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
+                "set to {}. Defaulting {} to {} and {} to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            VOLUME_IO_FAILURES_TOLERATED_DEFAULT, DISK_CHECK_IO_TEST_COUNT_KEY,
+            VOLUME_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = VOLUME_IO_TEST_COUNT_DEFAULT;
+        volumeIOFailureTolerance = VOLUME_IO_FAILURES_TOLERATED_DEFAULT;
+      }
 
-    if (volumeHealthCheckFileSize < 1) {
-      LOG.warn(VOLUME_HEALTH_CHECK_FILE_SIZE_KEY +
-              "must be at least 1 byte and was set to {}. Defaulting to {}",
-          volumeHealthCheckFileSize,
-          VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT);
-      volumeHealthCheckFileSize =
-          VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+      if (volumeHealthCheckFileSize < 1) {
+        LOG.warn(VOLUME_HEALTH_CHECK_FILE_SIZE_KEY +
+                "must be at least 1 byte and was set to {}. Defaulting to {}",
+            volumeHealthCheckFileSize,
+            VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT);
+        volumeHealthCheckFileSize =
+            VOLUME_HEALTH_CHECK_FILE_SIZE_DEFAULT;
+      }
     }
 
     if (diskCheckMinGap < 0) {
