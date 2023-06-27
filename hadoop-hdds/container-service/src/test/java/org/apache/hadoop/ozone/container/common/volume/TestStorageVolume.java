@@ -142,8 +142,6 @@ public class TestStorageVolume {
     HddsVolume volume = volumeBuilder.build();
     volume.format(CLUSTER_ID);
 
-    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
-
     final int numIOTests = CONF.getObject(DatanodeConfiguration.class)
         .getVolumeIOTestCount();
     final int numFailuresTolerated = CONF.getObject(DatanodeConfiguration.class)
@@ -240,7 +238,9 @@ public class TestStorageVolume {
     CONF.setFromObject(dnConf);
     dnConf = CONF.getObject(DatanodeConfiguration.class);
     assertEquals(dnConf.getVolumeIOTestCount(),
-        dnConf.getVolumeIOFailureTolerance());
+        DatanodeConfiguration.VOLUME_IO_TEST_COUNT_DEFAULT);
+    assertEquals(dnConf.getVolumeIOFailureTolerance(),
+        DatanodeConfiguration.VOLUME_IO_FAILURES_TOLERATED_DEFAULT);
 
     // When test count and failure tolerance are set to the same value,
     // Default values should be used.

@@ -616,6 +616,12 @@ public abstract class StorageVolume
       currentIOFailureCount++;
     }
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Volume {} ran IO test {} of {}. Seen {} of {} tolerated IO" +
+              "failures.", this, currentIOTestCount, ioTestCount,
+          currentIOFailureCount, ioFailureTolerance);
+    }
+
     // If the failure threshold has been crossed, fail the volume without
     // further scans.
     // Once the volume is failed, it will not be checked anymore.
