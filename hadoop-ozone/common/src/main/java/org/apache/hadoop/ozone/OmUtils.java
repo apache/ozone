@@ -268,6 +268,7 @@ public final class OmUtils {
     case SnapshotDiff:
     case ListSnapshotDiffJobs:
     case TransferLeadership:
+    case TestUnknownCommand:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

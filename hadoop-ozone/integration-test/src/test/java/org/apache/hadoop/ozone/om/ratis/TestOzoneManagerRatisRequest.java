@@ -35,13 +35,14 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
 /**
- * Test: Creating a client request for a bucket which doesn't exist.
+ * Test OM Ratis request handling.
  */
 public class TestOzoneManagerRatisRequest {
   @Rule public TemporaryFolder folder = new TemporaryFolder();
@@ -53,6 +54,7 @@ public class TestOzoneManagerRatisRequest {
   @Test(timeout = 300_000)
   public void testRequestWithNonExistentBucket()
       throws Exception {
+    // Test: Creating a client request for a bucket which doesn't exist.
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
@@ -85,6 +87,26 @@ public class TestOzoneManagerRatisRequest {
       // Expected exception.
       Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
           oe.getResult());
+    }
+  }
+
+  @Test
+  public void testUnknownRequestHandling() throws IOException {
+    // Create an instance of OMRequest with an unknown command type.
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.TestUnknownCommand)
+            .setClientId("test-client-id")
+            .build();
+
+    // Verify if OMException is thrown and the corresponding ResultCode is
+    // UNKNOWN_REQUEST.
+    try {
+      OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+      Assert.fail("Expected OMException, but no exception was thrown.");
+    } catch (OMException e) {
+      Assert.assertEquals(OMException.ResultCodes.UNKNOWN_REQUEST,
+          e.getResult());
     }
   }
 }
