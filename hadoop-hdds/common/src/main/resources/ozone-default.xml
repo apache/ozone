@@ -3152,14 +3152,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.s3g.datastream.min.length</name>
-    <tag>OZONE, S3GATEWAY</tag>
-    <value>1MB</value>
-    <description>
-      Use the minimum length of ozone streaming. (1MB by default).
-    </description>
-  </property>
-  <property>
     <name>ssl.server.keystore.keypassword</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value/>
