@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -694,13 +695,14 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
-  public SnapshotDiffResponse cancelSnapshotDiff(final String volume,
-                                                 final String bucket,
-                                                 final String fromSnapshot,
-                                                 final String toSnapshot)
-      throws IOException {
-    return snapshotDiffManager.cancelSnapshotDiff(volume,
-        bucket, fromSnapshot, toSnapshot);
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(
+      final String volume,
+      final String bucket,
+      final String fromSnapshot,
+      final String toSnapshot
+  ) throws IOException {
+    return snapshotDiffManager.cancelSnapshotDiff(volume, bucket, fromSnapshot,
+        toSnapshot);
   }
 
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,

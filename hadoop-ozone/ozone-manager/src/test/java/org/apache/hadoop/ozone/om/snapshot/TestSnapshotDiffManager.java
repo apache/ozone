@@ -55,9 +55,10 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject.SnapshotDiffObjectBuilder;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ClosableIterator;
@@ -142,6 +143,12 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_N
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_FAILED_JOB;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_JOB_NOT_EXIST;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_NON_CANCELLABLE;
+import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_SUCCEEDED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
@@ -961,26 +968,19 @@ public class TestSnapshotDiffManager {
 
   private static Stream<Arguments> snapDiffCancelFailureScenarios() {
     return Stream.of(
-        Arguments.of(JobStatus.IN_PROGRESS,
-            JobCancelResult.CANCELLATION_SUCCESS, true),
-        Arguments.of(JobStatus.CANCELLED,
-            JobCancelResult.JOB_ALREADY_CANCELLED, true),
-        Arguments.of(JobStatus.DONE,
-            JobCancelResult.JOB_DONE, false),
-        Arguments.of(JobStatus.QUEUED,
-            JobCancelResult.INVALID_STATUS_TRANSITION, false),
-        Arguments.of(JobStatus.FAILED,
-            JobCancelResult.INVALID_STATUS_TRANSITION, false),
-        Arguments.of(JobStatus.REJECTED,
-            JobCancelResult.INVALID_STATUS_TRANSITION, false)
+        Arguments.of(JobStatus.IN_PROGRESS, CANCEL_SUCCEEDED),
+        Arguments.of(JobStatus.CANCELLED, CANCEL_ALREADY_CANCELLED_JOB),
+        Arguments.of(JobStatus.DONE, CANCEL_ALREADY_DONE_JOB),
+        Arguments.of(JobStatus.QUEUED, CANCEL_NON_CANCELLABLE),
+        Arguments.of(JobStatus.FAILED, CANCEL_ALREADY_FAILED_JOB),
+        Arguments.of(JobStatus.REJECTED, CANCEL_NON_CANCELLABLE)
     );
   }
 
   @ParameterizedTest
   @MethodSource("snapDiffCancelFailureScenarios")
   public void testSnapshotDiffCancelFailure(JobStatus jobStatus,
-                                            JobCancelResult cancelResult,
-                                            boolean jobIsCancelled)
+                                            CancelMessage cancelMessage)
       throws IOException {
 
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
@@ -1008,15 +1008,12 @@ public class TestSnapshotDiffManager {
 
     snapDiffJobMap.put(diffJobKey, snapshotDiffJob);
 
-    SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
+    CancelSnapshotDiffResponse cancelSnapshotDiff = snapshotDiffManager
         .cancelSnapshotDiff(volumeName, bucketName,
             fromSnapshotName, toSnapshotName);
 
-    assertEquals(cancelResult, snapshotDiffResponse.getJobCancelResult());
-
-    if (jobIsCancelled) {
-      assertEquals(JobStatus.CANCELLED, snapshotDiffResponse.getJobStatus());
-    }
+    assertTrue(cancelSnapshotDiff.getMessage()
+        .startsWith(cancelMessage.getMessage()));
   }
 
   @Test
@@ -1035,14 +1032,14 @@ public class TestSnapshotDiffManager {
     setUpSnapshots(volumeName, bucketName, fromSnapshotName,
         toSnapshotName, fromSnapshotUUID, toSnapshotUUID);
 
-    SnapshotDiffResponse snapshotDiffResponse = snapshotDiffManager
+    CancelSnapshotDiffResponse cancelSnapshotDiff = snapshotDiffManager
         .cancelSnapshotDiff(volumeName, bucketName,
             fromSnapshotName, toSnapshotName);
 
     // The job doesn't exist on the SnapDiffJob table and
     // trying to cancel it should lead to NEW_JOB cancel result.
-    assertEquals(JobCancelResult.NEW_JOB,
-        snapshotDiffResponse.getJobCancelResult());
+    assertEquals(CANCEL_JOB_NOT_EXIST.getMessage(),
+        cancelSnapshotDiff.getMessage());
   }
 
   private static Stream<Arguments> listSnapshotDiffJobsScenarios() {
