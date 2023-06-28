@@ -1255,8 +1255,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
-      throws IOException {
+  public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
   }
 
