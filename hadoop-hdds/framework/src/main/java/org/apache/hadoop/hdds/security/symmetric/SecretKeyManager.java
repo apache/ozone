@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,7 +72,7 @@ public class SecretKeyManager implements SecretKeyClient {
    * SecretKeys from local file, or generate new keys if the file doesn't
    * exist.
    */
-  public synchronized void checkAndInitialize() throws Exception {
+  public synchronized void checkAndInitialize() throws SCMException {
     if (isInitialized()) {
       return;
     }
@@ -108,7 +109,7 @@ public class SecretKeyManager implements SecretKeyClient {
    *
    * @return true if rotation actually happens, false if it doesn't.
    */
-  public synchronized boolean checkAndRotate() throws Exception {
+  public synchronized boolean checkAndRotate() throws SCMException {
     // Initialize the state if it's not initialized already.
     checkAndInitialize();
 
