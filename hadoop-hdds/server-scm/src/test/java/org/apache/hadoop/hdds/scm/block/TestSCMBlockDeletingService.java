@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,8 +45,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
@@ -141,10 +140,9 @@ public class TestSCMBlockDeletingService {
 
   @Test
   public void testLimitCommandSending() throws Exception {
-    int pendingCommandLimit = conf.getInt(
-        OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT,
-        OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT_DEFAULT);
-
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    int pendingCommandLimit = dnConf.getBlockDeleteQueueLimit();
 
     // The number of commands pending on all Datanodes has reached the limit.
     when(nodeManager.getTotalDatanodeCommandCount(any(),
