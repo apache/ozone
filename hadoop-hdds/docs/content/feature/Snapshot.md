@@ -33,7 +33,7 @@ Snapshot feature for Apache Ozone object store allows users to take point-in-tim
 
 ## Snapshot APIs
 
-Snapshot feature is available through 'ozone fs' and 'ozone cli'. This feature can also be programattically accessed from native java Ozone object store client. The feature provides following functionalities :
+Snapshot feature is available through 'ozone fs' and 'ozone sh' CLI. This feature can also be programmatically accessed from Ozone `ObjectStore` Java client. The feature provides following functionalities:
 * Create Snapshot: Create an instantenous snapshot for a given bucket
 ```shell
 ozone sh snapshot create [-hV] <bucket> [<snapshotName>]
