@@ -902,7 +902,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   render() {
     const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource } = this.state;
-    console.log("Render--",this.state);
+
     const paginationConfig: PaginationConfig = {
       pageSize:this.state.DEFAULT_LIMIT,
       defaultPageSize: this.state.DEFAULT_LIMIT,
