@@ -1752,7 +1752,6 @@ message CancelSnapshotDiffRequest {
   optional string bucketName = 2;
   optional string fromSnapshot = 3;
   optional string toSnapshot = 4;
-  optional bool cancel = 8;
 }
 
 message ListSnapshotDiffJobRequest {
