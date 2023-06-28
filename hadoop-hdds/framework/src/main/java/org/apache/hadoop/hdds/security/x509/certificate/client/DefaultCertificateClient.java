@@ -1241,7 +1241,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             CertificateCodec.getX509Certificate(pemEncodedCert)
                 .getSerialNumber().toString());
       } else {
-        throw new CertificateException("Unable to retrieve datanode " +
+        throw new CertificateException("Unable to retrieve " +
             "certificate chain.");
       }
     } catch (IOException | java.security.cert.CertificateException e) {
