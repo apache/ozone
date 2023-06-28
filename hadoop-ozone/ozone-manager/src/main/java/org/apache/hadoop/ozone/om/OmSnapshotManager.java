@@ -185,7 +185,7 @@ public final class OmSnapshotManager implements AutoCloseable {
           "ones that are marked as deleted but not yet cleaned up by the " +
           "background worker thread). " +
           "Please set config ozone.filesystem.snapshot.enabled to true and " +
-          "restart this Ozone Manager.");
+          "try to start this Ozone Manager again.");
     }
 
     this.options = new ManagedDBOptions();
@@ -309,9 +309,11 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Helper method that would reject OM startup if snapshot feature is disabled
+   * Help reject OM startup if snapshot feature is disabled
    * but there are snapshots remaining in this OM. Note: snapshots that are
    * already deleted but not cleaned up yet still counts.
+   * @param ommm OMMetadataManager
+   * @return true if SnapshotInfoTable is empty, false otherwise.
    */
   @VisibleForTesting
   public boolean canDisableFsSnapshot(OMMetadataManager ommm) {
