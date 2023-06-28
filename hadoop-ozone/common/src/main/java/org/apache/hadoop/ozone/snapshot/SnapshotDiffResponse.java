@@ -94,8 +94,8 @@ public class SnapshotDiffResponse {
       break;
     case FAILED:
       str.append("Snapshot diff job is FAILED due to '");
-      if (StringUtils.isNotBlank(reason)) {
-        str.append(jobStatus);
+      if (StringUtils.isNotEmpty(reason)) {
+        str.append(reason);
       } else {
         str.append("Unknown reason.");
       }
