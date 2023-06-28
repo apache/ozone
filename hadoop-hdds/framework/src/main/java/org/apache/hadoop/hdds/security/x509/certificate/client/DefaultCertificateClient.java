@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -126,6 +127,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
+  private RootCaRotationPoller rootCaRotationPoller;
 
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
@@ -174,6 +176,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       } else {
         getLogger().warn("Component certificate was not loaded.");
       }
+    }
+    if (rootCaRotationPoller == null) {
+      rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
+          rootCaCertificates, scmSecurityClient);
+      rootCaRotationPoller.addRootCARotationProcessor(
+          this::getRootCARotationProcessor);
+      rootCaRotationPoller.run();
     }
   }
 
@@ -969,6 +978,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       executorService = null;
     }
 
+    if (rootCaRotationPoller != null) {
+      rootCaRotationPoller.close();
+    }
+
     if (serverKeyStoresFactory != null) {
       serverKeyStoresFactory.destroy();
     }
@@ -1264,6 +1277,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
+  }
+
+  public CompletableFuture<Void> getRootCARotationProcessor(
+      List<X509Certificate> rootCAs) {
+    if (rootCaCertificates.containsAll(rootCAs)) {
+      return CompletableFuture.completedFuture(null);
+    }
+    return CompletableFuture.runAsync(() -> new CertificateRenewerService(
+        this, true), executorService);
   }
 
   public synchronized void startCertificateMonitor() {
