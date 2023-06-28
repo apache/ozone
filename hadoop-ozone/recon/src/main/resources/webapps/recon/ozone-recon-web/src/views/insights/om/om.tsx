@@ -373,27 +373,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handleExistsAtChange = (e: any) => {
+    console.log("handleExistsAtChange", e.key);
     if (e.key === 'OM') {
-      this.setState({
-        mismatchMissingState: 'SCM',
-        prevKeyMismatch: 0,
-        expandedRowData:{}
-      },async() => {
-        mismatchPrevKeyList=[0];
-        console.log("before If fetchMismatchContainers OM",this.state);
-        await this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
-      });
+      mismatchPrevKeyList = [0];
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'SCM');
     }
     else {
-      this.setState({
-        mismatchMissingState: 'OM',
-        prevKeyMismatch: 0,
-        expandedRowData:{}
-      },async() => {
-        mismatchPrevKeyList=[0];
-        console.log("before fetchMismatchContainers SCM",this.state);
-        await this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
-      });
+      mismatchPrevKeyList = [0];
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'OM');
     }
   };
 
@@ -437,28 +424,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handlefsoNonfsoMenuChange = (e: any) => {
+    console.log("handlefsoNonfsoMenuChange", e.key);
     if (e.key === 'fso') {
-      this.setState({
-        includeFso: true,
-        includeNonFso: false,
-        prevKeyOpen: "",
-      },async () => {
-        openPrevKeyList =[""];
-        console.log("If handlefsoNonfsoMenuChang before fetchOpenkeys",this.state);
-        await this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
-      });
+      openPrevKeyList =[""];
+      this.fetchOpenKeys(true, false, this.state.DEFAULT_LIMIT, "");
     }
     else {
-      this.setState({
-        includeFso: false,
-        includeNonFso: true,
-        prevKeyOpen: "",
-        openKeysDataSource: []
-      },async () => {
-        openPrevKeyList =[""];
-        console.log("else handlefsoNonfsoMenuChang nonfso before fetchOpenkeys--",this.state);
-        await this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
-      });
+      openPrevKeyList = [""];
+      this.fetchOpenKeys(false, true, this.state.DEFAULT_LIMIT, "");
     }
   };
 
@@ -573,7 +546,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevClickable :true
     });
     let deletePendingKeysEndpoint;
-    if (prevKeyDeletePending === "") {
+    if (prevKeyDeletePending === "" || prevKeyDeletePending === undefined ) {
       deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey`;
     }
     else {
@@ -612,7 +585,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         })
       }
       else {
-           if (this.state.prevKeyDeletePending === "" ){
+           if (this.state.prevKeyDeletePending === "" ||this.state.prevKeyDeletePending === undefined ){
           this.setState({
             prevClickable: false
           })
@@ -716,26 +689,30 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   fetchPreviousRecords = () => {
     // to fetch previous call stored all prevkey in array and fetching in respective tabs
     if (this.state.activeTab === '2') {
-      this.setState({
-        prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]
-      })
-      this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]);
+        this.setState({
+          prevKeyOpen: openPrevKeyList[openPrevKeyList.indexOf(this.state.prevKeyOpen)-2]
+        }, () => {
+          this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT,this.state.prevKeyOpen);
+        })
     } else if (this.state.activeTab === '3') {
       this.setState({
         prevKeyDeletePending: keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending)-2]
+      }, () => {
+        this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
       })
-      this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, keysPendingPrevList[keysPendingPrevList.indexOf(this.state.prevKeyDeletePending)-2]);
     } else if (this.state.activeTab === '4') {
       this.setState({
         prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-2]
+      }, () => {
+        this.fetchDeletedKeys(this.state.DEFAULT_LIMIT,this.state.prevKeyDeleted);
       })
-      this.fetchDeletedKeys(this.state.DEFAULT_LIMIT,deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-2]);
     }
-      else{
+      else {
         this.setState({
           prevKeyMismatch: mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch)-2]
+        }, () => {
+          this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
         })
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,mismatchPrevKeyList[mismatchPrevKeyList.indexOf(this.state.prevKeyMismatch)-2], this.state.mismatchMissingState);
       }
   };
 
@@ -764,7 +741,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   onShowSizeChange = (current: number, pageSize: number) => {
-    console.log("onShowSizeChange","pageSize",pageSize, this.state);
+    console.log("onShowSizeChange",pageSize, this.state);
+    console.log("Open Keys Array", keysPendingPrevList);
     if (this.state.activeTab === '2') {
       //open keys
       this.setState({
@@ -788,7 +766,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         DEFAULT_LIMIT: pageSize,
         prevKeyDeleted: deletedKeysPrevList[deletedKeysPrevList.indexOf(this.state.prevKeyDeleted)-1]
-       // prevKeyDeleted:parseInt(localStorage.getItem('prevKeyDeleted'))
       }, () => {
         this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
       })
