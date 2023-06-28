@@ -32,7 +32,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-import java.io.IOException;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
