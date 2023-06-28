@@ -171,7 +171,7 @@ public class DBCheckpointServlet extends HttpServlet
       LOG.info("Received excluding SST {}", receivedSstList);
     }
 
-    try  (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       checkpoint = dbStore.getCheckpoint(flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
