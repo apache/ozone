@@ -1246,7 +1246,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   *  Task to monitor certificate lifetime and renew the certificate if needed.
+   * Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateRenewerService implements Runnable {
     private CertificateClient certClient;
