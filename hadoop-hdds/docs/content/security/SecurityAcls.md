@@ -78,12 +78,9 @@ allows the user to overwrite an existing ozone key.
 6. **Read_ACL** – Allows a user to read the ACL on a specific object.
 7. **Write_ACL** – Allows a user to write the ACL on a specific object.
 
-There are 2 types of ACLs based on their scope - **Access** and **Default**.<br>
+There are 2 types of ACLs based on their scope - **ACCESS** and **DEFAULT**.<br>
 Access ACLs are limited only to the specific object and not inherited. They control the access to the object itself.
-Only Default ACLs support inheritance. This inheritance is limited to only one level. For example,
-Any bucket created under a volume which has a Default ACL inherits that Default ACL as an Access ACLs. 
-The keys added under the bucket do not inherit them.
-Default ACLs cannot be set on keys (as there can be no objects under a key).
+Only Default ACLs are inherited by the descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
 
 
 ## Ozone Native ACL APIs
@@ -107,8 +104,8 @@ Usage: `ozone sh <object> <action> path-to-object [-a <value>]` <br>
 `<value>` is of the form `type:name:rights[scope]`.<br>
 _type_ can be user, group or world.<br>
 _name_ is the name of the user/group <br>
-_rights_ can be (read=r, write=w, delete-d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
-_scope_ can be access or default. If not specified, it is taken as access.<br>
+_rights_ can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
+_scope_ can be ACCESS or DEFAULT. If not specified, it is taken as ACCESS.<br>
 
 <div class="alert alert-warning" role="alert">
 When the object is a prefix, the path-to-object must contain the full path from volume till the directory or prefix of the key.

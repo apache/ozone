@@ -64,7 +64,10 @@ _权限_ 可选的值包括：:
 6. **读 ACL** – 允许用户读取某个对象的 ACL。
 7. **写 ACL** – 允许用户修改某个对象的 ACL。
 
-<h3>Ozone 原生 ACL API</h3>
+根据其范围，ACL 有 2 种类型 - 访问和默认。<br>
+访问 ACL 仅限于特定对象，不能继承。它们控制对对象本身的访问。后代仅继承默认 ACL。不能在键上设置默认 ACL（因为键下不能有对象）。
+
+## Ozone 原生 ACL API
 
 ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包括：
 
@@ -72,3 +75,65 @@ ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包�
 2. **GetAcl** – 此 API 的参数为 Ozone 对象名称和 Ozone 对象类型，返回值为 ACL 列表。
 3. **AddAcl** - 此 API 的参数为 Ozone 对象名称、Ozone 对象类型和待添加的 ACL，新的 ACL 会被添加到该 Ozone 对象的 ACL 条目中。
 4. **RemoveAcl** - 此 API 的参数为 Ozone 对象名称、Ozone 对象类型和待删除的 ACL。
+
+## 使用 Ozone CLI 操作 ACL
+
+还可以使用 `ozone sh` 命令来操作 ACL。<br>
+用法 : `ozone sh <object> <action> path-to-object [-a <value>]` <br>
+`<value>` 的格式为 `type:name:rights[scope]`.<br>
+_type_ 可以是 user, group 或 world.<br>
+_name_ 是用户/组的名称 <br>
+_rights_ 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)<br>
+_scope_ 可以是 ACCESS 或 DEFAULT. 如果不指定，则视为 ACCESS.<br>
+
+<div class="alert alert-warning" role="alert">
+当对象是前缀时，对象路径必须包含从卷到密钥的目录或前缀的完整路径。
+那是， /volume/bucket/some/key/prefix/
+</div>
+
+以下是可以使用 CLI 对 ACL 执行的操作。
+
+<h3>setacl</h3>
+
+```shell
+$ ozone sh bucket setacl /vol1/bucket1 -a user:testuser2:a
+ ACLs set successfully.
+```
+
+<h3>getacl</h3>
+
+```shell
+$ ozone sh bucket getacl /vol1/bucket2 
+[ {
+  "type" : "USER",
+  "name" : "om/om@EXAMPLE.COM",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+}, {
+  "type" : "GROUP",
+  "name" : "om",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+} ]
+```
+
+<h3>addacl</h3>
+
+```shell
+$ ozone sh bucket addacl vol1/bucket2 -a user:testuser2:a
+ACL user:testuser2:a[ACCESS] added successfully.
+
+$ ozone sh bucket addacl vol1/bucket2 -a user:testuser:rxy[DEFAULT]
+ACL user:testuser:rxy[DEFAULT] added successfully.
+
+$ ozone sh prefix addacl vol1/buck3/dir1/ -a user:testuser2:a[DEFAULT]
+ACL user:testuser2:a[DEFAULT] added successfully.
+```
+
+<h3>removeacl</h3>
+
+```shell
+$ ozone sh bucket removeacl vol1/bucket2 -a user:testuser:r[DEFAULT]
+ACL user:testuser:r[DEFAULT] removed successfully.
+```
+
