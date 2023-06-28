@@ -116,7 +116,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -1098,11 +1098,14 @@ public class KeyValueHandler extends Handler {
 
       try {
         container.markContainerUnhealthy();
-        ContainerLogger.logUnhealthy(container.getContainerData(), reason);
       } catch (StorageContainerException ex) {
         LOG.warn("Unexpected error while marking container {} unhealthy",
             containerID, ex);
       } finally {
+        // Even if the container file is corrupted/missing and the unhealthy
+        // update fails, the unhealthy state is kept in memory and sent to
+        // SCM. Write a corresponding entry to the container log as well.
+        ContainerLogger.logUnhealthy(container.getContainerData(), reason);
         sendICR(container);
       }
     } finally {

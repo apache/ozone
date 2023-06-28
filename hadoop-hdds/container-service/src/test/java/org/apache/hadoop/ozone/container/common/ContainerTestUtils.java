@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
@@ -172,17 +174,26 @@ public final class ContainerTestUtils {
 
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
-      boolean scanMetaDataSuccess, boolean scanDataSuccess,
+      ScanResult metadataScanResult, ScanResult dataScanResult,
       AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
     when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
+        .thenReturn(dataScanResult);
     when(c.shouldScanMetadata()).thenReturn(true);
-    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
     when(c.getContainerData().getVolume()).thenReturn(vol);
+  }
+
+  /**
+   * Construct an unhealthy scan result to use for testing purposes.
+   */
+  public static ScanResult getUnhealthyScanResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
+        new File(""),
+        new IOException("Fake corruption failure for testing"));
   }
 
   public static KeyValueContainer addContainerToDeletedDir(

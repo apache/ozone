@@ -134,8 +134,8 @@ public final class OnDemandContainerDataScanner {
       ScanResult result =
           container.scanData(instance.throttler, instance.canceler);
       if (!result.isHealthy()) {
-        LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
-            containerId, result.getException());
+        LOG.error("Corruption detected in container [{}]." +
+                "Marking it UNHEALTHY.", containerId, result.getException());
         instance.metrics.incNumUnHealthyContainers();
         instance.containerController.markContainerUnhealthy(containerId,
             result);

@@ -32,7 +32,7 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.

@@ -41,17 +41,24 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
  * Interface for Container Operations.
  */
 public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
+  /**
+   * Encapsulates the result of a container scan.
+   */
   class ScanResult {
+    /**
+     * Represents the reason a container scan failed and a container should
+     * be marked unhealthy.
+     */
     public enum FailureType {
       MISSING_CONTAINER_DIR,
+      MISSING_METADATA_DIR,
+      MISSING_CONTAINER_FILE,
       MISSING_CHUNKS_DIR,
       MISSING_CHUNK_FILE,
+      CORRUPT_CONTAINER_FILE,
       CORRUPT_CHUNK,
       INCONSISTENT_CHUNK_LENGTH,
-      MISSING_METADATA_DIR,
       INACCESSIBLE_DB,
-      MISSING_CONTAINER_FILE,
-      CORRUPT_CONTAINER_FILE,
       WRITE_FAILURE
     }
 
@@ -61,7 +68,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
     private final Throwable exception;
 
     private ScanResult(boolean healthy, FailureType failureType,
-       File unhealthyFile, Throwable exception) {
+        File unhealthyFile, Throwable exception) {
       this.healthy = healthy;
       this.unhealthyFile = unhealthyFile;
       this.failureType = failureType;

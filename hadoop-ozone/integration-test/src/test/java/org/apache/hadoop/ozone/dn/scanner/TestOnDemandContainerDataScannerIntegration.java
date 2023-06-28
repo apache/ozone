@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -29,6 +30,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 
@@ -42,6 +44,7 @@ public class TestOnDemandContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
   private final ContainerCorruptions corruption;
+  private final GenericTestUtils.LogCapturer logCapturer;
 
   /**
    The on-demand container scanner is triggered by errors on the block read
@@ -86,6 +89,8 @@ public class TestOnDemandContainerDataScannerIntegration
   public TestOnDemandContainerDataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
+    logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+        LoggerFactory.getLogger(ContainerLogger.LOG_NAME));
   }
 
   /**
@@ -113,5 +118,6 @@ public class TestOnDemandContainerDataScannerIntegration
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
+    corruption.assertLogged(logCapturer);
   }
 }

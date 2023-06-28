@@ -17,15 +17,12 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Utility class defining methods to write to the datanode container log.
@@ -39,11 +36,14 @@ import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
  * prevent misleading state changes or logs filling with retries on errors.
  * Errors and retries belong in the main datanode application log.
  */
-public class ContainerLogger {
+public final class ContainerLogger {
 
-  private static final String LOG_NAME = "ContainerLog";
+  @VisibleForTesting
+  public static final String LOG_NAME = "ContainerLog";
   private static final Logger LOG = LoggerFactory.getLogger(LOG_NAME);
   private static final String FIELD_SEPARATOR = " | ";
+
+  private ContainerLogger() { }
 
   /**
    * Logged when an open container is first created.
@@ -69,7 +69,8 @@ public class ContainerLogger {
    * @param containerData The container that was quasi-closed.
    * @param message The reason the container was quasi-closed, if known.
    */
-  public static void logQuasiClosed(ContainerData containerData, String message) {
+  public static void logQuasiClosed(ContainerData containerData,
+      String message) {
     LOG.warn(getMessage(containerData, message));
   }
 

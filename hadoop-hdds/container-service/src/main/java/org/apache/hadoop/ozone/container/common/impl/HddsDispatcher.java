@@ -74,7 +74,7 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -366,7 +366,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           handler.markContainerUnhealthy(container,
               ScanResult.unhealthy(ScanResult.FailureType.WRITE_FAILURE,
                   new File(container.getContainerData().getContainerPath()),
-              new StorageContainerException(result)));
+                  new StorageContainerException(result)));
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
