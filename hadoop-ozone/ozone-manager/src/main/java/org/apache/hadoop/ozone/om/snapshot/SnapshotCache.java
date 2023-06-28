@@ -233,7 +233,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
 
       if (v.decrementRefCount() == 0L) {
         synchronized (pendingEvictionList) {
-          // Eligible to be closed, add it to the list.
+          // v is eligible to be evicted and closed
           pendingEvictionList.add(v);
           // The cache size might have already exceed the soft limit
           // Thus triggering cleanup() to check and evict if applicable
@@ -241,7 +241,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
         }
       }
 
-      return v;
+      return dbMap.get(k);
     });
   }
 
