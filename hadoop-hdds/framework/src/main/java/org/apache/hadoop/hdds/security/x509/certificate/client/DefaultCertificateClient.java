@@ -1280,7 +1280,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
-        new CertificateRenewerService(this),
+        new CertificateRenewerService(this, false),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1292,9 +1292,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   public class CertificateRenewerService implements Runnable {
     private CertificateClient certClient;
+    private boolean forceRenewal;
 
-    public CertificateRenewerService(CertificateClient client) {
+    public CertificateRenewerService(CertificateClient client,
+        boolean forceRenewal) {
       this.certClient = client;
+      this.forceRenewal = forceRenewal;
     }
 
     @Override
@@ -1309,40 +1312,41 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
-        if (timeLeft.isZero()) {
-          String newCertId;
-          try {
-            getLogger().info("Current certificate has entered the expiry" +
-                    " grace period {}. Starting renew key and certs.",
-                timeLeft, securityConfig.getRenewalGracePeriod());
-            newCertId = renewAndStoreKeyAndCertificate(false);
-          } catch (CertificateException e) {
-            if (e.errorCode() ==
-                CertificateException.ErrorCode.ROLLBACK_ERROR) {
-              if (shutdownCallback != null) {
-                getLogger().error("Failed to rollback key and cert after an " +
-                    " unsuccessful renew try.", e);
-                shutdownCallback.run();
-              }
-            }
-            getLogger().error("Failed to renew and store key and cert." +
-                " Keep using existing certificates.", e);
-            return;
-          }
-
-          // Persist new cert serial id in component VERSION file
-          if (certIdSaveCallback != null) {
-            certIdSaveCallback.accept(newCertId);
-          }
-
-          // reset and reload all certs
-          reloadKeyAndCertificate(newCertId);
-          // cleanup backup directory
-          cleanBackupDir();
-          // notify notification receivers
-          notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-              certClient, currentCert.getSerialNumber().toString(), newCertId));
+        if (!forceRenewal && !timeLeft.isZero()) {
+          return;
         }
+        String newCertId;
+        try {
+          getLogger().info("Current certificate has entered the expiry" +
+                  " grace period {}. Starting renew key and certs.",
+              timeLeft, securityConfig.getRenewalGracePeriod());
+          newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
+        } catch (CertificateException e) {
+          if (e.errorCode() ==
+              CertificateException.ErrorCode.ROLLBACK_ERROR) {
+            if (shutdownCallback != null) {
+              getLogger().error("Failed to rollback key and cert after an " +
+                  " unsuccessful renew try.", e);
+              shutdownCallback.run();
+            }
+          }
+          getLogger().error("Failed to renew and store key and cert." +
+              " Keep using existing certificates.", e);
+          return;
+        }
+
+        // Persist new cert serial id in component VERSION file
+        if (certIdSaveCallback != null) {
+          certIdSaveCallback.accept(newCertId);
+        }
+
+        // reset and reload all certs
+        reloadKeyAndCertificate(newCertId);
+        // cleanup backup directory
+        cleanBackupDir();
+        // notify notification receivers
+        notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+            certClient, currentCert.getSerialNumber().toString(), newCertId));
       }
     }
   }
