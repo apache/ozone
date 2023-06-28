@@ -25,10 +25,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -361,6 +361,11 @@ public class HddsVolume extends StorageVolume {
 
   public File getDeletedContainerDir() {
     return this.deletedContainerDir;
+  }
+
+  @VisibleForTesting
+  public void setDeletedContainerDir(File deletedContainerDir) {
+    this.deletedContainerDir = deletedContainerDir;
   }
 
   public boolean isDbLoaded() {
