@@ -273,7 +273,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           if (keyValueContainer.
               writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
             try {
-              String schemaVersion = containerData.getValidSchemaVersion();
+              String schemaVersion = containerData
+                  .getSupportedSchemaVersionOrDefault();
               if (getSchemaHandlers().containsKey(schemaVersion)) {
                 schemaHandlers.get(schemaVersion).handle(containerData, tx);
               } else {

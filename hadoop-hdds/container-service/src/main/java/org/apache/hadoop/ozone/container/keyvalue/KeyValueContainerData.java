@@ -145,12 +145,14 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
-   * Returns valid schema version or throws exception if not found.
+   * Returns schema version or the default value when the
+   * {@link KeyValueContainerData#schemaVersion} is null. The default value can
+   * be referred to {@link KeyValueContainerUtil#isSameSchemaVersion}.
    *
    * @return Schema version as a string.
    * @throws UnsupportedOperationException If no valid schema version is found.
    */
-  public String getValidSchemaVersion() {
+  public String getSupportedSchemaVersionOrDefault() {
     String[] versions = {SCHEMA_V1, SCHEMA_V2, SCHEMA_V3};
 
     for (String version : versions) {

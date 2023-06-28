@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.SchemaHandler;
@@ -48,7 +49,6 @@ import org.apache.hadoop.hdds.protocol.proto
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -90,18 +90,16 @@ public class TestDeleteBlocksCommandHandler {
   private HddsVolume volume1;
   private BlockDeletingServiceMetrics blockDeleteMetrics;
 
-
-  public TestDeleteBlocksCommandHandler(String schemaVersion) {
-    this.schemaVersion = schemaVersion;
+  public TestDeleteBlocksCommandHandler(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    conf = new OzoneConfiguration();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  @Parameterized.Parameters(name = "{index}: Schema Version {0}")
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][]{
-        {SCHEMA_V1},
-        {SCHEMA_V2},
-        {SCHEMA_V3},
-    });
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ContainerTestVersionInfo.versionParameters();
   }
 
   @Before
@@ -164,7 +162,9 @@ public class TestDeleteBlocksCommandHandler {
     List<DeleteBlockTransactionResult> results =
         handler.executeCmdWithRetry(Arrays.asList(transaction));
 
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersion),
+    String schemaVersionOrDefault = ((KeyValueContainerData)
+        container.getContainerData()).getSupportedSchemaVersionOrDefault();
+    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
         times(1)).handle(any(), any());
     // submitTasks will be executed only once, as if there were not retries
     Mockito.verify(handler,
@@ -200,7 +200,9 @@ public class TestDeleteBlocksCommandHandler {
         Arrays.asList(transaction1, transaction2);
     List<DeleteBlockTransactionResult> results =
         handler.executeCmdWithRetry(transactions);
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersion),
+    String schemaVersionOrDefault = ((KeyValueContainerData) nonLockedcontainer.
+        getContainerData()).getSupportedSchemaVersionOrDefault();
+    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
             times(1)).handle(eq((KeyValueContainerData)
             nonLockedcontainer.getContainerData()), eq(transaction2));
 
@@ -257,9 +259,11 @@ public class TestDeleteBlocksCommandHandler {
         handler.executeCmdWithRetry(Arrays.asList(transaction));
 
     // submitTasks will be executed twice, as if there were retries
+    String schemaVersionOrDefault = ((KeyValueContainerData) lockedContainer
+        .getContainerData()).getSupportedSchemaVersionOrDefault();
     Mockito.verify(handler,
         times(2)).submitTasks(any());
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersion),
+    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
         times(1)).handle(any(), any());
     Assert.assertEquals(1, results.size());
     Assert.assertTrue(results.get(0).getSuccess());
