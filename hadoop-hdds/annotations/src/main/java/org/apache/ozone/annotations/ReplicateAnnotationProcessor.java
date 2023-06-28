@@ -18,6 +18,7 @@
 package org.apache.ozone.annotations;
 
 import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
@@ -27,13 +28,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
-import java.io.IOException;
-import java.util.Collections;
 import java.util.Set;
-
-import org.apache.commons.lang3.ClassUtils;
-
-import static java.util.stream.Collectors.toSet;
 
 /**
  * Annotation Processor that verifies if the methods that are marked with
@@ -48,17 +43,13 @@ public class ReplicateAnnotationProcessor extends AbstractProcessor {
       "org.apache.hadoop.hdds.scm.metadata.Replicate";
   private static final String REQUIRED_EXCEPTION =
       "org.apache.hadoop.hdds.scm.exceptions.SCMException";
+  private TypeMirror requiredException;
 
-  private static final Set<String> EXCEPTIONS;
-  static {
-    Set<String> set = ClassUtils.getAllSuperclasses(IOException.class)
-        .stream()
-        .filter(c -> Object.class != c)
-        .map(Class::getCanonicalName)
-        .collect(toSet());
-    set.add(IOException.class.getCanonicalName());
-    set.add(REQUIRED_EXCEPTION);
-    EXCEPTIONS = Collections.unmodifiableSet(set);
+  @Override
+  public synchronized void init(ProcessingEnvironment processingEnv) {
+    super.init(processingEnv);
+    requiredException = processingEnv.getElementUtils()
+        .getTypeElement(REQUIRED_EXCEPTION).asType();
   }
 
   @Override
@@ -85,11 +76,9 @@ public class ReplicateAnnotationProcessor extends AbstractProcessor {
       return;
     }
     final ExecutableElement executableElement = (ExecutableElement) element;
-    final boolean found = executableElement.getThrownTypes().stream()
-        .map(TypeMirror::toString)
-        .anyMatch(EXCEPTIONS::contains);
 
-    if (!found) {
+    if (executableElement.getThrownTypes().stream().noneMatch(
+        m -> processingEnv.getTypeUtils().isAssignable(requiredException, m))) {
       processingEnv.getMessager().printMessage(Kind.ERROR,
           "Method with Replicate annotation should declare throwing " +
               REQUIRED_EXCEPTION + " or one of its parents", executableElement);
