@@ -89,7 +89,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -570,7 +569,7 @@ public class LegacyReplicationManager {
       final InflightMap inflightActions,
       final Predicate<InflightAction> filter,
       final Runnable timeoutCounter,
-      final Consumer<InflightAction> completedCounter) throws TimeoutException {
+      final Consumer<InflightAction> completedCounter) {
     final ContainerID id = container.containerID();
     final long deadline = clock.millis() - rmConf.getEventTimeout();
     inflightActions.iterate(id, a -> updateInflightAction(
@@ -723,8 +722,7 @@ public class LegacyReplicationManager {
    */
   public CompletableFuture<MoveManager.MoveResult> move(ContainerID cid,
              DatanodeDetails src, DatanodeDetails tgt)
-      throws ContainerNotFoundException, NodeNotFoundException,
-      TimeoutException {
+      throws ContainerNotFoundException, NodeNotFoundException {
     return move(cid, new MoveDataNodePair(src, tgt));
   }
 
@@ -736,7 +734,7 @@ public class LegacyReplicationManager {
    */
   private CompletableFuture<MoveManager.MoveResult> move(ContainerID cid,
       MoveDataNodePair mp) throws ContainerNotFoundException,
-      NodeNotFoundException, TimeoutException {
+      NodeNotFoundException {
     CompletableFuture<MoveManager.MoveResult> ret = new CompletableFuture<>();
 
     if (!scmContext.isLeader()) {
@@ -1023,7 +1021,7 @@ public class LegacyReplicationManager {
    */
   private void deleteContainerReplicas(final ContainerInfo container,
       final Set<ContainerReplica> replicas) throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+      InvalidStateTransitionException {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.CLOSED);
 
@@ -1045,7 +1043,7 @@ public class LegacyReplicationManager {
    */
   private void handleContainerUnderDelete(final ContainerInfo container,
       final Set<ContainerReplica> replicas) throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+      InvalidStateTransitionException {
     if (replicas.size() == 0) {
       containerManager.updateContainerState(container.containerID(),
           HddsProtos.LifeCycleEvent.CLEANUP);
@@ -1700,7 +1698,7 @@ public class LegacyReplicationManager {
     @Replicate
     void startMove(HddsProtos.ContainerID contianerIDProto,
               HddsProtos.MoveDataNodePairProto mp)
-        throws IOException, TimeoutException;
+        throws IOException;
 
     /**
      * get the MoveDataNodePair of the giver container.
@@ -2270,8 +2268,7 @@ public class LegacyReplicationManager {
         containerManager.updateContainerState(containerInfo.containerID(),
             HddsProtos.LifeCycleEvent.CLOSE);
       }
-    } catch (IOException | InvalidStateTransitionException |
-             TimeoutException e) {
+    } catch (IOException | InvalidStateTransitionException e) {
       LOG.error("Failed to CLOSE the container {}",
           containerInfo.containerID(), e);
     }

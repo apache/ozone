@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -148,7 +147,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   public AllocatedBlock allocateBlock(final long size,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , replicationConfig: {}", size, replicationConfig);
     }
@@ -244,7 +243,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     try {
       deletedBlockLog.addTransactions(containerBlocks);
-    } catch (IOException | TimeoutException e) {
+    } catch (IOException e) {
       throw new IOException("Skip writing the deleted blocks info to"
           + " the delLog because addTransaction fails. " + keyBlocksInfoList
           .size() + "Keys skipped", e);
