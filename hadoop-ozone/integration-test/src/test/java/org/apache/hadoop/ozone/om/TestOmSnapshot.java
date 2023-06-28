@@ -58,6 +58,7 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.Ignore;
@@ -570,6 +571,29 @@ public class TestOmSnapshot {
     // TODO: Delete snapshot then delete bucket1 when deletion is implemented
     // no exception for bucket without snapshot
     volume.deleteBucket(bucket2);
+  }
+
+  @Test
+  public void testSnapDiffWithDirRename() throws Exception {
+    Assume.assumeTrue(bucketLayout.isFileSystemOptimized());
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    bucket1.createDirectory("dir1");
+    String snap1 = "snap1";
+    createSnapshot(volume, bucket, snap1);
+    bucket1.renameKey("dir1", "dir1_rename");
+    String snap2 = "snap2";
+    createSnapshot(volume, bucket, snap2);
+    SnapshotDiffReportOzone diff = getSnapDiffReport(volume, bucket,
+        snap1, snap2);
+    Assertions.assertEquals(Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, "/dir1", "/dir1_rename")),
+        diff.getDiffList());
   }
 
   @Test

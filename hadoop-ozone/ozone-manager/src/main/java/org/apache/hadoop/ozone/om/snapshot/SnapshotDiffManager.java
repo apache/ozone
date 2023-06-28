@@ -890,15 +890,21 @@ public class SnapshotDiffManager implements AutoCloseable {
           .getKeyTable(bucketLayout);
       Table<String, OmKeyInfo> tsKeyTable = toSnapshot.getMetadataManager()
           .getKeyTable(bucketLayout);
+      Table<String, OmDirectoryInfo> fsDirTable;
+      Table<String, OmDirectoryInfo> tsDirTable;
 
       final Optional<Set<Long>> oldParentIds;
       final Optional<Set<Long>> newParentIds;
       if (bucketLayout.isFileSystemOptimized()) {
         oldParentIds = Optional.of(new HashSet<>());
         newParentIds = Optional.of(new HashSet<>());
+        fsDirTable = fromSnapshot.getMetadataManager().getDirectoryTable();
+        tsDirTable = toSnapshot.getMetadataManager().getDirectoryTable();
       } else {
         oldParentIds = Optional.empty();
         newParentIds = Optional.empty();
+        fsDirTable = null;
+        tsDirTable = null;
       }
 
       final Optional<Map<Long, Path>> oldParentIdPathMap;
@@ -924,11 +930,6 @@ public class SnapshotDiffManager implements AutoCloseable {
           },
           () -> {
             if (bucketLayout.isFileSystemOptimized()) {
-              Table<String, OmDirectoryInfo> fsDirTable =
-                  fromSnapshot.getMetadataManager().getDirectoryTable();
-              Table<String, OmDirectoryInfo> tsDirTable =
-                  toSnapshot.getMetadataManager().getDirectoryTable();
-
               getDeltaFilesAndDiffKeysToObjectIdToKeyMap(fsDirTable, tsDirTable,
                   fromSnapshot, toSnapshot, fsInfo, tsInfo, useFullDiff,
                   tablePrefixes, objectIdToKeyNameMapForFromSnapshot,
@@ -959,6 +960,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             long totalDiffEntries = generateDiffReport(jobId,
                 fsKeyTable,
                 tsKeyTable,
+                fsDirTable,
+                tsDirTable,
                 objectIdToDiffObject,
                 objectIdToKeyNameMapForFromSnapshot,
                 objectIdToKeyNameMapForToSnapshot,
@@ -1116,7 +1119,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             oldObjIdToKeyMap.put(rawObjId, rawValue);
             SnapshotDiffObject diffObject =
                 createDiffObjectWithOldName(fromObjectId.getObjectID(), key,
-                    objectIdToDiffObject.get(rawObjId));
+                    objectIdToDiffObject.get(rawObjId), isDirectoryTable);
             objectIdToDiffObject.put(rawObjId, diffObject);
             oldParentIds.ifPresent(set -> set.add(
                 fromObjectId.getParentObjectID()));
@@ -1128,7 +1131,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             newObjIdToKeyMap.put(rawObjId, rawValue);
             SnapshotDiffObject diffObject =
                 createDiffObjectWithNewName(toObjectId.getObjectID(), key,
-                    objectIdToDiffObject.get(rawObjId));
+                    objectIdToDiffObject.get(rawObjId), isDirectoryTable);
             objectIdToDiffObject.put(rawObjId, diffObject);
             newParentIds.ifPresent(set -> set.add(toObjectId
                 .getParentObjectID()));
@@ -1145,9 +1148,10 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private SnapshotDiffObject createDiffObjectWithOldName(
-      long objectId, String oldName, SnapshotDiffObject diffObject) {
+      long objectId, String oldName, SnapshotDiffObject diffObject,
+      boolean isDirectory) {
     SnapshotDiffObjectBuilder builder = new SnapshotDiffObjectBuilder(objectId)
-        .withOldKeyName(oldName);
+        .withOldKeyName(oldName).setIsDirectory(isDirectory);
     if (diffObject != null) {
       builder.withNewKeyName(diffObject.getNewKeyName());
     }
@@ -1155,10 +1159,11 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   private SnapshotDiffObject createDiffObjectWithNewName(
-      long objectId, String newName, SnapshotDiffObject diffObject) {
+      long objectId, String newName, SnapshotDiffObject diffObject,
+      boolean isDirectory) {
 
     SnapshotDiffObjectBuilder builder = new SnapshotDiffObjectBuilder(objectId)
-        .withNewKeyName(newName);
+        .withNewKeyName(newName).setIsDirectory(isDirectory);
     if (diffObject != null) {
       builder.withOldKeyName(diffObject.getOldKeyName());
     }
@@ -1274,8 +1279,10 @@ public class SnapshotDiffManager implements AutoCloseable {
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   long generateDiffReport(
       final String jobId,
-      final Table<String, ? extends WithObjectID> fsTable,
-      final Table<String, ? extends WithObjectID> tsTable,
+      final Table<String, OmKeyInfo> fsTable,
+      final Table<String, OmKeyInfo> tsTable,
+      final Table<String, OmDirectoryInfo> fsDirTable,
+      final Table<String, OmDirectoryInfo> tsDirTable,
       final PersistentMap<byte[], SnapshotDiffObject> objectIdToDiffObject,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
@@ -1379,8 +1386,10 @@ public class SnapshotDiffManager implements AutoCloseable {
 
             // Check if block location is same or not. If it is not same,
             // key must have been overridden as well.
-            if (!isBlockLocationSame(snapshotDiffObject.getOldKeyName(),
-                snapshotDiffObject.getNewKeyName(), fsTable, tsTable)) {
+            if (isObjectModified(snapshotDiffObject.getOldKeyName(),
+                snapshotDiffObject.getNewKeyName(),
+                snapshotDiffObject.isDirectory() ? fsDirTable : fsTable,
+                snapshotDiffObject.isDirectory() ? tsDirTable : tsTable)) {
               // Here, oldKey name is returned as modified. Modified key name is
               // based on base snapshot (from snapshot).
               renameDiffs.add(codecRegistry.asRawData(
@@ -1442,6 +1451,34 @@ public class SnapshotDiffManager implements AutoCloseable {
       dropAndCloseColumnFamilyHandle(createDiffColumnFamily);
       dropAndCloseColumnFamilyHandle(modifyDiffColumnFamily);
     }
+  }
+
+  private boolean isObjectModified(String fromObjectName, String toObjectName,
+      final Table<String, ? extends WithObjectID> fromSnapshotTable,
+      final Table<String, ? extends WithObjectID> toSnapshotTable)
+      throws IOException {
+    Objects.requireNonNull(fromObjectName, "fromObjectName is null.");
+    Objects.requireNonNull(toObjectName, "toObjectName is null.");
+
+    final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
+    final WithObjectID toObject = toSnapshotTable.get(toObjectName);
+    if ((fromObject instanceof OmKeyInfo) && (toObject instanceof OmKeyInfo)) {
+      return !SnapshotDeletingService.isBlockLocationInfoSame(
+          (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
+    } else if ((fromObject instanceof OmDirectoryInfo)
+        && (toObject instanceof OmDirectoryInfo)) {
+      return !areAclsSame((OmDirectoryInfo) fromObject,
+          (OmDirectoryInfo) toObject);
+    } else {
+      throw new IllegalStateException("fromObject or toObject is not of " +
+          "the expected type. fromObject type : " +
+          fromObject.getClass().getName() + "toObject type: " +
+          toObject.getClass().getName());
+    }
+  }
+  private boolean areAclsSame(OmDirectoryInfo fromObject,
+                              OmDirectoryInfo toObject) {
+    return fromObject.getAcls().equals(toObject.getAcls());
   }
 
   private boolean isBlockLocationSame(
