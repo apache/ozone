@@ -1,5 +1,5 @@
 ---
-title: "Ozone Snapshots"
+title: "Ozone Snapshot"
 weight: 1
 menu:
    main:
