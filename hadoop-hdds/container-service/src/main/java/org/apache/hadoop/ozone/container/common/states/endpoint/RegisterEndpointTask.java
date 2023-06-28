@@ -163,7 +163,7 @@ public final class RegisterEndpointTask implements
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
         Preconditions.checkState(response.getErrorCode() == success,
-            "DataNode has higher Software Layout Version than SCM.");
+            "DataNode has different Software Layout Version than SCM or RECON.");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());
