@@ -231,7 +231,7 @@ public final class SCMContainerPlacementRackScatter
       availableNodes.removeAll(usedNodes);
     }
     if (availableNodes.size() < nodesRequired) {
-      throw new SCMException("Not enough datanodes to choose. " +
+      throw new SCMException("No enough datanodes to choose. " +
           "TotalNodes = " + totalNodesCount +
           " AvailableNodes = " + availableNodes.size() +
           " RequiredNodes = " + nodesRequired +
