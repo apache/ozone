@@ -46,7 +46,7 @@ ozone sh snapshot list [-hV] <bucket>
 ```shell
 ozone sh snapshot delete [-hV] <bucket> <snapshotName>
 ```
-* Snapshot Diff: Given two snapshots, list all the keys that are different betwenn the them.
+* Snapshot Diff: Given two snapshots, list all the keys that are different between the them.
 ```shell
 ozone sh snapshot diff [-chV] [-p=<pageSize>] [-t=<continuation-token>] <bucket> <fromSnapshot> <toSnapshot>
 ```
