@@ -491,7 +491,7 @@ public class TestDefaultCertificateClient {
 
           @Override
           public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath) {
+              PKCS10CertificationRequest request) {
             return null;
           }
         }) {
@@ -632,7 +632,7 @@ public class TestDefaultCertificateClient {
 
       @Override
       public String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath) {
+          PKCS10CertificationRequest request) {
         return "";
       }
     };

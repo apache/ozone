@@ -1209,13 +1209,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   protected abstract SCMGetCertResponseProto getCertificateSignResponse(
       PKCS10CertificationRequest request) throws IOException;
 
+  @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request)
       throws CertificateException {
     return signAndStoreCertificate(request,
         securityConfig.getCertificateLocation(getComponentName()));
   }
 
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+  private String signAndStoreCertificate(PKCS10CertificationRequest request,
       Path certificatePath) throws CertificateException {
     try {
       SCMGetCertResponseProto response =

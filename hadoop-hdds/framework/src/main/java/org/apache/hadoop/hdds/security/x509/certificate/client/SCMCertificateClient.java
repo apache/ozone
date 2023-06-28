@@ -158,8 +158,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) {
+  public String signAndStoreCertificate(PKCS10CertificationRequest request) {
     throw new UnsupportedOperationException("signAndStoreCertificate of " +
         " SCMCertificateClient is not supported currently");
   }
