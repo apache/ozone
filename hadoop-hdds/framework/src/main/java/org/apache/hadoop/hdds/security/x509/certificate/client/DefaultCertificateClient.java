@@ -1233,16 +1233,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
             CAType.SUBORDINATE,
             certCodec, false);
 
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
-        }
+        getAndStoreAllRootCAs(certCodec);
         // Return the default certificate ID
         return updateCertSerialId(
             CertificateCodec.getX509Certificate(pemEncodedCert)
-                .getSerialNumber()
-                .toString());
+                .getSerialNumber().toString());
       } else {
         throw new CertificateException("Unable to retrieve datanode " +
             "certificate chain.");
@@ -1252,6 +1247,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           e);
       throw new CertificateException(
           "Error while signing and storing SCM signed certificate.", e);
+    }
+  }
+
+  private void getAndStoreAllRootCAs(CertificateCodec certCodec)
+      throws IOException {
+    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
+    for (String rootCAPem : rootCAPems) {
+      storeCertificate(rootCAPem, CAType.ROOT, certCodec, false);
     }
   }
 
