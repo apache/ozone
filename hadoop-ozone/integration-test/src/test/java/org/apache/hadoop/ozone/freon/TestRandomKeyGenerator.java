@@ -30,7 +30,12 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
+
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -40,14 +45,8 @@ public class TestRandomKeyGenerator {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
-  public static void init() throws Exception {
+  static void init() throws Exception {
     conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
@@ -65,14 +64,28 @@ public class TestRandomKeyGenerator {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  @Timeout(5)
+  void singleFailedAttempt() {
+    BaseFreonGenerator subject = new BaseFreonGenerator();
+    subject.setThreadNo(2);
+    subject.setTestNo(1);
+    subject.init();
+
+    assertThrows(RuntimeException.class, () -> subject.runTests(
+        n -> {
+          waitFor(subject::isCompleted, 100, 3000);
+          throw new RuntimeException("fail");
+        }
+    ));
+    assertEquals(1, subject.getFailureCount());
   }
 
   @Test

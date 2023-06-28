@@ -195,6 +195,48 @@ public class PipelineManagerImpl implements PipelineManager {
     return pipelineManager;
   }
 
+  /**
+   * Build a new pipeline and return it, but do not add it to the pipeline
+   * manager. This new pipeline will be in ALLOCATED state, but also unavailable
+   * to clients in the system until it is added to the pipeline manager via the
+   * addPipeline method.
+   * @param replicationConfig
+   * @param excludedNodes
+   * @param favoredNodes
+   * @return The created pipeline.
+   * @throws IOException
+   */
+  @Override
+  public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
+    if (replicationConfig.getReplicationType() != ReplicationType.EC) {
+      throw new IllegalArgumentException("Replication type must be EC");
+    }
+    checkIfPipelineCreationIsAllowed(replicationConfig);
+    return pipelineFactory.create(replicationConfig, excludedNodes,
+        favoredNodes);
+  }
+
+  /**
+   * Add a previously built pipeline to the pipeline manager. This will allow
+   * the pipline to be used by clients in the system.
+   * @param pipeline
+   * @throws IOException
+   * @throws TimeoutException
+   */
+  @Override
+  public void addEcPipeline(Pipeline pipeline)
+      throws IOException, TimeoutException {
+    if (pipeline.getReplicationConfig().getReplicationType()
+        != ReplicationType.EC) {
+      throw new IllegalArgumentException(
+          "Pipeline replication type must be EC");
+    }
+    checkIfPipelineCreationIsAllowed(pipeline.getReplicationConfig());
+    addPipelineToManager(pipeline);
+  }
+
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
       throws IOException, TimeoutException {
@@ -206,6 +248,27 @@ public class PipelineManagerImpl implements PipelineManager {
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException, TimeoutException {
+    checkIfPipelineCreationIsAllowed(replicationConfig);
+
+    acquireWriteLock();
+    final Pipeline pipeline;
+    try {
+      try {
+        pipeline = pipelineFactory.create(replicationConfig,
+            excludedNodes, favoredNodes);
+      } catch (IOException e) {
+        metrics.incNumPipelineCreationFailed();
+        throw e;
+      }
+      addPipelineToManager(pipeline);
+      return pipeline;
+    } finally {
+      releaseWriteLock();
+    }
+  }
+
+  private void checkIfPipelineCreationIsAllowed(
+      ReplicationConfig replicationConfig) throws IOException {
     if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -219,25 +282,24 @@ public class PipelineManagerImpl implements PipelineManager {
       LOG.info(message);
       throw new IOException(message);
     }
+  }
 
+  private void addPipelineToManager(Pipeline pipeline)
+      throws IOException, TimeoutException {
+    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION);
     acquireWriteLock();
-    final Pipeline pipeline;
     try {
-      pipeline = pipelineFactory.create(replicationConfig,
-          excludedNodes, favoredNodes);
-      stateManager.addPipeline(pipeline.getProtobufMessage(
-          ClientVersion.CURRENT_VERSION));
+      stateManager.addPipeline(pipelineProto);
     } catch (IOException | TimeoutException ex) {
-      LOG.debug("Failed to create pipeline with replicationConfig {}.",
-          replicationConfig, ex);
+      LOG.debug("Failed to add pipeline {}.", pipeline, ex);
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
       releaseWriteLock();
     }
-    LOG.info("Created pipeline {}.", pipeline);
+    LOG.info("Added pipeline {}.", pipeline);
     recordMetricsForPipeline(pipeline);
-    return pipeline;
   }
 
   private boolean factorOne(ReplicationConfig replicationConfig) {

@@ -1361,7 +1361,7 @@ public class BasicRootedOzoneClientAdapterImpl
     while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
-              token, -1, false, false);
+              token, -1, false);
       if (snapshotDiffResponse.getJobStatus() == DONE) {
         break;
       }
