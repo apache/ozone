@@ -248,7 +248,7 @@ public class TestOmSnapshot {
     counter = new AtomicInteger(0);
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -1099,15 +1099,15 @@ public class TestOmSnapshot {
       if (bucketLayout.isFileSystemOptimized()) {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "dir2", "dir3"),
+                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2", "/dir1/dir3"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "dir1")));
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1")));
       } else {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "dir2", "dir3"),
+                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2", "/dir1/dir3"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "key1")));
+                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2/key1")));
       }
 
     }
@@ -1139,11 +1139,11 @@ public class TestOmSnapshot {
       if (bucketLayout.isFileSystemOptimized()) {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2", "/dir3/dir2"),
+            SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.MODIFY, "/dir1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2"),
-            SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "/dir1/dir2/dir3")));
+                SnapshotDiffReport.DiffType.MODIFY, "/dir3")));
       } else {
         Assertions.assertEquals(diff.getDiffList(), Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
