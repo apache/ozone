@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -150,8 +151,15 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
+  protected SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) {
+    throw new UnsupportedOperationException("getCertSignResponse of " +
+        " SCMCertificateClient is not supported currently");
+  }
+
+  @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
+      Path certPath) {
     throw new UnsupportedOperationException("signAndStoreCertificate of " +
         " SCMCertificateClient is not supported currently");
   }

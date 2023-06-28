@@ -78,6 +78,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
+import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
@@ -1205,14 +1206,53 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return certSerialId;
   }
 
-  protected abstract String signAndStoreCertificate(
-      PKCS10CertificationRequest request, Path certificatePath)
-      throws CertificateException;
+  protected abstract SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) throws IOException;
 
-  public String signAndStoreCertificate(
-      PKCS10CertificationRequest request) throws CertificateException {
-    return updateCertSerialId(signAndStoreCertificate(request,
-        securityConfig.getCertificateLocation(getComponentName())));
+  public String signAndStoreCertificate(PKCS10CertificationRequest request)
+      throws CertificateException {
+    return signAndStoreCertificate(request,
+        securityConfig.getCertificateLocation(getComponentName()));
+  }
+
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certificatePath) throws CertificateException {
+    try {
+      SCMGetCertResponseProto response =
+          getCertificateSignResponse(request);
+
+      if (response.hasX509CACertificate()) {
+        String pemEncodedCert = response.getX509Certificate();
+        CertificateCodec certCodec = new CertificateCodec(
+            getSecurityConfig(), certificatePath);
+        // Certs will be added to cert map after reloadAllCertificate called
+        storeCertificate(pemEncodedCert, CAType.NONE,
+            certCodec,
+            false);
+        storeCertificate(response.getX509CACertificate(),
+            CAType.SUBORDINATE,
+            certCodec, false);
+
+        // Store Root CA certificate.
+        if (response.hasX509RootCACertificate()) {
+          storeCertificate(response.getX509RootCACertificate(),
+              CAType.ROOT, certCodec, false);
+        }
+        // Return the default certificate ID
+        return updateCertSerialId(
+            CertificateCodec.getX509Certificate(pemEncodedCert)
+                .getSerialNumber()
+                .toString());
+      } else {
+        throw new CertificateException("Unable to retrieve datanode " +
+            "certificate chain.");
+      }
+    } catch (IOException | java.security.cert.CertificateException e) {
+      logger.error("Error while signing and storing SCM signed certificate.",
+          e);
+      throw new CertificateException(
+          "Error while signing and storing SCM signed certificate.", e);
+    }
   }
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
