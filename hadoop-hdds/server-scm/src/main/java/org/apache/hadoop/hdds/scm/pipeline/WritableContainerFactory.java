@@ -57,7 +57,7 @@ public class WritableContainerFactory {
         scm.getScmNodeManager(),
         scm.getPipelineManager(),
         scm.getContainerManager(),
-        scm.getPipelineChoosePolicy());
+        scm.getEcPipelineChoosePolicy());
   }
 
   public ContainerInfo getContainer(final long size,

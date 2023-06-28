@@ -87,7 +87,7 @@ public class KeyValueContainerCheck {
    *
    * @return true : integrity checks pass, false : otherwise.
    */
-  public boolean fastCheck() {
+  public boolean fastCheck() throws InterruptedException {
     LOG.debug("Running basic checks for container {};", containerID);
     boolean valid = false;
     try {
@@ -97,6 +97,10 @@ public class KeyValueContainerCheck {
       valid = true;
 
     } catch (IOException e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Metadata scan of container " +
+            containerID + " interrupted.");
+      }
       handleCorruption(e);
     }
 
@@ -114,7 +118,8 @@ public class KeyValueContainerCheck {
    *
    * @return true : integrity checks pass, false : otherwise.
    */
-  public boolean fullCheck(DataTransferThrottler throttler, Canceler canceler) {
+  public boolean fullCheck(DataTransferThrottler throttler,
+                           Canceler canceler) throws InterruptedException {
     boolean valid;
 
     try {
@@ -123,6 +128,10 @@ public class KeyValueContainerCheck {
         scanData(throttler, canceler);
       }
     } catch (IOException e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Data scan of container " + containerID +
+            " interrupted.");
+      }
       handleCorruption(e);
       valid = false;
     }

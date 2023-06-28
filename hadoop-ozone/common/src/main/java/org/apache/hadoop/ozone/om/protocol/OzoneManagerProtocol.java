@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelP
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
@@ -715,19 +716,34 @@ public interface OzoneManagerProtocol
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
-   * @param cancel request to cancel a running snapshot diff job.
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  @SuppressWarnings("parameternumber")
   default SnapshotDiffResponse snapshotDiff(String volumeName,
                                             String bucketName,
                                             String fromSnapshot,
                                             String toSnapshot,
                                             String token,
                                             int pageSize,
-                                            boolean forceFullDiff,
-                                            boolean cancel)
+                                            boolean forceFullDiff)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
+   * Cancel snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while cancelling snap diff job
+   */
+  default CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                        String bucketName,
+                                                        String fromSnapshot,
+                                                        String toSnapshot)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

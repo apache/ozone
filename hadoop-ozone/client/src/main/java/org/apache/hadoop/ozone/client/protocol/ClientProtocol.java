@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
@@ -1058,7 +1059,6 @@ public interface ClientProtocol {
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
 
-
   /**
    * Get the differences between two snapshots.
    * @param volumeName Name of the volume to which the snapshotted bucket belong
@@ -1068,15 +1068,28 @@ public interface ClientProtocol {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
-   * @param cancel request to cancel a running snapshot diff job.
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
-  @SuppressWarnings("parameternumber")
   SnapshotDiffResponse snapshotDiff(String volumeName, String bucketName,
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
-                                    boolean forceFullDiff, boolean cancel)
+                                    boolean forceFullDiff)
+      throws IOException;
+
+  /**
+   * Cancel snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshotted bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while cancelling snap diff job
+   */
+  CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                String bucketName,
+                                                String fromSnapshot,
+                                                String toSnapshot)
       throws IOException;
 
   /**
