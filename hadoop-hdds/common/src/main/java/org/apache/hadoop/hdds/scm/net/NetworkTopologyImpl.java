@@ -617,7 +617,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
         // excludeScope and finalScope share nothing case
         if (scopeNode.isAncestor(s)) {
           Node node = getNode(s);
-          if (mutableExcludedScopes.stream().noneMatch(node::isDescendant)) {
+          if (node != null &&
+              mutableExcludedScopes.stream().noneMatch(node::isDescendant)) {
             mutableExcludedScopes.add(s);
           }
         }
