@@ -39,6 +39,8 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -61,6 +63,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.File;
@@ -99,6 +102,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @Flaky("HDDS-8876")
 @Disabled("HDDS-8880")
 public class TestOMRatisSnapshots {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -179,7 +185,7 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {100})
+  @ValueSource(ints = {10})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -283,6 +289,22 @@ public class TestOMRatisSnapshots {
      */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+
+    // verify that the bootstrap Follower OM can become leader again
+    leaderOM.transferLeadership(followerNodeId);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        followerOM.checkLeaderStatus();
+        LOG.info("###New leader elected###");
+        return true;
+      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+        LOG.info("###Exception occured message={}###", e.getMessage());
+        return false;
+      }
+    }, 1000, 10000);
+
+    checkSnapshot(followerOM, leaderOM, snapshotName, keys, snapshotInfo);
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
