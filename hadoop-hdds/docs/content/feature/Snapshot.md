@@ -26,7 +26,7 @@ summary: Snapshots Support for Ozone.
 ## Introduction
 
 Snapshot feature for Apache Ozone object store allows users to take point-in-time consistent image of a given bucket. Snapshot feature enables various use cases, including:
- * backup/restore: Create hourly/daily/weekly/monthly snapshots for backup and restore.
+ * Backup and Restore: Create hourly, daily, weekly, monthly snapshots for backup and recovery when needed.
  * Archival and Compliance: Take snapshots for compliance purpose and archieve them as required.
  * Replication and DR : Snapshots provide a frozen immutable image of the bucket on the source Ozone cluster. Snapshots can be used for replicating these immutable bucket images to remote DR site.
  * Incremental Replication : Snapshots feature with efficent snapshot-diff can offer an effcient way to incremntally sync up remote copy of the bucket.
