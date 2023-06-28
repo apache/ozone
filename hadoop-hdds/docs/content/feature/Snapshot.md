@@ -4,7 +4,7 @@ weight: 1
 menu:
    main:
       parent: Features
-summary: Snapshots Support for Ozone.
+summary: Ozone Snapshot
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
