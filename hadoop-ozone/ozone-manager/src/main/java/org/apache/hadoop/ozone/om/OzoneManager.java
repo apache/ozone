@@ -97,6 +97,7 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -4593,23 +4594,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         false);
   }
 
-  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff,
-                                           boolean cancel)
+                                           boolean forceFullDiff)
       throws IOException {
-    if (cancel) {
-      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
-          fromSnapshot, toSnapshot);
-    } else {
-      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
-    }
+    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+  }
+
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
+                                                       String bucket,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+        fromSnapshot, toSnapshot);
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,

@@ -196,10 +196,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -1217,8 +1217,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff,
-                                           boolean cancel)
+                                           boolean forceFullDiff)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1228,8 +1227,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
-            .setForceFullDiff(forceFullDiff)
-            .setCancel(cancel);
+            .setForceFullDiff(forceFullDiff);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);
@@ -1247,7 +1245,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
-        JobCancelResult.fromProtobuf(diffResponse.getJobCancelResult()));
+        diffResponse.getReason());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    final OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setFromSnapshot(fromSnapshot)
+            .setToSnapshot(toSnapshot);
+
+    final OMRequest omRequest = createOMRequest(Type.CancelSnapshotDiff)
+        .setCancelSnapshotDiffRequest(requestBuilder)
+        .build();
+
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    OzoneManagerProtocolProtos.CancelSnapshotDiffResponse diffResponse =
+        omResponse.getCancelSnapshotDiffResponse();
+
+    return new CancelSnapshotDiffResponse(diffResponse.getReason());
   }
 
   /**
