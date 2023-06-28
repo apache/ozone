@@ -435,11 +435,9 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .collect(Collectors.groupingBy(
-            this::getPlacementGroup,
-            Collectors.reducing(0, e -> 1, Integer::sum)))
-        .values());
+    Map<Node, Long> currentRackCount = dns.stream()
+            .collect(Collectors.groupingBy(this::getPlacementGroup,
+                    Collectors.counting()));
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
@@ -451,7 +449,8 @@ public abstract class SCMCommonPlacementPolicy implements
             Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
-            currentRackCount);
+            currentRackCount.values().stream().map(Long::intValue)
+                    .collect(Collectors.toList()));
   }
 
   /**
