@@ -428,15 +428,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.block.deleting.pending.command.limit</name>
-    <value>5</value>
-    <tag>OZONE, PERFORMANCE, SCM</tag>
-    <description>A limit to restrict the total number of delete block commands
-      queued on a datanode. Note this is intended to be a temporary config
-      until we have a more dynamic way of limiting load.
-    </description>
-  </property>
-  <property>
     <name>ozone.block.deleting.limit.per.task</name>
     <value>1000</value>
     <tag>OZONE, PERFORMANCE, SCM</tag>

@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -58,8 +59,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
@@ -114,9 +113,9 @@ public class SCMBlockDeletingService extends BackgroundService
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
-    this.deleteBlocksPendingCommandLimit = conf.getInt(
-        OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT,
-        OZONE_BLOCK_DELETING_PENDING_COMMAND_LIMIT_DEFAULT);
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    this.deleteBlocksPendingCommandLimit = dnConf.getBlockDeleteQueueLimit();
     this.clock = clock;
     this.deletedBlockLog = deletedBlockLog;
     this.nodeManager = nodeManager;

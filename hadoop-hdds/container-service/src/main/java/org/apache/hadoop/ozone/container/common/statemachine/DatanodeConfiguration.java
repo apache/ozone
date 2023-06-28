@@ -149,7 +149,11 @@ public class DatanodeConfiguration {
       defaultValue = "5",
       tags = {DATANODE},
       description = "The maximum number of block delete commands queued on " +
-          " a datanode"
+          " a datanode, This configuration is also used by the SCM to " +
+          "control whether to send delete commands to the DN. If the DN" +
+          " has more commands waiting in the queue than this value, " +
+          "the SCM will not send any new block delete commands. until the " +
+          "DN has processed some commands and the queue length is reduced."
   )
   private int blockDeleteQueueLimit = 5;
 
