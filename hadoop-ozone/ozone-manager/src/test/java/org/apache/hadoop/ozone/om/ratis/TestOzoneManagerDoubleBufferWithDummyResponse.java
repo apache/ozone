@@ -74,7 +74,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     configuration.set(OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     omMetadataManager =
-        new OmMetadataManagerImpl(configuration);
+        new OmMetadataManagerImpl(configuration, null);
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };

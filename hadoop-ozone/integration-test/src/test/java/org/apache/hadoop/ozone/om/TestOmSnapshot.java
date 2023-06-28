@@ -259,7 +259,7 @@ public class TestOmSnapshot {
   private static void finalizeOMUpgrade() throws IOException {
 
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
-    final OzoneManagerProtocol omclient = 
+    final OzoneManagerProtocol omclient =
         client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
@@ -1200,8 +1200,8 @@ public class TestOmSnapshot {
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     RDBStore snapshotDBStore = (RDBStore)
-        ((OmSnapshot)cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix, false))
+        ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
+            .checkForSnapshot(volumeName, bucketName, snapPrefix, false).get())
             .getMetadataManager().getStore();
 
     for (String table : snapshotDBStore.getTableNames().values()) {
@@ -1325,7 +1325,7 @@ public class TestOmSnapshot {
 
     OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
         .getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName, snapshotName, false);
+        .checkForSnapshot(volumeName, bucketName, snapshotName, false).get();
 
     RDBStore snapshotDbStore =
         (RDBStore) omSnapshot.getMetadataManager().getStore();

@@ -568,7 +568,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           trxLogIndex).getOMResponse();
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
-      String errorMessage = "Request " + request + "failed with exception";
+      String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
     return null;
