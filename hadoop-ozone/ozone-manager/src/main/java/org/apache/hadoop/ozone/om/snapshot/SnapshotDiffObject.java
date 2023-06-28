@@ -41,6 +41,8 @@ public class SnapshotDiffObject {
   private String oldKeyName;
   private String newKeyName;
 
+  private boolean isDirectory;
+
   // Default constructor for Jackson Serializer.
   public SnapshotDiffObject() {
 
@@ -48,10 +50,12 @@ public class SnapshotDiffObject {
 
   public SnapshotDiffObject(long objectId,
                             String oldKeyName,
-                            String newKeyName) {
+                            String newKeyName,
+                            boolean isDirectory) {
     this.objectId = objectId;
     this.oldKeyName = oldKeyName;
     this.newKeyName = newKeyName;
+    this.isDirectory = isDirectory;
   }
 
   public long getObjectId() {
@@ -81,6 +85,14 @@ public class SnapshotDiffObject {
     this.newKeyName = newKeyName;
   }
 
+  public void setDirectory(boolean directory) {
+    isDirectory = directory;
+  }
+
+  public boolean isDirectory() {
+    return isDirectory;
+  }
+
   /**
    * Builder for SnapshotDiffObject.
    */
@@ -88,6 +100,8 @@ public class SnapshotDiffObject {
     private final long objectId;
     private String oldKeyName;
     private String newKeyName;
+
+    private boolean isDirectory;
 
     public SnapshotDiffObjectBuilder(long objectID) {
       this.objectId = objectID;
@@ -107,8 +121,14 @@ public class SnapshotDiffObject {
       return this;
     }
 
+    public SnapshotDiffObjectBuilder setIsDirectory(boolean directory) {
+      isDirectory = directory;
+      return this;
+    }
+
     public SnapshotDiffObject build() {
-      return new SnapshotDiffObject(objectId, oldKeyName, newKeyName);
+      return new SnapshotDiffObject(objectId, oldKeyName, newKeyName,
+          isDirectory);
     }
   }
 

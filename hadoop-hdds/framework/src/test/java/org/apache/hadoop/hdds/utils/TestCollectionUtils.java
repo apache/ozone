@@ -21,11 +21,18 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.reverseOrder;
 import static java.util.Collections.singletonList;
+import static java.util.Comparator.naturalOrder;
+import static java.util.stream.Collectors.toList;
 
 /** Test for {@link CollectionUtils}. */
 public class TestCollectionUtils {
@@ -84,5 +91,58 @@ public class TestCollectionUtils {
     List<T> actual = new ArrayList<>();
     CollectionUtils.newIterator(listOfLists).forEachRemaining(actual::add);
     Assertions.assertEquals(expected, actual);
+  }
+
+  @Test
+  void topN() {
+    testTopNInts(Arrays.asList(5, 8, 10, 20, 1, 2, 3, 42));
+    testTopNStrings(Arrays.asList("abc", "QWERTY", "hello world", "mayday",
+        "a new day", "\n", "LICENSE"));
+  }
+
+  private void testTopNStrings(List<String> strings) {
+    testTopN(strings,
+        s -> s.startsWith("a"),
+        s -> s.equals(s.toLowerCase()));
+  }
+
+  private static void testTopNInts(List<Integer> ints) {
+    testTopN(ints,
+        i -> (i % 2 == 0),
+        i -> (i < 20));
+  }
+
+  @SafeVarargs
+  private static <T extends Comparable<T>> void testTopN(List<T> items,
+      Predicate<T>... predicates) {
+
+    testTopN(items, naturalOrder(), any -> true);
+    testTopN(items, reverseOrder(), any -> true);
+
+    for (Predicate<T> predicate : predicates) {
+      testTopN(items, naturalOrder(), predicate);
+      testTopN(items, reverseOrder(), predicate);
+    }
+  }
+
+  private static <T> void testTopN(List<T> items, Comparator<T> comparator,
+      Predicate<T> predicate) {
+    List<T> shuffled = new ArrayList<>(items);
+    Collections.shuffle(shuffled);
+
+    List<T> sorted = new ArrayList<>(items);
+    sorted.sort(comparator.reversed()); // descending order
+
+    for (int i = 0; i <= items.size() + 1; i++) {
+      assertTopN(items, comparator, predicate, sorted, i);
+    }
+    assertTopN(items, comparator, predicate, sorted, Integer.MAX_VALUE);
+  }
+
+  private static <T> void assertTopN(List<T> items, Comparator<T> comparator,
+      Predicate<T> filter, List<T> sorted, int limit) {
+    Assertions.assertEquals(
+        sorted.stream().filter(filter).limit(limit).collect(toList()),
+        CollectionUtils.findTopN(items, limit, comparator, filter));
   }
 }
