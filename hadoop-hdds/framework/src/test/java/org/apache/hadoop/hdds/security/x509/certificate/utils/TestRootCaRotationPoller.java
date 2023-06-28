@@ -65,12 +65,18 @@ public class TestRootCaRotationPoller {
   }
 
   @Test
-  public void testPollerDoesNotInvokeRootCaProcessor() throws IOException {
+  public void testPollerDoesNotInvokeRootCaProcessor() throws Exception {
+    X509Certificate knownCert = generateX509Cert(
+        LocalDateTime.now(), Duration.ofSeconds(50));
+    HashSet<X509Certificate> knownCerts = new HashSet<>();
+    knownCerts.add(knownCert);
+    List<String> certsFromScm = new ArrayList<>();
+    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
-        new HashSet<>(), scmSecurityClient);
+        knownCerts, scmSecurityClient);
 
     Mockito.when(scmSecurityClient.getAllRootCaCertificates())
-        .thenReturn(new ArrayList<>());
+        .thenReturn(certsFromScm);
     AtomicBoolean atomicBoolean = new AtomicBoolean();
     atomicBoolean.set(false);
     poller.addRootCARotationProcessor(
