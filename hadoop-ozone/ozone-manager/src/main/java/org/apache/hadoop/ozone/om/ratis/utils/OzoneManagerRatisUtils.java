@@ -321,7 +321,7 @@ public final class OzoneManagerRatisUtils {
       break;
     default:
       throw new OMException("Unrecognized write command type request "
-          + cmdType, OMException.ResultCodes.UNKNOWN_REQUEST);
+          + cmdType, OMException.ResultCodes.INVALID_REQUEST);
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(

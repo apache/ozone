@@ -489,7 +489,6 @@ enum Status {
     CONTAINS_SNAPSHOT = 88;
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
-    UNKNOWN_REQUEST = 91;
 }
 
 /**

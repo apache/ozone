@@ -100,12 +100,12 @@ public class TestOzoneManagerRatisRequest {
             .build();
 
     // Verify if OMException is thrown and the corresponding ResultCode is
-    // UNKNOWN_REQUEST.
+    // INVALID_REQUEST.
     try {
       OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
       Assert.fail("Expected OMException, but no exception was thrown.");
     } catch (OMException e) {
-      Assert.assertEquals(OMException.ResultCodes.UNKNOWN_REQUEST,
+      Assert.assertEquals(OMException.ResultCodes.INVALID_REQUEST,
           e.getResult());
     }
   }
