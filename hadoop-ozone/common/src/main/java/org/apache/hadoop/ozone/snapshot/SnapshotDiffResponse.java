@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.snapshot;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobCancelResultProto;
 
 /**
  * POJO for Snapshot Diff Response.
@@ -45,41 +45,10 @@ public class SnapshotDiffResponse {
     }
   }
 
-  /**
-   * Snapshot diff cancel result enum.
-   */
-  public enum JobCancelResult {
-    JOB_NOT_CANCELLED("Job hasn't been cancelled"),
-    NEW_JOB("Cannot cancel a newly submitted job"),
-    JOB_DONE("Job is already DONE"),
-    INVALID_STATUS_TRANSITION("Job is not IN_PROGRESS, cancel failed"),
-    JOB_ALREADY_CANCELLED("Job has already been cancelled"),
-    CANCELLATION_SUCCESS("Job has successfully been cancelled");
-
-    private final String description;
-
-    JobCancelResult(String description) {
-      this.description = description;
-    }
-
-    public String getDescription() {
-      return description;
-    }
-
-    public JobCancelResultProto toProtobuf() {
-      return JobCancelResultProto.valueOf(this.name());
-    }
-
-    public static JobCancelResult fromProtobuf(
-        JobCancelResultProto jobCancelResultProto) {
-      return JobCancelResult.valueOf(jobCancelResultProto.name());
-    }
-  }
-
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
-  private final JobCancelResult jobCancelResult;
+  private final String reason;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -87,17 +56,17 @@ public class SnapshotDiffResponse {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
-    this.jobCancelResult = JobCancelResult.JOB_NOT_CANCELLED;
+    this.reason = StringUtils.EMPTY;
   }
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
                               final long waitTimeInMs,
-                              final JobCancelResult jobCancelResult) {
+                              final String reason) {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
-    this.jobCancelResult = jobCancelResult;
+    this.reason = reason;
   }
 
   public SnapshotDiffReportOzone getSnapshotDiffReport() {
@@ -112,27 +81,37 @@ public class SnapshotDiffResponse {
     return waitTimeInMs;
   }
 
-  public JobCancelResult getJobCancelResult() {
-    return jobCancelResult;
+  public String getReason() {
+    return reason;
   }
 
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
-    if (jobCancelResult == JobCancelResult.JOB_NOT_CANCELLED ||
-        jobCancelResult == JobCancelResult.CANCELLATION_SUCCESS) {
-      if (jobStatus == JobStatus.DONE) {
-        str.append(snapshotDiffReport.toString());
+    switch (jobStatus) {
+    case DONE:
+      str.append(snapshotDiffReport.toString());
+      break;
+    case FAILED:
+      str.append("Snapshot diff job is FAILED due to '");
+      if (StringUtils.isNotEmpty(reason)) {
+        str.append(reason);
       } else {
-        str.append("Snapshot diff job is ");
-        str.append(jobStatus);
-        str.append(". Please retry after ");
-        str.append(waitTimeInMs);
-        str.append(" ms.\n");
+        str.append("Unknown reason.");
       }
-    } else {
-      str.append(jobCancelResult.getDescription());
-      str.append("\n");
+      str.append("'. Please retry after ")
+          .append(waitTimeInMs)
+          .append(" ms.\n");
+      break;
+    case CANCELLED:
+      str.append("Snapshot diff job has been CANCELLED.");
+      break;
+    default:
+      str.append("Snapshot diff job is ")
+          .append(jobStatus)
+          .append(". Please retry after ")
+          .append(waitTimeInMs)
+          .append(" ms.\n");
     }
     return str.toString();
   }

@@ -34,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -226,6 +227,24 @@ public class TestOnDemandContainerDataScanner extends
 
   @Test
   @Override
+  public void testShutdownDuringScan() throws Exception {
+    // Make the on demand scan block until interrupt.
+    Mockito.when(healthy.scanData(any(), any())).then(i -> {
+      Thread.sleep(Duration.ofDays(1).toMillis()); return null;
+    });
+
+    // Start the blocking scan.
+    OnDemandContainerDataScanner.init(conf, controller);
+    OnDemandContainerDataScanner.scanContainer(healthy);
+    // Shut down the on demand scanner. This will interrupt the blocked scan
+    // on the healthy container.
+    OnDemandContainerDataScanner.shutdown();
+    // Interrupting the healthy container's scan should not mark it unhealthy.
+    verifyContainerMarkedUnhealthy(healthy, never());
+  }
+
+  @Test
+  @Override
   public void testUnhealthyContainerNotRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
     when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
@@ -260,8 +279,7 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
-  private void scanContainer(Container<?> container)
-      throws Exception {
+  private void scanContainer(Container<?> container) throws Exception {
     OnDemandContainerDataScanner.init(conf, controller);
     Optional<Future<?>> scanFuture =
         OnDemandContainerDataScanner.scanContainer(container);

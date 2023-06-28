@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -441,7 +442,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
 
-  private final boolean fsSnapshotEnabled;
+  private boolean fsSnapshotEnabled;
 
   /**
    * OM Startup mode.
@@ -552,10 +553,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Ratis server comes with JvmPauseMonitor, no need to start another
     jvmPauseMonitor = !isRatisEnabled ? newJvmPauseMonitor(omId) : null;
-
-    fsSnapshotEnabled = configuration.getBoolean(
-        OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
-        OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT);
 
     String defaultBucketLayoutString =
         configuration.getTrimmed(OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -786,6 +783,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       multiTenantManager = new OMMultiTenantManagerImpl(this, configuration);
       OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     }
+
     volumeManager = new VolumeManagerImpl(metadataManager);
 
     bucketManager = new BucketManagerImpl(this, metadataManager);
@@ -823,7 +821,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         this, LOG, AUDIT, metrics);
 
-    // TODO: [SNAPSHOT] Revisit this in HDDS-8529.
+    // Reload snapshot feature config flag
+    fsSnapshotEnabled = configuration.getBoolean(
+        OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
+        OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT);
     omSnapshotManager = new OmSnapshotManager(this);
 
     // Snapshot metrics
@@ -4526,23 +4527,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ozoneObj.getKeyName(), false);
   }
 
-  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff,
-                                           boolean cancel)
+                                           boolean forceFullDiff)
       throws IOException {
-    if (cancel) {
-      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
-          fromSnapshot, toSnapshot);
-    } else {
-      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
-    }
+    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+  }
+
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
+                                                       String bucket,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+        fromSnapshot, toSnapshot);
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,

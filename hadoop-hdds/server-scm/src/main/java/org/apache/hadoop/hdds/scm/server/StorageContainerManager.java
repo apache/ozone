@@ -197,6 +197,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.CRL_SEQUENCE_ID_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
@@ -268,7 +269,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private final String scmStarterUser;
   private final OzoneAdmins scmAdmins;
-  private OzoneAdmins scmReadOnlyAdmins;
+  private final OzoneAdmins scmReadOnlyAdmins;
 
   /**
    * SCM mxbean.
@@ -300,6 +301,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
+  private PipelineChoosePolicy ecPipelineChoosePolicy;
   private SecurityConfig securityConfig;
 
   private final SCMHANodeDetails scmHANodeDetails;
@@ -391,7 +393,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
-            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins);
+            .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
+            .register(OZONE_READONLY_ADMINISTRATORS,
+                this::reconfOzoneReadOnlyAdmins);
 
     initializeSystemManagers(conf, configurator);
 
@@ -764,7 +768,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerReplicaPendingOps);
     }
 
-    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    pipelineChoosePolicy = PipelineChoosePolicyFactory
+        .getPolicy(scmConfig, false);
+    ecPipelineChoosePolicy = PipelineChoosePolicyFactory
+        .getPolicy(scmConfig, true);
     if (configurator.getWritableContainerFactory() != null) {
       writableContainerFactory = configurator.getWritableContainerFactory();
     } else {
@@ -2010,6 +2018,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return this.pipelineChoosePolicy;
   }
 
+  public PipelineChoosePolicy getEcPipelineChoosePolicy() {
+    return this.ecPipelineChoosePolicy;
+  }
+
   @Override
   public String getScmId() {
     return getScmStorageConfig().getScmId();
@@ -2092,12 +2104,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmAdmins.getAdminUsernames();
   }
 
+  public Collection<String> getScmReadOnlyAdminUsernames() {
+    return scmReadOnlyAdmins.getAdminUsernames();
+  }
+
   private String reconfOzoneAdmins(String newVal) {
     getConfiguration().set(OZONE_ADMINISTRATORS, newVal);
     Collection<String> admins = OzoneAdmins.getOzoneAdminsFromConfig(
         getConfiguration(), scmStarterUser);
     scmAdmins.setAdminUsernames(admins);
     LOG.info("Load conf {} : {}, and now admins are: {}", OZONE_ADMINISTRATORS,
+        newVal, admins);
+    return String.valueOf(newVal);
+  }
+
+  private String reconfOzoneReadOnlyAdmins(String newVal) {
+    getConfiguration().set(OZONE_READONLY_ADMINISTRATORS, newVal);
+    Collection<String> admins = OzoneAdmins.getOzoneReadOnlyAdminsFromConfig(
+        getConfiguration());
+    scmReadOnlyAdmins.setAdminUsernames(admins);
+    LOG.info("Load conf {} : {}, and now read only admins are: {}",
+        OZONE_READONLY_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
   }

@@ -115,6 +115,9 @@ public abstract class TestContainerScannersAbstract {
   public abstract void testWithVolumeFailure() throws Exception;
 
   @Test
+  public abstract void testShutdownDuringScan() throws Exception;
+
+  @Test
   public abstract void testUnhealthyContainerNotRescanned() throws Exception;
 
   // HELPER METHODS

@@ -180,11 +180,17 @@ public final class ContainerTestUtils {
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(dataScanResult);
     when(c.shouldScanMetadata()).thenReturn(true);
-    Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
     when(c.getContainerData().getVolume()).thenReturn(vol);
+
+    try {
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+          .thenReturn(dataScanResult);
+      Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
+    } catch (InterruptedException ex) {
+      // Mockito.when invocations will not throw this exception. It is just
+      // required for compilation.
+    }
   }
 
   /**

@@ -45,6 +45,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
+import org.apache.hadoop.service.launcher.IrqHandler;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,46 +89,54 @@ public class KeyValueContainerCheck {
    *
    * @return true : integrity checks pass, false : otherwise.
    */
-  public ScanResult fastCheck() {
+  public ScanResult fastCheck() throws InterruptedException {
     LOG.debug("Running basic checks for container {};", containerID);
 
-    // Container directory should exist.
-    File containerDir = new File(metadataPath).getParentFile();
-    if (!containerDir.exists()) {
-      return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_DIR,
-          containerDir, new FileNotFoundException("Container directory " +
-              containerDir + " not found."));
-    }
-
-    // Metadata directory should exist.
-    File metadataDir = new File(metadataPath);
-    if (!metadataDir.exists()) {
-      return ScanResult.unhealthy(ScanResult.FailureType.MISSING_METADATA_DIR,
-          metadataDir, new FileNotFoundException("Metadata directory " +
-              metadataDir + " not found."));
-    }
-
-    File containerFile = KeyValueContainer
-        .getContainerFile(metadataPath, containerID);
     try {
-      loadContainerData(containerFile);
-    } catch (FileNotFoundException ex) {
-      return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_FILE,
-          containerFile, ex);
-    } catch (IOException ex) {
-      return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
-          containerFile, ex);
-    }
+      // Container directory should exist.
+      File containerDir = new File(metadataPath).getParentFile();
+      if (!containerDir.exists()) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_DIR,
+            containerDir, new FileNotFoundException("Container directory " +
+                containerDir + " not found."));
+      }
 
-    // Chunks directory should exist.
-    File chunksDir = new File(onDiskContainerData.getChunksPath());
-    if (!chunksDir.exists()) {
-      return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CHUNKS_DIR,
-          chunksDir, new FileNotFoundException("Chunks directory " +
-              chunksDir + " not found."));
-    }
+      // Metadata directory should exist.
+      File metadataDir = new File(metadataPath);
+      if (!metadataDir.exists()) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_METADATA_DIR,
+            metadataDir, new FileNotFoundException("Metadata directory " +
+                metadataDir + " not found."));
+      }
 
-    return checkContainerFile(containerFile);
+      // Container file should be valid.
+      File containerFile = KeyValueContainer
+          .getContainerFile(metadataPath, containerID);
+      try {
+        loadContainerData(containerFile);
+      } catch (FileNotFoundException ex) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_FILE,
+            containerFile, ex);
+      } catch (IOException ex) {
+        return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
+            containerFile, ex);
+      }
+
+      // Chunks directory should exist.
+      File chunksDir = new File(onDiskContainerData.getChunksPath());
+      if (!chunksDir.exists()) {
+        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CHUNKS_DIR,
+            chunksDir, new FileNotFoundException("Chunks directory " +
+                chunksDir + " not found."));
+      }
+
+      return checkContainerFile(containerFile);
+    } finally {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Metadata scan of container " +
+            containerID + " interrupted.");
+      }
+    }
   }
 
   /**
@@ -142,11 +151,17 @@ public class KeyValueContainerCheck {
    * @return true : integrity checks pass, false : otherwise.
    */
   public ScanResult fullCheck(DataTransferThrottler throttler,
-      Canceler canceler) {
+      Canceler canceler) throws InterruptedException {
     ScanResult result = fastCheck();
     if (result.isHealthy()) {
       result = scanData(throttler, canceler);
     }
+
+    if (!result.isHealthy() && Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException("Data scan of container " + containerID +
+          " interrupted.");
+    }
+
     return result;
   }
 
