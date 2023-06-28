@@ -210,12 +210,13 @@ public class SnapshotCache implements ReferenceCountedCallback {
     synchronized (pendingEvictionList) {
       // Remove instance from clean up list when it exists.
       pendingEvictionList.remove(rcOmSnapshot);
-      // Check if any entries can be cleaned up.
-      // At this point, cache size might temporarily exceed cacheSizeLimit
-      // even if there are entries that can be evicted, which is fine since it
-      // is a soft limit.
-      cleanup();
     }
+
+    // Check if any entries can be cleaned up.
+    // At this point, cache size might temporarily exceed cacheSizeLimit
+    // even if there are entries that can be evicted, which is fine since it
+    // is a soft limit.
+    cleanup();
 
     return rcOmSnapshot;
   }
@@ -235,14 +236,15 @@ public class SnapshotCache implements ReferenceCountedCallback {
         synchronized (pendingEvictionList) {
           // v is eligible to be evicted and closed
           pendingEvictionList.add(v);
-          // The cache size might have already exceed the soft limit
-          // Thus triggering cleanup() to check and evict if applicable
-          cleanup();
         }
       }
 
-      return dbMap.get(k);
+      return v;
     });
+
+    // The cache size might have already exceed the soft limit
+    // Thus triggering cleanup() to check and evict if applicable
+    cleanup();
   }
 
   /**
@@ -276,11 +278,21 @@ public class SnapshotCache implements ReferenceCountedCallback {
   }
 
   /**
+   * Wrapper for cleanupInternal() that is synchronized to prevent multiple
+   * threads from interleaving into the cleanup method.
+   */
+  private synchronized void cleanup() {
+    synchronized (pendingEvictionList) {
+      cleanupInternal();
+    }
+  }
+
+  /**
    * If cache size exceeds soft limit, attempt to clean up and close the
    * instances that has zero reference count.
    * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
    */
-  private void cleanup() {
+  private void cleanupInternal() {
     long numEntriesToEvict = (long) dbMap.size() - cacheSizeLimit;
     while (numEntriesToEvict > 0L && pendingEvictionList.size() > 0) {
       // Get the first instance in the clean up list
