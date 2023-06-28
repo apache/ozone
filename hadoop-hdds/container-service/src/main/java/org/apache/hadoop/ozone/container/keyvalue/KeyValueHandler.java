@@ -116,6 +116,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
 
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -1075,7 +1076,7 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void markContainerUnhealthy(Container container, String reason)
+  public void markContainerUnhealthy(Container container, ScanResult reason)
       throws StorageContainerException {
     container.writeLock();
     try {

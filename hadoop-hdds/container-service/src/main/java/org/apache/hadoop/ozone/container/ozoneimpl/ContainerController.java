@@ -42,6 +42,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
+
 /**
  * Control plane for container management in datanode.
  */
@@ -111,7 +113,7 @@ public class ContainerController {
    * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public void markContainerUnhealthy(final long containerId, String reason)
+  public void markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
     Container container = containerSet.getContainer(containerId);
     if (container != null) {

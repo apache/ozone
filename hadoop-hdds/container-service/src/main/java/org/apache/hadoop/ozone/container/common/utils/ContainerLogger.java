@@ -19,10 +19,13 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.*;
 
 /**
  * Utility class defining methods to write to the datanode container log.
@@ -83,9 +86,12 @@ public class ContainerLogger {
    * Logged when a container is moved to the unhealthy state.
    *
    * @param containerData The container that was marked unhealthy.
-   * @param message The reason the container was marked unhealthy.
+   * @param reason The reason the container was marked unhealthy.
    */
-  public static void logUnhealthy(ContainerData containerData, String message) {
+  public static void logUnhealthy(ContainerData containerData,
+      ScanResult reason) {
+    String message = reason.getFailureType() + " for file " +
+        reason.getUnhealthyFile();
     LOG.error(getMessage(containerData, message));
   }
 
