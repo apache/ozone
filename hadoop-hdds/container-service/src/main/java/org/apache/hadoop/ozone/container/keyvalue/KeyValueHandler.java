@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -126,7 +127,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueHandler extends Handler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  public static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
   private final BlockManager blockManager;
@@ -1288,6 +1289,16 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     container.writeLock();
     try {
+      if (container.getContainerData().getVolume().isFailed()) {
+        // if the  volume in which the container resides fails
+        // don't attempt to delete/move it. When a volume fails,
+        // failedVolumeListener will pick it up and clear the container
+        // from the container set.
+        LOG.info("Delete container issued on containerID {} which is in a " +
+                "failed volume. Skipping", container.getContainerData()
+            .getContainerID());
+        return;
+      }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
@@ -1325,12 +1336,15 @@ public class KeyValueHandler extends Handler {
 
         // Rename container location
         try {
-          KeyValueContainerUtil.moveToDeletedContainerDir(
-              keyValueContainerData, hddsVolume);
-        } catch (IOException ex) {
-          LOG.error("Failed to move deleted container under {}",
-              hddsVolume.getDeletedContainerDir(), ex);
-          throw new StorageContainerException("Moving deleted container failed",
+          KeyValueContainerUtil.moveToDeletedContainerDir(keyValueContainerData,
+              hddsVolume);
+        } catch (IOException ioe) {
+          LOG.error("Failed to move container under " + hddsVolume
+              .getDeletedContainerDir());
+          String errorMsg =
+              "Failed to move container" + container.getContainerData()
+                  .getContainerID();
+          triggerVolumeScanAndThrowException(container, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -1352,9 +1366,11 @@ public class KeyValueHandler extends Handler {
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
           container.getContainerData().getContainerID(), e);
-      throw new StorageContainerException("Could not determine if container "
-          + container.getContainerData().getContainerID() +
-          " is empty", DELETE_ON_NON_EMPTY_CONTAINER);
+      String errorMsg =
+          "Failed to read container dir" + container.getContainerData()
+              .getContainerID();
+      triggerVolumeScanAndThrowException(container, errorMsg,
+          CONTAINER_INTERNAL_ERROR);
     } finally {
       container.writeUnlock();
     }
@@ -1363,4 +1379,17 @@ public class KeyValueHandler extends Handler {
     container.getContainerData().setState(State.DELETED);
     sendICR(container);
   }
+
+  private void triggerVolumeScanAndThrowException(Container container,
+      String msg, ContainerProtos.Result result)
+      throws StorageContainerException {
+    // Trigger a volume scan as exception occurred.
+    StorageVolumeUtil.onFailure(container.getContainerData().getVolume());
+    throw new StorageContainerException(msg, result);
+  }
+
+  public static Logger getLogger() {
+    return LOG;
+  }
+
 }

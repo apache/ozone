@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -667,8 +668,7 @@ public class ObjectStore {
    * @param token to get the index to return diff report from.
    * @param pageSize maximum entries returned to the report.
    * @param forceFullDiff request to force full diff, skipping DAG optimization
-   * @param cancel request to cancel a running snapshot diff job.
-   * @param forceNonNativeDiff request to force diff to not use native libs
+   * @param forceNonNativeDiff request to force diff to not
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -680,11 +680,28 @@ public class ObjectStore {
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
-                                           boolean cancel,
                                            boolean forceNonNativeDiff)
       throws IOException {
     return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, cancel, forceNonNativeDiff);
+        token, pageSize, forceFullDiff, forceNonNativeDiff);
+  }
+
+  /**
+   * Cancel the snap diff jobs.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @return the success if cancel succeeds.
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return proxy.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot,
+        toSnapshot);
   }
 
   /**

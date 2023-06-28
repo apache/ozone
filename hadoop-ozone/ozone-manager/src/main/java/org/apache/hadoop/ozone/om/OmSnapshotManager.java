@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -96,8 +98,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -691,13 +695,14 @@ public final class OmSnapshotManager implements AutoCloseable {
         (keyParts[0].compareTo(OM_SNAPSHOT_INDICATOR) == 0);
   }
 
-  public SnapshotDiffResponse cancelSnapshotDiff(final String volume,
-                                                 final String bucket,
-                                                 final String fromSnapshot,
-                                                 final String toSnapshot)
-      throws IOException {
-    return snapshotDiffManager.cancelSnapshotDiff(volume,
-        bucket, fromSnapshot, toSnapshot);
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(
+      final String volume,
+      final String bucket,
+      final String fromSnapshot,
+      final String toSnapshot
+  ) throws IOException {
+    return snapshotDiffManager.cancelSnapshotDiff(volume, bucket, fromSnapshot,
+        toSnapshot);
   }
 
   @SuppressWarnings("parameternumber")
@@ -712,6 +717,14 @@ public final class OmSnapshotManager implements AutoCloseable {
       throws IOException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapshot, toSnapshot)) {
+      SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
+          getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          fromSnapshot, toSnapshot, Collections.emptyList(), null);
+      return new SnapshotDiffResponse(diffReport, DONE, 0L);
+    }
 
     int index = getIndexFromToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
@@ -779,6 +792,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
+
     // Check snapshot creation time
     if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
       throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +

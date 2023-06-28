@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Objects;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffJobProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -49,6 +51,10 @@ public class SnapshotDiffJob {
   private boolean forceNonNativeDiff;
   private long totalDiffEntries;
 
+  // Reason tells why the job was FAILED. It should be set only if job status
+  // is FAILED.
+  private String reason;
+
   // Default constructor for Jackson Serializer.
   public SnapshotDiffJob() {
 
@@ -75,6 +81,7 @@ public class SnapshotDiffJob {
     this.forceFullDiff = forceFullDiff;
     this.forceNonNativeDiff = forceNonNativeDiff;
     this.totalDiffEntries = totalDiffEntries;
+    this.reason = StringUtils.EMPTY;
   }
 
   public String getJobId() {
@@ -149,6 +156,14 @@ public class SnapshotDiffJob {
     this.totalDiffEntries = totalDiffEntries;
   }
 
+  public String getReason() {
+    return reason;
+  }
+
+  public void setReason(String reason) {
+    this.reason = reason;
+  }
+
   public boolean isForceNonNativeDiff() {
     return forceNonNativeDiff;
   }
@@ -159,16 +174,21 @@ public class SnapshotDiffJob {
 
   @Override
   public String toString() {
-    return "creationTime : " + creationTime +
-        ", jobId: " + jobId +
-        ", status: " + status +
-        ", volume: " + volume +
-        ", bucket: " + bucket +
-        ", fromSnapshot: " + fromSnapshot +
-        ", toSnapshot: " + toSnapshot +
-        ", forceFullDiff: " + forceFullDiff +
-        ", forceNonNativeDiff: " + forceNonNativeDiff +
-        ", totalDiffEntries: " + totalDiffEntries;
+    StringBuilder sb = new StringBuilder("creationTime : ").append(creationTime)
+        .append(", jobId: ").append(jobId)
+        .append(", status: ").append(status)
+        .append(", volume: ").append(volume)
+        .append(", bucket: ").append(bucket)
+        .append(", fromSnapshot: ").append(fromSnapshot)
+        .append(", toSnapshot: ").append(toSnapshot)
+        .append(", forceFullDiff: ").append(forceFullDiff)
+        .append(", forceNonNativeDiff: ").append(forceNonNativeDiff)
+        .append(", totalDiffEntries: ").append(totalDiffEntries);
+
+    if (StringUtils.isNotEmpty(reason)) {
+      sb.append(", reason: ").append(reason);
+    }
+    return sb.toString();
   }
 
   @Override
@@ -187,8 +207,9 @@ public class SnapshotDiffJob {
           Objects.equals(this.fromSnapshot, otherJob.fromSnapshot) &&
           Objects.equals(this.toSnapshot, otherJob.toSnapshot) &&
           Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
+          Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries) &&
           Objects.equals(this.forceNonNativeDiff, otherJob.forceNonNativeDiff)
-          && Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries);
+          && Objects.equals(this.reason, otherJob.reason);
     }
     return false;
   }
@@ -196,7 +217,8 @@ public class SnapshotDiffJob {
   @Override
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
-        fromSnapshot, toSnapshot, forceFullDiff, totalDiffEntries);
+        fromSnapshot, toSnapshot, forceFullDiff, forceNonNativeDiff,
+        totalDiffEntries, reason);
   }
 
   public SnapshotDiffJobProto toProtoBuf() {

@@ -95,6 +95,7 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -4534,17 +4535,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
-                                           boolean cancel,
                                            boolean forceNonNativeDiff)
       throws IOException {
-    if (cancel) {
-      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
-          fromSnapshot, toSnapshot);
-    } else {
-      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
-          forceNonNativeDiff);
-    }
+    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+        forceNonNativeDiff);
+  }
+
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
+                                                       String bucket,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+        fromSnapshot, toSnapshot);
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,

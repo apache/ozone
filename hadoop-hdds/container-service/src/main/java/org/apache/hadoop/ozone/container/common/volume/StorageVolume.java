@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -27,8 +28,9 @@ import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +39,15 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
 
@@ -66,6 +73,9 @@ public abstract class StorageVolume
 
   // The name of the directory used for temporary files on the volume.
   public static final String TMP_DIR_NAME = "tmp";
+  // The name of the directory where temporary files used to check disk
+  // health are written to. This will go inside the tmp directory.
+  public static final String TMP_DISK_CHECK_DIR_NAME = "disk-check";
 
   /**
    * Type for StorageVolume.
@@ -111,11 +121,22 @@ public abstract class StorageVolume
   private final File storageDir;
   private String workingDirName;
   private File tmpDir;
+  private File diskCheckDir;
 
   private final Optional<VolumeInfo> volumeInfo;
 
   private final VolumeSet volumeSet;
 
+  /*
+  Fields used to implement IO based disk health checks.
+  If more than ioFailureTolerance IO checks fail out of the last ioTestCount
+  tests run, then the volume is considered failed.
+   */
+  private final int ioTestCount;
+  private final int ioFailureTolerance;
+  private AtomicInteger currentIOFailureCount;
+  private Queue<Boolean> ioTestSlidingWindow;
+  private int healthCheckFileSize;
 
   protected StorageVolume(Builder<?> b) throws IOException {
     if (!b.failedVolume) {
@@ -131,12 +152,22 @@ public abstract class StorageVolume
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
       this.conf = b.conf;
+
+      DatanodeConfiguration dnConf =
+          conf.getObject(DatanodeConfiguration.class);
+      this.ioTestCount = dnConf.getVolumeIOTestCount();
+      this.ioFailureTolerance = dnConf.getVolumeIOFailureTolerance();
+      this.ioTestSlidingWindow = new LinkedList<>();
+      this.currentIOFailureCount = new AtomicInteger(0);
+      this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);
       this.volumeInfo = Optional.empty();
       this.volumeSet = null;
       this.storageID = UUID.randomUUID().toString();
       this.state = VolumeState.FAILED;
+      this.ioTestCount = 0;
+      this.ioFailureTolerance = 0;
     }
   }
 
@@ -220,6 +251,8 @@ public abstract class StorageVolume
     this.tmpDir =
         new File(new File(getStorageDir(), workDirName), TMP_DIR_NAME);
     Files.createDirectories(tmpDir.toPath());
+    diskCheckDir = createTmpSubdirIfNeeded(TMP_DISK_CHECK_DIR_NAME);
+    cleanTmpDiskCheckDir();
   }
 
   /**
@@ -438,6 +471,11 @@ public abstract class StorageVolume
     return this.tmpDir;
   }
 
+  @VisibleForTesting
+  public File getDiskCheckDir() {
+    return this.diskCheckDir;
+  }
+
   public void refreshVolumeInfo() {
     volumeInfo.ifPresent(VolumeInfo::refreshNow);
   }
@@ -509,21 +547,122 @@ public abstract class StorageVolume
   public void shutdown() {
     setState(VolumeState.NON_EXISTENT);
     volumeInfo.ifPresent(VolumeInfo::shutdownUsageThread);
+    cleanTmpDiskCheckDir();
   }
 
   /**
-   * Run a check on the current volume to determine if it is healthy.
+   * Delete all temporary files in the directory used ot check disk health.
+   */
+  private void cleanTmpDiskCheckDir() {
+    // If the volume was shut down before initialization completed, skip
+    // emptying the directory.
+    if (diskCheckDir == null) {
+      return;
+    }
+
+    if (!diskCheckDir.exists()) {
+      LOG.warn("Unable to clear disk check files from {}. Directory does " +
+          "not exist.", diskCheckDir);
+      return;
+    }
+
+    if (!diskCheckDir.isDirectory()) {
+      LOG.warn("Unable to clear disk check files from {}. Location is not a" +
+          " directory", diskCheckDir);
+      return;
+    }
+
+    try (Stream<Path> files = Files.list(diskCheckDir.toPath())) {
+      files.map(Path::toFile).filter(File::isFile).forEach(file -> {
+        try {
+          Files.delete(file.toPath());
+        } catch (IOException ex) {
+          LOG.warn("Failed to delete temporary volume health check file {}",
+              file);
+        }
+      });
+    } catch (IOException ex) {
+      LOG.warn("Failed to list contents of volume health check directory {} " +
+          "for deleting.", diskCheckDir);
+    }
+  }
+
+  /**
+   * Run a check on the current volume to determine if it is healthy. The
+   * check consists of a directory check and an IO check.
+   *
+   * If the directory check fails, the volume check fails immediately.
+   * The IO check is allows to fail up to {@code ioFailureTolerance} times
+   * out of the last {@code ioTestCount} IO checks before this volume check is
+   * failed. Each call to this method runs one IO check.
+   *
    * @param unused context for the check, ignored.
    * @return result of checking the volume.
+   * @throws InterruptedException if there was an error during the volume
+   *    check because the thread was interrupted.
    * @throws Exception if an exception was encountered while running
-   *            the volume check.
+   *    the volume check and the thread was not interrupted.
    */
   @Override
-  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
-    if (!storageDir.exists()) {
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused)
+      throws Exception {
+    boolean directoryChecksPassed =
+        DiskCheckUtil.checkExistence(storageDir) &&
+        DiskCheckUtil.checkPermissions(storageDir);
+    // If the directory is not present or has incorrect permissions, fail the
+    // volume immediately. This is not an intermittent error.
+    if (!directoryChecksPassed) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Directory check of volume " + this +
+            " interrupted.");
+      }
       return VolumeCheckResult.FAILED;
     }
-    DiskChecker.checkDir(storageDir);
+
+    // If IO test count is set to 0, IO tests for disk health are disabled.
+    if (ioTestCount == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
+    // Since IO errors may be intermittent, volume remains healthy until the
+    // threshold of failures is crossed.
+    boolean diskChecksPassed = DiskCheckUtil.checkReadWrite(storageDir,
+        diskCheckDir, healthCheckFileSize);
+    if (Thread.currentThread().isInterrupted()) {
+      // Thread interrupt may have caused IO operations to abort. Do not
+      // consider this a failure.
+      throw new InterruptedException("IO check of volume " + this +
+          " interrupted.");
+    }
+
+    // Move the sliding window of IO test results forward 1 by adding the
+    // latest entry and removing the oldest entry from the window.
+    // Update the failure counter for the new window.
+    ioTestSlidingWindow.add(diskChecksPassed);
+    if (!diskChecksPassed) {
+      currentIOFailureCount.incrementAndGet();
+    }
+    if (ioTestSlidingWindow.size() > ioTestCount &&
+        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
+      currentIOFailureCount.decrementAndGet();
+    }
+
+    // If the failure threshold has been crossed, fail the volume without
+    // further scans.
+    // Once the volume is failed, it will not be checked anymore.
+    // The failure counts can be left as is.
+    if (currentIOFailureCount.get() > ioFailureTolerance) {
+      LOG.info("Failed IO test for volume {}: the last {} runs " +
+              "encountered {}/{} tolerated failures.", this,
+          ioTestSlidingWindow.size(), currentIOFailureCount,
+          ioFailureTolerance);
+      return VolumeCheckResult.FAILED;
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("IO test results for volume {}: the last {} runs encountered " +
+              "{}/{} tolerated failures", this, ioTestSlidingWindow.size(),
+          currentIOFailureCount, ioFailureTolerance);
+    }
+
     return VolumeCheckResult.HEALTHY;
   }
 
