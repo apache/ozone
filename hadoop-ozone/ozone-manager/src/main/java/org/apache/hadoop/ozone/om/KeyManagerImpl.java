@@ -934,25 +934,32 @@ public class KeyManagerImpl implements KeyManager {
       OMFileRequest.validateBucket(metadataManager, volume, bucket);
       OmKeyInfo keyInfo;
 
-      // Recursive check is done only for ACL_TYPE DELETE
-      // Rename and delete operations will send ACL_TYPE DELETE
-      if (context.isRecursiveAccessCheck()
-          && context.getAclRights() == IAccessAuthorizer.ACLType.DELETE) {
-        return checkChildrenAcls(ozObject, context);
-      }
-      try {
-        OzoneFileStatus fileStatus = getFileStatus(args);
-        keyInfo = fileStatus.getKeyInfo();
-      } catch (IOException e) {
-        // OzoneFS will check whether the key exists when write a new key.
-        // For Acl Type "READ", when the key is not exist return true.
-        // To Avoid KEY_NOT_FOUND Exception.
-        if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
-          return true;
-        } else {
-          throw new OMException(
-              "Key not found, checkAccess failed. Key:" + objectKey,
-              KEY_NOT_FOUND);
+      // For Acl Type "WRITE", the key can only be found in
+      // OpenKeyTable since appends to existing keys are not supported.
+      if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
+        keyInfo =
+            metadataManager.getOpenKeyTable(bucketLayout).get(objectKey);
+      } else {
+        // Recursive check is done only for ACL_TYPE DELETE
+        // Rename and delete operations will send ACL_TYPE DELETE
+        if (context.isRecursiveAccessCheck()
+            && context.getAclRights() == IAccessAuthorizer.ACLType.DELETE) {
+          return checkChildrenAcls(ozObject, context);
+        }
+        try {
+          OzoneFileStatus fileStatus = getFileStatus(args);
+          keyInfo = fileStatus.getKeyInfo();
+        } catch (IOException e) {
+          // OzoneFS will check whether the key exists when write a new key.
+          // For Acl Type "READ", when the key is not exist return true.
+          // To Avoid KEY_NOT_FOUND Exception.
+          if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
+            return true;
+          } else {
+            throw new OMException(
+                "Key not found, checkAccess failed. Key:" + objectKey,
+                KEY_NOT_FOUND);
+          }
         }
       }
 
