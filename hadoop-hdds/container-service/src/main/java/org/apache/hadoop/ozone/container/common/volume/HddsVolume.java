@@ -310,20 +310,32 @@ public class HddsVolume extends StorageVolume {
   }
 
   @Override
-  public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+  public synchronized VolumeCheckResult check(@Nullable Boolean unused)
+      throws Exception {
     VolumeCheckResult result = super.check(unused);
-    if (!isDbLoaded()) {
-      return result;
-    }
+
     DatanodeConfiguration df = getConf().getObject(DatanodeConfiguration.class);
     if (result != VolumeCheckResult.HEALTHY ||
-        !df.getContainerSchemaV3Enabled() || !df.autoCompactionSmallSstFile()) {
+        !df.getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
     }
-    // Calculate number of files per level and size per level
-    RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
-        new File(dbParentDir, CONTAINER_DB_NAME).getAbsolutePath(), getConf());
-    rawDB.getStore().compactionIfNeeded();
+
+    // Check that per-volume RocksDB is present.
+    File dbFile = new File(dbParentDir, CONTAINER_DB_NAME);
+    if (!dbFile.exists() || !dbFile.canRead()) {
+      LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
+          "{}", getStorageDir(), dbFile);
+      return VolumeCheckResult.FAILED;
+    }
+
+    // TODO HDDS-8784 trigger compaction outside of volume check. Then the
+    //  exception can be removed.
+    if (df.autoCompactionSmallSstFile()) {
+      // Calculate number of files per level and size per level
+      RawDB rawDB = DatanodeStoreCache.getInstance().getDB(
+          dbFile.getAbsolutePath(), getConf());
+      rawDB.getStore().compactionIfNeeded();
+    }
 
     return VolumeCheckResult.HEALTHY;
   }
