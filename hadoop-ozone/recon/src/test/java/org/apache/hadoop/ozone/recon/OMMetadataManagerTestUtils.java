@@ -346,6 +346,7 @@ public final class OMMetadataManagerTestUtils {
           .setBucketName(bucketName)
           .setVolumeName(volName)
           .setKeyName(keyNames.get(i))
+          .setDataSize(100L)
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .build());
     }

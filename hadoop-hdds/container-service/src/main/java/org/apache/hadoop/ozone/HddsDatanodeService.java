@@ -63,7 +63,6 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -150,25 +149,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
-  }
-
-  private void cleanTmpDir() {
-    if (datanodeStateMachine != null) {
-      MutableVolumeSet volumeSet =
-          datanodeStateMachine.getContainer().getVolumeSet();
-      for (StorageVolume volume : volumeSet.getVolumesList()) {
-        if (volume instanceof HddsVolume) {
-          HddsVolume hddsVolume = (HddsVolume) volume;
-          try {
-            KeyValueContainerUtil.ContainerDeleteDirectory
-                .cleanTmpDir(hddsVolume);
-          } catch (IOException ex) {
-            LOG.error("Error while cleaning tmp delete directory " +
-                "under {}", hddsVolume.getWorkingDir(), ex);
-          }
-        }
-      }
-    }
   }
 
   public static void main(String[] args) {
@@ -580,8 +560,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void stop() {
     if (!isStopped.getAndSet(true)) {
-      // Clean <HddsVolume>/tmp/container_delete_service dir.
-      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {
