@@ -99,6 +99,8 @@ public class TestOzoneManagerRatisRequest {
             .setClientId("test-client-id")
             .build();
 
+    ozoneManager = Mockito.mock(OzoneManager.class);
+
     // Verify if OMException is thrown and the corresponding ResultCode is
     // INVALID_REQUEST.
     try {
