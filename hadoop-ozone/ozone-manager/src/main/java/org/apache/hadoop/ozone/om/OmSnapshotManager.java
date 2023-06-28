@@ -60,8 +60,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
@@ -171,17 +169,25 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
-  /**
-   * TODO: [SNAPSHOT] HDDS-8529: Refactor the constructor in a way that when
-   *  ozoneManager.isFilesystemSnapshotEnabled() returns false,
-   *  no snapshot-related background job or initialization would run,
-   *  except for applying previously committed Ratis transactions in e.g.:
-   *  1. {@link OMKeyPurgeRequest#validateAndUpdateCache}
-   *  2. {@link OMDirectoriesPurgeRequestWithFSO#validateAndUpdateCache}
-   */
   public OmSnapshotManager(OzoneManager ozoneManager) {
+
+    boolean isFilesystemSnapshotEnabled =
+        ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
-        ozoneManager.isFilesystemSnapshotEnabled() ? "enabled" : "disabled");
+        isFilesystemSnapshotEnabled ? "enabled" : "disabled");
+
+    // Confirm that snapshot feature can be safely disabled.
+    // Throw unchecked exception if that is not the case.
+    if (!isFilesystemSnapshotEnabled &&
+        !canDisableFsSnapshot(ozoneManager.getMetadataManager())) {
+      throw new RuntimeException("Ozone Manager is refusing to start up" +
+          "because filesystem snapshot feature is disabled in config while" +
+          "there are still snapshots remaining in the system (including the " +
+          "ones that are marked as deleted but not yet cleaned up by the " +
+          "background worker thread). " +
+          "Please set config ozone.filesystem.snapshot.enabled to true and " +
+          "try to start this Ozone Manager again.");
+    }
 
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
@@ -301,6 +307,27 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       this.snapshotDiffCleanupService = null;
     }
+  }
+
+  /**
+   * Help reject OM startup if snapshot feature is disabled
+   * but there are snapshots remaining in this OM. Note: snapshots that are
+   * already deleted but not cleaned up yet still counts.
+   * @param ommm OMMetadataManager
+   * @return true if SnapshotInfoTable is empty, false otherwise.
+   */
+  @VisibleForTesting
+  public boolean canDisableFsSnapshot(OMMetadataManager ommm) {
+
+    boolean isSnapshotInfoTableEmpty;
+    try {
+      isSnapshotInfoTableEmpty = ommm.getSnapshotInfoTable().isEmpty();
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Unable to check SnapshotInfoTable emptiness", e);
+    }
+
+    return isSnapshotInfoTableEmpty;
   }
 
   private CacheLoader<String, OmSnapshot> createCacheLoader() {

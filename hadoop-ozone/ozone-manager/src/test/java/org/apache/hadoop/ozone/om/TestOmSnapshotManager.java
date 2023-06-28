@@ -116,6 +116,24 @@ public class TestOmSnapshotManager {
   }
 
   @Test
+  public void testSnapshotFeatureFlagSafetyCheck() throws IOException {
+    // Verify that the snapshot feature config safety check method
+    // is returning the expected value.
+
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+
+    when(snapshotInfoTable.isEmpty()).thenReturn(false);
+    Assert.assertFalse(om.getOmSnapshotManager()
+        .canDisableFsSnapshot(om.getMetadataManager()));
+
+    when(snapshotInfoTable.isEmpty()).thenReturn(true);
+    Assert.assertTrue(om.getOmSnapshotManager()
+        .canDisableFsSnapshot(om.getMetadataManager()));
+  }
+
+  @Test
   public void testCloseOnEviction() throws IOException {
 
     // set up db tables
