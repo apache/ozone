@@ -152,12 +152,6 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   @Override
   public boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException {
-    if (action == SafeModeAction.GET) {
-      statistics.incrementReadOps(1);
-    } else {
-      statistics.incrementWriteOps(1);
-    }
-    LOG.trace("setSafeMode() action:{}", action);
-    return getAdapter().setSafeMode(action, isChecked);
+    return setSafeModeUtil(action, isChecked);
   }
 }
