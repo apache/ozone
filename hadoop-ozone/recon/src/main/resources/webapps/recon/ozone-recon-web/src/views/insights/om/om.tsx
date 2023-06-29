@@ -35,6 +35,7 @@ let mismatchPrevKeyList = [0];
 let openPrevKeyList =[""];
 let keysPendingPrevList =[""];
 let deletedKeysPrevList =[0];
+let keysPendingExpanded: any = [];
 interface IContainerResponse {
   containerId: number;
   mismatchMissingState: string;
@@ -552,6 +553,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       clickable: true,
       prevClickable :true
     });
+    keysPendingExpanded =[];
     let deletePendingKeysEndpoint;
     if (prevKeyDeletePending === "" || prevKeyDeletePending === undefined ) {
       deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey`;
@@ -565,12 +567,13 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       let deletedKeyInfoData = [];
       deletedKeyInfoData = deletePendingKeys && deletePendingKeys.flatMap((infoObject:any) => {
         const { omKeyInfoList } = infoObject;
+        keysPendingExpanded.push(infoObject);
         let count = 0;
         let item = omKeyInfoList && omKeyInfoList.reduce((obj:any, item:any) => {
           const { dataSize } = item;
-          item.dataSize = obj.dataSize + dataSize;
+          const newDataSize = obj.dataSize + dataSize;
           count = count + 1;
-          return item;
+          return { ...item, dataSize: newDataSize };
         }, { "dataSize": 0 });
       
         return {
@@ -613,6 +616,49 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       showDataFetchError(error.toString());
     });
   };
+
+  expandedKey =  ( record:any)=> {
+    const filteredData = keysPendingExpanded && keysPendingExpanded.flatMap((info:any) =>
+    info.omKeyInfoList && info.omKeyInfoList.filter((item: any) => item.keyName === record.keyName)
+    )
+    const columns= [{
+      title: 'Data Size',
+      dataIndex: 'dataSize',
+      key: 'dataSize',
+      render: (dataSize :any) => dataSize = dataSize > 0 ? byteToSize(dataSize,1) : dataSize
+    },
+    {
+      title: 'Replicated Data Size',
+      dataIndex: 'replicatedSize',
+      key: 'replicatedSize',
+      render: (replicatedSize :any) => replicatedSize = replicatedSize > 0 ? byteToSize(replicatedSize,1) : replicatedSize
+    },
+    {
+      title: 'Creation Time',
+      dataIndex: 'creationTime',
+      key: 'creationTime',
+      render: (creationTime: number) => {
+        return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
+      }
+    },
+    {
+      title: 'Modification Time',
+      dataIndex: 'modificationTime',
+      key: 'modificationTime',
+      render: (modificationTime: number) => {
+        return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
+      }
+    }
+  ]
+    return (
+      <Table
+      columns={columns}
+      dataSource={filteredData}
+        pagination={true}
+        rowKey='dataSize'
+    />
+    );
+  }
 
   fetchDeletedKeys = (limit: number, prevKeyDeleted: number) => {
     this.setState({
@@ -683,6 +729,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       if (activeKey === '2') {
         this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
       } else if (activeKey === '3') {
+        keysPendingExpanded =[];
         this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
       } else if (activeKey === '4') {
         this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
@@ -931,7 +978,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       return <Table
         expandRowByClick dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
-        loading={loading}
+        loading={loading} rowKey='path'
         pagination={paginationConfig} />
     }
 
@@ -940,7 +987,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         expandRowByClick dataSource={dataSource}
         columns={this.searchKeysPendingColumn()}
         loading={loading}
-        pagination={paginationConfig} rowKey='keyName' />
+        pagination={paginationConfig} rowKey='keyName'
+        expandedRowRender={this.expandedKey} />
     }
 
     const generateDeletedKeysTable = (dataSource: any) => {
