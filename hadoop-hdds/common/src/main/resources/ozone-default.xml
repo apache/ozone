@@ -3943,6 +3943,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.force.non.native.diff</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.diff.max.page.size</name>
     <value>1000</value>
     <tag>OZONE, OM</tag>
