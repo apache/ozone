@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
@@ -93,7 +92,7 @@ public class WritableECContainerProvider
   @Override
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
     int openPipelineCount = 0;
     synchronized (this) {
@@ -180,7 +179,7 @@ public class WritableECContainerProvider
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
       long size, String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
     if (excludeList.getDatanodes().size() > 0) {
