@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +56,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
-public class DBCheckpointServlet extends HttpServlet {
+public class DBCheckpointServlet extends HttpServlet
+    implements BootstrapStateHandler {
 
   private static final String FIELD_NAME =
       OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]";
@@ -69,6 +71,7 @@ public class DBCheckpointServlet extends HttpServlet {
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
   private transient OzoneAdmins admins;
+  private transient BootstrapStateHandler.Lock lock;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -87,6 +90,7 @@ public class DBCheckpointServlet extends HttpServlet {
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
+    lock = new Lock();
   }
 
   private boolean hasPermission(UserGroupInformation user) {
@@ -145,28 +149,29 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     DBCheckpoint checkpoint = null;
-    try {
-      boolean flush = false;
-      String flushParam =
-          request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
-      if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.parseBoolean(flushParam);
-      }
 
-      List<String> receivedSstList = new ArrayList<>();
-      List<String> excludedSstList = new ArrayList<>();
-      String[] sstParam = isFormData ?
-          parseFormDataParameters(request) : request.getParameterValues(
-          OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-      if (sstParam != null) {
-        receivedSstList.addAll(
-            Arrays.stream(sstParam)
-            .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
-            .distinct()
-            .collect(Collectors.toList()));
-        LOG.info("Received excluding SST {}", receivedSstList);
-      }
+    boolean flush = false;
+    String flushParam =
+        request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
+    if (StringUtils.isNotEmpty(flushParam)) {
+      flush = Boolean.parseBoolean(flushParam);
+    }
 
+    List<String> receivedSstList = new ArrayList<>();
+    List<String> excludedSstList = new ArrayList<>();
+    String[] sstParam = isFormData ?
+        parseFormDataParameters(request) : request.getParameterValues(
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
+    if (sstParam != null) {
+      receivedSstList.addAll(
+          Arrays.stream(sstParam)
+              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct()
+              .collect(Collectors.toList()));
+      LOG.info("Received excluding SST {}", receivedSstList);
+    }
+
+    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       checkpoint = dbStore.getCheckpoint(flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
@@ -300,5 +305,28 @@ public class DBCheckpointServlet extends HttpServlet {
 
     writeDBCheckpointToStream(checkpoint, destination,
         toExcludeList, excludedList);
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
+
+  /**
+   * This lock is a no-op but can overridden by child classes.
+   */
+  public static class Lock extends BootstrapStateHandler.Lock {
+    public Lock() {
+    }
+
+    @Override
+    public BootstrapStateHandler.Lock lock()
+        throws InterruptedException {
+      return this;
+    }
+
+    @Override
+    public void unlock() {
+    }
   }
 }
