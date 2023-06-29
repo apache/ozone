@@ -315,9 +315,6 @@ public class DBCheckpointServlet extends HttpServlet
   /**
    * This lock is a no-op but can overridden by child classes.
    */
-    public static class Lock extends BootstrapStateHandler.Lock {
- * This lock is a no-op but can overriden by child classes.
- */
   public static class Lock extends BootstrapStateHandler.Lock {
     public Lock() {
     }
