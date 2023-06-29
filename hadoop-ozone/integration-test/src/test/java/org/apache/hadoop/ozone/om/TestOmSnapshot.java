@@ -100,7 +100,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -637,11 +636,10 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
-    OmKeyInfo keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     bucket.deleteKey(key1);
     String snap3 = "snap3";
-    String activeSnapshotPrefix =
-            createSnapshot(testVolumeName, testBucketName, snap3);
+    createSnapshot(testVolumeName, testBucketName, snap3);
     SnapshotDiffReportOzone diff =
         getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
     Assert.assertEquals(diff.getDiffList().size(), 0);
@@ -672,15 +670,14 @@ public class TestOmSnapshot {
     OzoneBucket bucket = volume.getBucket(testBucketName);
     String key1 = "k1";
     key1 = createFileKeyWithPrefix(bucket, key1);
-    OmKeyInfo keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     String snap1 = "snap1";
     createSnapshot(testVolumeName, testBucketName, snap1);
     bucket.deleteKey(key1);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
     String snap3 = "snap3";
-    String activeSnapshotPrefix = createSnapshot(testVolumeName, testBucketName,
-            snap3);
+    createSnapshot(testVolumeName, testBucketName, snap3);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 1);
@@ -717,17 +714,16 @@ public class TestOmSnapshot {
     OzoneBucket bucket = volume.getBucket(testBucketName);
     String key1 = "k1";
     key1 = createFileKeyWithPrefix(bucket, key1);
-    OmKeyInfo keyInfo1 = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     String snap1 = "snap1";
     createSnapshot(testVolumeName, testBucketName, snap1);
     bucket.deleteKey(key1);
     key1 = createFileKey(bucket, key1);
-    OmKeyInfo keyInfo2 = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
     String snap3 = "snap3";
-    String activeSnapshotPrefix = createSnapshot(testVolumeName, testBucketName,
-        snap3);
+    createSnapshot(testVolumeName, testBucketName, snap3);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 2);
@@ -741,8 +737,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 0);
     bucket.deleteKey(key1);
     String snap4 = "snap4";
-    activeSnapshotPrefix = createSnapshot(testVolumeName, testBucketName,
-        snap4);
+    createSnapshot(testVolumeName, testBucketName, snap4);
     diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap1, snap4);
     Assert.assertEquals(diff.getDiffList().size(), 1);
@@ -790,12 +785,10 @@ public class TestOmSnapshot {
               }
               return true;
             }, 1000, 10000);
-    OmKeyInfo renamedKeyInfo = getOmKeyInfo(testVolumeName, testBucketName,
-            renamedKey);
+    getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
     bucket.deleteKey(renamedKey);
     String snap2 = "snap2";
-    String activeSnapshotPrefix = createSnapshot(testVolumeName, testBucketName,
-            snap2);
+    createSnapshot(testVolumeName, testBucketName, snap2);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap2);
     Assert.assertEquals(diff.getDiffList().size(), 1);
@@ -849,8 +842,7 @@ public class TestOmSnapshot {
               }
               return true;
             }, 1000, 120000);
-    OmKeyInfo renamedRenamedKeyInfo = getOmKeyInfo(testVolumeName,
-            testBucketName, renamedRenamedKey);
+    getOmKeyInfo(testVolumeName, testBucketName, renamedRenamedKey);
     bucket.deleteKey(renamedRenamedKey);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
@@ -891,8 +883,7 @@ public class TestOmSnapshot {
     String renamedKey = "renamed-" + key1;
     bucket.renameKey(key1, renamedKey);
     key1 =  createFileKey(bucket, key1);
-    OmKeyInfo recreatedKeyInfo = getOmKeyInfo(testVolumeName, testBucketName,
-            key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     String snap3 = "snap3";
     createSnapshot(testVolumeName, testBucketName, snap3);
     getSnapDiffReport(testVolumeName, testBucketName,
@@ -932,13 +923,12 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     String key1 = "k1";
     key1 = createFileKeyWithPrefix(bucket, key1);
-    OmKeyInfo keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     bucket.deleteKey(key1);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
     String activeSnap = "activefs";
-    String activeSnapshotPrefix = createSnapshot(testVolumeName, testBucketName,
-            activeSnap);
+    createSnapshot(testVolumeName, testBucketName, activeSnap);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
             snap1, activeSnap);
     Assert.assertEquals(diff.getDiffList().size(), 0);
@@ -1540,13 +1530,13 @@ public class TestOmSnapshot {
     key1 = createFileKeyWithPrefix(bucket, key1);
     String snap1 = "snap1";
     createSnapshot(testVolumeName, testBucketName, snap1);
-    OmKeyInfo keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     createFileKey(bucket, key1);
     String snap2 = "snap2";
     createSnapshot(testVolumeName, testBucketName, snap2);
     SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
         testBucketName, snap1, snap2);
-    keyInfo = getOmKeyInfo(testVolumeName, testBucketName, key1);
+    getOmKeyInfo(testVolumeName, testBucketName, key1);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Lists.newArrayList(
         SnapshotDiffReportOzone.getDiffReportEntry(
