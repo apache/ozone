@@ -378,8 +378,8 @@ public class TestOmSnapshotManager {
     long fileSize;
     // Confirm the exclude file gets added to the excluded list,
     //  (and thus is excluded.)
-    fileSize = processFile(excludeFile, copyFiles, hardLinkFiles, toExcludeFiles,
-        excluded);
+    fileSize = processFile(excludeFile, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
     Assert.assertEquals(excluded.size(), 1);
     Assert.assertEquals((excluded.get(0)), excludeFile.toString());
     Assert.assertEquals(copyFiles.size(), 1);
@@ -388,8 +388,8 @@ public class TestOmSnapshotManager {
     excluded = new ArrayList<>();
 
     // Confirm the linkToExcludedFile gets added as a link.
-    fileSize = processFile(linkToExcludedFile, copyFiles, hardLinkFiles, toExcludeFiles,
-        excluded);
+    fileSize = processFile(linkToExcludedFile, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 1);
     Assert.assertEquals(hardLinkFiles.size(), 1);
@@ -398,8 +398,8 @@ public class TestOmSnapshotManager {
     hardLinkFiles = new HashMap<>();
 
     // Confirm the linkToCopiedFile gets added as a link.
-    fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles, toExcludeFiles,
-        excluded);
+    fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 1);
     Assert.assertEquals(hardLinkFiles.size(), 1);
@@ -408,8 +408,8 @@ public class TestOmSnapshotManager {
     hardLinkFiles = new HashMap<>();
 
     // Confirm the addToCopiedFiles gets added to list of copied files
-    fileSize = processFile(addToCopiedFiles, copyFiles, hardLinkFiles, toExcludeFiles,
-        excluded);
+    fileSize = processFile(addToCopiedFiles, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertTrue(copyFiles.contains(addToCopiedFiles));

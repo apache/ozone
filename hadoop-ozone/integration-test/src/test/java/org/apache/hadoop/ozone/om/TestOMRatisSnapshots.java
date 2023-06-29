@@ -68,7 +68,6 @@ import org.slf4j.event.Level;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -90,7 +89,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
@@ -189,7 +187,7 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {100})
+  @ValueSource(ints = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -211,7 +209,7 @@ public class TestOMRatisSnapshots {
     FaultInjector faultInjector =
         new SnapshotMaxSizeInjector(leaderOM,
             followerOM.getOmSnapshotProvider().getSnapshotDir(),
-                                    sstSetList);
+            sstSetList);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
@@ -248,7 +246,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
           >= leaderOMSnapshotIndex - 1;
-    }, 100, 1000*100);
+    }, 100, 10000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -309,7 +307,7 @@ public class TestOMRatisSnapshots {
     // Confirm that there were multiple tarballs.
     assertTrue(sstSetList.size() > 1);
     // Confirm that there was no overlap of sst files
-    //  between the individual tarballs
+    // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
   }
 
@@ -574,6 +572,17 @@ public class TestOMRatisSnapshots {
       assertTrue(lineCount > 0);
     }
     return id;
+  }
+
+  // Returns temp dir where tarball was untarred.
+  private void unTarLatestTarBall(OzoneManager followerOm, Path tempDir)
+      throws IOException {
+    File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
+    // Find the latest tarball.
+    String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
+        filter(s -> s.toLowerCase().endsWith(".tar")).
+        reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
+    FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
   }
 
   @Test
@@ -1078,53 +1087,6 @@ public class TestOMRatisSnapshots {
     }, 100, 5000);
   }
 
-  // Returns temp dir where tarball was untarred.
-  private void unTarLatestTarBall(OzoneManager followerOm, Path tempDir)
-      throws IOException {
-    File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
-    // Find the latest tarball.
-    String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
-        filter(s -> s.toLowerCase().endsWith(".tar")).
-        reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
-    FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
-  }
-
-  private void createEmptyTarball(File dummyTarFile)
-      throws IOException {
-    FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
-    try (TarArchiveOutputStream archiveOutputStream =
-             new TarArchiveOutputStream(fileOutputStream)) {
-    }
-  }
-
-  // Return a list of sst files in tarball.
-  private Set<String> getSstFilenames(File tarball)
-      throws IOException {
-    Set<String> sstFilenames = new HashSet<>();
-    TarArchiveInputStream tarInput =
-        new TarArchiveInputStream(new FileInputStream(tarball));
-    while (true) {
-      TarArchiveEntry entry = tarInput.getNextTarEntry();
-      if (entry == null) {
-        break;
-      }
-      String name = entry.getName();
-      if (name.toLowerCase().endsWith(".sst")) {
-        sstFilenames.add(entry.getName());
-      }
-    }
-    return sstFilenames;
-  }
-
-  // Find the tarball in the snapshot dir
-  private File getTarball(File snapshotDir) {
-    for (File f : Objects.requireNonNull(snapshotDir.listFiles())) {
-      if (f.getName().toLowerCase().endsWith(".tar")) {
-        return f;
-      }
-    }
-    return null;
-  }
   private static class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
@@ -1175,14 +1137,14 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  // Interupts the tarball download process to excercise tarballs
+  // Interupts the tarball download process to test tarballs
   // exceeding the max size.
-  private class SnapshotMaxSizeInjector extends FaultInjector {
-    OzoneManager om;
-    int count;
-    File snapshotDir;
-    List<Set<String>> sstSetList;
-    Path tempDir;
+  private static class SnapshotMaxSizeInjector extends FaultInjector {
+    private final OzoneManager om;
+    private int count;
+    private final File snapshotDir;
+    private final List<Set<String>> sstSetList;
+    private final Path tempDir;
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
                             List<Set<String>> sstSetList) throws IOException {
       this.om = om;
@@ -1200,19 +1162,13 @@ public class TestOMRatisSnapshots {
     public void pause() throws IOException {
       count++;
       File tarball = getTarball(snapshotDir);
-      // First time through, untar tarball, get total
-      // size of sst files and reduce max size to
-      // get multiple tarballs
+      // First time through, get total size of sst files and reduce
+      // max size config.  That way next time through, we get multiple
+      // tarballs.
       if (count == 1) {
-        FileUtil.unTar(tarball, tempDir.toFile());
-        List<Path> sstPaths = Files.walk(tempDir).filter(
-            path -> path.toString().endsWith(".sst")).collect(Collectors.toList());
-        long sstSize = 0;
-        for (Path sstPath : sstPaths) {
-          sstSize += Files.size(sstPath);
-        }
-        om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
-                                      sstSize/2);
+        long sstSize = getSizeOfSstFiles(tarball);
+        om.getConfiguration().setLong(
+            OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
         // process.
         createEmptyTarball(tarball);
@@ -1222,6 +1178,58 @@ public class TestOMRatisSnapshots {
         // have one entry for each tarball.
         sstSetList.add(getSstFilenames(tarball));
       }
+    }
+
+    // Get Size of sstfiles in tarball.
+    private long getSizeOfSstFiles(File tarball) throws IOException {
+      FileUtil.unTar(tarball, tempDir.toFile());
+      List<Path> sstPaths = Files.walk(tempDir).filter(
+          path -> path.toString().endsWith(".sst")).
+          collect(Collectors.toList());
+      long sstSize = 0;
+      for (Path sstPath : sstPaths) {
+        sstSize += Files.size(sstPath);
+      }
+      return sstSize;
+    }
+
+    @SuppressWarnings("checkstyle:EmptyBlock")
+    private void createEmptyTarball(File dummyTarFile)
+        throws IOException {
+      FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
+      try (TarArchiveOutputStream archiveOutputStream =
+               new TarArchiveOutputStream(fileOutputStream)) {
+        ; // Don't add any files.
+      }
+    }
+
+    // Return a list of sst files in tarball.
+    private Set<String> getSstFilenames(File tarball)
+        throws IOException {
+      Set<String> sstFilenames = new HashSet<>();
+      TarArchiveInputStream tarInput =
+          new TarArchiveInputStream(new FileInputStream(tarball));
+      while (true) {
+        TarArchiveEntry entry = tarInput.getNextTarEntry();
+        if (entry == null) {
+          break;
+        }
+        String name = entry.getName();
+        if (name.toLowerCase().endsWith(".sst")) {
+          sstFilenames.add(entry.getName());
+        }
+      }
+      return sstFilenames;
+    }
+
+    // Find the tarball in the dir.
+    private File getTarball(File dir) {
+      for (File f : Objects.requireNonNull(dir.listFiles())) {
+        if (f.getName().toLowerCase().endsWith(".tar")) {
+          return f;
+        }
+      }
+      return null;
     }
 
     @Override

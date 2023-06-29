@@ -123,11 +123,12 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
       RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
           candidateDir, true);
-      File hardLinkFile = new File(checkpoint.getCheckpointLocation().toString(), "hardLinkFile");
+      File hardLinkFile = new File(
+          checkpoint.getCheckpointLocation().toString(), "hardLinkFile");
       // If the hardlink file exists we have gotten the last tar file.
       if (hardLinkFile.exists()) {
-        LOG.info("Successfully untar the downloaded snapshot {} at {}.", targetFile,
-            checkpoint.getCheckpointLocation());
+        LOG.info("Successfully untar the downloaded snapshot {} at {}.",
+            targetFile, checkpoint.getCheckpointLocation());
         return checkpoint;
       }
     }

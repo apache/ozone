@@ -87,7 +87,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
-  private long max_total_sst_size = 0;
+  private long maxTotalSstSize = 0;
   @Override
   public void init() throws ServletException {
 
@@ -147,9 +147,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Set<Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
           checkpoint.getCheckpointLocation().toString(),
           ServerUtils.getOzoneMetaDirPath(getConf()).toString());
-      boolean completed = getFilesForArchive(checkpoint, copyFiles, hardLinkFiles, toExcludeFiles,
-          includeSnapshotData(request), excludedList);
-      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream, completed);
+      boolean completed = getFilesForArchive(checkpoint, copyFiles,
+          hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
+          excludedList);
+      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
+          completed);
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
       throw e;
@@ -180,8 +182,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   List<String> excluded)
       throws IOException {
 
-    max_total_sst_size = getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
-                                      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+    maxTotalSstSize = getConf().getLong(
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
 
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
@@ -266,8 +269,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             return false;
           }
         } else {
-          long fileSize = processFile(file, copyFiles, hardLinkFiles, toExcludeFiles, excluded);
-          if (copySize.get() + fileSize > max_total_sst_size) {
+          long fileSize = processFile(file, copyFiles, hardLinkFiles,
+              toExcludeFiles, excluded);
+          if (copySize.get() + fileSize > maxTotalSstSize) {
             return false;
           } else {
             copySize.addAndGet(fileSize);
@@ -355,7 +359,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     int truncateLength = metaDirPath.toString().length() + 1;
 
     Set<Path> filteredCopyFiles = completed ? copyFiles :
-      copyFiles.stream().filter(path ->
+        copyFiles.stream().filter(path ->
           path.getFileName().toString().toLowerCase().endsWith(".sst")).
           collect(Collectors.toSet());
 
