@@ -62,6 +62,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
@@ -84,9 +86,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-  private static final long MAX_COPY_SIZE = 10000000L;
   private transient BootstrapStateHandler.Lock lock;
-  private long max_copy_size = MAX_COPY_SIZE;
+  private long max_total_sst_size = 0;
   @Override
   public void init() throws ServletException {
 
@@ -179,7 +180,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   List<String> excluded)
       throws IOException {
 
-    max_copy_size = getConf().getLong("ozone.om.maxsize", 10000000L);
+    max_total_sst_size = getConf().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
+                                      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
 
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
@@ -265,7 +267,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           }
         } else {
           long fileSize = processFile(file, copyFiles, hardLinkFiles, toExcludeFiles, excluded);
-          if (copySize.get() + fileSize > max_copy_size) {
+          if (copySize.get() + fileSize > max_total_sst_size) {
             return false;
           } else {
             copySize.addAndGet(fileSize);

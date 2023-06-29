@@ -92,6 +92,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -1210,7 +1211,7 @@ public class TestOMRatisSnapshots {
         for (Path sstPath : sstPaths) {
           sstSize += Files.size(sstPath);
         }
-        om.getConfiguration().setLong("ozone.om.maxsize",
+        om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
                                       sstSize/2);
         // Now empty the tarball to restart the download
         // process.
