@@ -458,12 +458,12 @@ public class DeletedBlockLogImpl
           .build();
       Set<ContainerReplica> replicas = containerManager
           .getContainerReplicas(
-              ContainerID.valueOf(tx.getContainerID()));
+              ContainerID.valueOf(updatedTxn.getContainerID()));
       for (ContainerReplica replica : replicas) {
         DatanodeDetails details = replica.getDatanodeDetails();
         if (shouldAddTransactionToDN(details,
             updatedTxn.getTxID(), dnList, commandStatus)) {
-          transactions.addTransactionToDN(details.getUuid(), tx);
+          transactions.addTransactionToDN(details.getUuid(), updatedTxn);
         }
       }
     } catch (IOException e) {
