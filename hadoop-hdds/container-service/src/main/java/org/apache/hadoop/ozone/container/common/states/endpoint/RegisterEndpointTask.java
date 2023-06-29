@@ -164,7 +164,8 @@ public final class RegisterEndpointTask implements
             "Invalid cluster ID in the response.");
         Preconditions.checkState(response.getErrorCode() == success,
             "DataNode has different Software Layout Version" +
-                " than SCM or RECON.");
+                " than SCM or RECON. EndPoint address is: " +
+                rpcEndPoint.getAddressString());
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());
