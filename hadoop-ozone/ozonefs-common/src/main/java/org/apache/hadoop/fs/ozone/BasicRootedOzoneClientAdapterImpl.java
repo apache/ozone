@@ -1384,6 +1384,9 @@ public class BasicRootedOzoneClientAdapterImpl
         throw new IOException("file is in a snapshot.");
       } else {
         OzoneFileStatus status = bucket.getFileStatus(key);
+        if (!status.isFile()) {
+          throw new IOException("not a file");
+        }
         return !status.getKeyInfo().isHsync();
       }
     }

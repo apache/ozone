@@ -739,6 +739,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throw new IOException("not a file");
     }
     OzoneFileStatus status = bucket.getFileStatus(pathStr);
+    if (!status.isFile()) {
+      throw new IOException("not a file");
+    }
     return !status.getKeyInfo().isHsync();
   }
 

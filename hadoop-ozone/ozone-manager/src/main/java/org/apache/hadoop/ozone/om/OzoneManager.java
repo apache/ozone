@@ -4478,11 +4478,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     case ENTER:
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
-    case LEAVE:
     case FORCE_EXIT:
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();
+    //case LEAVE:
+    // TODO: support LEAVE in the future.
     default:
       throw new OMException("Unsupported safe mode action " + action,
           INTERNAL_ERROR);

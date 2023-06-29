@@ -143,7 +143,11 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   @Override
   public boolean setSafeMode(SafeModeAction action, boolean isChecked)
       throws IOException {
-    statistics.incrementWriteOps(1);
+    if (action == SafeModeAction.GET) {
+      statistics.incrementReadOps(1);
+    } else {
+      statistics.incrementWriteOps(1);
+    }
     LOG.trace("setSafeMode() action:{}", action);
     return getAdapter().setSafeMode(action, isChecked);
   }
