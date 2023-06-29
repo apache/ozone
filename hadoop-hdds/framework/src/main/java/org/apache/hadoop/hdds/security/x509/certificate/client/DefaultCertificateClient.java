@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,7 +52,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -222,15 +222,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   private synchronized void updateCachedRootCAId(String s) {
+    BigInteger candidateNewId = new BigInteger(s);
     if (rootCaCertId == null
-        || Long.parseLong(s) > Long.parseLong(rootCaCertId)) {
+        || new BigInteger(rootCaCertId).compareTo(candidateNewId) < 0) {
       rootCaCertId = s;
     }
   }
 
   private synchronized void updateCachedSubCAId(String s) {
+    BigInteger candidateNewId = new BigInteger(s);
     if (caCertId == null
-        || Long.parseLong(s) > Long.parseLong(caCertId)) {
+        || new BigInteger(caCertId).compareTo(candidateNewId) < 0) {
       caCertId = s;
     }
   }
@@ -1262,15 +1264,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient() {
     return scmSecurityClient;
-  }
-
-  public CompletableFuture<Void> getRootCARotationProcessor(
-      List<X509Certificate> rootCAs) {
-    if (rootCaCertificates.containsAll(rootCAs)) {
-      return CompletableFuture.completedFuture(null);
-    }
-    return CompletableFuture.runAsync(() -> new CertificateRenewerService(
-        this, true), executorService);
   }
 
   public synchronized void startCertificateMonitor() {
