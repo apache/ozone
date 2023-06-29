@@ -18,8 +18,6 @@
 package org.apache.hadoop.ozone.om;
 import java.time.Duration;
 import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -1331,8 +1329,8 @@ public class TestOmSnapshot {
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 4; j++) {
         for (int k = 0; k < 7; k++) {
-          //If there are seven day's snapshots in cluster already,
-          //remove the oldest day snapshot then create the latest day snapshot
+          // If there are seven day's snapshots in cluster already,
+          // remove the oldest day snapshot then create the latest day snapshot
           updatedDayIndexArr = checkSnapshotExpirationThenCreateLatest(
               SNAPSHOT_DAY_PREFIX, oldestDayIndex, latestDayIndex,
               oldestWeekIndex, latestWeekIndex,
@@ -1341,8 +1339,8 @@ public class TestOmSnapshot {
           oldestDayIndex = updatedDayIndexArr[0];
           latestDayIndex = updatedDayIndexArr[1];
         }
-        //If there is one week's snapshot in cluster already,
-        //remove the oldest week snapshot then create the latest week snapshot
+        // If there is one week's snapshot in cluster already,
+        // remove the oldest week snapshot then create the latest week snapshot
         updatedWeekIndexArr = checkSnapshotExpirationThenCreateLatest(
             SNAPSHOT_WEEK_PREFIX, oldestDayIndex, latestDayIndex,
             oldestWeekIndex, latestWeekIndex,
@@ -1351,8 +1349,8 @@ public class TestOmSnapshot {
         oldestWeekIndex = updatedWeekIndexArr[0];
         latestWeekIndex = updatedWeekIndexArr[1];
       }
-      //If there is one month's snapshot in cluster already,
-      //remove the oldest month snapshot then create the latest month snapshot
+      // If there is one month's snapshot in cluster already,
+      // remove the oldest month snapshot then create the latest month snapshot
       updatedMonthIndexArr = checkSnapshotExpirationThenCreateLatest(
           SNAPSHOT_MONTH_PREFIX, oldestDayIndex, latestDayIndex,
           oldestWeekIndex, latestWeekIndex, oldestMonthIndex, latestMonthIndex,
@@ -1361,6 +1359,7 @@ public class TestOmSnapshot {
       latestMonthIndex = updatedMonthIndexArr[1];
     }
   }
+
   @SuppressWarnings("parameternumber")
   private int[] checkSnapshotExpirationThenCreateLatest(String snapshotPrefix,
       int oldestDayIndex, int latestDayIndex,
@@ -1429,9 +1428,8 @@ public class TestOmSnapshot {
       int oldestDayIndex, int latestDayIndex,
       int oldestWeekIndex, int latestWeekIndex,
       int oldestMonthIndex, int latestMonthIndex) throws Exception {
-    String keyName = "";
     for (int i = 0; i < latestDayIndex; i++) {
-      keyName = KEY_PREFIX + i;
+      String keyName = KEY_PREFIX + i;
       // Validate keys metadata in active Ozone namespace
       OzoneKeyDetails ozoneKeyDetails = ozoneBucketClient.getKey(keyName);
       Assert.assertEquals(keyName, ozoneKeyDetails.getName());
@@ -1470,25 +1468,22 @@ public class TestOmSnapshot {
     for (int i = oldestIndex; i < latestIndex; i++) {
       Iterator<? extends OzoneKey> iterator =
           ozoneBucketClient.listKeys(
-              OmSnapshotManager.getSnapshotPrefix(snapshotPrefix + i)
-                  + KEY_PREFIX);
-      Set<String> keyNamesInSnapshot = new HashSet<>();
+              OmSnapshotManager.getSnapshotPrefix(snapshotPrefix + i));
       while (iterator.hasNext()) {
-        keyNamesInSnapshot.add(iterator.next().getName());
-      }
-      for (String keyName : keyNamesInSnapshot) {
+        String keyName = iterator.next().getName();
         try (OzoneInputStream ozoneInputStream =
                  ozoneBucketClient.readKey(keyName)) {
-          byte[] fileContent = new byte[keyName.length()];
-          ozoneInputStream.read(fileContent);
-          // Key content only contains "key-{index}"
-          // Thus need to remove snapshot related prefix
-          // before comparing key content
+          // We previously created key content as only "key-{index}"
+          // Thus need to remove snapshot related prefix from key name by regex
+          // before use key name to compare key content
           // e.g.,".snapshot/snap-day-1/key-0" -> "key-0"
           Matcher snapshotKeyNameMatcher = snapshotKeyPattern.matcher(keyName);
           if (snapshotKeyNameMatcher.matches()) {
-            Assert.assertEquals(snapshotKeyNameMatcher.group(3),
-                new String(fileContent, UTF_8).trim());
+            String truncatedSnapshotKeyName = snapshotKeyNameMatcher.group(3);
+            byte[] fileContent = new byte[truncatedSnapshotKeyName.length()];
+            ozoneInputStream.read(fileContent);
+            Assert.assertEquals(truncatedSnapshotKeyName,
+                new String(fileContent, UTF_8));
           }
         }
       }
