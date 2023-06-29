@@ -574,17 +574,6 @@ public class TestOMRatisSnapshots {
     return id;
   }
 
-  // Returns temp dir where tarball was untarred.
-  private void unTarLatestTarBall(OzoneManager followerOm, Path tempDir)
-      throws IOException {
-    File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
-    // Find the latest tarball.
-    String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
-        filter(s -> s.toLowerCase().endsWith(".tar")).
-        reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
-    FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
-  }
-
   @Test
   @Timeout(300)
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
@@ -1087,6 +1076,17 @@ public class TestOMRatisSnapshots {
     }, 100, 5000);
   }
 
+  // Returns temp dir where tarball was untarred.
+  private void unTarLatestTarBall(OzoneManager followerOm, Path tempDir)
+      throws IOException {
+    File snapshotDir = followerOm.getOmSnapshotProvider().getSnapshotDir();
+    // Find the latest tarball.
+    String tarBall = Arrays.stream(Objects.requireNonNull(snapshotDir.list())).
+        filter(s -> s.toLowerCase().endsWith(".tar")).
+        reduce("", (s1, s2) -> s1.compareToIgnoreCase(s2) > 0 ? s1 : s2);
+    FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
+  }
+
   private static class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
@@ -1207,11 +1207,8 @@ public class TestOMRatisSnapshots {
       Set<String> sstFilenames = new HashSet<>();
       TarArchiveInputStream tarInput =
           new TarArchiveInputStream(new FileInputStream(tarball));
-      while (true) {
-        TarArchiveEntry entry = tarInput.getNextTarEntry();
-        if (entry == null) {
-          break;
-        }
+      TarArchiveEntry entry;
+      while ((entry = tarInput.getNextTarEntry()) != null) {
         String name = entry.getName();
         if (name.toLowerCase().endsWith(".sst")) {
           sstFilenames.add(entry.getName());
