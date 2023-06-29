@@ -1279,13 +1279,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return scmSecurityClient;
   }
 
-  public CompletableFuture<Void> getRootCARotationProcessor(
+  public synchronized CompletableFuture<Void> getRootCARotationProcessor(
       List<X509Certificate> rootCAs) {
     if (rootCaCertificates.containsAll(rootCAs)) {
       return CompletableFuture.completedFuture(null);
     }
-    return CompletableFuture.runAsync(() -> new CertificateRenewerService(
-        this, true), executorService);
+    CertificateRenewerService renewerService = new CertificateRenewerService(
+        this, true);
+    return CompletableFuture.runAsync(renewerService, executorService);
   }
 
   public synchronized void startCertificateMonitor() {
