@@ -20,11 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -37,10 +33,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -60,11 +56,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
@@ -116,7 +112,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
-  private final LoadingCache<String, OmSnapshot> snapshotCache;
+  // Per-OM instance of snapshot cache map
+  private final SnapshotCache snapshotCache;
   private final ManagedRocksDB snapshotDiffDb;
 
   public static final String DELIMITER = "-";
@@ -171,17 +168,25 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
-  /**
-   * TODO: [SNAPSHOT] HDDS-8529: Refactor the constructor in a way that when
-   *  ozoneManager.isFilesystemSnapshotEnabled() returns false,
-   *  no snapshot-related background job or initialization would run,
-   *  except for applying previously committed Ratis transactions in e.g.:
-   *  1. {@link OMKeyPurgeRequest#validateAndUpdateCache}
-   *  2. {@link OMDirectoriesPurgeRequestWithFSO#validateAndUpdateCache}
-   */
   public OmSnapshotManager(OzoneManager ozoneManager) {
+
+    boolean isFilesystemSnapshotEnabled =
+        ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
-        ozoneManager.isFilesystemSnapshotEnabled() ? "enabled" : "disabled");
+        isFilesystemSnapshotEnabled ? "enabled" : "disabled");
+
+    // Confirm that snapshot feature can be safely disabled.
+    // Throw unchecked exception if that is not the case.
+    if (!isFilesystemSnapshotEnabled &&
+        !canDisableFsSnapshot(ozoneManager.getMetadataManager())) {
+      throw new RuntimeException("Ozone Manager is refusing to start up" +
+          "because filesystem snapshot feature is disabled in config while" +
+          "there are still snapshots remaining in the system (including the " +
+          "ones that are marked as deleted but not yet cleaned up by the " +
+          "background worker thread). " +
+          "Please set config ozone.filesystem.snapshot.enabled to true and " +
+          "try to start this Ozone Manager again.");
+    }
 
     this.options = new ManagedDBOptions();
     this.options.setCreateIfMissing(true);
@@ -233,13 +238,15 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getStore()
         .getRocksDBCheckpointDiffer();
 
-    // snapshot cache size, soft-limit
+    // Soft-limit of lru cache size
     this.softCacheSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
 
     CacheLoader<String, OmSnapshot> loader = createCacheLoader();
 
+    // TODO: [SNAPSHOT] Remove this if not going to make SnapshotCache impl
+    //  pluggable.
     RemovalListener<String, OmSnapshot> removalListener = notification -> {
       try {
         final String snapshotTableKey = notification.getKey();
@@ -262,15 +269,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
     };
 
-    // init LRU cache
-    this.snapshotCache = CacheBuilder.newBuilder()
-        // Indicating OmSnapshot instances are softly referenced from the cache.
-        // If no thread is holding a strong reference to an OmSnapshot instance
-        // (e.g. SnapDiff), the instance could be garbage collected by JVM at
-        // its discretion.
-        .softValues()
-        .removalListener(removalListener)
-        .build(loader);
+    // Init snapshot cache
+    this.snapshotCache = new SnapshotCache(this, loader, softCacheSize);
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapshotCache, snapDiffJobCf, snapDiffReportCf,
@@ -303,6 +303,27 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
   }
 
+  /**
+   * Help reject OM startup if snapshot feature is disabled
+   * but there are snapshots remaining in this OM. Note: snapshots that are
+   * already deleted but not cleaned up yet still counts.
+   * @param ommm OMMetadataManager
+   * @return true if SnapshotInfoTable is empty, false otherwise.
+   */
+  @VisibleForTesting
+  public boolean canDisableFsSnapshot(OMMetadataManager ommm) {
+
+    boolean isSnapshotInfoTableEmpty;
+    try {
+      isSnapshotInfoTableEmpty = ommm.getSnapshotInfoTable().isEmpty();
+    } catch (IOException e) {
+      throw new IllegalStateException(
+          "Unable to check SnapshotInfoTable emptiness", e);
+    }
+
+    return isSnapshotInfoTableEmpty;
+  }
+
   private CacheLoader<String, OmSnapshot> createCacheLoader() {
     return new CacheLoader<String, OmSnapshot>() {
 
@@ -310,8 +331,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       @Override
       public OmSnapshot load(@Nonnull String snapshotTableKey)
           throws IOException {
-        // see if the snapshot exists
-        SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
+        // Check if the snapshot exists
+        final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
         // Block snapshot from loading when it is no longer active e.g. DELETED,
         // unless this is called from SnapshotDeletingService.
@@ -336,7 +357,7 @@ public final class OmSnapshotManager implements AutoCloseable {
               snapshotInfo.getCheckpointDirName(), isSnapshotInCache,
               maxOpenSstFilesInSnapshotDb);
         } catch (IOException e) {
-          LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey);
+          LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
           throw e;
         }
 
@@ -379,7 +400,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * Get snapshot instance LRU cache.
    * @return LoadingCache
    */
-  public LoadingCache<String, OmSnapshot> getSnapshotCache() {
+  public SnapshotCache getSnapshotCache() {
     return snapshotCache;
   }
 
@@ -632,17 +653,17 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
-  public IOmMetadataReader checkForSnapshot(String volumeName,
-                                            String bucketName,
-                                            String keyName,
-                                            boolean skipActiveCheck)
-      throws IOException {
+  public ReferenceCounted<IOmMetadataReader, SnapshotCache> checkForSnapshot(
+      String volumeName,
+      String bucketName,
+      String keyName,
+      boolean skipActiveCheck) throws IOException {
     if (keyName == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
 
     // see if key is for a snapshot
-    String[] keyParts = keyName.split("/");
+    String[] keyParts = keyName.split(OM_KEY_PREFIX);
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
       if (snapshotName == null || snapshotName.isEmpty()) {
@@ -664,14 +685,22 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
 
       // retrieve the snapshot from the cache
-      try {
-        return snapshotCache.get(snapshotTableKey);
-      } catch (ExecutionException e) {
-        throw new IOException(e.getCause());
-      }
+      return snapshotCache.get(snapshotTableKey, skipActiveCheck);
     } else {
       return ozoneManager.getOmMetadataReader();
     }
+  }
+
+  /**
+   * Returns true if the snapshot is in given status.
+   * @param key DB snapshot table key
+   * @param status SnapshotStatus
+   * @return true if the snapshot is in given status, false otherwise
+   */
+  public boolean isSnapshotStatus(String key,
+                                  SnapshotInfo.SnapshotStatus status)
+      throws IOException {
+    return getSnapshotInfo(key).getSnapshotStatus().equals(status);
   }
 
   public SnapshotInfo getSnapshotInfo(String key) throws IOException {

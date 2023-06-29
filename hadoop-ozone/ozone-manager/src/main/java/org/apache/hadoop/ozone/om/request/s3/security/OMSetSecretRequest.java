@@ -164,8 +164,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     if (exception == null) {
       LOG.debug("Success: SetSecret for accessKey '{}'", accessId);
     } else {
-      LOG.error("Failed to SetSecret for accessKey '{}': {}",
-          accessId, exception);
+      LOG.error("Failed to SetSecret for accessKey '{}'", accessId, exception);
     }
     return omClientResponse;
   }
