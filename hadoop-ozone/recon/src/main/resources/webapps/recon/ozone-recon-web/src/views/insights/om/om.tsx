@@ -165,10 +165,10 @@ const MISMATCH_TAB_COLUMNS = [
 
 const OPEN_KEY_TAB_COLUMNS = [
   {
-    title: 'Path',
+    title: 'Key',
     dataIndex: 'path',
     key: 'path',
-    isSearchable: true,
+    isSearchable: true
   },
   {
     title: 'Amount of data',
@@ -177,7 +177,7 @@ const OPEN_KEY_TAB_COLUMNS = [
     render: (size :any) => size = byteToSize(size,1)
   },
   {
-    title: 'Key',
+    title: 'Path',
     dataIndex: 'key',
     key: 'key',
     width: '270px'
@@ -339,10 +339,17 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const existsAtColumn = {
       title: <span>
         <Dropdown overlay={this.existAtScmOmMenu} >
-          <label> Exists at&nbsp;&nbsp;
-            <Icon type="funnel-plot" theme="filled" />
-          </label>
-        </Dropdown></span>,
+            <label> Exists at&nbsp;&nbsp;
+              <Icon type="funnel-plot" theme="filled" />&nbsp;&nbsp;&nbsp;&nbsp;
+            </label>
+        </Dropdown>&nbsp;&nbsp;
+        <label>
+          <Tooltip placement='top' title={<span>{'SCM: Container exist at SCM but missing at OM.'}<br />
+            {'OM: Container exist at OM but missing at SCM.'}</span>}>
+          <Icon type='info-circle' />
+          </Tooltip>
+       </label>
+      </span>,
       dataIndex: 'existsAt',
       key: 'existsAt',
       isVisible: true,
@@ -833,7 +840,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           rowKey='uid' />
       );
     }
-
     return <div>Loading...</div>;
   };
 
@@ -946,6 +952,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
       />
     }
+
+  
 
     return (
       <div className='missing-containers-container'>
