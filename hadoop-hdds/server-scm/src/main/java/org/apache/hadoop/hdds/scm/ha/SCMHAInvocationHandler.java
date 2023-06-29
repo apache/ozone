@@ -92,9 +92,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     }
     try {
       return method.invoke(localHandler, args);
-    } catch (InvocationTargetException e) {
-      throw translateException(e.getCause());
-    } catch (IllegalAccessException e) {
+    } catch (Exception e) {
       throw translateException(e);
     }
   }
@@ -150,7 +148,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     if (t instanceof SCMException) {
       return (SCMException) t;
     }
-    if (t instanceof ExecutionException) {
+    if (t instanceof ExecutionException
+        || t instanceof InvocationTargetException) {
       return translateException(t.getCause());
     }
 
