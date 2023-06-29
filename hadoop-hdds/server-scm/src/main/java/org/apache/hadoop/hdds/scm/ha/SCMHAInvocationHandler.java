@@ -17,15 +17,21 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,40 +65,55 @@ public class SCMHAInvocationHandler implements InvocationHandler {
 
   @Override
   public Object invoke(final Object proxy, final Method method,
-                       final Object[] args) throws Throwable {
+                       final Object[] args) throws SCMException {
     // Javadoc for InvocationHandler#invoke specifies that args will be null
     // if the method takes no arguments. Convert this to an empty array for
     // easier handling.
     Object[] convertedArgs = (args == null) ? new Object[]{} : args;
-    try {
-      long startTime = Time.monotonicNow();
-      final Object result =
-          ratisHandler != null && method.isAnnotationPresent(Replicate.class) ?
-              invokeRatis(method, convertedArgs) :
-              invokeLocal(method, convertedArgs);
+    long startTime = Time.monotonicNow();
+    final Object result =
+        ratisHandler != null && method.isAnnotationPresent(Replicate.class) ?
+            invokeRatis(method, convertedArgs) :
+            invokeLocal(method, convertedArgs);
+    if (LOG.isDebugEnabled()) {
       LOG.debug("Call: {} took {} ms", method, Time.monotonicNow() - startTime);
-      return result;
-    } catch (InvocationTargetException iEx) {
-      throw iEx.getCause();
     }
+    return result;
   }
 
   /**
    * TODO.
    */
   private Object invokeLocal(Method method, Object[] args)
-      throws InvocationTargetException, IllegalAccessException {
-    LOG.trace("Invoking method {} on target {} with arguments {}",
-        method, localHandler, args);
-    return method.invoke(localHandler, args);
+      throws SCMException {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Invoking method {} on target {} with arguments {}",
+          method, localHandler, args);
+    }
+    try {
+      return method.invoke(localHandler, args);
+    } catch (Exception e) {
+      throw translateException(e);
+    }
   }
 
   /**
    * TODO.
    */
   private Object invokeRatis(Method method, Object[] args)
+      throws SCMException {
+    try {
+      return invokeRatisImpl(method, args);
+    } catch (Exception e) {
+      throw translateException(e);
+    }
+  }
+
+  private Object invokeRatisImpl(Method method, Object[] args)
       throws Exception {
-    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    }
     // TODO: Add metric here to track time taken by Ratis
     Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
@@ -121,6 +142,29 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     }
     // Should we unwrap and throw proper exception from here?
     throw response.getException();
+  }
+
+  private static SCMException translateException(Throwable t) {
+    if (t instanceof SCMException) {
+      return (SCMException) t;
+    }
+    if (t instanceof ExecutionException
+        || t instanceof InvocationTargetException) {
+      return translateException(t.getCause());
+    }
+
+    ResultCodes result;
+    if (t instanceof TimeoutException) {
+      result = ResultCodes.TIMEOUT;
+    } else if (t instanceof NotLeaderException) {
+      result = ResultCodes.SCM_NOT_LEADER;
+    } else if (t instanceof IOException) {
+      result = ResultCodes.IO_EXCEPTION;
+    } else {
+      result = ResultCodes.INTERNAL_ERROR;
+    }
+
+    return new SCMException(t, result);
   }
 
 }

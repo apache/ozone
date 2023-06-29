@@ -30,7 +30,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -150,7 +149,7 @@ public class SecretKeyManagerTest {
   public void testRotate(List<ManagedSecretKey> initialKeys,
                          boolean expectRotate,
                          List<ManagedSecretKey> expectedRetainedKeys)
-      throws TimeoutException {
+      throws Exception {
 
     SecretKeyState state = new SecretKeyStateImpl(mockedKeyStore);
 

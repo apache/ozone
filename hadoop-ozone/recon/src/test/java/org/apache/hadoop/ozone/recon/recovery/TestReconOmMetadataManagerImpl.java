@@ -155,7 +155,7 @@ public class TestReconOmMetadataManagerImpl {
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration);
+        omConfiguration, null);
 
     //Create a volume + bucket + 2 keys.
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");

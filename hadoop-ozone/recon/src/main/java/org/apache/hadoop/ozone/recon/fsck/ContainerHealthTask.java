@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -245,7 +244,7 @@ public class ContainerHealthTask extends ReconScmTask {
     } catch (InvalidStateTransitionException e) {
       LOG.error("Failed to transition Container state while processing " +
           "container in Container Health task", e);
-    } catch (IOException | TimeoutException e) {
+    } catch (IOException e) {
       LOG.error("Got exception while processing container in" +
           " Container Health task", e);
     }

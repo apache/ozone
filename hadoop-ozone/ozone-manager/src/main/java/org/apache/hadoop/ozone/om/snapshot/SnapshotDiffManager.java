@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -89,7 +89,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.SynchronousQueue;
@@ -152,7 +151,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final ManagedRocksDB db;
   private final RocksDBCheckpointDiffer differ;
   private final OzoneManager ozoneManager;
-  private final LoadingCache<String, OmSnapshot> snapshotCache;
+  private final SnapshotCache snapshotCache;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
   // TODO: [SNAPSHOT] Use different wait time based of job status.
@@ -198,7 +197,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   public SnapshotDiffManager(ManagedRocksDB db,
                              RocksDBCheckpointDiffer differ,
                              OzoneManager ozoneManager,
-                             LoadingCache<String, OmSnapshot> snapshotCache,
+                             SnapshotCache snapshotCache,
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions,
@@ -818,8 +817,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                                   final String fromSnapshotName,
                                   final String toSnapshotName,
                                   final boolean forceFullDiff) {
-    LOG.info("Started snap diff report generation for volume: {} " +
-            "bucket: {}, fromSnapshot: {} and toSnapshot: {}",
+    LOG.info("Started snap diff report generation for volume: '{}', " +
+            "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
 
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
@@ -832,6 +831,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot = null;
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot = null;
+
     try {
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
           fromSnapshotName, toSnapshotName)) {
@@ -841,8 +843,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       String fsKey = getTableKey(volumeName, bucketName, fromSnapshotName);
       String tsKey = getTableKey(volumeName, bucketName, toSnapshotName);
 
-      OmSnapshot fromSnapshot = snapshotCache.get(fsKey);
-      OmSnapshot toSnapshot = snapshotCache.get(tsKey);
+      rcFromSnapshot = snapshotCache.get(fsKey);
+      rcToSnapshot = snapshotCache.get(tsKey);
+
+      OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
+      OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
       SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
           volumeName, bucketName, fromSnapshotName);
       SnapshotInfo tsInfo = getSnapshotInfo(ozoneManager,
@@ -991,7 +996,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         }
         methodCall.call();
       }
-    } catch (ExecutionException | IOException | RocksDBException exception) {
+    } catch (IOException | RocksDBException exception) {
       updateJobStatusToFailed(jobKey, exception.getMessage());
       LOG.error("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
@@ -1014,6 +1019,13 @@ public class SnapshotDiffManager implements AutoCloseable {
       dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
       // Delete SST files backup directory.
       deleteDir(path);
+      // Decrement ref counts
+      if (rcFromSnapshot != null) {
+        rcFromSnapshot.close();
+      }
+      if (rcToSnapshot != null) {
+        rcToSnapshot.close();
+      }
     }
   }
 

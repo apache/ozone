@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The DeletedBlockLog is a persisted log in SCM to keep tracking
@@ -53,7 +52,7 @@ public interface DeletedBlockLog extends Closeable {
    */
   DatanodeDeletedBlockTransactions getTransactions(
       int blockDeletionLimit, Set<DatanodeDetails> dnList)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Return the failed transactions in the log. A transaction is
@@ -77,7 +76,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param txIDs - transaction ID.
    */
   void incrementCount(List<Long> txIDs)
-      throws IOException, TimeoutException;
+      throws IOException;
 
 
   /**
@@ -86,7 +85,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param txIDs transactionId list to be reset
    * @return num of successful reset
    */
-  int resetCount(List<Long> txIDs) throws IOException, TimeoutException;
+  int resetCount(List<Long> txIDs) throws IOException;
 
   /**
    * Commits a transaction means to delete all footprints of a transaction
@@ -112,7 +111,7 @@ public interface DeletedBlockLog extends Closeable {
    * @throws IOException
    */
   void addTransactions(Map<Long, List<Long>> containerBlocksMap)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Returns the total number of valid transactions. A transaction is

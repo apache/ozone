@@ -30,5 +30,4 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </description>
   <name>Apache Ozone Annotation Processing</name>
   <packaging>jar</packaging>
-
 </project>

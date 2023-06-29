@@ -627,6 +627,8 @@ public class ContainerBalancerTask implements Runnable {
         selectedSources.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
+    metrics.incrementNumContainerMovesScheduled(
+        metrics.getNumContainerMovesScheduledInLatestIteration());
     metrics.incrementNumContainerMovesCompleted(
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
@@ -817,6 +819,7 @@ public class ContainerBalancerTask implements Runnable {
         future = moveManager.move(containerID, source,
             moveSelection.getTargetNode());
       }
+      metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
       future = future.whenComplete((result, ex) -> {
         metrics.incrementCurrentIterationContainerMoveMetric(result, 1);

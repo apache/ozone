@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableE
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
@@ -62,7 +61,7 @@ public class WritableContainerFactory {
 
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
     switch (repConfig.getReplicationType()) {
     case STAND_ALONE:
       return standaloneProvider

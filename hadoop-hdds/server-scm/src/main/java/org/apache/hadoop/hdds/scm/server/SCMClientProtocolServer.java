@@ -107,7 +107,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -229,18 +228,13 @@ public class SCMClientProtocolServer implements
           ResultCodes.SAFE_MODE_EXCEPTION);
     }
     getScm().checkAdminAccess(getRemoteUser(), false);
-    try {
-      final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(
-              ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
-              owner);
-      final Pipeline pipeline = scm.getPipelineManager()
-          .getPipeline(container.getPipelineID());
-      return new ContainerWithPipeline(container, pipeline);
-    } catch (TimeoutException e) {
-      throw new SCMException("Allocate Container TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
-    }
+    final ContainerInfo container = scm.getContainerManager()
+        .allocateContainer(
+            ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
+            owner);
+    final Pipeline pipeline = scm.getPipelineManager()
+        .getPipeline(container.getPipelineID());
+    return new ContainerWithPipeline(container, pipeline);
   }
 
   @Override
@@ -588,11 +582,6 @@ public class SCMClientProtocolServer implements
           ContainerID.valueOf(containerID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.DELETE_CONTAINER, auditMap));
-    } catch (TimeoutException ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.DELETE_CONTAINER, auditMap, ex));
-      throw new SCMException("Delete Container TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.DELETE_CONTAINER, auditMap, ex));
@@ -700,11 +689,10 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CREATE_PIPELINE, null));
       return result;
-    } catch (TimeoutException ex) {
+    } catch (SCMException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.CREATE_PIPELINE, null, ex));
-      throw new SCMException("Create Pipeline TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
+          SCMAction.CREATE_PIPELINE, null, e));
+      throw e;
     }
   }
 
@@ -730,11 +718,10 @@ public class SCMClientProtocolServer implements
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.ACTIVATE_PIPELINE, null));
-    } catch (TimeoutException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ACTIVATE_PIPELINE, null, ex));
-      throw new SCMException("Activate Pipeline TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
+      throw ex;
     }
   }
 
@@ -747,11 +734,10 @@ public class SCMClientProtocolServer implements
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.DEACTIVATE_PIPELINE, null));
-    } catch (TimeoutException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.DEACTIVATE_PIPELINE, null, ex));
-      throw new SCMException("DeActivate Pipeline TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
+      throw ex;
     }
   }
 
@@ -768,11 +754,9 @@ public class SCMClientProtocolServer implements
       pipelineManager.closePipeline(pipeline, true);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CLOSE_PIPELINE, auditMap));
-    } catch (TimeoutException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.CLOSE_PIPELINE, auditMap, ex));
-      throw new SCMException("Close Pipeline TimeoutException",
-          ResultCodes.INTERNAL_ERROR);
     }
   }
 
@@ -887,10 +871,10 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
       return count;
-    } catch (TimeoutException | IOException ex) {
+    } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
-      throw new IOException(ex);
+      throw ex;
     }
   }
 
@@ -1055,7 +1039,7 @@ public class SCMClientProtocolServer implements
     try {
       containerBalancer.startBalancer(cbc);
     } catch (IllegalContainerBalancerStateException | IOException |
-        InvalidContainerBalancerConfigurationException | TimeoutException e) {
+        InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.START_CONTAINER_BALANCER, null, e));
       return StartContainerBalancerResponseProto.newBuilder()
@@ -1077,7 +1061,7 @@ public class SCMClientProtocolServer implements
       scm.getContainerBalancer().stopBalancer();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.STOP_CONTAINER_BALANCER, null));
-    } catch (IllegalContainerBalancerStateException | TimeoutException e) {
+    } catch (IllegalContainerBalancerStateException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.STOP_CONTAINER_BALANCER, null, e));
     }
