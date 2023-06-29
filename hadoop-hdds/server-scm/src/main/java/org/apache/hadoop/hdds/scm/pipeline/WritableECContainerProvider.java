@@ -191,6 +191,7 @@ public class WritableECContainerProvider
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
     pipelineManager.openPipeline(newPipeline.getId());
+    LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
   }
 
