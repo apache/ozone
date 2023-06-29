@@ -105,7 +105,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 @Timeout(5000)
 @Flaky("HDDS-8876")
-//@Disabled("HDDS-8880")
+@Disabled("HDDS-8880")
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -187,7 +187,7 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
+  @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -1193,14 +1193,12 @@ public class TestOMRatisSnapshots {
       return sstSize;
     }
 
-    @SuppressWarnings("checkstyle:EmptyBlock")
     private void createEmptyTarball(File dummyTarFile)
         throws IOException {
       FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
-      try (TarArchiveOutputStream archiveOutputStream =
-               new TarArchiveOutputStream(fileOutputStream)) {
-        ; // Don't add any files.
-      }
+      TarArchiveOutputStream archiveOutputStream =
+          new TarArchiveOutputStream(fileOutputStream);
+      archiveOutputStream.close();
     }
 
     // Return a list of sst files in tarball.
