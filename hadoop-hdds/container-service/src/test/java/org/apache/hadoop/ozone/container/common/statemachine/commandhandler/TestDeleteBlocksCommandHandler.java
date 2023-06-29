@@ -77,7 +77,6 @@ import static org.mockito.Mockito.when;
 public class TestDeleteBlocksCommandHandler {
 
   @Rule
-  @SuppressWarnings("unused")
   public Timeout testTimeout = Timeout.seconds(300);
 
   private OzoneConfiguration conf;
