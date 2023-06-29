@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +88,7 @@ public class SCMDeleteBlocksCommandStatusManager {
     return new CmdStatusData(dnId, scmCmdId, deletedBlocksTxIds);
   }
 
-  private static final class CmdStatusData {
+  protected static final class CmdStatusData {
     private final UUID dnId;
     private final long scmCmdId;
     private final Set<Long> deletedBlocksTxIds;
@@ -177,7 +178,7 @@ public class SCMDeleteBlocksCommandStatusManager {
   }
 
   public void updateStatusByDNCommandStatus(UUID dnId, long scmCmdId,
-                                            CommandStatus.Status newState) {
+      CommandStatus.Status newState) {
     CmdStatus status = fromProtoCommandStatus(newState);
     if (status != null) {
       updateStatus(dnId, scmCmdId, status);
@@ -204,6 +205,10 @@ public class SCMDeleteBlocksCommandStatusManager {
       removeTimeoutScmCommand(
           dnId, getScmCommandIds(dnId, status), timeoutMs);
     }
+  }
+
+  public void clear() {
+    scmCmdStatusRecord.clear();
   }
 
   private void cleanFinalStatusSCMCommand(UUID dnId) {
@@ -323,7 +328,7 @@ public class SCMDeleteBlocksCommandStatusManager {
   }
 
   private void removeTimeoutScmCommand(UUID dnId,
-                                       Set<Long> scmCmdIds, long timeoutMs) {
+      Set<Long> scmCmdIds, long timeoutMs) {
     Instant now = Instant.now();
     for (Long scmCmdId : scmCmdIds) {
       Instant updateTime = getUpdateTime(dnId, scmCmdId);
@@ -333,6 +338,9 @@ public class SCMDeleteBlocksCommandStatusManager {
         CmdStatusData state = removeScmCommand(dnId, scmCmdId);
         LOG.warn("Remove Timeout SCM BlockDeletionCommand {} for DN {} " +
             "after without update {}ms}", state, dnId, timeoutMs);
+      } else {
+        LOG.warn("FFFFF Timeout SCM scmCmdIds {} for DN {} " +
+            "after without update {}ms}", scmCmdIds, dnId, timeoutMs);
       }
     }
   }
@@ -344,10 +352,9 @@ public class SCMDeleteBlocksCommandStatusManager {
     }
 
     CmdStatus status = scmCmdStatusRecord.get(dnId).get(scmCmdId).getStatus();
-    if (!failedStatuses.contains(
-        scmCmdStatusRecord.get(dnId).get(scmCmdId).getStatus())) {
+    if (!finialStatuses.contains(status)) {
       LOG.error("Cannot Remove ScmCommand {} Non-final Status {} for DN: {}." +
-          " final Status {}", scmCmdId, status, dnId, failedStatuses);
+          " final Status {}", scmCmdId, status, dnId, finialStatuses);
       return null;
     }
 
@@ -370,5 +377,10 @@ public class SCMDeleteBlocksCommandStatusManager {
           "to ScmDeleteBlockCommandStatus", protoCmdStatus);
       return null;
     }
+  }
+
+  @VisibleForTesting
+  Map<UUID, Map<Long, CmdStatusData>> getScmCmdStatusRecord() {
+    return scmCmdStatusRecord;
   }
 }

@@ -404,6 +404,7 @@ public class DeletedBlockLogImpl
   public void onBecomeLeader() {
     transactionToDNsCommitMap.clear();
     transactionToRetryCountMap.clear();
+    scmDeleteBlocksCommandStatusManager.clear();
   }
 
   /**
