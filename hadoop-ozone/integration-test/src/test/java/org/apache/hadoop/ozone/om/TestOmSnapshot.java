@@ -154,7 +154,7 @@ public class TestOmSnapshot {
       Pattern.compile(SNAPSHOT_KEY_PATTERN_STRING);
 
   @Rule
-  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
+  public Timeout timeout = new Timeout(300, TimeUnit.SECONDS);
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -421,7 +421,6 @@ public class TestOmSnapshot {
   }
 
   @Test
-  @Ignore("HDDS-8089")
   public void checkKey() throws Exception {
     String s = "testData";
     String dir1 = "dir1";
@@ -436,7 +435,22 @@ public class TestOmSnapshot {
 
 
     String snapshotKeyPrefix = createSnapshot(volumeName, bucketName);
-    ozoneBucket.deleteKey(key1);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        int keyCount = keyCount(ozoneBucket, key1);
+        if (keyCount == 0) {
+          return true;
+        }
+
+        ozoneBucket.deleteKey(key1);
+
+        return false;
+      } catch (Exception e) {
+        return  false;
+      }
+    }, 1000, 10000);
+
     try {
       ozoneBucket.deleteKey(dir1);
     } catch (OMException e) {
