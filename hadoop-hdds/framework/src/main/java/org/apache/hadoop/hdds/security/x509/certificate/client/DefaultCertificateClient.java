@@ -177,6 +177,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         getLogger().warn("Component certificate was not loaded.");
       }
     }
+    startRootCaRotationPoller();
+  }
+
+  protected void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
           rootCaCertificates, scmSecurityClient);

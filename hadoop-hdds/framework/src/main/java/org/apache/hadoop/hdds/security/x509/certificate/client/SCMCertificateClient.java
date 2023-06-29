@@ -161,4 +161,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     throw new UnsupportedOperationException("signAndStoreCertificate of " +
         " SCMCertificateClient is not supported currently");
   }
+
+  @Override
+  protected void startRootCaRotationPoller() {
+    //SCM root CA rotation is handled separately from polling
+  }
 }
