@@ -30,12 +30,4 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </description>
   <name>Apache Ozone Annotation Processing</name>
   <packaging>jar</packaging>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-      <scope>provided</scope>
-    </dependency>
-  </dependencies>
 </project>
