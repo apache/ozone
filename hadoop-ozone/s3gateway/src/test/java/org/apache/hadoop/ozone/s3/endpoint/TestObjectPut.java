@@ -113,6 +113,22 @@ public class TestObjectPut {
   }
 
   @Test
+  public void testPutObjectWithWrongLength() throws IOException {
+    //GIVEN
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    objectEndpoint.setHeaders(headers);
+
+    try {
+      objectEndpoint.put(bucketName, keyName, CONTENT
+          .length()-2, 1, null, body);
+    } catch (OS3Exception ex) {
+      Assert.assertTrue(ex.getErrorMessage().contains("InvalidLength"));
+    }
+  }
+
+  @Test
   public void testPutObjectWithECReplicationConfig()
       throws IOException, OS3Exception {
     //GIVEN
@@ -169,6 +185,31 @@ public class TestObjectPut {
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals("1234567890abcde", keyContent);
+  }
+
+  @Test
+  public void testPutObjectWithSignedChunksAndWrongLength() throws IOException {
+    //GIVEN
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    objectEndpoint.setHeaders(headers);
+
+    String chunkedContent = "0a;chunk-signature=signature\r\n"
+        + "1234567890\r\n"
+        + "05;chunk-signature=signature\r\n"
+        + "abcde\r\n";
+
+    when(headers.getHeaderString("x-amz-content-sha256"))
+        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+    when(headers.getHeaderString("x-amz-decoded-content-length"))
+        .thenReturn("10");
+
+    try {
+      objectEndpoint.put(bucketName, keyName,
+          chunkedContent.length(), 1, null,
+          new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
+    } catch (OS3Exception ex) {
+      Assert.assertTrue(ex.getErrorMessage().contains("InvalidLength"));
+    }
   }
 
   @Test

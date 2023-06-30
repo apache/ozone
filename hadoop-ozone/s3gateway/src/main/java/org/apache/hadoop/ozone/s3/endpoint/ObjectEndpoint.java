@@ -255,8 +255,8 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().updatePutKeyMetadataStats(startNanos);
       long putLength = IOUtils.copyLarge(body, output);
 
-      if ((signed?signedChunksLength:length) != putLength) {
-        delete(bucketName,keyPath,uploadID);
+      if ((signed ? signedChunksLength : length) != putLength) {
+        delete(bucketName, keyPath, uploadID);
         OS3Exception os3Exception = newError(S3ErrorTable.INVALID_LENGTH,
             keyPath);
         os3Exception.setErrorMessage("An error occurred (InvalidLength) " +
