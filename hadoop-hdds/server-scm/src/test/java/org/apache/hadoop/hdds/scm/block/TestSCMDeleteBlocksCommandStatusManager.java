@@ -45,16 +45,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 public class TestSCMDeleteBlocksCommandStatusManager {
 
   private SCMDeleteBlocksCommandStatusManager manager;
-  private static UUID dnId1;
-  private static UUID dnId2;
-  private static long scmCmdId1;
-  private static long scmCmdId2;
-  private static long scmCmdId3;
-  private static long scmCmdId4;
-  private static Set<Long> deletedBlocksTxIds1;
-  private static Set<Long> deletedBlocksTxIds2;
-  private static Set<Long> deletedBlocksTxIds3;
-  private static Set<Long> deletedBlocksTxIds4;
+  private UUID dnId1;
+  private UUID dnId2;
+  private long scmCmdId1;
+  private long scmCmdId2;
+  private long scmCmdId3;
+  private long scmCmdId4;
+  private Set<Long> deletedBlocksTxIds1;
+  private Set<Long> deletedBlocksTxIds2;
+  private Set<Long> deletedBlocksTxIds3;
+  private Set<Long> deletedBlocksTxIds4;
 
   @BeforeEach
   public void setup() throws Exception {
