@@ -95,7 +95,7 @@ public class DeletedBlockLogImpl
   private final ScmBlockDeletingServiceMetrics metrics;
   private final SCMDeleteBlocksCommandStatusManager
       scmDeleteBlocksCommandStatusManager;
-  private final long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
+  private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
 
@@ -239,7 +239,7 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void commitCommandStatus(
+  public void commitSCMCommandStatus(
       List<CommandStatus> deleteBlockStatus, UUID dnID) {
     lock.lock();
     try {
@@ -507,6 +507,10 @@ public class DeletedBlockLogImpl
       throws IOException {
     lock.lock();
     try {
+      // Here we can clean up the Datanode timeout command that no longer
+      // reports heartbeats
+      getScmCommandStatusManager().cleanAllTimeoutSCMCommand(
+          scmCommandTimeoutMs);
       DatanodeDeletedBlockTransactions transactions =
           new DatanodeDeletedBlockTransactions();
       try (TableIterator<Long,
@@ -550,10 +554,6 @@ public class DeletedBlockLogImpl
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
         }
       }
-      // Here we can clean up the Datanode timeout command that no longer
-      // reports heartbeats
-      getScmCommandStatusManager().cleanAllTimeoutSCMCommand(
-          scmCommandTimeoutMs);
       return transactions;
     } finally {
       lock.unlock();
@@ -584,7 +584,13 @@ public class DeletedBlockLogImpl
             commandStatus.getCmdId(), details.getUuid());
       }
 
-      commitCommandStatus(deleteBlockStatus.getCmdStatus(), details.getUuid());
+      commitSCMCommandStatus(
+          deleteBlockStatus.getCmdStatus(), details.getUuid());
     }
   }
+
+  public void setScmCommandTimeoutMs(long scmCommandTimeoutMs) {
+    this.scmCommandTimeoutMs = scmCommandTimeoutMs;
+  }
+
 }

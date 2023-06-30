@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -45,6 +47,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -58,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +72,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
@@ -439,6 +445,167 @@ public class TestDeletedBlockLog {
 
     blocks = getTransactions(50 * BLOCKS_PER_TXN * THREE);
     Assertions.assertEquals(0, blocks.size());
+  }
+
+  private void recordScmCommandToStatusManager(
+      UUID dnId, DeleteBlocksCommand command) {
+    Set<Long> dnTxSet = command.blocksTobeDeleted()
+        .stream().map(DeletedBlocksTransaction::getTxID)
+        .collect(Collectors.toSet());
+    deletedBlockLog.getScmCommandStatusManager().recordScmCommand(
+        SCMDeleteBlocksCommandStatusManager.createScmCmdStatusData(
+            dnId, command.getId(), dnTxSet));
+  }
+
+  private void sendSCMDeleteBlocksCommand(UUID dnId, long scmCmdId) {
+    deletedBlockLog.getScmCommandStatusManager().onSent(
+        dnId, scmCmdId);
+  }
+
+  private void assertNoDuplicateTransactions(
+      DatanodeDeletedBlockTransactions transactions1,
+      DatanodeDeletedBlockTransactions transactions2) {
+    Map<UUID, List<DeletedBlocksTransaction>> map1 =
+        transactions1.getDatanodeTransactionMap();
+    Map<UUID, List<DeletedBlocksTransaction>> map2 =
+        transactions2.getDatanodeTransactionMap();
+
+    for (UUID dnId : map1.keySet()) {
+      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(map1.get(dnId));
+      Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
+
+      txSet1.retainAll(txSet2);
+      Assertions.assertEquals(0, txSet1.size(),
+          String.format("Duplicate Transactions found first transactions %s " +
+                  "second transactions %s for Dn %s", txSet1, txSet2, dnId));
+    }
+  }
+
+  private void assertContainsAllTransactions(
+      DatanodeDeletedBlockTransactions transactions1,
+      DatanodeDeletedBlockTransactions transactions2) {
+    Map<UUID, List<DeletedBlocksTransaction>> map1 =
+        transactions1.getDatanodeTransactionMap();
+    Map<UUID, List<DeletedBlocksTransaction>> map2 =
+        transactions2.getDatanodeTransactionMap();
+
+    for (UUID dnId : map1.keySet()) {
+      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(map1.get(dnId));
+      Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
+
+      Assertions.assertTrue(txSet1.containsAll(txSet2));
+    }
+  }
+
+  private void commitSCMCommandStatus(Long scmCmdId, UUID dnID,
+      StorageContainerDatanodeProtocolProtos.CommandStatus.Status status) {
+    List<StorageContainerDatanodeProtocolProtos
+        .CommandStatus> deleteBlockStatus = new ArrayList<>();
+    deleteBlockStatus.add(CommandStatus.CommandStatusBuilder.newBuilder()
+        .setCmdId(scmCmdId)
+        .setType(Type.deleteBlocksCommand)
+        .setStatus(status)
+        .build()
+        .getProtoBufMessage());
+
+    deletedBlockLog.commitSCMCommandStatus(deleteBlockStatus, dnID);
+  }
+
+  private void createDeleteBlocksCommandAndAction(
+      DatanodeDeletedBlockTransactions transactions,
+      BiConsumer<UUID, DeleteBlocksCommand> afterCreate) {
+    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+        transactions.getDatanodeTransactionMap().entrySet()) {
+      UUID dnId = entry.getKey();
+      List<DeletedBlocksTransaction> dnTXs = entry.getValue();
+      DeleteBlocksCommand command = new DeleteBlocksCommand(dnTXs);
+      afterCreate.accept(dnId, command);
+    }
+  }
+
+  @Test
+  public void testNoDuplicateTransactionsForInProcessingSCMCommand()
+      throws Exception {
+    // The SCM will not resend these transactions in blow case:
+    // - If the command has not been sent;
+    // - The DN does not report the status of the command via heartbeat
+    //   After the command is sent;
+    // - If the DN reports the command status as PENDING;
+    addTransactions(generateData(10), true);
+    int blockLimit = 2 * BLOCKS_PER_TXN * THREE;
+
+    // If the command has not been sent
+    DatanodeDeletedBlockTransactions transactions1 =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    createDeleteBlocksCommandAndAction(transactions1,
+        this::recordScmCommandToStatusManager);
+
+    // - The DN does not report the status of the command via heartbeat
+    //   After the command is sent
+    DatanodeDeletedBlockTransactions transactions2 =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    assertNoDuplicateTransactions(transactions1, transactions2);
+    createDeleteBlocksCommandAndAction(transactions2, (dnId, command) -> {
+      recordScmCommandToStatusManager(dnId, command);
+      sendSCMDeleteBlocksCommand(dnId, command.getId());
+    });
+
+    // - If the DN reports the command status as PENDING
+    DatanodeDeletedBlockTransactions transactions3 =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    assertNoDuplicateTransactions(transactions1, transactions3);
+    createDeleteBlocksCommandAndAction(transactions3, (dnId, command) -> {
+      recordScmCommandToStatusManager(dnId, command);
+      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      commitSCMCommandStatus(command.getId(), dnId,
+          StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    });
+    assertNoDuplicateTransactions(transactions3, transactions1);
+    assertNoDuplicateTransactions(transactions3, transactions2);
+
+    DatanodeDeletedBlockTransactions transactions4 =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    assertNoDuplicateTransactions(transactions4, transactions1);
+    assertNoDuplicateTransactions(transactions4, transactions2);
+    assertNoDuplicateTransactions(transactions4, transactions3);
+  }
+
+  @Test
+  public void testFailedAndTimeoutSCMCommandCanBeResend() throws Exception {
+    // The SCM will be resent these transactions in blow case:
+    // - Executed failed commands;
+    // - DN does not refresh the PENDING state for more than a period of time;
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(10), true);
+    int blockLimit = 2 * BLOCKS_PER_TXN * THREE;
+
+    // - DN does not refresh the PENDING state for more than a period of time;
+    DatanodeDeletedBlockTransactions transactions =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    createDeleteBlocksCommandAndAction(transactions, (dnId, command) -> {
+      recordScmCommandToStatusManager(dnId, command);
+      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      commitSCMCommandStatus(command.getId(), dnId,
+          StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
+    });
+
+    // - Executed failed commands;
+    DatanodeDeletedBlockTransactions transactions2 =
+        deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
+    createDeleteBlocksCommandAndAction(transactions2, (dnId, command) -> {
+      recordScmCommandToStatusManager(dnId, command);
+      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      commitSCMCommandStatus(command.getId(), dnId,
+          StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED);
+    });
+
+    deletedBlockLog.setScmCommandTimeoutMs(-1L);
+    DatanodeDeletedBlockTransactions transactions3 =
+        deletedBlockLog.getTransactions(Integer.MAX_VALUE,
+            new HashSet<>(dnList));
+    assertNoDuplicateTransactions(transactions, transactions2);
+    assertContainsAllTransactions(transactions3, transactions);
+    assertContainsAllTransactions(transactions3, transactions2);
   }
 
   @Test

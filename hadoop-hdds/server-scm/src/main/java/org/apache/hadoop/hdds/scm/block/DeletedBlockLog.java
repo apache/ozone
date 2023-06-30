@@ -104,7 +104,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param deleteBlockStatus the list of DeleteBlocksCommand
    * @param dnID
    */
-  void commitCommandStatus(List<CommandStatus> deleteBlockStatus, UUID dnID);
+  void commitSCMCommandStatus(List<CommandStatus> deleteBlockStatus, UUID dnID);
 
   /**
    * Get ScmDeleteBlocksCommandStatusManager.

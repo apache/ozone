@@ -83,7 +83,7 @@ public class SCMDeleteBlocksCommandStatusManager {
     this.scmCmdStatusRecord = new ConcurrentHashMap<>();
   }
 
-  public static CmdStatusData createScmTxStateMachine(
+  public static CmdStatusData createScmCmdStatusData(
       UUID dnId, long scmCmdId, Set<Long> deletedBlocksTxIds) {
     return new CmdStatusData(dnId, scmCmdId, deletedBlocksTxIds);
   }

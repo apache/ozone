@@ -79,7 +79,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
   @Test
   public void testRecordScmCommand() {
     CmdStatusData statusData =
-        SCMDeleteBlocksCommandStatusManager.createScmTxStateMachine(
+        SCMDeleteBlocksCommandStatusManager.createScmCmdStatusData(
             dnId1, scmCmdId1, deletedBlocksTxIds1);
 
     manager.recordScmCommand(statusData);
@@ -99,7 +99,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
   @Test
   public void testOnSent() {
     CmdStatusData statusData =
-        SCMDeleteBlocksCommandStatusManager.createScmTxStateMachine(
+        SCMDeleteBlocksCommandStatusManager.createScmCmdStatusData(
             dnId1, scmCmdId1, deletedBlocksTxIds1);
     manager.recordScmCommand(statusData);
 
@@ -263,7 +263,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
       long scmCmdId = scmCmdIds.get(i);
       Set<Long> deletedBlocksTxIds = txIds.get(i);
       CmdStatusData statusData =
-          SCMDeleteBlocksCommandStatusManager.createScmTxStateMachine(
+          SCMDeleteBlocksCommandStatusManager.createScmCmdStatusData(
               dnId, scmCmdId, deletedBlocksTxIds);
       statusManager.recordScmCommand(statusData);
       statusManager.onSent(dnId, scmCmdId);
