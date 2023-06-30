@@ -409,16 +409,10 @@ public final class HASecurityUtils {
   }
 
   public static boolean isSelfSignedCertificate(X509Certificate cert) {
-    if (cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal())) {
-      return true;
-    }
-    return false;
+    return cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal());
   }
 
   public static boolean isCACertificate(X509Certificate cert) {
-    if (cert.getBasicConstraints() != -1) {
-      return true;
-    }
-    return false;
+    return cert.getBasicConstraints() != -1;
   }
 }

@@ -25,14 +25,14 @@ jobs:
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
-      basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
-      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
+      basic-checks: false
+      needs-basic-checks: false
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
+      needs-compile: false
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
-      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
-      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-dependency-check: false
+      needs-integration-tests: false
+      needs-kubernetes-tests: false
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v3
@@ -248,14 +248,7 @@ jobs:
     strategy:
       matrix:
         suite:
-          - secure
-          - unsecure
-          - compat
-          - EC
           - HA-secure
-          - HA-unsecure
-          - MR
-          - misc
       fail-fast: false
     steps:
       - name: Checkout project

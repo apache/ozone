@@ -63,7 +63,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -382,6 +381,7 @@ public class RootCARotationManager implements SCMService {
             String message = "Terminate SCM, encounter exception(" +
                 e.getMessage() + ") when generating new root CA certificate " +
                 "under " + newCAComponent;
+            cleanupAndStop(message);
             scm.shutDown(message);
           }
 
@@ -399,7 +399,10 @@ public class RootCARotationManager implements SCMService {
                 "expected:" + newId + ", fetched:" + newRootCertId);
             scm.getSecurityProtocolServer()
                 .setRootCertificateServer(newRootCAServer);
+
+
             if (isRunning()) {
+              checkInterruptState();
               handler.rotationPrepare(newRootCertId);
               LOG.info("Send out sub CA rotation prepare request for new " +
                   "root certificate {}", newRootCertId);
@@ -415,6 +418,7 @@ public class RootCARotationManager implements SCMService {
             return;
           }
 
+          checkInterruptState();
           // save root certificate to certStore
           try {
             if (scm.getCertificateStore().getCertificateByID(
@@ -426,7 +430,7 @@ public class RootCARotationManager implements SCMService {
                   CertificateCodec.getX509Certificate(newRootCertificate),
                   HddsProtos.NodeType.SCM);
             }
-          } catch (CertificateException | IOException | TimeoutException e) {
+          } catch (CertificateException | IOException e) {
             LOG.error("Failed to save root certificate {} to cert store",
                 newRootCertId);
             scm.shutDown("Failed to save root certificate to cert store");
@@ -438,7 +442,7 @@ public class RootCARotationManager implements SCMService {
               1, 1, TimeUnit.SECONDS);
           waitAckTimeoutTask = executorService.schedule(() -> {
             // No enough acks are received
-            waitAckTask.cancel(false);
+            waitAckTask.cancel(true);
             String msg = "Failed to receive all acks of rotation prepare" +
                 " after " + ackTimeout + ", received " +
                 handler.rotationPrepareAcks() + " acks";
@@ -452,6 +456,16 @@ public class RootCARotationManager implements SCMService {
           processStartTime.set(null);
         }
       }
+    }
+  }
+
+  private void checkInterruptState() {
+    // check whether thread is interrupted(cancelled) before
+    // time-consuming ratis request
+    if (Thread.currentThread().isInterrupted()) {
+      cleanupAndStop(this.getClass().getSimpleName() +
+          " is interrupted");
+      return;
     }
   }
 
@@ -569,6 +583,7 @@ public class RootCARotationManager implements SCMService {
           scm.shutDown(message);
         }
 
+        checkInterruptState();
         // Get certificate signed
         String newCertSerialId = "";
         try {
@@ -605,6 +620,7 @@ public class RootCARotationManager implements SCMService {
         }
 
         // Send ack to rotationPrepare request
+        checkInterruptState();
         sendRotationPrepareAck(rootCACertId, newCertSerialId);
       } catch (Throwable e) {
         LOG.error("Unexpected error happen", e);
@@ -653,12 +669,14 @@ public class RootCARotationManager implements SCMService {
 
     @Override
     public void run() {
+      checkInterruptState();
       if (!isRunning()) {
         LOG.info("SCM is not leader anymore. Delete the in-progress " +
             "root CA directory");
         cleanupAndStop("SCM is not leader anymore");
         return;
       }
+
       synchronized (RootCARotationManager.class) {
         int numFromHADetails =
             scm.getSCMHANodeDetails().getPeerNodeDetails().size() + 1;
@@ -669,7 +687,7 @@ public class RootCARotationManager implements SCMService {
         if (handler.rotationPrepareAcks() == numFromRatisServer) {
           // all acks are received.
           try {
-            waitAckTimeoutTask.cancel(false);
+            waitAckTimeoutTask.cancel(true);
             handler.rotationCommit(rootCACertId);
             handler.rotationCommitted(rootCACertId);
 
@@ -688,10 +706,7 @@ public class RootCARotationManager implements SCMService {
             handler.resetRotationPrepareAcks();
             cleanupAndStop("Execution error, " + e.getMessage());
           } finally {
-            // stop this task to re-execute again in next cycle
-            throw new RuntimeException("Exit the this " +
-                "WaitSubCARotationPrepareAckTask for root certificate " +
-                rootCACertId + " since the rotation is finished execution");
+            waitAckTask.cancel(true);
           }
         }
       }
@@ -706,14 +721,9 @@ public class RootCARotationManager implements SCMService {
     if (metrics != null) {
       metrics.unRegister();
     }
-    try {
-      executorService.shutdown();
-      if (!executorService.awaitTermination(3, TimeUnit.SECONDS)) {
-        executorService.shutdownNow();
-      }
-    } catch (InterruptedException ie) {
-      // Ignore, we don't really care about the failure.
-      Thread.currentThread().interrupt();
+
+    if (executorService != null) {
+      executorService.shutdownNow();
     }
   }
 

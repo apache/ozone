@@ -38,10 +38,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.CERT_ROTATE;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 
 /**
  * Root CA Rotation Handler for ratis SCM statemachine.
@@ -55,9 +53,6 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
   private final SCMCertificateClient scmCertClient;
   private final SecurityConfig secConfig;
   private Set<String> newScmCertIdSet = new HashSet<>();
-  private String newCAComponent = SCM_ROOT_CA_COMPONENT_NAME +
-      HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
-      HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
   private final String newSubCAPath;
   private final RootCARotationManager rotationManager;
   private AtomicReference<String> newSubCACertId = new AtomicReference();
