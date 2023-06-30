@@ -138,6 +138,7 @@ enum Type {
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
+  TestUnknownCommand = 124;
 }
 
 message OMRequest {

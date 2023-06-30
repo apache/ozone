@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -152,7 +153,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     return requestValidations.validateResponse(request, response);
   }
 
-  private OMResponse processRequest(OMRequest request) throws ServiceException {
+  @VisibleForTesting
+  public OMResponse processRequest(OMRequest request) throws ServiceException {
     OMClientRequest omClientRequest = null;
     boolean s3Auth = false;
 

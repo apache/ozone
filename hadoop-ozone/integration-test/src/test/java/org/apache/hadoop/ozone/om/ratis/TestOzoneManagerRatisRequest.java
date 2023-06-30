@@ -17,7 +17,10 @@
  */
 package org.apache.hadoop.ozone.om.ratis;
 
+import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -29,19 +32,23 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
 /**
- * Test: Creating a client request for a bucket which doesn't exist.
+ * Test OM Ratis request handling.
  */
 public class TestOzoneManagerRatisRequest {
   @Rule public TemporaryFolder folder = new TemporaryFolder();
@@ -53,6 +60,7 @@ public class TestOzoneManagerRatisRequest {
   @Test(timeout = 300_000)
   public void testRequestWithNonExistentBucket()
       throws Exception {
+    // Test: Creating a client request for a bucket which doesn't exist.
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
@@ -86,6 +94,54 @@ public class TestOzoneManagerRatisRequest {
       // Expected exception.
       Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
           oe.getResult());
+    }
+  }
+
+  @Test
+  public void testUnknownRequestHandling() throws IOException,
+      ServiceException {
+    // Create an instance of OMRequest with an unknown command type.
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.TestUnknownCommand)
+            .setClientId("test-client-id")
+            .build();
+
+    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        folder.newFolder().getAbsolutePath());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+
+    OzoneManagerRatisServer ratisServer =
+        Mockito.mock(OzoneManagerRatisServer.class);
+    ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
+        Mockito.mock(ProtocolMessageMetrics.class);
+    long lastTransactionIndexForNonRatis = 100L;
+
+    OzoneManagerProtocolProtos.OMResponse expectedResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder()
+            .setStatus(INVALID_REQUEST)
+            .setCmdType(omRequest.getCmdType())
+            .setTraceID(omRequest.getTraceID())
+            .setSuccess(false)
+            .setMessage("Unrecognized write command type request " +
+                omRequest.getCmdType())
+            .build();
+
+    boolean[] enableRatisValues = {true, false};
+    for (boolean enableRatis : enableRatisValues) {
+      OzoneManagerProtocolServerSideTranslatorPB serverSideTranslatorPB =
+          new OzoneManagerProtocolServerSideTranslatorPB(ozoneManager,
+              ratisServer, protocolMessageMetrics, enableRatis,
+              lastTransactionIndexForNonRatis);
+
+      OzoneManagerProtocolProtos.OMResponse actualResponse =
+          serverSideTranslatorPB.processRequest(omRequest);
+
+      Assertions.assertEquals(expectedResponse, actualResponse);
     }
   }
 }
