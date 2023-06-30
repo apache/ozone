@@ -55,7 +55,3 @@ for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.6; do
   save_container_logs nm rm
   stop_containers nm rm
 done
-
-stop_docker_env
-
-generate_report
