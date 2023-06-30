@@ -319,6 +319,7 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case UnknownCommand:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
