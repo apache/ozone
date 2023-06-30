@@ -117,8 +117,6 @@ public class BasicRootedOzoneClientAdapterImpl
   private BucketLayout defaultOFSBucketLayout;
   private OzoneConfiguration config;
 
-  public static final String ACTIVE_FS_SNAPSHOT_NAME = ".";
-
   /**
    * Create new OzoneClientAdapter implementation.
    *
@@ -1318,7 +1316,9 @@ public class BasicRootedOzoneClientAdapterImpl
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
     boolean takeTemporarySnapshot = false;
-    if (toSnapshot.equals(ACTIVE_FS_SNAPSHOT_NAME)) {
+    if (toSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the fromSnapshot &
+      // current state.
       takeTemporarySnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
           "temp" + SnapshotInfo.generateName(Time.now()));

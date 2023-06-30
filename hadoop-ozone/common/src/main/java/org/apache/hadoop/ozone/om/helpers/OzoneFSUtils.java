@@ -278,4 +278,12 @@ public final class OzoneFSUtils {
       return key;
     }
   }
+
+  public static String removeLeadingSlashIfNeeded(String key) {
+    if (key.startsWith(OZONE_URI_DELIMITER)) {
+      return key.substring(1);
+    } else {
+      return key;
+    }
+  }
 }

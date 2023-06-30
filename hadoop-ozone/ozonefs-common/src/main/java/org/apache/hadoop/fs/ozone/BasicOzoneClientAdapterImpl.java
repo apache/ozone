@@ -668,7 +668,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
     boolean takeTemporarySnapshot = false;
-    if (toSnapshot.equals(ACTIVE_FS_SNAPSHOT_NAME)) {
+    if (toSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the fromSnapshot &
+      // current state.
       takeTemporarySnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
           "temp" + SnapshotInfo.generateName(Time.now()));
