@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ratis.util.function.CheckedSupplier;
 
@@ -42,25 +41,6 @@ public class OzoneKeyDetails extends OzoneKey {
   private final FileEncryptionInfo feInfo;
 
   private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
-
-  /**
-   * Constructs OzoneKeyDetails from OmKeyInfo.
-   */
-  @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-                         long size, long creationTime, long modificationTime,
-                         List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationType type, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo, int replicationFactor) {
-    super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
-    this.ozoneKeyLocations = ozoneKeyLocations;
-    this.feInfo = feInfo;
-    contentSupplier = null;
-    this.setMetadata(metadata);
-  }
-
 
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
@@ -90,13 +70,6 @@ public class OzoneKeyDetails extends OzoneKey {
 
   public FileEncryptionInfo getFileEncryptionInfo() {
     return feInfo;
-  }
-  /**
-   * Set details of key location.
-   * @param ozoneKeyLocations - details of key location
-   */
-  public void setOzoneKeyLocations(List<OzoneKeyLocation> ozoneKeyLocations) {
-    this.ozoneKeyLocations = ozoneKeyLocations;
   }
 
   /**
