@@ -141,6 +141,10 @@ public final class OnDemandContainerDataScanner {
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);
+    } catch (InterruptedException ex) {
+      // This should only happen as part of shutdown, which will stop the
+      // ExecutorService.
+      LOG.info("On demand container scan interrupted.");
     }
   }
 

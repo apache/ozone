@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -39,8 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Handles purging of keys from OM DB.
@@ -62,7 +58,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         .getDeletedKeysList();
     List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest
         .getKeysToUpdateList();
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
         purgeKeysRequest.getSnapshotTableKey() : null;
     List<String> keysToBePurgedList = new ArrayList<>();
@@ -71,7 +66,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
 
-
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
         keysToBePurgedList.add(deletedKey);
@@ -79,20 +73,13 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     try {
-      OmSnapshot omFromSnapshot = null;
+      SnapshotInfo fromSnapshotInfo = null;
       if (fromSnapshot != null) {
-        SnapshotInfo snapshotInfo =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .get(fromSnapshot);
-        // TODO: [SNAPSHOT] Revisit in HDDS-8529.
-        omFromSnapshot = (OmSnapshot) omSnapshotManager
-            .checkForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()), true);
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable().get(fromSnapshot);
       }
-
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList, omFromSnapshot, keysToUpdateList);
+          keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
     } catch (IOException ex) {
       omClientResponse = new OMKeyPurgeResponse(
           createErrorOMResponse(omResponse, ex));

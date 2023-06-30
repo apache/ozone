@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -196,10 +197,10 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobCancelResult;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
@@ -210,6 +211,7 @@ import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.util.ProtobufUtils;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
@@ -301,6 +303,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (s3AuthCheck && getThreadLocalS3Auth() == null) {
       throw new IllegalArgumentException("S3 Auth expected to " +
           "be set but is null " + omRequest.toString());
+    }
+    if (threadLocalS3Auth.get() != null) {
+      if (!Strings.isNullOrEmpty(threadLocalS3Auth.get().getAccessID())) {
+        String caller = OM_S3_CALLER_CONTEXT_PREFIX +
+            threadLocalS3Auth.get().getAccessID();
+        CallerContext callerContext =
+            new CallerContext.Builder(caller).build();
+        CallerContext.setCurrent(callerContext);
+      }
     }
     OMResponse response =
         transport.submitRequest(
@@ -1217,8 +1228,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff,
-                                           boolean cancel)
+                                           boolean forceFullDiff)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1228,8 +1238,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
-            .setForceFullDiff(forceFullDiff)
-            .setCancel(cancel);
+            .setForceFullDiff(forceFullDiff);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);
@@ -1247,7 +1256,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         diffResponse.getSnapshotDiffReport()),
         JobStatus.fromProtobuf(diffResponse.getJobStatus()),
         diffResponse.getWaitTimeInMs(),
-        JobCancelResult.fromProtobuf(diffResponse.getJobCancelResult()));
+        diffResponse.getReason());
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    final OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.Builder
+        requestBuilder =
+        OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setFromSnapshot(fromSnapshot)
+            .setToSnapshot(toSnapshot);
+
+    final OMRequest omRequest = createOMRequest(Type.CancelSnapshotDiff)
+        .setCancelSnapshotDiffRequest(requestBuilder)
+        .build();
+
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+    OzoneManagerProtocolProtos.CancelSnapshotDiffResponse diffResponse =
+        omResponse.getCancelSnapshotDiffResponse();
+
+    return new CancelSnapshotDiffResponse(diffResponse.getReason());
   }
 
   /**

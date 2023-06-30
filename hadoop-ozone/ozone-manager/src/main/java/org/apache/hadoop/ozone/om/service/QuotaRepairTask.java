@@ -39,6 +39,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -48,8 +50,11 @@ import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Quota repair task.
@@ -59,6 +64,7 @@ public class QuotaRepairTask {
       QuotaRepairTask.class);
   private static final int BATCH_SIZE = 5000;
   private static final int TASK_THREAD_CNT = 3;
+  public static final long EPOCH_DEFAULT = -1L;
   private final OMMetadataManager metadataManager;
   private final Map<String, OmBucketInfo> nameBucketInfoMap = new HashMap<>();
   private final Map<String, OmBucketInfo> idBucketInfoMap = new HashMap<>();
@@ -68,6 +74,7 @@ public class QuotaRepairTask {
       = new ConcurrentHashMap<>();
   private final Map<String, CountPair> directoryCountMap
       = new ConcurrentHashMap<>();
+  private final Map<String, String> oldVolumeKeyNameMap = new HashMap();
 
   public QuotaRepairTask(OMMetadataManager metadataManager) {
     this.metadataManager = metadataManager;
@@ -90,6 +97,13 @@ public class QuotaRepairTask {
       executor.shutdown();
       LOG.info("Completed quota repair task");
     }
+    updateOldVolumeQuotaSupport();
+
+    // cleanup epoch added to avoid extra epoch id in cache
+    ArrayList<Long> epochs = new ArrayList<>();
+    epochs.add(EPOCH_DEFAULT);
+    metadataManager.getBucketTable().cleanupCache(epochs);
+    metadataManager.getVolumeTable().cleanupCache(epochs);
   }
   
   private void prepareAllVolumeBucketInfo() throws IOException {
@@ -102,8 +116,48 @@ public class QuotaRepairTask {
             iterator.next();
         omVolumeArgs = entry.getValue();
         getAllBuckets(omVolumeArgs.getVolume(), omVolumeArgs.getObjectID());
+        if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT
+            || omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+          oldVolumeKeyNameMap.put(entry.getKey(), entry.getValue().getVolume());
+        }
       }
     }
+  }
+
+  private void updateOldVolumeQuotaSupport() throws IOException {
+    LOG.info("Starting volume quota support update");
+    IOzoneManagerLock lock = metadataManager.getLock();
+    try (BatchOperation batchOperation = metadataManager.getStore()
+        .initBatchOperation()) {
+      for (Map.Entry<String, String> volEntry
+          : oldVolumeKeyNameMap.entrySet()) {
+        lock.acquireReadLock(VOLUME_LOCK, volEntry.getValue());
+        try {
+          OmVolumeArgs omVolumeArgs = metadataManager.getVolumeTable().get(
+              volEntry.getKey());
+          boolean isQuotaReset = false;
+          if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
+            omVolumeArgs.setQuotaInBytes(QUOTA_RESET);
+            isQuotaReset = true;
+          }
+          if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+            omVolumeArgs.setQuotaInNamespace(QUOTA_RESET);
+            isQuotaReset = true;
+          }
+          if (isQuotaReset) {
+            metadataManager.getVolumeTable().addCacheEntry(
+                new CacheKey<>(volEntry.getKey()),
+                CacheValue.get(EPOCH_DEFAULT, omVolumeArgs));
+            metadataManager.getVolumeTable().putWithBatch(batchOperation,
+                volEntry.getKey(), omVolumeArgs);
+          }
+        } finally {
+          lock.releaseReadLock(VOLUME_LOCK, volEntry.getValue());
+        }
+      }
+      metadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    LOG.info("Completed volume quota support update");
   }
   
   private void getAllBuckets(String volumeName, long volumeId)
@@ -176,6 +230,9 @@ public class QuotaRepairTask {
     updateCountToBucketInfo(idBucketInfoMap, fileCountMap);
     updateCountToBucketInfo(idBucketInfoMap, directoryCountMap);
     
+    // update quota enable flag for old volume and buckets
+    updateOldBucketQuotaSupport();
+
     try (BatchOperation batchOperation = metadataManager.getStore()
         .initBatchOperation()) {
       for (Map.Entry<String, OmBucketInfo> entry
@@ -190,7 +247,31 @@ public class QuotaRepairTask {
     }
     LOG.info("Completed quota repair for all keys, files and directories");
   }
-  
+
+  private void updateOldBucketQuotaSupport() {
+    for (Map.Entry<String, OmBucketInfo> entry : nameBucketInfoMap.entrySet()) {
+      if (entry.getValue().getQuotaInBytes() == OLD_QUOTA_DEFAULT
+          || entry.getValue().getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+        OmBucketInfo.Builder builder = entry.getValue().toBuilder();
+        if (entry.getValue().getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
+          builder.setQuotaInBytes(QUOTA_RESET);
+        }
+        if (entry.getValue().getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
+          builder.setQuotaInNamespace(QUOTA_RESET);
+        }
+        OmBucketInfo bucketInfo = builder.build();
+        entry.setValue(bucketInfo);
+        
+        // there is a new value to be updated in bucket cache
+        String bucketKey = metadataManager.getBucketKey(
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+        metadataManager.getBucketTable().addCacheEntry(
+            new CacheKey<>(bucketKey),
+            CacheValue.get(EPOCH_DEFAULT, bucketInfo));
+      }
+    }
+  }
+
   private <VALUE> void recalculateUsages(
       Table<String, VALUE> table, Map<String, CountPair> prefixUsageMap,
       String strType, boolean haveValue) throws UncheckedIOException,

@@ -56,7 +56,8 @@ public class TestOzoneManagerRatisRequest {
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
     String volumeName = "vol1";

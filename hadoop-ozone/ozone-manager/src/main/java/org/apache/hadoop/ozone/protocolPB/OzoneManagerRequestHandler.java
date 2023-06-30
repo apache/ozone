@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -70,6 +71,8 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -307,6 +310,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
             request.getSnapshotDiffRequest());
         responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
+        break;
+      case CancelSnapshotDiff:
+        CancelSnapshotDiffResponse cancelSnapshotDiff = cancelSnapshotDiff(
+                request.getCancelSnapshotDiffRequest());
+        responseBuilder.setCancelSnapshotDiffResponse(cancelSnapshotDiff);
         break;
       case ListSnapshotDiffJobs:
         ListSnapshotDiffJobResponse listSnapDiffResponse =
@@ -1253,17 +1261,39 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToSnapshot(),
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize(),
-            snapshotDiffRequest.getForceFullDiff(),
-            snapshotDiffRequest.getCancel());
+            snapshotDiffRequest.getForceFullDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())
-        .setWaitTimeInMs(response.getWaitTimeInMs())
-        .setJobCancelResult(response.getJobCancelResult().toProtobuf());
+        .setWaitTimeInMs(response.getWaitTimeInMs());
 
+    if (StringUtils.isNotEmpty(response.getReason())) {
+      builder.setReason(response.getReason());
+    }
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private CancelSnapshotDiffResponse cancelSnapshotDiff(
+      CancelSnapshotDiffRequest cancelSnapshotDiffRequest) throws IOException {
+
+    org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse response =
+        impl.cancelSnapshotDiff(
+            cancelSnapshotDiffRequest.getVolumeName(),
+            cancelSnapshotDiffRequest.getBucketName(),
+            cancelSnapshotDiffRequest.getFromSnapshot(),
+            cancelSnapshotDiffRequest.getToSnapshot());
+
+    CancelSnapshotDiffResponse.Builder builder = CancelSnapshotDiffResponse
+        .newBuilder();
+
+    if (StringUtils.isNotEmpty(response.getMessage())) {
+      builder.setReason(response.getMessage());
     }
 
     return builder.build();

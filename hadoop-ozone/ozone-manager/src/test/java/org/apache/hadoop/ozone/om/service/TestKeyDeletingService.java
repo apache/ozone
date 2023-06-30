@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -46,6 +47,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
@@ -537,21 +540,25 @@ t
 
     keyDeletingService.resume();
 
-    OmSnapshot snap3 = (OmSnapshot) om.getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName,
-            getSnapshotPrefix("snap3"), true);
-    Table<String, RepeatedOmKeyInfo> snap3deletedTable =
-        snap3.getMetadataManager().getDeletedTable();
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
+        om.getOmSnapshotManager().checkForSnapshot(
+            volumeName, bucketName, getSnapshotPrefix("snap3"), true)) {
+      OmSnapshot snap3 = (OmSnapshot) rcOmSnapshot.get();
 
-    // 5 keys can be deep cleaned as it was stuck previously
-    assertTableRowCount(snap3deletedTable, 10, metadataManager);
-    checkSnapDeepCleanStatus(snapshotInfoTable, false);
+      Table<String, RepeatedOmKeyInfo> snap3deletedTable =
+          snap3.getMetadataManager().getDeletedTable();
 
-    writeClient.deleteSnapshot(volumeName, bucketName, "snap2");
-    assertTableRowCount(snapshotInfoTable, 2, metadataManager);
+      // 5 keys can be deep cleaned as it was stuck previously
+      assertTableRowCount(snap3deletedTable, 10, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, false);
 
-    assertTableRowCount(snap3deletedTable, 0, metadataManager);
-    assertTableRowCount(deletedTable, 0, metadataManager);
+      writeClient.deleteSnapshot(volumeName, bucketName, "snap2");
+      assertTableRowCount(snapshotInfoTable, 2, metadataManager);
+
+      assertTableRowCount(snap3deletedTable, 0, metadataManager);
+      assertTableRowCount(deletedTable, 0, metadataManager);
+    }
+
   }
 
   private void checkSnapDeepCleanStatus(Table<String, SnapshotInfo>

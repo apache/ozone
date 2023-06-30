@@ -266,6 +266,7 @@ public final class OmUtils {
       // operation SetRangerServiceVersion.
     case GetKeyInfo:
     case SnapshotDiff:
+    case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
     case TransferLeadership:
       return true;

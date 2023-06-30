@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -38,7 +39,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -105,7 +105,7 @@ public class SequenceIdGenerator {
    * @param sequenceIdName : name of the sequenceId
    * @return : next id of this sequenceId.
    */
-  public long getNextId(String sequenceIdName) throws TimeoutException {
+  public long getNextId(String sequenceIdName) throws SCMException {
     lock.lock();
     try {
       Batch batch = sequenceIdToBatchMap.computeIfAbsent(
@@ -188,7 +188,7 @@ public class SequenceIdGenerator {
     @Replicate
     Boolean allocateBatch(String sequenceIdName,
                           Long expectedLastId, Long newLastId)
-        throws TimeoutException;
+        throws SCMException;
 
     /**
      * @param sequenceIdName : name of the sequence id.
