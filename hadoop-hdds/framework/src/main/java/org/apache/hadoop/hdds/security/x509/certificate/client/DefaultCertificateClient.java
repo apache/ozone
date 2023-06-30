@@ -54,7 +54,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -126,7 +125,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
-  private static Semaphore semaphore = new Semaphore(1);
 
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
@@ -135,8 +133,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       String certSerialId,
       String component,
       Consumer<String> saveCertId,
-      Runnable shutdown
-  ) {
+      Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
     this.securityConfig = securityConfig;
     this.scmSecurityClient = scmSecurityClient;
@@ -170,13 +167,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return;
     }
 
-    if (certPath != null && executorService == null) {
-      startCertificateMonitor();
-    } else {
-      if (executorService != null) {
-        getLogger().debug("CertificateLifetimeMonitor is already started.");
+    if (shouldStartCertificateMonitor()) {
+      if (certPath != null && executorService == null) {
+        startCertificateMonitor();
       } else {
-        getLogger().warn("Component certificate was not loaded.");
+        if (executorService != null) {
+          getLogger().debug("CertificateLifetimeMonitor is already started.");
+        } else {
+          getLogger().warn("Component certificate was not loaded.");
+        }
       }
     }
   }
@@ -1245,12 +1244,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return scmSecurityClient;
   }
 
-  public static void acquirePermit() throws InterruptedException {
-    semaphore.acquire();
-  }
-
-  public static void releasePermit() {
-    semaphore.release();
+  protected boolean shouldStartCertificateMonitor() {
+    return true;
   }
 
   public synchronized void startCertificateMonitor() {
@@ -1294,13 +1289,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       //  2. switch on disk new keys and certificate with current ones
       //  3. save new certificate ID into service VERSION file
       //  4. refresh in memory certificate ID and reload all new certificates
-      try {
-        acquirePermit();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-      try {
+      synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
         if (timeLeft.isZero()) {
@@ -1335,8 +1324,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           // cleanup backup directory
           cleanBackupDir();
         }
-      } finally {
-        releasePermit();
       }
     }
   }

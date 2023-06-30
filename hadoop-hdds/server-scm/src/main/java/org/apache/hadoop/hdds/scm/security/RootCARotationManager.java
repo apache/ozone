@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -105,7 +104,6 @@ public class RootCARotationManager implements SCMService {
   private ScheduledFuture rotationTask;
   private ScheduledFuture waitAckTask;
   private ScheduledFuture waitAckTimeoutTask;
-  private ScheduledFuture releaseLockOnTimeoutTask;
   private final RootCARotationMetrics metrics;
 
   /**
@@ -180,11 +178,6 @@ public class RootCARotationManager implements SCMService {
         if (waitAckTimeoutTask != null) {
           waitAckTask.cancel(true);
         }
-        if (releaseLockOnTimeoutTask != null) {
-          if (releaseLockOnTimeoutTask.cancel(true)) {
-            releaseLock();
-          }
-        }
         isProcessing.set(false);
         processStartTime.set(null);
       }
@@ -235,24 +228,6 @@ public class RootCARotationManager implements SCMService {
   public void scheduleSubCaRotationPrepareTask(String rootCertId) {
     executorService.schedule(new SubCARotationPrepareTask(rootCertId), 0,
         TimeUnit.MILLISECONDS);
-  }
-
-  public void acquireLock() throws InterruptedException {
-    DefaultCertificateClient.acquirePermit();
-  }
-
-  public void releaseLock() {
-    DefaultCertificateClient.releasePermit();
-  }
-
-  public void checkAndReleaseLock() {
-    if (releaseLockOnTimeoutTask != null) {
-      if (releaseLockOnTimeoutTask.cancel(true)) {
-        releaseLock();
-      }
-    } else {
-      releaseLock();
-    }
   }
 
   public boolean isRotationInProgress() {
@@ -522,109 +497,106 @@ public class RootCARotationManager implements SCMService {
       //  1. generate new sub CA keys
       //  2. send CSR to leader SCM
       //  3. wait CSR response and persist the certificate to disk
-      try {
-        acquireLock();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-      try {
-        LOG.info("SubCARotationPrepareTask[rootCertId = {}] - started.",
-            rootCACertId);
+      synchronized (RootCARotationManager.class) {
+        try {
+          LOG.info("SubCARotationPrepareTask[rootCertId = {}] - started.",
+              rootCACertId);
 
-        if (shouldSkipRootCert(rootCACertId)) {
+          if (shouldSkipRootCert(rootCACertId)) {
+            // Send ack to rotationPrepare request
+            sendRotationPrepareAck(rootCACertId,
+                scmCertClient.getCertificate().getSerialNumber().toString());
+            return;
+          }
+
+          SecurityConfig securityConfig =
+              scmCertClient.getSecurityConfig();
+          String progressComponent = SCMCertificateClient.COMPONENT_NAME +
+              HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
+              HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
+          final String newSubCAProgressPath =
+              securityConfig.getLocation(progressComponent).toString();
+          final String newSubCAPath = securityConfig.getLocation(
+              SCMCertificateClient.COMPONENT_NAME +
+                  HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX).toString();
+
+          File newProgressDir = new File(newSubCAProgressPath);
+          File newDir = new File(newSubCAPath);
+          try {
+            FileUtils.deleteDirectory(newProgressDir);
+            FileUtils.deleteDirectory(newDir);
+            Files.createDirectories(newProgressDir.toPath());
+          } catch (IOException e) {
+            LOG.error("Failed to delete and create {}, or delete {}",
+                newProgressDir, newDir, e);
+            String message = "Terminate SCM, encounter IO exception(" +
+                e.getMessage() + ") when deleting and create directory";
+            scm.shutDown(message);
+          }
+
+          // Generate key
+          Path keyDir = securityConfig.getKeyLocation(progressComponent);
+          KeyCodec keyCodec = new KeyCodec(securityConfig, keyDir);
+          KeyPair newKeyPair = null;
+          try {
+            HDDSKeyGenerator keyGenerator =
+                new HDDSKeyGenerator(securityConfig);
+            newKeyPair = keyGenerator.generateKey();
+            keyCodec.writePublicKey(newKeyPair.getPublic());
+            keyCodec.writePrivateKey(newKeyPair.getPrivate());
+            LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
+                "scm key generated.", rootCACertId);
+          } catch (Exception e) {
+            LOG.error("Failed to generate key under {}", newProgressDir, e);
+            String message = "Terminate SCM, encounter exception(" +
+                e.getMessage() + ") when generating new key under " +
+                newProgressDir;
+            scm.shutDown(message);
+          }
+
+          checkInterruptState();
+          // Get certificate signed
+          String newCertSerialId = "";
+          try {
+            CertificateSignRequest.Builder csrBuilder =
+                scmCertClient.getCSRBuilder();
+            csrBuilder.setKey(newKeyPair);
+            newCertSerialId = scmCertClient.signAndStoreCertificate(
+                csrBuilder.build(),
+                Paths.get(newSubCAProgressPath, HDDS_X509_DIR_NAME_DEFAULT),
+                true);
+            LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
+                "scm certificate {} signed.", rootCACertId, newCertSerialId);
+          } catch (Exception e) {
+            LOG.error("Failed to generate certificate under {}",
+                newProgressDir, e);
+            String message = "Terminate SCM, encounter exception(" +
+                e.getMessage() + ") when generating new certificate " +
+                newProgressDir;
+            scm.shutDown(message);
+          }
+
+          // move dir from *-next-progress to *-next
+          try {
+            Files.move(newProgressDir.toPath(), newDir.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+          } catch (IOException e) {
+            LOG.error("Failed to move {} to {}",
+                newSubCAProgressPath, newSubCAPath, e);
+            String message = "Terminate SCM, encounter exception(" +
+                e.getMessage() + ") when moving " + newSubCAProgressPath +
+                " to " + newSubCAPath;
+            scm.shutDown(message);
+          }
+
           // Send ack to rotationPrepare request
-          sendRotationPrepareAck(rootCACertId,
-              scmCertClient.getCertificate().getSerialNumber().toString());
-          return;
+          checkInterruptState();
+          sendRotationPrepareAck(rootCACertId, newCertSerialId);
+        } catch (Throwable e) {
+          LOG.error("Unexpected error happen", e);
+          scm.shutDown("Unexpected error happen, " + e.getMessage());
         }
-
-        SecurityConfig securityConfig =
-            scmCertClient.getSecurityConfig();
-        String progressComponent = SCMCertificateClient.COMPONENT_NAME +
-            HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
-            HDDS_NEW_KEY_CERT_DIR_NAME_PROGRESS_SUFFIX;
-        final String newSubCAProgressPath =
-            securityConfig.getLocation(progressComponent).toString();
-        final String newSubCAPath = securityConfig.getLocation(
-            SCMCertificateClient.COMPONENT_NAME +
-                HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX).toString();
-
-        File newProgressDir = new File(newSubCAProgressPath);
-        File newDir = new File(newSubCAPath);
-        try {
-          FileUtils.deleteDirectory(newProgressDir);
-          FileUtils.deleteDirectory(newDir);
-          Files.createDirectories(newProgressDir.toPath());
-        } catch (IOException e) {
-          LOG.error("Failed to delete and create {}, or delete {}",
-              newProgressDir, newDir, e);
-          String message = "Terminate SCM, encounter IO exception(" +
-              e.getMessage() + ") when deleting and create directory";
-          scm.shutDown(message);
-        }
-
-        // Generate key
-        Path keyDir = securityConfig.getKeyLocation(progressComponent);
-        KeyCodec keyCodec = new KeyCodec(securityConfig, keyDir);
-        KeyPair newKeyPair = null;
-        try {
-          HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
-          newKeyPair = keyGenerator.generateKey();
-          keyCodec.writePublicKey(newKeyPair.getPublic());
-          keyCodec.writePrivateKey(newKeyPair.getPrivate());
-          LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
-              "scm key generated.", rootCACertId);
-        } catch (Exception e) {
-          LOG.error("Failed to generate key under {}", newProgressDir, e);
-          String message = "Terminate SCM, encounter exception(" +
-              e.getMessage() + ") when generating new key under " +
-              newProgressDir;
-          scm.shutDown(message);
-        }
-
-        checkInterruptState();
-        // Get certificate signed
-        String newCertSerialId = "";
-        try {
-          CertificateSignRequest.Builder csrBuilder =
-              scmCertClient.getCSRBuilder();
-          csrBuilder.setKey(newKeyPair);
-          newCertSerialId = scmCertClient.signAndStoreCertificate(
-              csrBuilder.build(),
-              Paths.get(newSubCAProgressPath, HDDS_X509_DIR_NAME_DEFAULT),
-              true);
-          LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
-              "scm certificate {} signed.", rootCACertId, newCertSerialId);
-        } catch (Exception e) {
-          LOG.error("Failed to generate certificate under {}",
-              newProgressDir, e);
-          String message = "Terminate SCM, encounter exception(" +
-              e.getMessage() + ") when generating new certificate " +
-              newProgressDir;
-          scm.shutDown(message);
-        }
-
-        // move dir from *-next-progress to *-next
-        try {
-          Files.move(newProgressDir.toPath(), newDir.toPath(),
-              StandardCopyOption.ATOMIC_MOVE,
-              StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-          LOG.error("Failed to move {} to {}",
-              newSubCAProgressPath, newSubCAPath, e);
-          String message = "Terminate SCM, encounter exception(" +
-              e.getMessage() + ") when moving " + newSubCAProgressPath +
-              " to " + newSubCAPath;
-          scm.shutDown(message);
-        }
-
-        // Send ack to rotationPrepare request
-        checkInterruptState();
-        sendRotationPrepareAck(rootCACertId, newCertSerialId);
-      } catch (Throwable e) {
-        LOG.error("Unexpected error happen", e);
-        scm.shutDown("Unexpected error happen, " + e.getMessage());
       }
     }
   }
@@ -646,14 +618,6 @@ public class RootCARotationManager implements SCMService {
     }
 
     handler.setSubCACertId(newSubCACertId);
-
-    releaseLockOnTimeoutTask = executorService.schedule(() -> {
-      // If no rotation commit request received after rotation prepare
-      LOG.warn("Failed to have enough rotation acks from SCM. This " +
-              " time root rotation {} is failed. Release the lock.",
-          newRootCACertId);
-      releaseLock();
-    }, ackTimeout.toMillis(), TimeUnit.MILLISECONDS);
   }
 
   /**

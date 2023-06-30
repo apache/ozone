@@ -183,9 +183,6 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       LOG.error("Failed to delete backup dir {}", backupSubCaDir, e);
     }
 
-    // release lock
-    rotationManager.checkAndReleaseLock();
-
     // reset state
     newSubCACertId.set(null);
   }
