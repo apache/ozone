@@ -103,7 +103,7 @@ public class TestOzoneManagerRatisRequest {
     // Create an instance of OMRequest with an unknown command type.
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.TestUnknownCommand)
+            .setCmdType(OzoneManagerProtocolProtos.Type.UnknownCommand)
             .setClientId("test-client-id")
             .build();
 

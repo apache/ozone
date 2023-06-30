@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;
@@ -138,7 +139,6 @@ enum Type {
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
-  TestUnknownCommand = 124;
 }
 
 message OMRequest {

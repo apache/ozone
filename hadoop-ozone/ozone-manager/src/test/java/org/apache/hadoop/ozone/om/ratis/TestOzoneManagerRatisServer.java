@@ -200,11 +200,6 @@ public class TestOzoneManagerRatisServer {
         OzoneManagerProtocolProtos.Type.values();
 
     for (OzoneManagerProtocolProtos.Type cmdtype : cmdTypes) {
-      if (cmdtype == OzoneManagerProtocolProtos.Type.TestUnknownCommand) {
-        // Skip OzoneManagerProtocolProtos.Type.TestUnknownCommand, since this
-        // cmdType is reserved for testing purposes only.
-        continue;
-      }
       OMRequest request = OMRequest.newBuilder()
           .setCmdType(cmdtype)
           .setClientId(clientId)
