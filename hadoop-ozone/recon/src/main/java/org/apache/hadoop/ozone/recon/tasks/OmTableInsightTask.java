@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -43,10 +44,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+
 import java.util.Map.Entry;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -158,8 +161,17 @@ public class OmTableInsightTask implements ReconOmTask {
             OmKeyInfo omKeyInfo = (OmKeyInfo) kv.getValue();
             unReplicatedSize += omKeyInfo.getDataSize();
             replicatedSize += omKeyInfo.getReplicatedSize();
+            count++;
           }
-          count++;  // Increment count for each row
+          if (kv.getValue() instanceof RepeatedOmKeyInfo) {
+            RepeatedOmKeyInfo repeatedOmKeyInfo = (RepeatedOmKeyInfo) kv
+                .getValue();
+            Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
+            unReplicatedSize += result.getRight();
+            replicatedSize += result.getLeft();
+            // Since we can have multiple deleted keys of same name
+            count += repeatedOmKeyInfo.getOmKeyInfoList().size();
+          }
         }
       }
     }
@@ -174,6 +186,7 @@ public class OmTableInsightTask implements ReconOmTask {
     List<String> taskTables = new ArrayList<>();
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
+    taskTables.add(DELETED_TABLE);
     return taskTables;
   }
 
@@ -196,80 +209,38 @@ public class OmTableInsightTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    // Initialize maps to store count and size information
     HashMap<String, Long> objectCountMap = initializeCountMap();
     HashMap<String, Long> unreplicatedSizeCountMap = initializeSizeMap(false);
     HashMap<String, Long> replicatedSizeCountMap = initializeSizeMap(true);
     final Collection<String> taskTables = getTaskTables();
     final Collection<String> sizeRelatedTables = getTablesToCalculateSize();
 
+    // Process each update event
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
       String tableName = omdbUpdateEvent.getTable();
-
       if (!taskTables.contains(tableName)) {
         continue;
       }
 
-      String countKey = getTableCountKeyFromTable(tableName);
-      String unReplicatedSizeKey =
-          getUnReplicatedSizeKeyFromTable(tableName);
-      String replicatedSizeKey =
-          getReplicatedSizeKeyFromTable(tableName);
-
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
-
-          // Compute unreplicated and replicated sizes for size-related tables
-          if (sizeRelatedTables.contains(tableName) &&
-              omdbUpdateEvent.getValue() instanceof OmKeyInfo) {
-            OmKeyInfo omKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
-            unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-                (k, size) -> size + omKeyInfo.getDataSize());
-            replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-                (k, size) -> size + omKeyInfo.getReplicatedSize());
-          }
+          handlePutEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
+              objectCountMap, unreplicatedSizeCountMap, replicatedSizeCountMap);
           break;
 
         case DELETE:
-          if (omdbUpdateEvent.getValue() != null) {
-            objectCountMap.computeIfPresent(countKey,
-                (k, count) -> count > 0 ? count - 1L : 0L);
+          handleDeleteEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
+              objectCountMap, unreplicatedSizeCountMap, replicatedSizeCountMap);
+          break;
 
-            // Compute unreplicated and replicated sizes for size-related tables
-            if (sizeRelatedTables.contains(tableName) &&
-                omdbUpdateEvent.getValue() instanceof OmKeyInfo) {
-              OmKeyInfo omKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
-              unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-                  (k, size) ->
-                      size > omKeyInfo.getDataSize() ?
-                          size - omKeyInfo.getDataSize() : 0L);
-              replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-                  (k, size) ->
-                      size > omKeyInfo.getReplicatedSize() ?
-                          size - omKeyInfo.getReplicatedSize() : 0L);
-            }
-          }
-          break;
         case UPDATE:
-          if (omdbUpdateEvent.getValue() instanceof OmKeyInfo &&
-              sizeRelatedTables.contains(tableName) &&
-              omdbUpdateEvent.getOldValue() != null) {
-            OmKeyInfo oldKeyInfo = (OmKeyInfo) omdbUpdateEvent.getOldValue();
-            OmKeyInfo newKeyInfo = (OmKeyInfo) omdbUpdateEvent.getValue();
-            // Update key size by subtracting the oldSize and adding newSize
-            unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
-                (k, size) -> size - oldKeyInfo.getDataSize() +
-                    newKeyInfo.getDataSize());
-            replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
-                (k, size) -> size - oldKeyInfo.getReplicatedSize() +
-                    newKeyInfo.getReplicatedSize());
-          } else if (omdbUpdateEvent.getValue() != null) {
-            LOG.warn("Update event does not have the old Key Info for {}.",
-                omdbUpdateEvent.getKey());
-          }
+          handleUpdateEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
+              objectCountMap, unreplicatedSizeCountMap, replicatedSizeCountMap);
           break;
+
         default:
           LOG.trace("Skipping DB update event : Table: {}, Action: {}",
               tableName, omdbUpdateEvent.getAction());
@@ -281,7 +252,7 @@ public class OmTableInsightTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
-
+    // Write the updated count and size information to the database
     if (!objectCountMap.isEmpty()) {
       writeDataToDB(objectCountMap);
     }
@@ -291,9 +262,155 @@ public class OmTableInsightTask implements ReconOmTask {
     if (!replicatedSizeCountMap.isEmpty()) {
       writeDataToDB(replicatedSizeCountMap);
     }
-
     LOG.info("Completed a 'process' run of OmTableInsightTask.");
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  private void handlePutEvent(OMDBUpdateEvent<String, Object> event,
+                              String tableName,
+                              Collection<String> sizeRelatedTables,
+                              HashMap<String, Long> objectCountMap,
+                              HashMap<String, Long> unreplicatedSizeCountMap,
+                              HashMap<String, Long> replicatedSizeCountMap) {
+    String countKey = getTableCountKeyFromTable(tableName);
+    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
+    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+
+    if (sizeRelatedTables.contains(tableName)) {
+      handleSizeRelatedTablePutEvent(event, countKey, unReplicatedSizeKey,
+          replicatedSizeKey, objectCountMap,
+          unreplicatedSizeCountMap, replicatedSizeCountMap);
+    } else {
+      objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+    }
+  }
+
+  private void handleSizeRelatedTablePutEvent(
+      OMDBUpdateEvent<String, Object> event, String countKey,
+      String unReplicatedSizeKey, String replicatedSizeKey,
+      HashMap<String, Long> objectCountMap,
+      HashMap<String, Long> unreplicatedSizeCountMap,
+      HashMap<String, Long> replicatedSizeCountMap) {
+    // Handle PUT for OpenKeyTable & OpenFileTable
+    if (event.getValue() instanceof OmKeyInfo) {
+      OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size + omKeyInfo.getDataSize());
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size + omKeyInfo.getReplicatedSize());
+    } else if (event.getValue() instanceof RepeatedOmKeyInfo) {
+      // Handle PUT for DeletedTable
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          (RepeatedOmKeyInfo) event.getValue();
+      objectCountMap.computeIfPresent(countKey,
+          (k, count) -> count + repeatedOmKeyInfo.getOmKeyInfoList().size());
+      Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size + result.getLeft());
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size + result.getRight());
+    }
+  }
+
+  private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
+                                 String tableName,
+                                 Collection<String> sizeRelatedTables,
+                                 HashMap<String, Long> objectCountMap,
+                                 HashMap<String, Long> unreplicatedSizeCountMap,
+                                 HashMap<String, Long> replicatedSizeCountMap) {
+    String countKey = getTableCountKeyFromTable(tableName);
+    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
+    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+
+    if (event.getValue() != null) {
+      if (sizeRelatedTables.contains(tableName)) {
+        handleSizeRelatedTableDeleteEvent(event, countKey, unReplicatedSizeKey,
+            replicatedSizeKey, objectCountMap,
+            unreplicatedSizeCountMap, replicatedSizeCountMap);
+      } else {
+        objectCountMap.computeIfPresent(countKey,
+            (k, count) -> count > 0 ? count - 1L : 0L);
+      }
+    }
+  }
+
+  private void handleSizeRelatedTableDeleteEvent(
+      OMDBUpdateEvent<String, Object> event, String countKey,
+      String unReplicatedSizeKey, String replicatedSizeKey,
+      HashMap<String, Long> objectCountMap,
+      HashMap<String, Long> unreplicatedSizeCountMap,
+      HashMap<String, Long> replicatedSizeCountMap) {
+    if (event.getValue() instanceof OmKeyInfo) {
+      // Handle DELETE for OpenKeyTable & OpenFileTable
+      OmKeyInfo omKeyInfo = (OmKeyInfo) event.getValue();
+      objectCountMap.computeIfPresent(countKey,
+          (k, count) -> count > 0 ? count - 1L : 0L);
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size > omKeyInfo.getDataSize() ?
+              size - omKeyInfo.getDataSize() : 0L);
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size > omKeyInfo.getReplicatedSize() ?
+              size - omKeyInfo.getReplicatedSize() : 0L);
+    } else if (event.getValue() instanceof RepeatedOmKeyInfo) {
+      // Handle DELETE for DeletedTable
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          (RepeatedOmKeyInfo) event.getValue();
+      objectCountMap.computeIfPresent(countKey, (k, count) ->
+          count > 0 ? count - repeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
+      Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size > result.getLeft() ? size - result.getLeft() : 0L);
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size > result.getRight() ? size - result.getRight() :
+              0L);
+    }
+  }
+
+  private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
+                                 String tableName,
+                                 Collection<String> sizeRelatedTables,
+                                 HashMap<String, Long> objectCountMap,
+                                 HashMap<String, Long> unreplicatedSizeCountMap,
+                                 HashMap<String, Long> replicatedSizeCountMap) {
+    String countKey = getTableCountKeyFromTable(tableName);
+    String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
+    String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
+    // In Update event the count for the table will not change. So we don't
+    // need to update the count. Except for RepeatedOmKeyInfo, for which the
+    // size of omKeyInfoList can change
+    if (event.getValue() instanceof OmKeyInfo && event.getOldValue() != null &&
+        sizeRelatedTables.contains(tableName)) {
+      // Handle UPDATE for OpenKeyTable & OpenFileTable
+      OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
+      OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size - oldKeyInfo.getDataSize() +
+              newKeyInfo.getDataSize());
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size - oldKeyInfo.getReplicatedSize() +
+              newKeyInfo.getReplicatedSize());
+    } else if (event.getValue() instanceof RepeatedOmKeyInfo &&
+        sizeRelatedTables.contains(tableName) && event.getOldValue() != null) {
+      // Handle UPDATE for DeletedTable
+      RepeatedOmKeyInfo oldRepeatedOmKeyInfo =
+          (RepeatedOmKeyInfo) event.getOldValue();
+      RepeatedOmKeyInfo newRepeatedOmKeyInfo =
+          (RepeatedOmKeyInfo) event.getValue();
+      objectCountMap.computeIfPresent(countKey,
+          (k, count) -> count > 0 ?
+              count - oldRepeatedOmKeyInfo.getOmKeyInfoList().size() +
+                  newRepeatedOmKeyInfo.getOmKeyInfoList().size() : 0L);
+      Pair<Long, Long> oldSize = oldRepeatedOmKeyInfo.getTotalSize();
+      Pair<Long, Long> newSize = newRepeatedOmKeyInfo.getTotalSize();
+      unreplicatedSizeCountMap.computeIfPresent(unReplicatedSizeKey,
+          (k, size) -> size - oldSize.getLeft() + newSize.getLeft());
+      replicatedSizeCountMap.computeIfPresent(replicatedSizeKey,
+          (k, size) -> size - oldSize.getRight() + newSize.getRight());
+    } else if (event.getValue() != null) {
+      LOG.warn("Update event does not have the old Key Info for {}.",
+          event.getKey());
+    }
   }
 
 

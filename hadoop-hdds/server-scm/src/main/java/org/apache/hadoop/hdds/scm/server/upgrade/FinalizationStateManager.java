@@ -20,7 +20,6 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Manages the state of finalization in SCM.
@@ -28,14 +27,14 @@ import java.util.concurrent.TimeoutException;
 public interface FinalizationStateManager {
 
   @Replicate
-  void addFinalizingMark() throws IOException, TimeoutException;
+  void addFinalizingMark() throws IOException;
 
   @Replicate
-  void removeFinalizingMark() throws IOException, TimeoutException;
+  void removeFinalizingMark() throws IOException;
 
   @Replicate
   void finalizeLayoutFeature(Integer layoutVersion)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * @param query The checkpoint to check for being crossed.

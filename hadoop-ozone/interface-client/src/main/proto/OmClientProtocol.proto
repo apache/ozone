@@ -137,6 +137,7 @@ enum Type {
   SetTimes = 120;
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
 }
 
 message OMRequest {
@@ -259,6 +260,7 @@ message OMRequest {
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
 
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
 }
 
 message OMResponse {
@@ -373,6 +375,7 @@ message OMResponse {
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
 
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
 }
 
 enum Status {
@@ -816,6 +819,7 @@ message SnapshotDiffJobProto {
   optional string toSnapshot = 7;
   optional bool forceFullDiff = 8;
   optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
 }
 
 message OzoneObj {
@@ -1740,7 +1744,13 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
-  optional bool cancel = 8;
+}
+
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
 }
 
 message ListSnapshotDiffJobRequest {
@@ -1830,19 +1840,14 @@ message SnapshotDiffResponse {
     CANCELLED = 6;
   }
 
-  enum JobCancelResultProto {
-    JOB_NOT_CANCELLED = 1;
-    NEW_JOB = 2;
-    JOB_DONE = 3;
-    INVALID_STATUS_TRANSITION = 4;
-    JOB_ALREADY_CANCELLED = 5;
-    CANCELLATION_SUCCESS = 6;
-  }
-
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
-  optional JobCancelResultProto jobCancelResult = 4;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
 }
 
 message ListSnapshotDiffJobResponse {

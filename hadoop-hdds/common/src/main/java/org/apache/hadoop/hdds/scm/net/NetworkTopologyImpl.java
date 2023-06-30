@@ -27,12 +27,12 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -576,11 +576,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = "
               + "{}, excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
-          scope, leafIndex, (excludedScopes == null ? "" :
-              excludedScopes.stream().collect(Collectors.joining(", "))),
-          (excludedNodes == null ? "" : excludedNodes.stream()
-              .map(Object::toString).collect(Collectors.joining(", "))),
-          affinityNode == null ? "" : affinityNode.toString(), ancestorGen);
+          scope, leafIndex,
+          excludedScopes == null ? "" : excludedScopes,
+          excludedNodes == null ? "" : excludedNodes,
+          affinityNode == null ? "" : affinityNode, ancestorGen);
     }
 
     String finalScope = scope;
@@ -617,8 +616,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
         // excludeScope and finalScope share nothing case
         if (scopeNode.isAncestor(s)) {
-          if (mutableExcludedScopes.stream().
-              noneMatch(n -> getNode(s).isDescendant(n))) {
+          Node node = getNode(s);
+          if (node != null &&
+              mutableExcludedScopes.stream().noneMatch(node::isDescendant)) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -626,7 +626,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
 
     // clone excludedNodes before remove duplicate in it
-    Collection<Node> mutableExNodes = new ArrayList<>();
+    Collection<Node> mutableExNodes = new LinkedHashSet<>();
 
     // add affinity node to mutableExNodes
     if (affinityNode != null) {
@@ -636,8 +636,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
     // Remove duplicate in excludedNodes
     if (excludedNodes != null) {
       mutableExNodes.addAll(excludedNodes);
-      mutableExNodes =
-          mutableExNodes.stream().distinct().collect(Collectors.toList());
     }
 
     // remove duplicate in mutableExNodes and mutableExcludedScopes
@@ -888,7 +886,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private void checkExcludedScopes(List<String> excludedScopes) {
     if (!CollectionUtils.isEmpty(excludedScopes)) {
-      excludedScopes.stream().forEach(scope -> {
+      excludedScopes.forEach(scope -> {
         if (scope.startsWith(SCOPE_REVERSE_STR)) {
           throw new IllegalArgumentException("excludedScope " + scope +
               " cannot start with " + SCOPE_REVERSE_STR);

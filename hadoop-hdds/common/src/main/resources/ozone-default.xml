@@ -1013,6 +1013,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.lock.stripes</name>
+    <value>512</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The number of stripes created for the container state manager lock.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.address</name>
     <value/>
     <tag>OZONE, MANAGEMENT</tag>
@@ -3983,7 +3991,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
-    <value>60m</value>
+    <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.

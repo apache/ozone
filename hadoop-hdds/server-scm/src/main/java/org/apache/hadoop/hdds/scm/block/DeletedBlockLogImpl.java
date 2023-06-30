@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -174,7 +173,7 @@ public class DeletedBlockLogImpl
    */
   @Override
   public void incrementCount(List<Long> txIDs)
-      throws IOException, TimeoutException {
+      throws IOException {
     lock.lock();
     try {
       ArrayList<Long> txIDsToUpdate = new ArrayList<>();
@@ -206,7 +205,7 @@ public class DeletedBlockLogImpl
    *
    */
   @Override
-  public int resetCount(List<Long> txIDs) throws IOException, TimeoutException {
+  public int resetCount(List<Long> txIDs) throws IOException {
     lock.lock();
     try {
       if (txIDs == null || txIDs.isEmpty()) {
@@ -344,7 +343,7 @@ public class DeletedBlockLogImpl
       try {
         deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
         metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
         LOG.warn("Could not commit delete block transactions: "
             + txIDsToBeDeleted, e);
       }
@@ -423,7 +422,7 @@ public class DeletedBlockLogImpl
    */
   @Override
   public void addTransactions(Map<Long, List<Long>> containerBlocksMap)
-      throws IOException, TimeoutException {
+      throws IOException {
     lock.lock();
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
@@ -505,7 +504,7 @@ public class DeletedBlockLogImpl
   @Override
   public DatanodeDeletedBlockTransactions getTransactions(
       int blockDeletionLimit, Set<DatanodeDetails> dnList)
-      throws IOException, TimeoutException {
+      throws IOException {
     lock.lock();
     try {
       DatanodeDeletedBlockTransactions transactions =

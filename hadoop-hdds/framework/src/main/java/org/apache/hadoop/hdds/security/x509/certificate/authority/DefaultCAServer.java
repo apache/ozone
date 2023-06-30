@@ -60,7 +60,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -269,8 +268,7 @@ public class DefaultCAServer implements CertificateServer {
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
-    } catch (CertificateException | IOException | OperatorCreationException |
-             TimeoutException e) {
+    } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
       xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
@@ -281,7 +279,7 @@ public class DefaultCAServer implements CertificateServer {
   private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
       LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
-      OperatorCreationException, CertificateException, TimeoutException {
+      OperatorCreationException, CertificateException {
 
     lock.lock();
     X509CertificateHolder xcert;
@@ -328,7 +326,7 @@ public class DefaultCAServer implements CertificateServer {
           store.revokeCertificates(certificates,
               getCACertificate(), reason, revocationTime, crlApprover)
       );
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));
     }

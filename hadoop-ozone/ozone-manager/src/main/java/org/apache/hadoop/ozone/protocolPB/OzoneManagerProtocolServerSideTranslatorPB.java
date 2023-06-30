@@ -65,7 +65,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = 
       "org.apache.hadoop.ozone";
-  
+
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final boolean isRatisEnabled;
