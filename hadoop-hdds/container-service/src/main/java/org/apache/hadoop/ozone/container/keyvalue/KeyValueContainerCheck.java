@@ -45,7 +45,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
-import org.apache.hadoop.service.launcher.IrqHandler;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +95,8 @@ public class KeyValueContainerCheck {
       // Container directory should exist.
       File containerDir = new File(metadataPath).getParentFile();
       if (!containerDir.exists()) {
-        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_DIR,
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.MISSING_CONTAINER_DIR,
             containerDir, new FileNotFoundException("Container directory " +
                 containerDir + " not found."));
       }
@@ -115,11 +115,11 @@ public class KeyValueContainerCheck {
       try {
         loadContainerData(containerFile);
       } catch (FileNotFoundException ex) {
-        return ScanResult.unhealthy(ScanResult.FailureType.MISSING_CONTAINER_FILE,
-            containerFile, ex);
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.MISSING_CONTAINER_FILE, containerFile, ex);
       } catch (IOException ex) {
-        return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CONTAINER_FILE,
-            containerFile, ex);
+        return ScanResult.unhealthy(
+            ScanResult.FailureType.CORRUPT_CONTAINER_FILE, containerFile, ex);
       }
 
       // Chunks directory should exist.
