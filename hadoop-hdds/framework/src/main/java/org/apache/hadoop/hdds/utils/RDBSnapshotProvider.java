@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 
 /**
@@ -123,10 +124,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
       RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
           candidateDir, true);
-      File hardLinkFile = new File(
-          checkpoint.getCheckpointLocation().toString(), "hardLinkFile");
-      // If the hardlink file exists we have gotten the last tar file.
-      if (hardLinkFile.exists()) {
+      if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
         LOG.info("Successfully untar the downloaded snapshot {} at {}.",
             targetFile, checkpoint.getCheckpointLocation());
         return checkpoint;
