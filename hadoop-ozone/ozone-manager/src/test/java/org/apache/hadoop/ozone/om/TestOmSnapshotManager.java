@@ -342,8 +342,8 @@ public class TestOmSnapshotManager {
    */
   @Test
   public void testProcessFile() throws IOException {
-    new File(testDir.toString(), "snap1").mkdirs();
-    new File(testDir.toString(), "snap2").mkdirs();
+    Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());
+    Assert.assertTrue(new File(testDir.toString(), "snap2").mkdirs());
     Path copyFile = Paths.get(testDir.toString(),
         "snap1/copyfile.sst");
     Files.write(copyFile,

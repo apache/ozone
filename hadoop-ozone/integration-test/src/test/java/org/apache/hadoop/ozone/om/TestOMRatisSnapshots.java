@@ -1205,13 +1205,14 @@ public class TestOMRatisSnapshots {
     private Set<String> getSstFilenames(File tarball)
         throws IOException {
       Set<String> sstFilenames = new HashSet<>();
-      TarArchiveInputStream tarInput =
-          new TarArchiveInputStream(new FileInputStream(tarball));
-      TarArchiveEntry entry;
-      while ((entry = tarInput.getNextTarEntry()) != null) {
-        String name = entry.getName();
-        if (name.toLowerCase().endsWith(".sst")) {
-          sstFilenames.add(entry.getName());
+      try (TarArchiveInputStream tarInput =
+           new TarArchiveInputStream(new FileInputStream(tarball))) {
+        TarArchiveEntry entry;
+        while ((entry = tarInput.getNextTarEntry()) != null) {
+          String name = entry.getName();
+          if (name.toLowerCase().endsWith(".sst")) {
+            sstFilenames.add(entry.getName());
+          }
         }
       }
       return sstFilenames;
@@ -1219,9 +1220,11 @@ public class TestOMRatisSnapshots {
 
     // Find the tarball in the dir.
     private File getTarball(File dir) {
-      for (File f : Objects.requireNonNull(dir.listFiles())) {
-        if (f.getName().toLowerCase().endsWith(".tar")) {
-          return f;
+      for (File f : dir.listFiles()) {
+        if (f != null) {
+          if (f.getName().toLowerCase().endsWith(".tar")) {
+            return f;
+          }
         }
       }
       return null;
