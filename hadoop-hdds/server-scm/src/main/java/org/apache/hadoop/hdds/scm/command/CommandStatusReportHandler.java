@@ -77,8 +77,10 @@ public class CommandStatusReportHandler implements
      * , there will have many {@link CommandStatus#Status#PENDING} status
      * CommandStatus in report
      */
-    publisher.fireEvent(SCMEvents.DELETE_BLOCK_STATUS, new DeleteBlockStatus(
-        deleteBlocksCommandStatus, report.getDatanodeDetails()));
+    if (!deleteBlocksCommandStatus.isEmpty()) {
+      publisher.fireEvent(SCMEvents.DELETE_BLOCK_STATUS, new DeleteBlockStatus(
+          deleteBlocksCommandStatus, report.getDatanodeDetails()));
+    }
   }
 
   /**

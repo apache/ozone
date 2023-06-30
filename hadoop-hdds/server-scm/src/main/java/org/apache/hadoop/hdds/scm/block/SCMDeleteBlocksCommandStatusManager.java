@@ -197,7 +197,6 @@ public class SCMDeleteBlocksCommandStatusManager {
   public void cleanSCMCommandForDn(UUID dnId, long timeoutMs) {
     cleanTimeoutSCMCommand(dnId, timeoutMs);
     cleanFinalStatusSCMCommand(dnId);
-    cleanFailedCMCommandState(dnId);
   }
 
   private void cleanTimeoutSCMCommand(UUID dnId, long timeoutMs) {
@@ -213,16 +212,6 @@ public class SCMDeleteBlocksCommandStatusManager {
 
   private void cleanFinalStatusSCMCommand(UUID dnId) {
     for (CmdStatus status : finialStatuses) {
-      for (Long scmCmdId : getScmCommandIds(dnId, status)) {
-        CmdStatusData stateData = removeScmCommand(dnId, scmCmdId);
-        LOG.debug("Clean SCMCommand status: {} for DN: {}, stateData: {}",
-            status, dnId, stateData);
-      }
-    }
-  }
-
-  private void cleanFailedCMCommandState(UUID dnId) {
-    for (CmdStatus status : failedStatuses) {
       for (Long scmCmdId : getScmCommandIds(dnId, status)) {
         CmdStatusData stateData = removeScmCommand(dnId, scmCmdId);
         LOG.debug("Clean SCMCommand status: {} for DN: {}, stateData: {}",
