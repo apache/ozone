@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -61,7 +62,10 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       SCMSecurityProtocolClientSideTranslatorPB scmSecureClient) {
     this.scmSecureClient = scmSecureClient;
     this.knownRootCerts = initiallyKnownRootCaCerts;
-    poller = Executors.newSingleThreadScheduledExecutor();
+    poller = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat(
+                "RootCaRotationPoller")
+            .setDaemon(true).build());
     pollingRate = securityConfig.getRootCaClientPollingFrequency();
     rootCARotationProcessors = new ArrayList<>();
   }
