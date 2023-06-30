@@ -470,16 +470,19 @@ public class TestDeletedBlockLog {
     Map<UUID, List<DeletedBlocksTransaction>> map2 =
         transactions2.getDatanodeTransactionMap();
 
-    for (UUID dnId : map1.keySet()) {
-      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(map1.get(dnId));
+    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+        map1.entrySet()) {
+      UUID dnId = entry.getKey();
+      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(entry.getValue());
       Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
 
       txSet1.retainAll(txSet2);
       Assertions.assertEquals(0, txSet1.size(),
           String.format("Duplicate Transactions found first transactions %s " +
-                  "second transactions %s for Dn %s", txSet1, txSet2, dnId));
+              "second transactions %s for Dn %s", txSet1, txSet2, dnId));
     }
   }
+
 
   private void assertContainsAllTransactions(
       DatanodeDeletedBlockTransactions transactions1,
@@ -489,8 +492,10 @@ public class TestDeletedBlockLog {
     Map<UUID, List<DeletedBlocksTransaction>> map2 =
         transactions2.getDatanodeTransactionMap();
 
-    for (UUID dnId : map1.keySet()) {
-      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(map1.get(dnId));
+    for (Map.Entry<UUID, List<DeletedBlocksTransaction>> entry :
+        map1.entrySet()) {
+      UUID dnId = entry.getKey();
+      Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(entry.getValue());
       Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
 
       Assertions.assertTrue(txSet1.containsAll(txSet2));
