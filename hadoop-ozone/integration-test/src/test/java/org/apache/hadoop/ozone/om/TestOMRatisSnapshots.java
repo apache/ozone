@@ -1137,8 +1137,9 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  // Interupts the tarball download process to test tarballs
-  // exceeding the max size.
+  // Interupts the tarball download process to test creation of
+  // multiple tarballs as needed when the tarball size exceeds the
+  // max.
   private static class SnapshotMaxSizeInjector extends FaultInjector {
     private final OzoneManager om;
     private int count;
@@ -1159,6 +1160,7 @@ public class TestOMRatisSnapshots {
     }
 
     @Override
+    // Pause each time a tarball is received, to process it.
     public void pause() throws IOException {
       count++;
       File tarball = getTarball(snapshotDir);
@@ -1170,12 +1172,11 @@ public class TestOMRatisSnapshots {
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
-        // process.
+        // process from the beginning.
         createEmptyTarball(tarball);
       } else {
-        // Each entry in the list is the set of sst
-        // files in this iteration; so the list will
-        // have one entry for each tarball.
+        // Each time we get a new tarball add a set of
+        // its sst file to the list, (i.e. one per tarball.)
         sstSetList.add(getSstFilenames(tarball));
       }
     }
@@ -1220,7 +1221,9 @@ public class TestOMRatisSnapshots {
 
     // Find the tarball in the dir.
     private File getTarball(File dir) {
-      for (File f : dir.listFiles()) {
+      assertNotNull(dir);
+      File[] fileList = dir.listFiles();
+       for (File f : fileList) {
         if (f != null) {
           if (f.getName().toLowerCase().endsWith(".tar")) {
             return f;

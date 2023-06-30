@@ -117,13 +117,12 @@ public final class OmSnapshotUtils {
           String to = l.split("\t")[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           Path fullToPath = Paths.get(dbPath.toString(), to);
+          // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();
-          if (parent != null) {
-            if (!parent.toFile().exists()) {
-              if (!toParent.mkdirs()) {
-                throw new IOException(
+          if ((parent != null) && (!parent.toFile().exists())) {
+            if (!parent.toFile().mkdirs()) {
+              throw new IOException(
                   "Failed to create directory: " + parent.toString());
-              }
             }
           }
           Files.createLink(fullToPath, fullFromPath);
