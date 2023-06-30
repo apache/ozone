@@ -184,7 +184,7 @@ execute_robot_test(){
   declare -i i=0
   OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
   while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let i++
+    let ++i
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
