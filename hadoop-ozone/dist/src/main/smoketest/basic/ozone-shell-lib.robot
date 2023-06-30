@@ -36,8 +36,6 @@ Test ozone shell
                     Should Be Empty     ${result}
     ${result} =     Execute             ozone sh volume list ${protocol}${server}/ | jq -r '.[] | select(.name=="${volume}")'
                     Should contain      ${result}       creationTime
-    ${result} =     Execute             ozone sh volume list | jq -r '.[] | select(.name=="${volume}")'
-                    Should contain      ${result}       creationTime
 # TODO: Disable updating the owner, acls should be used to give access to other user.
                     Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 10TB --namespace-quota 100
 #    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.volumeName=="${volume}") | .owner | .name'
@@ -46,16 +44,18 @@ Test ozone shell
                     Should Be Equal     ${result}       10995116277760
     ${result} =     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
                     Should Be Empty     ${result}
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .storageType'
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' bb1.json
                     Should Be Equal     ${result}       DISK
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
                     Should Be Equal     ${result}       10995116277760
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
                     Should Be Equal     ${result}       100
                     Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 1TB --namespace-quota 1000
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
                     Should Be Equal     ${result}       1099511627776
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
                     Should Be Equal     ${result}       1000
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '.[] | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
@@ -75,14 +75,16 @@ Test ozone shell
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
                     Execute             ozone sh volume create ${protocol}${server}/${volume}
-    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInBytes'
+                    Execute             ozone sh volume info ${protocol}${server}/${volume} > volume.json
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInBytes' volume.json
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.name=="${volume}") | .quotaInNamespace'
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInNamespace' volume.json
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInBytes'
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="bb1") | .quotaInNamespace'
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
@@ -204,6 +206,44 @@ Test prefix Acls
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
     Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
     Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+
+Test native authorizer
+    [arguments]     ${protocol}         ${server}       ${volume}
+
+    Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
+
+    Execute         ozone sh volume removeacl ${protocol}${server}/${volume} -a group:root:a
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
+                    Should contain      ${result}    PERMISSION_DENIED
+    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
+                    Should contain      ${result}    PERMISSION_DENIED
+    ${result} =     Execute And Ignore Error         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xy
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser     testuser.keytab
+    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xyrw
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have LIST permission to access volume
+    Execute         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:l
+    Execute         ozone sh bucket list ${protocol}${server}/${volume}
+    Execute         ozone sh volume getacl ${protocol}${server}/${volume}
+
+    ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
+    Should contain      ${result}    PERMISSION_DENIED
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser     testuser.keytab
+    Execute         ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:testuser2:a
+    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    Execute         ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
+    Execute         ozone sh key list ${protocol}${server}/${volume}/bb1
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser    testuser.keytab
 
 Test Delete key with and without Trash
     [arguments]    ${protocol}         ${server}       ${volume}

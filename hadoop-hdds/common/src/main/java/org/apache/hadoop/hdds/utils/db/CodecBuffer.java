@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
+import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -32,9 +34,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
+
+import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
 
 /**
  * A buffer used by {@link Codec}
@@ -43,48 +50,79 @@ import java.util.function.ToIntFunction;
 public final class CodecBuffer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
+  /** The size of a buffer. */
+  public static class Capacity {
+    private final Object name;
+    private final AtomicInteger value;
+
+    public Capacity(Object name, int initialCapacity) {
+      this.name = name;
+      this.value = new AtomicInteger(initialCapacity);
+    }
+
+    public int get() {
+      return value.get();
+    }
+
+    private static int nextValue(int n) {
+      // round up to the next power of 2.
+      final long roundUp = Long.highestOneBit(n) << 1;
+      return roundUp > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) roundUp;
+    }
+
+    /** Increase this size to accommodate the given required size. */
+    public void increase(int required) {
+      final MemoizedSupplier<Integer> newBufferSize = MemoizedSupplier.valueOf(
+          () -> nextValue(required));
+      final int previous = value.getAndUpdate(
+          current -> required <= current ? current : newBufferSize.get());
+      if (newBufferSize.isInitialized()) {
+        LOG.info("{}: increase {} -> {}", name, previous, newBufferSize.get());
+      }
+    }
+  }
+
   private static final ByteBufAllocator POOL
       = PooledByteBufAllocator.DEFAULT;
+  private static final IntFunction<ByteBuf> POOL_DIRECT = c -> c >= 0
+      ? POOL.directBuffer(c, c) // allocate exact size
+      : POOL.directBuffer(-c);  // allocate a resizable buffer
+  private static final IntFunction<ByteBuf> POOL_HEAP = c -> c >= 0
+      ? POOL.heapBuffer(c, c)   // allocate exact size
+      : POOL.heapBuffer(-c);    // allocate a resizable buffer
 
-  
+  private final StackTraceElement[] elements;
+
   /**
-   * Allocate a direct buffer.
-   * When the given capacity is non-negative, allocate a buffer by setting
-   * the initial capacity and the maximum capacity to the given capacity.
-   * When the given capacity is negative, allocate a buffer
-   * by setting only the initial capacity to the absolute value of it
-   * and then the buffer's capacity can be increased if necessary.
+   * Allocate a buffer using the given allocator.
+   *
+   * @param allocator Take a capacity parameter and return an allocated buffer.
+   *                  When the capacity is non-negative,
+   *                  allocate a buffer by setting the initial capacity
+   *                  and the maximum capacity to the given capacity.
+   *                  When the capacity is negative,
+   *                  allocate a buffer by setting only the initial capacity
+   *                  to the absolute value of it and, as a result,
+   *                  the buffer's capacity can be increased if necessary.
    */
-  public static CodecBuffer allocateDirect(int capacity) {
-    final ByteBuf buf;
-    if (capacity >= 0) {
-      // allocate exact size
-      buf = POOL.directBuffer(capacity, capacity);
-    } else {
-      // allocate a resizable buffer
-      buf = POOL.directBuffer(-capacity);
-    }
-    return new CodecBuffer(buf);
+  static CodecBuffer allocate(int capacity, IntFunction<ByteBuf> allocator) {
+    return new CodecBuffer(allocator.apply(capacity));
   }
 
   /**
-   * Allocate a heap buffer.
-   * When the given capacity is non-negative, allocate a buffer by setting
-   * the initial capacity and the maximum capacity to the given capacity.
-   * When the given capacity is negative, allocate a buffer
-   * by setting only the initial capacity to the absolute value of it
-   * and then the buffer's capacity can be increased if necessary.
+   * Allocate a pooled direct buffer.
+   * @see #allocate(int, IntFunction)
+   */
+  public static CodecBuffer allocateDirect(int capacity) {
+    return allocate(capacity, POOL_DIRECT);
+  }
+
+  /**
+   * Allocate a pooled heap buffer.
+   * @see #allocate(int, IntFunction)
    */
   public static CodecBuffer allocateHeap(int capacity) {
-    final ByteBuf buf;
-    if (capacity >= 0) {
-      // allocate exact size
-      buf = POOL.heapBuffer(capacity, capacity);
-    } else {
-      // allocate a resizable buffer
-      buf = POOL.heapBuffer(-capacity);
-    }
-    return new CodecBuffer(buf);
+    return allocate(capacity, POOL_HEAP);
   }
 
   /** Wrap the given array. */
@@ -107,6 +145,7 @@ public final class CodecBuffer implements AutoCloseable {
 
   private CodecBuffer(ByteBuf buf) {
     this.buf = buf;
+    this.elements = getStackTrace(LOG);
     assertRefCnt(1);
   }
 
@@ -122,8 +161,11 @@ public final class CodecBuffer implements AutoCloseable {
       final int refCnt = buf.refCnt();
       if (refCnt > 0) {
         final int leak = LEAK_COUNT.incrementAndGet();
-        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}",
-            leak, this, refCnt, capacity);
+        LOG.warn("LEAK {}: {}, refCnt={}, capacity={}{}",
+            leak, this, refCnt, capacity,
+            elements != null
+                ? " allocation:\n" + formatStackTrace(elements, 3)
+                : "");
         buf.release(refCnt);
       }
     }
@@ -187,6 +229,26 @@ public final class CodecBuffer implements AutoCloseable {
     assertRefCnt(1);
     Preconditions.assertTrue(buf.nioBufferCount() > 0);
     return buf.nioBuffer().asReadOnlyBuffer();
+  }
+
+  /**
+   * @return a new array containing the readable bytes.
+   * @see #readableBytes()
+   */
+  public byte[] getArray() {
+    final byte[] array = new byte[readableBytes()];
+    buf.readBytes(array);
+    return array;
+  }
+
+  /** Does the content of this buffer start with the given prefix? */
+  public boolean startsWith(CodecBuffer prefix) {
+    Objects.requireNonNull(prefix, "prefix == null");
+    final int length = prefix.readableBytes();
+    if (this.readableBytes() < length) {
+      return false;
+    }
+    return buf.slice(buf.readerIndex(), length).equals(prefix.buf);
   }
 
   /** @return an {@link InputStream} reading from this buffer. */
@@ -272,7 +334,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @return this object.
    * @throws IOException in case the source throws an {@link IOException}.
    */
-  CodecBuffer put(
+  public CodecBuffer put(
       CheckedFunction<OutputStream, Integer, IOException> source)
       throws IOException {
     assertRefCnt(1);
@@ -299,7 +361,7 @@ public final class CodecBuffer implements AutoCloseable {
    * @throws E in case the source throws it.
    */
   <E extends Exception> Integer putFromSource(
-      CheckedFunction<ByteBuffer, Integer, E> source) throws E {
+      PutToByteBuffer<E> source) throws E {
     assertRefCnt(1);
     final int i = buf.writerIndex();
     final int writable = buf.writableBytes();
@@ -312,5 +374,16 @@ public final class CodecBuffer implements AutoCloseable {
       }
     }
     return size;
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName()
+        + "[" + buf.readerIndex()
+        + "<=" + buf.writerIndex()
+        + "<=" + buf.capacity()
+        + ": "
+        + StringUtils.bytes2Hex(asReadOnlyByteBuffer(), 10)
+        + "]";
   }
 }

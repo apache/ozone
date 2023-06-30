@@ -21,8 +21,9 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.ratis.util.function.CheckedSupplier;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,11 +37,30 @@ public class OzoneKeyDetails extends OzoneKey {
   /**
    * A list of block location information to specify replica locations.
    */
-  private List<OzoneKeyLocation> ozoneKeyLocations;
+  private final List<OzoneKeyLocation> ozoneKeyLocations;
 
-  private FileEncryptionInfo feInfo;
+  private final FileEncryptionInfo feInfo;
 
-  private SupplierWithIOException<OzoneInputStream> contentSupplier;
+  private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
+
+  /**
+   * Constructs OzoneKeyDetails from OmKeyInfo.
+   */
+  @SuppressWarnings("parameternumber")
+  @Deprecated
+  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
+                         long size, long creationTime, long modificationTime,
+                         List<OzoneKeyLocation> ozoneKeyLocations,
+                         ReplicationType type, Map<String, String> metadata,
+                         FileEncryptionInfo feInfo, int replicationFactor) {
+    super(volumeName, bucketName, keyName, size, creationTime,
+        modificationTime, type, replicationFactor);
+    this.ozoneKeyLocations = ozoneKeyLocations;
+    this.feInfo = feInfo;
+    contentSupplier = null;
+    this.setMetadata(metadata);
+  }
+
 
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
@@ -52,7 +72,7 @@ public class OzoneKeyDetails extends OzoneKey {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
-      SupplierWithIOException<OzoneInputStream> contentSupplier,
+      CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
       boolean isFile) {
     super(volumeName, bucketName, keyName, size, creationTime,
         modificationTime, replicationConfig, metadata, isFile);

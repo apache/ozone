@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
@@ -817,19 +817,24 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
-    List<OzoneSnapshot> snapshotList =
-        objectStore.listSnapshot(volumeName, bucketName);
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
+    List<FileStatusAdapter> res = new ArrayList<>();
 
-    return snapshotList.stream()
-        .map(ozoneSnapshot -> getFileStatusAdapterForBucketSnapshot(
-            ozoneBucket, ozoneSnapshot, uri, owner, group))
-        .collect(Collectors.toList());
+    Iterator<? extends OzoneSnapshot> snapshotIter =
+        objectStore.listSnapshot(volumeName, bucketName, null, null);
+
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot ozoneSnapshot = snapshotIter.next();
+      res.add(getFileStatusAdapterForBucketSnapshot(
+          ozoneBucket, ozoneSnapshot, uri, owner, group));
+    }
+
+    return res;
   }
 
   /**
@@ -1297,6 +1302,15 @@ public class BasicRootedOzoneClientAdapterImpl
     return proxy.createSnapshot(ofsPath.getVolumeName(),
             ofsPath.getBucketName(),
             snapshotName);
+  }
+
+  @Override
+  public void deleteSnapshot(String pathStr, String snapshotName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    proxy.deleteSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotName);
   }
 
   @Override

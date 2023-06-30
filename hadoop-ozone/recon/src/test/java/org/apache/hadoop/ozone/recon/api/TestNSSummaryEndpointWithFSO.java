@@ -835,7 +835,7 @@ public class TestNSSummaryEndpointWithFSO {
     omConfiguration.set(OZONE_OM_DB_DIRS,
             omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-            omConfiguration);
+            omConfiguration, null);
 
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =

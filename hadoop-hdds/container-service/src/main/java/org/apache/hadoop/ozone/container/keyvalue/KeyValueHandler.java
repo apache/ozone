@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -126,7 +127,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueHandler extends Handler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(
+  public static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
 
   private final BlockManager blockManager;
@@ -135,8 +136,6 @@ public class KeyValueHandler extends Handler {
   private final long maxContainerSize;
   private final Function<ByteBuffer, ByteString> byteBufferToByteString;
   private final boolean validateChunkChecksumData;
-  private final boolean checkIfNoBlockFiles;
-
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
 
@@ -159,13 +158,6 @@ public class KeyValueHandler extends Handler {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
-    checkIfNoBlockFiles =
-        conf.getBoolean(
-            DatanodeConfiguration.
-                OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE,
-        DatanodeConfiguration.
-            OZONE_DATANODE_CHECK_EMPTY_CONTAINER_ON_DISK_ON_DELETE_DEFAULT);
 
     maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
@@ -1078,21 +1070,32 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void markContainerUnhealthy(Container container)
-      throws IOException {
+      throws StorageContainerException {
     container.writeLock();
     try {
-      if (container.getContainerState() != State.UNHEALTHY) {
-        try {
-          container.markContainerUnhealthy();
-        } catch (IOException ex) {
-          // explicitly catch IOException here since this operation
-          // will fail if the Rocksdb metadata is corrupted.
-          long id = container.getContainerData().getContainerID();
-          LOG.warn("Unexpected error while marking container " + id
-              + " as unhealthy", ex);
-        } finally {
-          sendICR(container);
-        }
+      long containerID = container.getContainerData().getContainerID();
+      if (container.getContainerState() == State.UNHEALTHY) {
+        LOG.debug("Call to mark already unhealthy container {} as unhealthy",
+            containerID);
+        return;
+      }
+      // If the volume is unhealthy, no action is needed. The container has
+      // already been discarded and SCM notified. Once a volume is failed, it
+      // cannot be restored without a restart.
+      HddsVolume containerVolume = container.getContainerData().getVolume();
+      if (containerVolume.isFailed()) {
+        LOG.debug("Ignoring unhealthy container {} detected on an " +
+            "already failed volume {}", containerID, containerVolume);
+        return;
+      }
+
+      try {
+        container.markContainerUnhealthy();
+      } catch (StorageContainerException ex) {
+        LOG.warn("Unexpected error while marking container {} unhealthy",
+            containerID, ex);
+      } finally {
+        sendICR(container);
       }
     } finally {
       container.writeUnlock();
@@ -1286,6 +1289,16 @@ public class KeyValueHandler extends Handler {
       throws StorageContainerException {
     container.writeLock();
     try {
+      if (container.getContainerData().getVolume().isFailed()) {
+        // if the  volume in which the container resides fails
+        // don't attempt to delete/move it. When a volume fails,
+        // failedVolumeListener will pick it up and clear the container
+        // from the container set.
+        LOG.info("Delete container issued on containerID {} which is in a " +
+                "failed volume. Skipping", container.getContainerData()
+            .getContainerID());
+        return;
+      }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
@@ -1298,63 +1311,20 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (container.getContainerData().getBlockCount() != 0) {
-          metrics.incContainerDeleteFailedBlockCountNotZero();
+        if (container.hasBlocks()) {
+          metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for container {} but" +
                   " the container is not empty with blockCount {}",
               container.getContainerData().getContainerID(),
               container.getContainerData().getBlockCount());
+          // blocks table for future debugging.
+          // List blocks
+          logBlocksIfNonZero(container);
+          // Log chunks
+          logBlocksFoundOnDisk(container);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
-        }
-
-        // This is a defensive check to make sure there is no data loss if
-        // 1. There are one or more blocks on the filesystem
-        // 2. There are one or more blocks in the block table
-        // This can lead to false positives as
-        // 1. Chunks written to disk that did not get recorded in RocksDB can
-        //    occur due to failures during write
-        // 2. Blocks that were deleted from blocks table but the deletion of
-        //    the underlying file could not be completed
-        // 3. Failures between files being deleted from disk but not being
-        //    cleaned up.
-        // 4. Bugs in the code.
-        // Blocks stored on disk represent data written by a client and should
-        // be treated with care at the expense of creating artifacts on disk
-        // that  might be unreferenced.
-        // https://issues.apache.org/jira/browse/HDDS-8138 will move the
-        // implementation to only depend on consistency of the chunks folder
-
-        // First check if any files are in the chunks folder. If there are
-        // to help with debugging also dump the blocks table data.
-        if (checkIfNoBlockFiles) {
-          if (!container.isEmpty()) {
-            metrics.incContainerDeleteFailedNonEmpty();
-            logBlocksFoundOnDisk(container);
-            logBlocksIfNonZero(container);
-            // List Blocks from Blocks Table
-            throw new StorageContainerException("Non-force deletion of " +
-                "non-empty container dir:" +
-                container.getContainerData().getContainerID() +
-                " is not allowed.",
-                DELETE_ON_NON_EMPTY_CONTAINER);
-          }
-
-          // The chunks folder is empty, not check if the blocks table has any
-          // blocks still referenced. This will avoid cleaning up the
-          // blocks table for future debugging.
-          // List rocks
-          if (logBlocksIfNonZero(container)) {
-            LOG.error("Non-empty blocks table for container {}",
-                container.getContainerData().getContainerID());
-            metrics.incContainerDeleteFailedNonEmptyBlocksDB();
-            throw new StorageContainerException("Non-force deletion of " +
-                "non-empty container block table:" +
-                container.getContainerData().getContainerID() +
-                " is not allowed.",
-                DELETE_ON_NON_EMPTY_CONTAINER);
-          }
         }
       } else {
         metrics.incContainersForceDelete();
@@ -1365,13 +1335,16 @@ public class KeyValueHandler extends Handler {
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Rename container location
-        boolean success = KeyValueContainerUtil.ContainerDeleteDirectory
-            .moveToTmpDeleteDirectory(keyValueContainerData, hddsVolume);
-
-        if (!success) {
-          LOG.error("Failed to move container under " +
-              hddsVolume.getDeleteServiceDirPath());
-          throw new StorageContainerException("Moving container failed",
+        try {
+          KeyValueContainerUtil.moveToDeletedContainerDir(keyValueContainerData,
+              hddsVolume);
+        } catch (IOException ioe) {
+          LOG.error("Failed to move container under " + hddsVolume
+              .getDeletedContainerDir());
+          String errorMsg =
+              "Failed to move container" + container.getContainerData()
+                  .getContainerID();
+          triggerVolumeScanAndThrowException(container, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
 
@@ -1380,8 +1353,8 @@ public class KeyValueHandler extends Handler {
               .getContainerPath();
           File containerDir = new File(containerPath);
 
-          LOG.debug("Container {} has been successfuly moved under {}",
-              containerDir.getName(), hddsVolume.getDeleteServiceDirPath());
+          LOG.debug("Container {} has been successfully moved under {}",
+              containerDir.getName(), hddsVolume.getDeletedContainerDir());
         }
       }
       long containerId = container.getContainerData().getContainerID();
@@ -1393,9 +1366,11 @@ public class KeyValueHandler extends Handler {
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
           container.getContainerData().getContainerID(), e);
-      throw new StorageContainerException("Could not determine if container "
-          + container.getContainerData().getContainerID() +
-          " is empty", DELETE_ON_NON_EMPTY_CONTAINER);
+      String errorMsg =
+          "Failed to read container dir" + container.getContainerData()
+              .getContainerID();
+      triggerVolumeScanAndThrowException(container, errorMsg,
+          CONTAINER_INTERNAL_ERROR);
     } finally {
       container.writeUnlock();
     }
@@ -1404,4 +1379,17 @@ public class KeyValueHandler extends Handler {
     container.getContainerData().setState(State.DELETED);
     sendICR(container);
   }
+
+  private void triggerVolumeScanAndThrowException(Container container,
+      String msg, ContainerProtos.Result result)
+      throws StorageContainerException {
+    // Trigger a volume scan as exception occurred.
+    StorageVolumeUtil.onFailure(container.getContainerData().getVolume());
+    throw new StorageContainerException(msg, result);
+  }
+
+  public static Logger getLogger() {
+    return LOG;
+  }
+
 }

@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 
@@ -618,16 +619,16 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneSnapshot> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException {
+    return null;
+  }
+  
   public void deleteSnapshot(String volumeName,
       String bucketName, String snapshotName)
       throws IOException {
 
-  }
-
-  @Override
-  public List<OzoneSnapshot> listSnapshot(String volumeName, String bucketName)
-      throws IOException {
-    return null;
   }
 
   @Override
@@ -639,6 +640,22 @@ public class ClientProtocolStub implements ClientProtocol {
                                            int pageSize,
                                            boolean forceFullDiff)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
     return null;
   }
 

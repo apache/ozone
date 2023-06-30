@@ -60,7 +60,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
@@ -68,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 
@@ -149,7 +149,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   void testPipelinesCreatedBasedOnTotalDiskCount(PipelineChoosePolicy policy)
-      throws IOException, TimeoutException {
+      throws IOException {
     provider = createSubject(policy);
     providerConf.setMinimumPipelines(1);
     nodeManager.setNumHealthyVolumes(20);
@@ -163,7 +163,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   void testPipelinesCreatedBasedOnTotalDiskCountWithFactor(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     int factor = 10;
     providerConf.setMinimumPipelines(1);
@@ -179,7 +179,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   void testPipelinesCreatedUpToMinLimitAndRandomPipelineReturned(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     int minimumPipelines = providerConf.getMinimumPipelines();
     Set<ContainerInfo> allocated = assertDistinctContainers(minimumPipelines);
@@ -187,7 +187,7 @@ public class TestWritableECContainerProvider {
   }
 
   private Set<ContainerInfo> assertDistinctContainers(int n)
-      throws IOException, TimeoutException {
+      throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < n; i++) {
       ContainerInfo container =
@@ -200,7 +200,7 @@ public class TestWritableECContainerProvider {
   }
 
   private void assertReusesExisting(Set<ContainerInfo> existing, int n)
-      throws IOException, TimeoutException {
+      throws IOException {
     for (int i = 0; i < 3 * n; i++) {
       ContainerInfo container =
           provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -212,7 +212,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testPiplineLimitIgnoresExcludedPipelines(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -221,7 +221,7 @@ public class TestWritableECContainerProvider {
       allocatedContainers.add(container);
     }
     // We have the min limit of pipelines, but then exclude one. It should use
-    // one of the existing rather than createing a new one, as the limit is
+    // one of the existing rather than creating a new one, as the limit is
     // checked against all pipelines, not just the filtered list
     ExcludeList exclude = new ExcludeList();
     PipelineID excludedID = allocatedContainers
@@ -235,8 +235,8 @@ public class TestWritableECContainerProvider {
 
   @ParameterizedTest
   @MethodSource("policies")
-  public void testNewPipelineCreatedIfAllPipelinesExcluded(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+  public void testNewPipelineNotCreatedIfAllPipelinesExcluded(
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -244,21 +244,20 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude one. It should use
-    // one of the existing rather than creating a new one, as the limit is
-    // checked against all pipelines, not just the filtered list
+    // We have the min limit of pipelines, but then exclude all the associated
+    // containers.
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addPipeline(c.getPipelineID());
     }
-    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude);
-    assertFalse(allocatedContainers.contains(c));
+    assertThrows(IOException.class, () -> provider.getContainer(
+        1, repConfig, OWNER, exclude));
   }
 
   @ParameterizedTest
   @MethodSource("policies")
-  public void testNewPipelineCreatedIfAllContainersExcluded(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+  public void testNewPipelineNotCreatedIfAllContainersExcluded(
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -266,15 +265,13 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude one. It should use
-    // one of the existing rather than createing a new one, as the limit is
-    // checked against all pipelines, not just the filtered list
+    // We have the min limit of pipelines, but then exclude them all
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addConatinerId(c.containerID());
     }
-    ContainerInfo c = provider.getContainer(1, repConfig, OWNER, exclude);
-    assertFalse(allocatedContainers.contains(c));
+    assertThrows(IOException.class, () -> provider.getContainer(
+        1, repConfig, OWNER, exclude));
   }
 
   @ParameterizedTest
@@ -295,7 +292,7 @@ public class TestWritableECContainerProvider {
     try {
       provider.getContainer(1, repConfig, OWNER, new ExcludeList());
       Assert.fail();
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
     }
   }
@@ -303,7 +300,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testExistingPipelineReturnedWhenNewCannotBeCreated(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     pipelineManager = new MockPipelineManager(
         dbStore, scmhaManager, nodeManager) {
 
@@ -313,7 +310,7 @@ public class TestWritableECContainerProvider {
       public Pipeline createPipeline(ReplicationConfig repConf,
           List<DatanodeDetails> excludedNodes,
           List<DatanodeDetails> favoredNodes)
-          throws IOException, TimeoutException {
+          throws IOException {
         if (throwError) {
           throw new IOException("Cannot create pipelines");
         }
@@ -343,7 +340,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testNewContainerAllocatedAndPipelinesClosedIfNoSpaceInExisting(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers =
         assertDistinctContainers(providerConf.getMinimumPipelines());
@@ -377,7 +374,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testPipelineNotFoundWhenAttemptingToUseExisting(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     // Ensure PM throws PNF exception when we ask for the containers in the
     // pipeline
     pipelineManager = new MockPipelineManager(
@@ -405,7 +402,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testContainerNotFoundWhenAttemptingToUseExisting(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers =
         assertDistinctContainers(providerConf.getMinimumPipelines());
@@ -431,7 +428,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testPipelineOpenButContainerRemovedFromIt(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     // This can happen if the container close process is triggered from the DN.
     // When tha happens, CM will change the container state to CLOSING and
     // remove it from the container list in pipeline Manager.
@@ -458,7 +455,7 @@ public class TestWritableECContainerProvider {
   @ParameterizedTest
   @MethodSource("policies")
   public void testExcludedNodesPassedToCreatePipelineIfProvided(
-      PipelineChoosePolicy policy) throws IOException, TimeoutException {
+      PipelineChoosePolicy policy) throws IOException {
     PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
     provider = createSubject(pipelineManagerSpy, policy);
     ExcludeList excludeList = new ExcludeList();

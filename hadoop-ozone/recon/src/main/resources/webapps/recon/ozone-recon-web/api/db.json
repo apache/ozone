@@ -1943,5 +1943,1244 @@
         ]
       }
     ]
-  }
+  },
+  "bucketHeatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "clusternewvol2",
+        "children": [
+          {
+            "label": "obsbuck11",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 39202,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/obsbuck11",
+            "minAccessCount": 39202,
+            "maxAccessCount": 39202
+          },
+          {
+            "label": "clusterbuck21",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 5675,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/obsbuck21",
+            "minAccessCount": 5675,
+            "maxAccessCount": 5675
+          },
+          {
+            "label": "clusterbuck31",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4867,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck31",
+            "minAccessCount": 4867,
+            "maxAccessCount": 4867
+          },
+          {
+            "label": "obsbuck12",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4655,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/obsbuck12",
+            "minAccessCount": 4655,
+            "maxAccessCount": 4655
+          },
+          {
+            "label": "clusterbuck32",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 4606,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck32",
+            "minAccessCount": 4606,
+            "maxAccessCount": 4606
+          },
+          {
+            "label": "clusterbuck33",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 3832,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck33",
+            "minAccessCount": 3832,
+            "maxAccessCount": 3832
+          },
+          {
+            "label": "fsobuck11",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2369,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/fsobuck11",
+            "minAccessCount": 2369,
+            "maxAccessCount": 2369
+          },
+          {
+            "label": "fsobuck13",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2228,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/fsobuck13",
+            "minAccessCount": 2228,
+            "maxAccessCount": 2228
+          },
+          {
+            "label": "obsbuck13",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1984,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/obsbuck13",
+            "minAccessCount": 1984,
+            "maxAccessCount": 1984
+          },
+          {
+            "label": "fsobuck12",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1895,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/fsobuck12",
+            "minAccessCount": 1895,
+            "maxAccessCount": 1895
+          },
+          {
+            "label": "clusterbuck22",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 271,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck22",
+            "minAccessCount": 271,
+            "maxAccessCount": 271
+          },
+          {
+            "label": "clusterbuck23",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 245,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck23",
+            "minAccessCount": 245,
+            "maxAccessCount": 245
+          }
+        ],
+        "size": 3072,
+        "path": "/clusternewvol2"
+      },
+      {
+        "label": "clusternewvol2",
+        "children": [
+          {
+            "label": "clusterbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1015,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck2",
+            "minAccessCount": 1015,
+            "maxAccessCount": 1015
+          },
+          {
+            "label": "clusterbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 839,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck1",
+            "minAccessCount": 839,
+            "maxAccessCount": 839
+          },
+          {
+            "label": "clusterbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 727,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck3",
+            "minAccessCount": 727,
+            "maxAccessCount": 727
+          }
+        ],
+        "size": 768,
+        "path": "/clusternewvol"
+      },
+      {
+        "label": "clustervol3",
+        "children": [
+          {
+            "label": "clusterbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 271,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol3/clusterbuck2",
+            "minAccessCount": 271,
+            "maxAccessCount": 271
+          },
+          {
+            "label": "clusterbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 237,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck1",
+            "minAccessCount": 237,
+            "maxAccessCount": 237
+          },
+          {
+            "label": "clusterbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 213,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/clusterbuck3",
+            "minAccessCount": 213,
+            "maxAccessCount": 213
+          }
+        ],
+        "size": 768,
+        "path": "/clusternewvol3"
+      },
+      {
+        "label": "vol3",
+        "children": [
+          {
+            "label": "testbuck1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 187,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/vol3/testbuck1",
+            "minAccessCount": 187,
+            "maxAccessCount": 187
+          },
+          {
+            "label": "testbuck2",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 185,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/testbuck2",
+            "minAccessCount": 185,
+            "maxAccessCount": 185
+          },
+          {
+            "label": "testbuck3",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 73,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/clusternewvol2/testbuck3",
+            "minAccessCount": 73,
+            "maxAccessCount": 73
+          }
+        ],
+        "size": 768,
+        "path": "/vol3"
+      },
+      {
+        "label": "volumerep",
+        "children": [
+          {
+            "label": "bucket2",
+            "children": [
+              {
+                "label": "label1",
+                "size": 0,
+                "accessCount": 3,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volumerep/bucket2",
+            "minAccessCount": 3,
+            "maxAccessCount": 3
+          },
+          {
+            "label": "bucket1",
+            "children": [
+              {
+                "label": "label2",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volumerep/bucket1",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 512,
+        "path": "/volumerep"
+      },
+      {
+        "label": "tvol",
+        "children": [
+          {
+            "label": "buck",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/tvol/buck",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 256,
+        "path": "/tvol"
+      },
+      {
+        "label": "vol1",
+        "children": [
+          {
+            "label": "buck5",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/vol1/buck5",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          }
+        ],
+        "size": 256,
+        "path": "/vol1"
+      },
+      {
+        "label": "volume1",
+        "children": [
+          {
+            "label": "fso-bucket",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 2,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volume1/fso-bucket",
+            "minAccessCount": 2,
+            "maxAccessCount": 2
+          },
+          {
+            "label": "bucket1",
+            "children": [
+              {
+                "label": "",
+                "size": 256,
+                "accessCount": 1,
+                "color": 1.0
+              }
+            ],
+            "size": 256,
+            "path": "/volume1/bucket1",
+            "minAccessCount": 1,
+            "maxAccessCount": 1
+          }
+        ],
+        "size": 512,
+        "path": "/volume1"
+      }
+    ],
+    "size": 6912,
+    "minAccessCount": 1,
+    "maxAccessCount": 39202
+  },
+  "keyHeatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "clusternewvol2",
+        "children": [
+          {
+            "label": "obsbuck11",
+            "children": [
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 84,
+                "color": 1.0
+              },
+              {
+                "label": "demo35",
+                "size": 256,
+                "accessCount": 50,
+                "color": 0.595
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo46",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo61",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo92",
+                "size": 256,
+                "accessCount": 48,
+                "color": 0.571
+              },
+              {
+                "label": "demo11",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.547
+              },
+              {
+                "label": "demo43",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.547
+              },
+              {
+                "label": "demo13",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo4",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo72",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.535
+              },
+              {
+                "label": "demo23",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo25",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo38",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo50",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.511
+              },
+              {
+                "label": "demo41",
+                "size": 256,
+                "accessCount": 42,
+                "color": 0.5
+              },
+              {
+                "label": "demo49",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.488
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo29",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo93",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.476
+              },
+              {
+                "label": "demo30",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.464
+              },
+              {
+                "label": "demo31",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.464
+              },
+              {
+                "label": "demo52",
+                "size": 256,
+                "accessCount": 38,
+                "color": 0.452
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo42",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo80",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.44
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 36,
+                "color": 0.428
+              },
+              {
+                "label": "demo77",
+                "size": 256,
+                "accessCount": 36,
+                "color": 0.428
+              },
+              {
+                "label": "demo90",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.416
+              },
+              {
+                "label": "demo98",
+                "size": 256,
+                "accessCount": 33,
+                "color": 0.392
+              },
+              {
+                "label": "demo21",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo47",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.38
+              },
+              {
+                "label": "demo70",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.369
+              },
+              {
+                "label": "demo85",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.369
+              },
+              {
+                "label": "demo55",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.345
+              },
+              {
+                "label": "demo58",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.345
+              },
+              {
+                "label": "demo65",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.333
+              },
+              {
+                "label": "demo68",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.333
+              },
+              {
+                "label": "demo78",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo8",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo9",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.321
+              },
+              {
+                "label": "demo62",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.309
+              },
+              {
+                "label": "demo63",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.309
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo48",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo54",
+                "size": 256,
+                "accessCount": 25,
+                "color": 0.297
+              },
+              {
+                "label": "demo33",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo45",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo83",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.285
+              },
+              {
+                "label": "demo28",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.273
+              },
+              {
+                "label": "demo59",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.273
+              },
+              {
+                "label": "demo12",
+                "size": 256,
+                "accessCount": 22,
+                "color": 0.261
+              }
+            ],
+            "size": 13824,
+            "path": "/clusternewvol2/obsbuck11",
+            "minAccessCount": 22,
+            "maxAccessCount": 84
+          },
+          {
+            "label": "obsbuck13",
+            "children": [
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 65,
+                "color": 1.0
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.63
+              }
+            ],
+            "size": 512,
+            "path": "/clusternewvol2/obsbuck13",
+            "minAccessCount": 41,
+            "maxAccessCount": 65
+          },
+          {
+            "label": "obsbuck12",
+            "children": [
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 55,
+                "color": 1.0
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 45,
+                "color": 0.818
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.781
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 34,
+                "color": 0.618
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 30,
+                "color": 0.545
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 29,
+                "color": 0.527
+              }
+            ],
+            "size": 1536,
+            "path": "/clusternewvol2/obsbuck12",
+            "minAccessCount": 29,
+            "maxAccessCount": 55
+          },
+          {
+            "label": "clusterbuck33",
+            "children": [
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 49,
+                "color": 1.0
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 46,
+                "color": 0.938
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 43,
+                "color": 0.877
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.816
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 39,
+                "color": 0.795
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.714
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.489
+              }
+            ],
+            "size": 1792,
+            "path": "/clusternewvol2/clusterbuck33",
+            "minAccessCount": 24,
+            "maxAccessCount": 49
+          },
+          {
+            "label": "clusterbuck31",
+            "children": [
+              {
+                "label": "demo9",
+                "size": 256,
+                "accessCount": 48,
+                "color": 1.0
+              },
+              {
+                "label": "demo6",
+                "size": 256,
+                "accessCount": 47,
+                "color": 0.979
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.854
+              },
+              {
+                "label": "demo2",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.854
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.77
+              },
+              {
+                "label": "demo11",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.77
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 35,
+                "color": 0.729
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.666
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 31,
+                "color": 0.645
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.562
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 26,
+                "color": 0.541
+              },
+              {
+                "label": "demo7",
+                "size": 256,
+                "accessCount": 24,
+                "color": 0.5
+              },
+              {
+                "label": "demo16",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.479
+              }
+            ],
+            "size": 3328,
+            "path": "/clusternewvol2/clusterbuck31",
+            "minAccessCount": 23,
+            "maxAccessCount": 48
+          },
+          {
+            "label": "fsobuck11",
+            "children": [
+              {
+                "label": "test_dir/demo1",
+                "size": 256,
+                "accessCount": 45,
+                "color": 1.0
+              },
+              {
+                "label": "test_dir/demo2",
+                "size": 256,
+                "accessCount": 34,
+                "color": 0.755
+              }
+            ],
+            "size": 512,
+            "path": "/clusternewvol2/fsobuck11",
+            "minAccessCount": 34,
+            "maxAccessCount": 45
+          },
+          {
+            "label": "clusterbuck32",
+            "children": [
+              {
+                "label": "demo17",
+                "size": 256,
+                "accessCount": 44,
+                "color": 1.0
+              },
+              {
+                "label": "demo5",
+                "size": 256,
+                "accessCount": 42,
+                "color": 0.954
+              },
+              {
+                "label": "demo3",
+                "size": 256,
+                "accessCount": 41,
+                "color": 0.931
+              },
+              {
+                "label": "demo19",
+                "size": 256,
+                "accessCount": 40,
+                "color": 0.909
+              },
+              {
+                "label": "demo4",
+                "size": 256,
+                "accessCount": 38,
+                "color": 0.863
+              },
+              {
+                "label": "demo18",
+                "size": 256,
+                "accessCount": 37,
+                "color": 0.84
+              },
+              {
+                "label": "demo10",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.727
+              },
+              {
+                "label": "demo8",
+                "size": 256,
+                "accessCount": 32,
+                "color": 0.727
+              },
+              {
+                "label": "demo20",
+                "size": 256,
+                "accessCount": 30,
+                "color": 0.681
+              },
+              {
+                "label": "demo1",
+                "size": 256,
+                "accessCount": 28,
+                "color": 0.636
+              },
+              {
+                "label": "demo14",
+                "size": 256,
+                "accessCount": 27,
+                "color": 0.613
+              },
+              {
+                "label": "demo13",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.522
+              }
+            ],
+            "size": 3072,
+            "path": "/clusternewvol2/clusterbuck32",
+            "minAccessCount": 23,
+            "maxAccessCount": 44
+          },
+          {
+            "label": "fsobuck13",
+            "children": [
+              {
+                "label": "test_dir/demo2",
+                "size": 256,
+                "accessCount": 38,
+                "color": 1.0
+              },
+              {
+                "label": "test_dir/demo1",
+                "size": 256,
+                "accessCount": 23,
+                "color": 0.605
+              }
+            ],
+            "size": 512,
+            "path": "/clusternewvol2/fsobuck13",
+            "minAccessCount": 23,
+            "maxAccessCount": 38
+          }
+        ],
+        "size": 25088,
+        "path": "/clusternewvol2/"
+      },
+      {
+        "label": "volume1",
+        "children": [
+          {
+            "label": "fso-bucket",
+            "children": [
+              {
+                "label": ".trash",
+                "size": 256,
+                "accessCount": 24,
+                "color": 1.0
+              },
+              {
+                "label": ".trash/om",
+                "size": 256,
+                "accessCount": 24,
+                "color": 1.0
+              }
+            ],
+            "size": 512,
+            "path": "/volume1/fso-bucket",
+            "minAccessCount": 24,
+            "maxAccessCount": 24
+          }
+        ],
+        "size": 512,
+        "path": "/volume1/"
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 22,
+    "maxAccessCount": 84
+  },
+  "heatmap": {
+    "label": "root",
+    "children": [
+      {
+        "label": "hivevolTest1",
+        "children": [
+          {
+            "label": "hivebucketTest1",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/test1.dat",
+                "size": 1026,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/test2",
+                "size": 20,
+                "accessCount": 68567,
+                "color": 0.56
+              }
+            ],
+            "size": 22358,
+            "path": "/hivevolTest1/hivebucketTest2",
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          }
+        ],
+        "size": 7168,
+        "path": "/hivevolTest1"
+      },
+      {
+        "label": "hivevolTest2",
+        "children": [
+          {
+            "label": "hivebucketTest2",
+            "children": [
+              {
+                "label": "enc_path/hive_tpcds/store_sales/test11.dat",
+                "size": 2500,
+                "accessCount": 155074,
+                "color": 1.0
+              },
+              {
+                "label": "enc_path/hive_tpcds/catalog_sales/test12",
+                "size": 300000,
+                "accessCount": 68567,
+                "color": 0.56
+              }
+            ],
+            "size": 1536,
+            "path": "/hivevolTest1/hivebucketTest2",
+            "minAccessCount": 2924,
+            "maxAccessCount": 155074
+          }
+        ],
+        "size": 7168,
+        "path": "/hivevolTest2"
+      }
+    ],
+    "size": 25600,
+    "minAccessCount": 2924,
+    "maxAccessCount": 155074
+  },
+  "disabledFeatures": [
+       "FLAG1"
+  ]
 }

@@ -22,18 +22,16 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -62,14 +60,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -272,8 +268,7 @@ public class DefaultCAServer implements CertificateServer {
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
-    } catch (CertificateException | IOException | OperatorCreationException |
-             TimeoutException e) {
+    } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
       xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
@@ -284,7 +279,7 @@ public class DefaultCAServer implements CertificateServer {
   private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
       LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
-      OperatorCreationException, CertificateException, TimeoutException {
+      OperatorCreationException, CertificateException {
 
     lock.lock();
     X509CertificateHolder xcert;
@@ -331,7 +326,7 @@ public class DefaultCAServer implements CertificateServer {
           store.revokeCertificates(certificates,
               getCACertificate(), reason, revocationTime, crlApprover)
       );
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));
     }
@@ -574,25 +569,10 @@ public class DefaultCAServer implements CertificateServer {
         .setBeginDate(beginDate)
         .setEndDate(endDate)
         .makeCA()
-        .setConfiguration(securityConfig.getConfiguration())
+        .setConfiguration(securityConfig)
         .setKey(key);
 
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if (validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new org.apache.hadoop.hdds.security.x509
-          .exception.CertificateException(
-          "Error while adding ip to CA self signed certificate", e,
-          CSR_ERROR);
-    }
+    builder.addInetAddresses();
     X509CertificateHolder selfSignedCertificate = builder.build();
 
     CertificateCodec certCodec =

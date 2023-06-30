@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -137,6 +138,7 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
                               CertificateClient certClient,
+                              SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
                               DatanodeCRLStore crlStore) throws IOException {
     DatanodeConfiguration dnConf =
@@ -169,7 +171,7 @@ public class DatanodeStateMachine implements Closeable {
     constructionLock.writeLock().lock();
     try {
       container = new OzoneContainer(this.datanodeDetails,
-          conf, context, certClient);
+          conf, context, certClient, secretKeyClient);
     } finally {
       constructionLock.writeLock().unlock();
     }
@@ -206,7 +208,7 @@ public class DatanodeStateMachine implements Closeable {
     ecReconstructionMetrics = ECReconstructionMetrics.create();
 
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
-        conf, certClient, context, ecReconstructionMetrics);
+        conf, certClient, secretKeyClient, context, ecReconstructionMetrics);
 
     // This is created as an instance variable as Mockito needs to access it in
     // a test. The test mocks it in a running mini-cluster.
@@ -254,6 +256,12 @@ public class DatanodeStateMachine implements Closeable {
         .build();
 
     queueMetrics = DatanodeQueueMetrics.create(this);
+  }
+
+  @VisibleForTesting
+  public DatanodeStateMachine(DatanodeDetails datanodeDetails,
+                              ConfigurationSource conf) throws IOException {
+    this(datanodeDetails, conf, null, null, null, null);
   }
 
   private int getEndPointTaskThreadPoolSize() {

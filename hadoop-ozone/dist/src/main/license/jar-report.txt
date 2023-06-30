@@ -1,11 +1,9 @@
-share/ozone/lib/accessors-smart.jar
 share/ozone/lib/activation.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/aopalliance.jar
 share/ozone/lib/aopalliance-repackaged.jar
-share/ozone/lib/asm.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
 share/ozone/lib/awaitility.jar
@@ -33,6 +31,7 @@ share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
+share/ozone/lib/commons-fileupload.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
 share/ozone/lib/derby.jar
@@ -155,7 +154,6 @@ share/ozone/lib/jooq.jar
 share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
-share/ozone/lib/json-smart.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar

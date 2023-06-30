@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.OptionalLong;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -93,6 +94,13 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
@@ -141,6 +149,9 @@ public class ObjectEndpoint extends EndpointBase {
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
   private Map<String, String> overrideQueryParameter;
   private int bufferSize;
+  private int chunkSize;
+  private boolean datastreamEnabled;
+  private long datastreamMinLength;
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
@@ -161,6 +172,16 @@ public class ObjectEndpoint extends EndpointBase {
     bufferSize = (int) ozoneConfiguration.getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
         OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
+    chunkSize = (int) ozoneConfiguration.getStorageSize(
+        OZONE_SCM_CHUNK_SIZE_KEY,
+        OZONE_SCM_CHUNK_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+    datastreamEnabled = ozoneConfiguration.getBoolean(
+        DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+    datastreamMinLength = (long) ozoneConfiguration.getStorageSize(
+        OZONE_FS_DATASTREAM_AUTO_THRESHOLD,
+        OZONE_FS_DATASTREAM_AUTO_THRESHOLD_DEFAULT, StorageUnit.BYTES);
   }
 
   /**
@@ -203,6 +224,13 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replicationConfig =
           getReplicationConfig(bucket, storageType);
 
+      boolean enableEC = false;
+      if ((replicationConfig != null &&
+          replicationConfig.getReplicationType() == EC) ||
+          bucket.getReplicationConfig() instanceof ECReplicationConfig) {
+        enableEC = true;
+      }
+
       if (copyHeader != null) {
         //Copy object, as copy source available.
         s3GAction = S3GAction.COPY_OBJECT;
@@ -233,11 +261,19 @@ public class ObjectEndpoint extends EndpointBase {
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
       }
+      long putLength = 0;
+      if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
+        getMetrics().updatePutKeyMetadataStats(startNanos);
+        putLength = ObjectEndpointStreaming
+            .put(bucket, keyPath, length, replicationConfig, chunkSize,
+                customMetadata, body);
+      } else {
+        output = getClientProtocol().createKey(volume.getName(), bucketName,
+            keyPath, length, replicationConfig, customMetadata);
+        getMetrics().updatePutKeyMetadataStats(startNanos);
+        putLength = IOUtils.copyLarge(body, output);
+      }
 
-      output = getClientProtocol().createKey(volume.getName(), bucketName,
-          keyPath, length, replicationConfig, customMetadata);
-      getMetrics().updatePutKeyMetadataStats(startNanos);
-      long putLength = IOUtils.copyLarge(body, output);
       getMetrics().incPutKeySuccessLength(putLength);
       return Response.ok().status(HttpStatus.SC_OK)
           .build();

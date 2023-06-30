@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Manages the state of pipelines in SCM.
@@ -42,7 +41,7 @@ public interface PipelineStateManager {
    */
   @Replicate
   void addPipeline(HddsProtos.Pipeline pipelineProto)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Removing pipeline would be replicated to Ratis.
@@ -52,7 +51,7 @@ public interface PipelineStateManager {
    */
   @Replicate
   void removePipeline(HddsProtos.PipelineID pipelineIDProto)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Updating pipeline state would be replicated to Ratis.
@@ -62,7 +61,7 @@ public interface PipelineStateManager {
    */
   @Replicate
   void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
-      HddsProtos.PipelineState newState) throws IOException, TimeoutException;
+      HddsProtos.PipelineState newState) throws IOException;
 
   void addContainerToPipeline(
       PipelineID pipelineID,

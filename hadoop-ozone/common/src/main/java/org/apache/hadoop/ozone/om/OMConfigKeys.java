@@ -80,6 +80,19 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_PORT_DEFAULT = 9862;
   public static final String OZONE_OM_GRPC_PORT_KEY =
       "ozone.om.grpc.port";
+
+  public static final String OZONE_OM_GRPC_BOSSGROUP_SIZE_KEY =
+      "ozone.om.grpc.bossgroup.size";
+  public static final int OZONE_OM_GRPC_BOSSGROUP_SIZE_DEFAULT = 8;
+
+  public static final String OZONE_OM_GRPC_WORKERGROUP_SIZE_KEY =
+      "ozone.om.grpc.workergroup.size";
+  public static final int OZONE_OM_GRPC_WORKERGROUP_SIZE_DEFAULT = 32;
+
+  public static final String OZONE_OM_GRPC_READ_THREAD_NUM_KEY =
+      "ozone.om.grpc.read.thread.num";
+  public static final int OZONE_OM_GRPC_READ_THREAD_NUM_DEFAULT = 32;
+
   public static final String OZONE_OM_HTTP_ENABLED_KEY =
       "ozone.om.http.enabled";
   public static final String OZONE_OM_HTTP_BIND_HOST_KEY =
@@ -237,7 +250,7 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.provider.request.timeout";
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -481,6 +494,11 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
       = "ozone.om.snapshot.diff.max.page.size";
+
+  public static final String OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES
+      = "ozone.om.snapshot.db.max.open.files";
+  public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+      = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
       = 1000;
 
@@ -509,7 +527,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
@@ -523,4 +541,7 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
 }

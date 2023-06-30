@@ -96,7 +96,7 @@ class TestOzoneManagerDoubleBuffer {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.getAbsolutePath());
     OMMetadataManager omMetadataManager =
-        new OmMetadataManagerImpl(ozoneConfiguration);
+        new OmMetadataManagerImpl(ozoneConfiguration, null);
     OzoneManager ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);

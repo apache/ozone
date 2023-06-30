@@ -20,7 +20,8 @@ package org.apache.hadoop.ozone.om;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -66,6 +67,7 @@ public class TestSecureOzoneManager {
   private String scmId;
   private String omId;
   private Path metaDir;
+  private HddsProtos.OzoneManagerDetailsProto omInfo;
 
   @Rule
   public Timeout timeout = Timeout.seconds(25);
@@ -90,7 +92,7 @@ public class TestSecureOzoneManager {
     metaDir = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
     OzoneManager.setTestSecureOmFlag(true);
-
+    omInfo = OzoneManager.getOmDetailsProto(conf, omId);
   }
 
   /**
@@ -122,7 +124,8 @@ public class TestSecureOzoneManager {
     // boot-up. Get certificate will fail when SCM is not running.
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.GETCERT, client.init());
     privateKey = client.getPrivateKey();
     publicKey = client.getPublicKey();
@@ -133,7 +136,8 @@ public class TestSecureOzoneManager {
 
     // Case 2: If key pair already exist than response should be RECOVER.
     client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.RECOVER, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());
@@ -142,7 +146,8 @@ public class TestSecureOzoneManager {
 
     // Case 3: When public key as well as certificate is missing.
     client =
-        new OMCertificateClient(securityConfig, omStorage, null, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", null, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
@@ -153,7 +158,8 @@ public class TestSecureOzoneManager {
 
     // Case 4: When private key and certificate is missing.
     client =
-        new OMCertificateClient(securityConfig, omStorage, null, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", null, null, null);
     KeyCodec keyCodec = new KeyCodec(securityConfig, COMPONENT);
     keyCodec.writePublicKey(publicKey);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
@@ -176,7 +182,8 @@ public class TestSecureOzoneManager {
         x509Certificate.getEncoded()));
     omStorage.setOmCertSerialId(x509Certificate.getSerialNumber().toString());
     client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.FAILURE, client.init());
     Assert.assertNull(client.getPrivateKey());
     Assert.assertNull(client.getPublicKey());
@@ -185,7 +192,8 @@ public class TestSecureOzoneManager {
 
     // Case 6: When private key and certificate is present.
     client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     FileUtils.deleteQuietly(Paths.get(securityConfig.getKeyLocation(COMPONENT)
         .toString(), securityConfig.getPublicKeyFileName()).toFile());
     keyCodec.writePrivateKey(privateKey);
@@ -197,7 +205,8 @@ public class TestSecureOzoneManager {
 
     // Case 7 When keypair and certificate is present.
     client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null);
     Assert.assertEquals(CertificateClient.InitResponse.SUCCESS, client.init());
     Assert.assertNotNull(client.getPrivateKey());
     Assert.assertNotNull(client.getPublicKey());

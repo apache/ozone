@@ -58,11 +58,11 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   void delete() throws StorageContainerException;
 
   /**
-   * Returns true if container is empty.
-   * @return true of container is empty
+   * Returns true if container has some block.
+   * @return true if container has some block.
    * @throws IOException if was unable to check container status.
    */
-  boolean isEmpty() throws IOException;
+  boolean hasBlocks() throws IOException;
 
   /**
    * Update the container.
@@ -164,11 +164,17 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   long getBlockCommitSequenceId();
 
   /**
+   * Returns if the container metadata should be checked. The result depends
+   * on the state of the container.
+   */
+  boolean shouldScanMetadata();
+
+  /**
    * check and report the structural integrity of the container.
    * @return true if the integrity checks pass
    * Scan the container metadata to detect corruption.
    */
-  boolean scanMetaData();
+  boolean scanMetaData() throws InterruptedException;
 
   /**
    * Return if the container data should be checksum verified to detect
@@ -187,6 +193,8 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    *                  I/O bandwidth throttling (e.g. for shutdown purpose).
    * @return true if the checksum verification succeeds
    *         false otherwise
+   * @throws InterruptedException if the scan is interrupted.
    */
-  boolean scanData(DataTransferThrottler throttler, Canceler canceler);
+  boolean scanData(DataTransferThrottler throttler, Canceler canceler)
+      throws InterruptedException;
 }

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@ant-design/icons": "^5.1.4",
     "@babel/core": "^7.0.0",
     "@fontsource/roboto": "^4.5.8",
     "@types/classnames": "^2.2.10",
@@ -11,6 +12,8 @@
     "@types/react": "16.8.15",
     "@types/react-dom": "16.8.4",
     "@types/react-router-dom": "^4.3.3",
+    "ag-charts-community": "^7.3.0",
+    "ag-charts-react": "^7.3.0",
     "antd": "^3.26.9",
     "axios": "^0.21.4",
     "babel-jest": "^24.9.0",
@@ -35,7 +38,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
-    "build": "react-app-rewired build",
+    "build": "react-app-rewired --max_old_space_size=4096 build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",

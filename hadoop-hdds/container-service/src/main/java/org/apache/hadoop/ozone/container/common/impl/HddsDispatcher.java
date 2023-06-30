@@ -359,6 +359,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                 || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
+          // TODO HDDS-7096: Use on demand scanning here instead.
           handler.markContainerUnhealthy(container);
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {

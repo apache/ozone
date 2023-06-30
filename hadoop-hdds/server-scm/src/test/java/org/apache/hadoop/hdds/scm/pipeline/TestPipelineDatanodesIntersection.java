@@ -49,7 +49,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
@@ -146,7 +145,7 @@ public class TestPipelineDatanodesIntersection {
         createdPipelineCount++;
       } catch (SCMException e) {
         end = true;
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
         end = true;
         // Should not throw regular IOException.
         Assertions.fail();

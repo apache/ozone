@@ -24,11 +24,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmMetadataReader;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -36,6 +37,8 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
@@ -76,18 +79,16 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
+  private OmSnapshotManager omSnapshotManager;
   private AuditLogger auditLogger;
 
   private String volumeName;
   private String bucketName;
   private String keyName;
 
-
   // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private static OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
+  private static final OzoneManagerDoubleBufferHelper
+      DOUBLE_BUFFER_HELPER = ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -105,7 +106,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
@@ -113,8 +115,11 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         .thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
-    OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
-    when(ozoneManager.getOmMetadataReader()).thenReturn(omMetadataReader);
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
+        Mockito.mock(ReferenceCounted.class);
+    when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
+    omSnapshotManager = new OmSnapshotManager(ozoneManager);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
@@ -178,7 +183,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     // validateAndUpdateCache OMSnapshotCreateResponse.
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+            DOUBLE_BUFFER_HELPER);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -217,7 +222,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     // validateAndUpdateCache for OMSnapshotPurgeRequest.
     OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
         omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L,
-            ozoneManagerDoubleBufferHelper);
+            DOUBLE_BUFFER_HELPER);
 
     // Commit to DB.
     batchOperation = omMetadataManager.getStore().initBatchOperation();
@@ -259,28 +264,30 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     // Get previous and next snapshotInfos to verify if the SnapInfo
     // is changed.
-    String prevPathSnapId = null;
-    String prevGlobalSnapId = null;
-    String nextPathSnapId = null;
-    String nextGlobalSnapId = null;
+    // Get previous and next snapshotInfos to verify if the SnapInfo
+    // is changed.
+    UUID prevPathSnapId = null;
+    UUID prevGlobalSnapId = null;
+    UUID nextPathSnapId = null;
+    UUID nextGlobalSnapId = null;
 
     if (chainManager.hasPreviousPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotID())) {
+        snapInfo.getSnapshotId())) {
       prevPathSnapId = chainManager.previousPathSnapshot(
-          snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
+          snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
     }
-    if (chainManager.hasPreviousGlobalSnapshot(snapInfo.getSnapshotID())) {
+    if (chainManager.hasPreviousGlobalSnapshot(snapInfo.getSnapshotId())) {
       prevGlobalSnapId = chainManager.previousGlobalSnapshot(
-          snapInfo.getSnapshotID());
+          snapInfo.getSnapshotId());
     }
     if (chainManager.hasNextPathSnapshot(snapInfo.getSnapshotPath(),
-        snapInfo.getSnapshotID())) {
+        snapInfo.getSnapshotId())) {
       nextPathSnapId = chainManager.nextPathSnapshot(
-          snapInfo.getSnapshotPath(), snapInfo.getSnapshotID());
+          snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
     }
-    if (chainManager.hasNextGlobalSnapshot(snapInfo.getSnapshotID())) {
+    if (chainManager.hasNextGlobalSnapshot(snapInfo.getSnapshotId())) {
       nextGlobalSnapId = chainManager.nextGlobalSnapshot(
-          snapInfo.getSnapshotID());
+          snapInfo.getSnapshotId());
     }
 
     long rowsInTableBeforePurge = omMetadataManager
@@ -296,7 +303,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
       SnapshotInfo nextPathSnapshotInfoAfterPurge = metadataManager
           .getSnapshotInfoTable().get(chainManager.getTableKey(nextPathSnapId));
       Assertions.assertEquals(nextPathSnapshotInfoAfterPurge
-          .getGlobalPreviousSnapshotID(), prevPathSnapId);
+          .getGlobalPreviousSnapshotId(), prevPathSnapId);
     }
 
     if (nextGlobalSnapId != null) {
@@ -304,7 +311,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
           .getSnapshotInfoTable().get(chainManager
               .getTableKey(nextGlobalSnapId));
       Assertions.assertEquals(nextGlobalSnapshotInfoAfterPurge
-          .getGlobalPreviousSnapshotID(), prevGlobalSnapId);
+          .getGlobalPreviousSnapshotId(), prevGlobalSnapId);
     }
 
     Assertions.assertNotEquals(rowsInTableBeforePurge, omMetadataManager

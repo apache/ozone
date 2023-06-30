@@ -517,6 +517,12 @@ public class TestPipelinePlacementPolicy {
     subSet.add(dns.get(0));
     status = placementPolicy.validateContainerPlacement(subSet, 1);
     Assertions.assertTrue(status.isPolicySatisfied());
+
+    // three nodes, one dead, one rack
+    cluster.remove(dns.get(2));
+    status = placementPolicy.validateContainerPlacement(dns, 3);
+    Assertions.assertFalse(status.isPolicySatisfied());
+    Assertions.assertEquals(1, status.misReplicationCount());
   }
 
   @Test

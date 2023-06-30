@@ -36,8 +36,8 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client
-    .CertificateClient;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -257,7 +257,8 @@ class TestSCMHAManagerImpl {
         conf.get(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY));
     when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
 
-    final SCMHAManager manager = new SCMHAManagerImpl(conf, scm);
+    final SCMHAManager manager = new SCMHAManagerImpl(conf,
+        new SecurityConfig(conf), scm);
     when(scm.getScmHAManager()).thenReturn(manager);
     return scm;
   }

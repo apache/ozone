@@ -19,12 +19,10 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
-import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -33,13 +31,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.SignatureException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -49,33 +44,29 @@ import java.util.Date;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * Test Class for Root Certificate generation.
  */
 public class TestRootCertificate {
-  private static OzoneConfiguration conf = new OzoneConfiguration();
   private SecurityConfig securityConfig;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) {
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
   }
 
   @Test
-  public void testAllFieldsAreExpected()
-      throws SCMSecurityException, NoSuchProviderException,
-      NoSuchAlgorithmException, CertificateException,
-      SignatureException, InvalidKeyException, IOException {
+  public void testAllFieldsAreExpected() throws Exception {
     LocalDateTime notBefore = LocalDateTime.now();
     LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     SelfSignedCertificate.Builder builder =
@@ -86,7 +77,7 @@ public class TestRootCertificate {
             .setScmID(scmID)
             .setSubject(subject)
             .setKey(keyPair)
-            .setConfiguration(conf);
+            .setConfiguration(securityConfig);
 
     X509CertificateHolder certificateHolder = builder.build();
 
@@ -129,19 +120,17 @@ public class TestRootCertificate {
   }
 
   @Test
-  public void testCACert(@TempDir Path basePath)
-      throws SCMSecurityException, NoSuchProviderException,
-      NoSuchAlgorithmException, IOException, CertificateException {
+  public void testCACert(@TempDir Path basePath) throws Exception {
     LocalDateTime notBefore = LocalDateTime.now();
     LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
-    SelfSignedCertificate.Builder builder =
+    X509CertificateHolder certificateHolder =
         SelfSignedCertificate.newBuilder()
             .setBeginDate(notBefore)
             .setEndDate(notAfter)
@@ -149,27 +138,11 @@ public class TestRootCertificate {
             .setScmID(scmID)
             .setSubject(subject)
             .setKey(keyPair)
-            .setConfiguration(conf)
-            .makeCA();
+            .setConfiguration(securityConfig)
+            .makeCA()
+            .addInetAddresses()
+            .build();
 
-    try {
-      DomainValidator validator = DomainValidator.getInstance();
-      // Add all valid ips.
-      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
-          ip -> {
-            builder.addIpAddress(ip.getHostAddress());
-            if (validator.isValid(ip.getCanonicalHostName())) {
-              builder.addDnsName(ip.getCanonicalHostName());
-            }
-          });
-    } catch (IOException e) {
-      throw new org.apache.hadoop.hdds.security.x509
-          .exception.CertificateException(
-          "Error while adding ip to CA self signed certificate", e,
-          CSR_ERROR);
-    }
-
-    X509CertificateHolder certificateHolder = builder.build();
     // This time we asked for a CertificateServer Certificate, make sure that
     // extension is
     // present and valid.
@@ -198,16 +171,14 @@ public class TestRootCertificate {
   }
 
   @Test
-  public void testInvalidParamFails()
-      throws SCMSecurityException, NoSuchProviderException,
-      NoSuchAlgorithmException, IOException {
+  public void testInvalidParamFails() throws Exception {
     LocalDateTime notBefore = LocalDateTime.now();
     LocalDateTime notAfter = notBefore.plusYears(1);
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
     String subject = "testRootCert";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     SelfSignedCertificate.Builder builder =
@@ -217,7 +188,7 @@ public class TestRootCertificate {
             .setClusterID(clusterID)
             .setScmID(scmID)
             .setSubject(subject)
-            .setConfiguration(conf)
+            .setConfiguration(securityConfig)
             .setKey(keyPair)
             .makeCA();
     try {

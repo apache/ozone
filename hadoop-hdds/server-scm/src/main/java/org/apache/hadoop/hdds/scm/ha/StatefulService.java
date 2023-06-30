@@ -23,7 +23,6 @@ import com.google.protobuf.Message;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A StatefulService is an SCMService that persists configuration to RocksDB.
@@ -49,7 +48,7 @@ public abstract class StatefulService implements SCMService {
    * @throws IOException on failure to persist configuration
    */
   protected final void saveConfiguration(Message configurationMessage)
-      throws IOException, TimeoutException {
+      throws IOException {
     stateManager.saveConfiguration(getServiceName(),
         configurationMessage.toByteString());
   }
