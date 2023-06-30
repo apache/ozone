@@ -1050,7 +1050,7 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
-    ContainerLogger.logImported(container.getContainerData());
+    ContainerLogger.logExported(container.getContainerData());
   }
 
   @Override

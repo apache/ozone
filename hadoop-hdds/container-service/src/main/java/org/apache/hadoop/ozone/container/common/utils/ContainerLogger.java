@@ -117,7 +117,7 @@ public final class ContainerLogger {
     if (force) {
       LOG.info(getMessage(containerData, "Container force deleted"));
     } else {
-      LOG.info(getMessage(containerData, "Container is empty"));
+      LOG.info(getMessage(containerData, "Empty container deleted"));
     }
   }
 
@@ -157,6 +157,7 @@ public final class ContainerLogger {
     return String.join(FIELD_SEPARATOR,
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
+        "BCSID=" + containerData.getBlockCommitSequenceId(),
         "State=" + containerData.getState());
   }
 }
