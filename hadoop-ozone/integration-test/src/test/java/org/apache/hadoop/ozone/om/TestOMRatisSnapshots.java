@@ -1221,14 +1221,11 @@ public class TestOMRatisSnapshots {
 
     // Find the tarball in the dir.
     private File getTarball(File dir) {
-      assertNotNull(dir);
       File[] fileList = dir.listFiles();
       assertNotNull(fileList);
       for (File f : fileList) {
-        if (f != null) {
-          if (f.getName().toLowerCase().endsWith(".tar")) {
-            return f;
-          }
+        if (f.getName().toLowerCase().endsWith(".tar")) {
+          return f;
         }
       }
       return null;
