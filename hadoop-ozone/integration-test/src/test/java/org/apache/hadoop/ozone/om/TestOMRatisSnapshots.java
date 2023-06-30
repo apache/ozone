@@ -1224,7 +1224,7 @@ public class TestOMRatisSnapshots {
       assertNotNull(dir);
       File[] fileList = dir.listFiles();
       assertNotNull(fileList);
-       for (File f : fileList) {
+      for (File f : fileList) {
         if (f != null) {
           if (f.getName().toLowerCase().endsWith(".tar")) {
             return f;
