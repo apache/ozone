@@ -383,6 +383,7 @@ public class KeyValueHandler extends Handler {
     }
 
     if (created) {
+      ContainerLogger.logOpen(newContainerData);
       try {
         sendICR(newContainer);
       } catch (StorageContainerException ex) {
@@ -390,7 +391,6 @@ public class KeyValueHandler extends Handler {
       }
     }
 
-    ContainerLogger.logOpen(newContainerData);
     return getSuccessResponse(request);
   }
 
