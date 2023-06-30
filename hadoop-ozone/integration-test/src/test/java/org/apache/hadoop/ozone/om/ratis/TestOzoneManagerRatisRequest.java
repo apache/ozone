@@ -56,9 +56,6 @@ public class TestOzoneManagerRatisRequest {
   private OzoneManager ozoneManager;
   private OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
   private OMMetadataManager omMetadataManager;
-  private OzoneManagerRatisServer ratisServer;
-  private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
-  private long lastTransactionIndexForNonRatis;
 
   @Test(timeout = 300_000)
   public void testRequestWithNonExistentBucket()
@@ -118,9 +115,11 @@ public class TestOzoneManagerRatisRequest {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
 
-    ratisServer = Mockito.mock(OzoneManagerRatisServer.class);
-    protocolMessageMetrics = Mockito.mock(ProtocolMessageMetrics.class);
-    lastTransactionIndexForNonRatis = 100L;
+    OzoneManagerRatisServer ratisServer =
+        Mockito.mock(OzoneManagerRatisServer.class);
+    ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
+        Mockito.mock(ProtocolMessageMetrics.class);
+    long lastTransactionIndexForNonRatis = 100L;
 
     OzoneManagerProtocolProtos.OMResponse expectedResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder()
