@@ -621,7 +621,7 @@ public class TestOmSnapshot {
    * 3) Snapshot snap2 is created
    * 4) Key k1 is deleted.
    * 5) Snapshot snap3 is created.
-   * 5) Snapdiff b/w snap3 & snap2 taken to assert difference of 1 key
+   * 6) Snapdiff b/w snap3 & snap2 taken to assert difference of 1 key
    */
   @Test
   public void testSnapDiffHandlingReclaimWithLatestUse() throws Exception {
