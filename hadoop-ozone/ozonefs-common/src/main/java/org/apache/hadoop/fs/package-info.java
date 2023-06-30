@@ -14,31 +14,17 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
  */
-package org.apache.hadoop.fs;
 
 /**
+ * Interface definitions borrowed from Hadoop 3.3.6.
  * FIXME: Hack: This is copied from Hadoop 3.3.6. Remove this interface once
  * we drop Hadoop 3.1, 3.2 support.
- * An identical copy from org.apache.hadoop.hdfs.protocol.HdfsConstants
- * .SafeModeAction, that helps
- * the other file system implementation to define {@link SafeMode}.
  */
-public enum SafeModeAction {
-  /**
-   * Starting entering into safe mode.
-   */
-  ENTER,
-  /**
-   * Gracefully exit from safe mode.
-   */
-  LEAVE,
-  /**
-   * Force Exit from safe mode.
-   */
-  FORCE_EXIT,
-  /**
-   * Get the status of the safe mode.
-   */
-  GET;
-}
+@InterfaceAudience.Private
+@InterfaceStability.Evolving
+package org.apache.hadoop.fs;
+
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;

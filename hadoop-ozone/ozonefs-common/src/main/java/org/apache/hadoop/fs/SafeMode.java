@@ -32,7 +32,8 @@ public interface SafeMode {
    *
    * @param action One of {@link SafeModeAction} LEAVE, ENTER, GET, FORCE_EXIT.
    * @throws IOException if set safe mode fails to proceed.
-   * @return true if the action is successfully accepted, otherwise false means rejected.
+   * @return true if the action is successfully accepted, otherwise false means
+   * rejected.
    */
   default boolean setSafeMode(SafeModeAction action) throws IOException {
     return setSafeMode(action, false);
@@ -41,12 +42,16 @@ public interface SafeMode {
   /**
    * Enter, leave, or get safe mode.
    *
-   * @param action    One of {@link SafeModeAction} LEAVE, ENTER, GET, FORCE_EXIT.
-   * @param isChecked If true check only for Active metadata node / NameNode's status,
+   * @param action    One of {@link SafeModeAction} LEAVE, ENTER, GET,
+   *                  FORCE_EXIT.
+   * @param isChecked If true check only for Active metadata node / NameNode's
+   *                  status,
    *                  else check first metadata node / NameNode's status.
    * @throws IOException if set safe mode fails to proceed.
-   * @return true if the action is successfully accepted, otherwise false means rejected.
+   * @return true if the action is successfully accepted, otherwise false means
+   * rejected.
    */
-  boolean setSafeMode(SafeModeAction action, boolean isChecked) throws IOException;
+  boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException;
 
 }

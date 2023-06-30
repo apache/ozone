@@ -18,8 +18,6 @@ package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;

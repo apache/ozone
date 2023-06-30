@@ -23,7 +23,8 @@ import java.io.IOException;
 /**
  * FIXME: Hack: This is copied from Hadoop 3.3.6. Remove this interface once
  * we drop Hadoop 3.1, 3.2 support.
- * Whether the given Path of the FileSystem has the capability to perform lease recovery.
+ * Whether the given Path of the FileSystem has the capability to perform lease
+ * recovery.
  */
 public interface LeaseRecoverable {
 
@@ -31,9 +32,11 @@ public interface LeaseRecoverable {
    * Start the lease recovery of a file.
    *
    * @param file path to a file.
-   * @return true if the file is already closed, and it does not require lease recovery.
+   * @return true if the file is already closed, and it does not require lease
+   * recovery.
    * @throws IOException if an error occurs during lease recovery.
-   * @throws UnsupportedOperationException if lease recovery is not supported by this filesystem.
+   * @throws UnsupportedOperationException if lease recovery is not supported
+   * by this filesystem.
    */
   boolean recoverLease(Path file) throws IOException;
 
@@ -42,7 +45,8 @@ public interface LeaseRecoverable {
    * @param file The string representation of the path to the file
    * @return return true if file is closed
    * @throws IOException If an I/O error occurred
-   * @throws UnsupportedOperationException if isFileClosed is not supported by this filesystem.
+   * @throws UnsupportedOperationException if isFileClosed is not supported by
+   * this filesystem.
    */
   boolean isFileClosed(Path file) throws IOException;
 }
