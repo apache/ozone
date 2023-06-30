@@ -696,13 +696,13 @@ public class TestOmSnapshot {
    * 3) Key k1 is deleted.
    * 4) Key k1 is recreated.
    * 5) Snapshot snap2 is created.
-   * 6) Snapdiff b/w Active FS & snap1 taken to assert difference of 2 keys.
-   * 7) Snapdiff b/w Active FS & snap2 taken to assert difference of 0 key.
+   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 2 keys.
+   * 7) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 0 key.
    * 8) Checking rocks db to ensure the object created shouldn't be reclaimed
    *    as it is used by snapshot.
    * 9) Key k1 is deleted.
-   * 10) Snapdiff b/w Active FS & snap1 taken to assert difference of 1 key.
-   * 11) Snapdiff b/w Active FS & snap2 taken to assert difference of 1 key.
+   * 10) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key.
+   * 11) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 1 key.
    */
   @Test
   public void testSnapDiffReclaimWithKeyRecreation() throws Exception {
@@ -752,7 +752,6 @@ public class TestOmSnapshot {
             SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
   }
 
-
   /**
    * Testing scenario:
    * 1) Key k1 is created.
@@ -776,15 +775,14 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     String renamedKey = "renamed-" + key1;
     bucket.renameKey(key1, renamedKey);
-    GenericTestUtils.waitFor(
-            () -> {
-              try {
-                getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
-              } catch (IOException e) {
-                return false;
-              }
-              return true;
-            }, 1000, 10000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+          getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
+        } catch (IOException e) {
+          return false;
+        }
+        return true;
+      }, 1000, 10000);
     getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
     bucket.deleteKey(renamedKey);
     String snap2 = "snap2";
@@ -822,26 +820,24 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName, snap1);
     String renamedKey = "renamed-" + key1;
     bucket.renameKey(key1, renamedKey);
-    GenericTestUtils.waitFor(
-            () -> {
-              try {
-                getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
-              } catch (IOException e) {
-                return false;
-              }
-              return true;
-            }, 1000, 120000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 1000, 120000);
     String renamedRenamedKey = "renamed-" + renamedKey;
     bucket.renameKey(renamedKey, renamedRenamedKey);
-    GenericTestUtils.waitFor(
-            () -> {
-              try {
-                getOmKeyInfo(testVolumeName, testBucketName, renamedRenamedKey);
-              } catch (IOException e) {
-                return false;
-              }
-              return true;
-            }, 1000, 120000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        getOmKeyInfo(testVolumeName, testBucketName, renamedRenamedKey);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 1000, 120000);
     getOmKeyInfo(testVolumeName, testBucketName, renamedRenamedKey);
     bucket.deleteKey(renamedRenamedKey);
     String snap2 = "snap2";
@@ -865,7 +861,7 @@ public class TestOmSnapshot {
    * 3) Key k1 is renamed to renamed-k1.
    * 4) Key k1 is recreated.
    * 5) Key k1 is deleted.
-   * 6) Snapdiff b/w Active FS & snap1 taken to assert difference of 1 key.
+   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key.
    */
   @Test
   public void testSnapDiffWithKeyRenamesRecreationAndDelete()
@@ -908,8 +904,8 @@ public class TestOmSnapshot {
    * 2) Key k1 is created.
    * 3) Key k1 is deleted.
    * 4) Snapshot s2 is created instantly before the key k1 is deleted.
-   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 0 keys.
-   * 6) Snapdiff b/w Active FS & snap2 taken to assert difference of 0 keys.
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 0 keys.
+   * 6) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 0 keys.
    */
   @Test
   public void testSnapDiffReclaimWithDeferredKeyDeletion() throws Exception {
@@ -943,7 +939,7 @@ public class TestOmSnapshot {
    * 2) Snapshot snap1 created.
    * 3) Key k1 is renamed to key k1_renamed
    * 4) Key k1_renamed is renamed to key k1
-   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 1 key
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key
    *    with 1 Modified entry.
    */
   @Test
@@ -983,7 +979,7 @@ public class TestOmSnapshot {
    * 2) Snapshot snap1 created.
    * 3) Dir dir1/dir2 is created.
    * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
-   * 5) Snapdiff b/w Active FS & snap1 taken to assert difference of 3 key
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 3 key
    *    with 1 rename entry & 2 dirs create entry.
    */
   @Test

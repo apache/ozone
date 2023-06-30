@@ -1053,7 +1053,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Table<String, ? extends WithParentObjectId> tsTable,
       final OmSnapshot fromSnapshot, final OmSnapshot toSnapshot,
       final SnapshotInfo fsInfo, final SnapshotInfo tsInfo,
-      final boolean useFullDiff, final boolean forceNonNativeDiff,
+      final boolean useFullDiff, final boolean skipNativeDiff,
       final Map<String, String> tablePrefixes,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
@@ -1070,7 +1070,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     // Workaround to handle deletes if native rocksDb tool for reading
     // tombstone is not loaded.
     // TODO: [SNAPSHOT] Update Rocksdb SSTFileIterator to read tombstone
-    if (forceNonNativeDiff || !sstDumpTool.isPresent()) {
+    if (skipNativeDiff || !sstDumpTool.isPresent()) {
       deltaFiles.addAll(getSSTFileListForSnapshot(fromSnapshot,
           tablesToLookUp));
     }
@@ -1079,7 +1079,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       addToObjectIdMap(fsTable,
           tsTable,
           deltaFiles,
-          forceNonNativeDiff || !sstDumpTool.isPresent(),
+          !skipNativeDiff && sstDumpTool.isPresent(),
           oldObjIdToKeyMap,
           newObjIdToKeyMap,
           objectIdToDiffObject,
