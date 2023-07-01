@@ -1367,28 +1367,28 @@ public class SnapshotDiffManager implements AutoCloseable {
             throw new IllegalStateException(
                 "Old and new key name both are null");
           } else if (oldKeyName == null) { // Key Created.
-            String key = resolveBucketRelativePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(CREATE, key);
             createDiffs.add(codecRegistry.asRawData(entry));
           } else if (newKeyName == null) { // Key Deleted.
-            String key = resolveBucketRelativePath(isFSOBucket, oldParentIdPathMap,
-                oldKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                oldParentIdPathMap, oldKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
           } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
-            String key = resolveBucketRelativePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
           } else { // Key Renamed.
-            String oldKey = resolveBucketRelativePath(isFSOBucket, oldParentIdPathMap,
-                oldKeyName);
-            String newKey = resolveBucketRelativePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String oldKey = resolveBucketRelativePath(isFSOBucket,
+                oldParentIdPathMap, oldKeyName);
+            String newKey = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             renameDiffs.add(codecRegistry.asRawData(
                 SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
                     newKey)));
