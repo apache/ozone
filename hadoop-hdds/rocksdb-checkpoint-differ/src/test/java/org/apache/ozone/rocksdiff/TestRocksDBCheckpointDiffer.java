@@ -434,7 +434,8 @@ public class TestRocksDBCheckpointDiffer {
     createCheckPoint(activeDbDirName, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
     final DifferSnapshotInfo currentSnapshot =
-        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null, null);
+        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null,
+            null);
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
