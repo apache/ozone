@@ -88,7 +88,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
