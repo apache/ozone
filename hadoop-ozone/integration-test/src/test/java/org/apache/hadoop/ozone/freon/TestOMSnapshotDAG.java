@@ -152,7 +152,8 @@ public class TestOMSnapshotDAG {
     // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
-        getTablePrefixes(omMetadataManager, volumeName, bucketName));
+        getTablePrefixes(omMetadataManager, volumeName, bucketName),
+        ((RDBStore)omMetadataManager.getStore()).getDb().getDb());
   }
 
   private Map<String, String> getTablePrefixes(

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -695,40 +697,25 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   /**
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
-   * @param dbPathArg path to a RocksDB directory
+   * @param rocksDB open rocksDB instance.
    * @return a list of SST files (without extension) in the DB.
    */
-  public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
-    ManagedRocksDB rocksDB = null;
+  public HashSet<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
     HashSet<String> liveFiles = new HashSet<>();
 
-    final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
-    final List<ColumnFamilyDescriptor> cfDescriptors =
-        getCFDescriptorList(cfOpts);
-    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-
-    try (ManagedDBOptions managedDBOptions = new ManagedDBOptions()) {
-      managedDBOptions.setParanoidChecks(true);
-      rocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
-          cfDescriptors, columnFamilyHandles);
-      // Note it retrieves only the selected column families by the descriptor
-      // i.e. keyTable, directoryTable, fileTable
-      List<LiveFileMetaData> liveFileMetaDataList =
-          rocksDB.get().getLiveFilesMetaData();
-      LOG.debug("SST File Metadata for DB: " + dbPathArg);
-      for (LiveFileMetaData m : liveFileMetaDataList) {
-        LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
-        final String trimmedFilename = trimSSTFilename(m.fileName());
-        liveFiles.add(trimmedFilename);
-      }
-    } catch (RocksDBException e) {
-      LOG.error("Error during RocksDB operation: {}", e.getMessage());
-      e.printStackTrace();
-    } finally {
-      if (rocksDB != null) {
-        rocksDB.close();
-      }
-      cfOpts.close();
+    final List<String> cfs = Arrays.asList(
+        org.apache.hadoop.hdds.StringUtils.bytes2String(
+            RocksDB.DEFAULT_COLUMN_FAMILY), "keyTable", "directoryTable",
+        "fileTable");
+    // Note it retrieves only the selected column families by the descriptor
+    // i.e. keyTable, directoryTable, fileTable
+    List<LiveFileMetaData> liveFileMetaDataList =
+        RdbUtil.getLiveSSTFilesForCFs(rocksDB, cfs);
+    LOG.debug("SST File Metadata for DB: " + rocksDB.get().getName());
+    for (LiveFileMetaData m : liveFileMetaDataList) {
+      LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
+      final String trimmedFilename = trimSSTFilename(m.fileName());
+      liveFiles.add(trimmedFilename);
     }
     return liveFiles;
   }
@@ -896,9 +883,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-
-    HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getDbPath());
-    HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getDbPath());
+    HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
+    HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
     HashSet<String> fwdDAGDifferentFiles = new HashSet<>();

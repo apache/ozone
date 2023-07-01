@@ -1003,4 +1003,8 @@ public final class RocksDatabase implements Closeable {
     }
     super.finalize();
   }
+
+  public ManagedRocksDB getDb() {
+    return db;
+  }
 }

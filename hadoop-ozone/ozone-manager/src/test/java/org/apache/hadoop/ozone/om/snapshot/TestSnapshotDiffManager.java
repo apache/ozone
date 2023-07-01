@@ -458,7 +458,7 @@ public class TestSnapshotDiffManager {
       "10,false", "100,false", "1000,false", "10000,false"})
   public void testGetDeltaFilesWithFullDiff(int numberOfFiles,
                                             boolean useFullDiff)
-      throws ExecutionException, RocksDBException, IOException {
+      throws IOException {
     try (MockedStatic<RdbUtil> mockedRdbUtil =
              Mockito.mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
@@ -466,7 +466,7 @@ public class TestSnapshotDiffManager {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(anyString(), anyList()))
+              () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
                 .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
@@ -523,7 +523,7 @@ public class TestSnapshotDiffManager {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
   public void testGetDeltaFilesWithDifferThrowException(int numberOfFiles)
-      throws ExecutionException, RocksDBException, IOException {
+      throws IOException {
     try (MockedStatic<RdbUtil> mockedRdbUtil =
              Mockito.mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
@@ -531,7 +531,7 @@ public class TestSnapshotDiffManager {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(anyString(), anyList()))
+              () -> RdbUtil.getSSTFilesForComparison(any(), anyList()))
           .thenAnswer((Answer<Set<String>>) invocation -> {
             Set<String> retVal = IntStream.range(0, numberOfFiles)
                 .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
