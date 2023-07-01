@@ -139,8 +139,7 @@ enum Type {
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
-  TestUnknownCommand = 124;
-  SetSafeMode = 125;
+  SetSafeMode = 124;
 }
 
 enum SafeMode {
@@ -270,8 +269,7 @@ message OMRequest {
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
-  // skip TestUnknownCommand
-  optional SetSafeModeRequest               SetSafeModeRequest             = 125;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
 }
 
 message OMResponse {
@@ -386,7 +384,7 @@ message OMResponse {
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
-  optional SetSafeModeResponse               SetSafeModeResponse           = 125;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
 }
 
 enum Status {
