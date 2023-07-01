@@ -520,9 +520,9 @@ public class SCMNodeManager implements NodeManager {
       // Update the SCMCommand of deleteBlocksCommand Status
       for (SCMCommand command : commands) {
         if (command.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
-          DeletedBlockLog scmBlockDeletingService = scmContext.getScm().
+          DeletedBlockLog deletedBlockLog = scmContext.getScm().
               getScmBlockManager().getDeletedBlockLog();
-          scmBlockDeletingService.getScmCommandStatusManager()
+          deletedBlockLog.getScmCommandStatusManager()
               .onSent(datanodeDetails.getUuid(), command.getId());
         }
       }
