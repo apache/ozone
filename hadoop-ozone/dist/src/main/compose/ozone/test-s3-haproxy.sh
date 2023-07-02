@@ -27,7 +27,3 @@ source "$COMPOSE_DIR/../testlib.sh"
 start_docker_env
 
 execute_robot_test scm s3
-
-stop_docker_env
-
-generate_report
