@@ -280,7 +280,6 @@ execute_commands_in_container(){
 ## @description Stop a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
-  set -e
   docker-compose --ansi never stop $@
 }
 

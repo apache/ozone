@@ -40,7 +40,7 @@ execute_robot_test scm1.org kinit.robot
 wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | sed 's/StorageContainerManagerStarter//' | xargs  | xargs -I {} jstack {} | grep 'RootCARotationManager-Active'"
 
 # wait and verify root CA is rotated
-wait_for_execute_command scm1.org 90 "ozone admin cert info 2"
+wait_for_execute_command scm1.org 180 "ozone admin cert info 2"
 
 # transfer leader to scm2.org
 execute_robot_test scm1.org scmha/scm-leader-transfer.robot
@@ -52,8 +52,8 @@ execute_commands_in_container scm1.org "ozone sh volume create /r-v1 && ozone sh
 # verify scm operations
 execute_robot_test scm1.org admincli/pipeline.robot
 
-# wait for second root CA rotation
-wait_for_execute_command scm1.org 90 "ozone admin cert info 3"
+# wait for next root CA rotation
+wait_for_execute_command scm1.org 180 "ozone admin cert info 3"
 
 # bootstrap new SCM4 and verify certificate
 docker-compose up -d scm4.org
@@ -61,6 +61,9 @@ wait_for_port scm4.org 9894 120
 execute_robot_test scm4.org kinit.robot
 wait_for_execute_command scm4.org 120 "ozone admin scm roles | grep scm4.org"
 wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm | grep scm4.org"
+
+# wait for next root CA rotation
+wait_for_execute_command scm4.org 180 "ozone admin cert info 4"
 
 #transfer leader to scm4.org
 export TARGET_SCM=scm4.org
@@ -71,8 +74,16 @@ docker-compose up -d datanode4
 wait_for_port datanode4 9856 60
 wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
 
+#transfer leader to scm3.org
+execute_robot_test scm3.org kinit.robot
+export TARGET_SCM=scm3.org
+execute_robot_test scm4.org scmha/scm-leader-transfer.robot
+
+# wait for next root CA rotation
+wait_for_execute_command scm3.org 180 "ozone admin cert info 5"
+
 #decomission scm1.org
-execute_robot_test scm4.org scmha/scm-decommission.robot
+execute_robot_test scm3.org scmha/scm-decommission.robot
 
 # check the metrics
 execute_robot_test scm2.org scmha/root-ca-rotation.robot

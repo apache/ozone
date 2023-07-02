@@ -393,24 +393,6 @@ public class RootCARotationManager implements SCMService {
             return;
           }
 
-          checkInterruptState();
-          // save root certificate to certStore
-          try {
-            if (scm.getCertificateStore().getCertificateByID(
-                newRootCertificate.getSerialNumber(), VALID_CERTS) == null) {
-              LOG.info("Persist root certificate {} to cert store",
-                  newRootCertId);
-              scm.getCertificateStore().storeValidCertificate(
-                  newRootCertificate.getSerialNumber(),
-                  CertificateCodec.getX509Certificate(newRootCertificate),
-                  HddsProtos.NodeType.SCM);
-            }
-          } catch (CertificateException | IOException e) {
-            LOG.error("Failed to save root certificate {} to cert store",
-                newRootCertId);
-            scm.shutDown("Failed to save root certificate to cert store");
-          }
-
           // schedule task to wait for prepare acks
           waitAckTask = executorService.scheduleAtFixedRate(
               new WaitSubCARotationPrepareAckTask(newRootCertificate),
@@ -625,9 +607,11 @@ public class RootCARotationManager implements SCMService {
    */
   public class WaitSubCARotationPrepareAckTask implements Runnable {
     private String rootCACertId;
+    private X509CertificateHolder rootCACertHolder;
 
     public WaitSubCARotationPrepareAckTask(
         X509CertificateHolder rootCertHolder) {
+      this.rootCACertHolder = rootCertHolder;
       this.rootCACertId = rootCertHolder.getSerialNumber().toString();
     }
 
@@ -659,6 +643,23 @@ public class RootCARotationManager implements SCMService {
             long timeTaken = System.nanoTime() - processStartTime.get();
             metrics.setSuccessTimeInNs(timeTaken);
             processStartTime.set(null);
+
+            // save root certificate to certStore
+            try {
+              if (scm.getCertificateStore().getCertificateByID(
+                  rootCACertHolder.getSerialNumber(), VALID_CERTS) == null) {
+                LOG.info("Persist root certificate {} to cert store",
+                    rootCACertId);
+                scm.getCertificateStore().storeValidCertificate(
+                    rootCACertHolder.getSerialNumber(),
+                    CertificateCodec.getX509Certificate(rootCACertHolder),
+                    HddsProtos.NodeType.SCM);
+              }
+            } catch (CertificateException | IOException e) {
+              LOG.error("Failed to save root certificate {} to cert store",
+                  rootCACertId);
+              scm.shutDown("Failed to save root certificate to cert store");
+            }
 
             // reset state
             handler.resetRotationPrepareAcks();
