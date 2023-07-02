@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffObject.SnapshotDiffObjectBuilder;
@@ -1279,11 +1278,10 @@ public class SnapshotDiffManager implements AutoCloseable {
             "Cannot resolve path for key: %s with parent Id: %d", key,
             parentId));
       }
-      return OzoneFSUtils.removeLeadingSlashIfNeeded(
-          parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1])).get()
-              .toString());
+      return parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1]))
+          .get().toString();
     }
-    return Paths.get(key).toString();
+    return Paths.get(OzoneConsts.OZONE_URI_DELIMITER).resolve(key).toString();
   }
 
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})

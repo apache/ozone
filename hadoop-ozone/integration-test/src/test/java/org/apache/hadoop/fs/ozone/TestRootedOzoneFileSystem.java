@@ -2506,7 +2506,7 @@ public class TestRootedOzoneFileSystem {
     Path file =
         new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
     ContractTestUtils.touch(fs, file);
-    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, ".");
+    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, "");
     Assert.assertEquals(1, diff.getDiffList().size());
 
 
