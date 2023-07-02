@@ -812,6 +812,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       try {
         if (datastreamEnabled && !enableEC && copyHeader == null) {
+          getMetrics().updatePutKeyMetadataStats(startNanos);
           return ObjectEndpointStreaming
               .createMultipartKey(ozoneBucket, key, length, partNumber,
                   uploadID, chunkSize, body);
