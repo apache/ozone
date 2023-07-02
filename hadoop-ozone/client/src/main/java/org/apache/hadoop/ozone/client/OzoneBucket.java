@@ -1168,14 +1168,20 @@ public class OzoneBucket extends WithMetadata {
      *      a/b2/d1/
      *      a/b2/d2/
      *      a/b2/d2/d21.txt
+     *      a/b2/d2/d22.txt
      *      a/b2/d3/
-     *      a/b2/d3/d22.txt
      *      a/b3/
      *      a/b3/e1/
+     *      a/b3/e1/e11.txt
      *      a/b3/e2/
      *      a/b3/e3/
-     *      a/b3/e3/e11.txt
      *
+     * Example 1: keyPrefix="a/b2/", prevKey=""
+     *            result: [a/b2/d1/, a/b2/d2/, a/b2/d3/]
+     * Example 2: keyPrefix="a/b2/", prevKey="a/b2/d2/d21.txt"
+     *            result: [a/b2/d2/, a/b2/d3/]
+     * Example 3: keyPrefix="a/b2/", prevKey="a/b2/d2/d22.txt"
+     *            result: [a/b2/d3/]
      * Say, keyPrefix="a/b" and prevKey="", the results will be
      * [a/b1/, a/b2/, a/b3/]
      * In implementation, the keyPrefix "a/b" can be identified in listKeys,
