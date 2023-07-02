@@ -254,6 +254,7 @@ jobs:
           - EC
           - HA-secure
           - HA-unsecure
+          - integration
           - MR
           - misc
       fail-fast: false
