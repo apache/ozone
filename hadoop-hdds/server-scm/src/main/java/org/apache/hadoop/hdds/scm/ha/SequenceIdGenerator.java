@@ -95,7 +95,13 @@ public class SequenceIdGenerator {
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     Preconditions.checkNotNull(scmhaManager);
-    this.stateManager = new StateManagerImpl.Builder()
+    this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
+  }
+
+  public StateManager createStateManager(SCMHAManager scmhaManager,
+      Table<String, Long> sequenceIdTable) {
+    Preconditions.checkNotNull(scmhaManager);
+    return new StateManagerImpl.Builder()
         .setRatisServer(scmhaManager.getRatisServer())
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setSequenceIdTable(sequenceIdTable).build();
@@ -116,22 +122,22 @@ public class SequenceIdGenerator {
       }
 
       Preconditions.checkArgument(batch.nextId == batch.lastId + 1);
+      Long prevLastId = batch.lastId;
       while (true) {
-        Long prevLastId = batch.lastId;
         batch.nextId = prevLastId + 1;
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
-        batch.lastId += batchSize;
 
         if (stateManager.allocateBatch(sequenceIdName,
-            prevLastId, batch.lastId)) {
+            prevLastId, prevLastId + batchSize)) {
+          batch.lastId = prevLastId + batchSize;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
               sequenceIdName, prevLastId, batch.lastId);
           break;
         }
 
         // reload lastId from RocksDB.
-        batch.lastId = stateManager.getLastId(sequenceIdName);
+        prevLastId = stateManager.getLastId(sequenceIdName);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
