@@ -31,7 +31,3 @@ export COMPOSE_FILE=docker-compose.yaml:certificate-rotation.yaml
 start_docker_env
 
 execute_robot_test scm certrotation
-
-stop_docker_env
-
-generate_report
