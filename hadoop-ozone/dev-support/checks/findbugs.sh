@@ -16,11 +16,17 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+: ${OZONE_WITH_COVERAGE:="false"}
+
 source "${DIR}/_lib.sh"
 
 install_spotbugs
 
 MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx --no-transfer-progress'
+
+if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
+fi
 
 #shellcheck disable=SC2086
 mvn ${MAVEN_OPTIONS} test-compile spotbugs:spotbugs "$@"

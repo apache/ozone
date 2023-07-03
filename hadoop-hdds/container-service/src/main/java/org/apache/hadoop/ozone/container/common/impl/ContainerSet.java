@@ -21,32 +21,38 @@ package org.apache.hadoop.ozone.container.common.impl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.List;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 
 /**
  * Class that manages Containers created on the datanode.
  */
-public class ContainerSet {
+public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
@@ -54,6 +60,30 @@ public class ContainerSet {
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
+  private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
+      new ConcurrentSkipListMap<>();
+  private Clock clock;
+  private long recoveringTimeout;
+
+  public ContainerSet(long recoveringTimeout) {
+    this.clock = Clock.system(ZoneOffset.UTC);
+    this.recoveringTimeout = recoveringTimeout;
+  }
+
+  public long getCurrentTime() {
+    return clock.millis();
+  }
+
+  @VisibleForTesting
+  public void setClock(Clock clock) {
+    this.clock = clock;
+  }
+
+  @VisibleForTesting
+  public void setRecoveringTimeout(long recoveringTimeout) {
+    this.recoveringTimeout = recoveringTimeout;
+  }
+
   /**
    * Add Container to container map.
    * @param container container to be added
@@ -72,6 +102,10 @@ public class ContainerSet {
       }
       // wish we could have done this from ContainerData.setState
       container.getContainerData().commitSpace();
+      if (container.getContainerData().getState() == RECOVERING) {
+        recoveringContainerMap.put(
+            clock.millis() + recoveringTimeout, containerId);
+      }
       return true;
     } else {
       LOG.warn("Container already exists with container Id {}", containerId);
@@ -114,6 +148,33 @@ public class ContainerSet {
   }
 
   /**
+   * Removes the Recovering Container matching with specified containerId.
+   * @param containerId ID of the container to remove.
+   * @return true If container is removed from containerMap returns true,
+   * otherwise false.
+   */
+  public boolean removeRecoveringContainer(long containerId) {
+    Preconditions.checkState(containerId >= 0,
+        "Container Id cannot be negative.");
+    //it might take a little long time to iterate all the entries
+    // in recoveringContainerMap, but it seems ok here since:
+    // 1 In the vast majority of cases，there will not be too
+    // many recovering containers.
+    // 2 closing container is not a sort of urgent action
+    //
+    // we can revisit here if any performance problem happens
+    Iterator<Map.Entry<Long, Long>> it = getRecoveringContainerIterator();
+    while (it.hasNext()) {
+      Map.Entry<Long, Long> entry = it.next();
+      if (entry.getValue() == containerId) {
+        it.remove();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Return number of containers in container map.
    * @return container count
    */
@@ -122,29 +183,53 @@ public class ContainerSet {
     return containerMap.size();
   }
 
-  public void handleVolumeFailures() {
+  /**
+   * Remove all containers belonging to failed volume.
+   * Send FCR which will not contain removed containers.
+   *
+   * @param  context StateContext
+   * @return
+   */
+  public void handleVolumeFailures(StateContext context) {
+    AtomicBoolean failedVolume = new AtomicBoolean(false);
+    AtomicInteger containerCount = new AtomicInteger(0);
     containerMap.values().forEach(c -> {
       if (c.getContainerData().getVolume().isFailed()) {
-        try {
-          c.markContainerUnhealthy();
-          LOG.info("Marking Container {} UNHEALTHY as the Volume {} " +
+        removeContainer(c.getContainerData().getContainerID());
+        LOG.debug("Removing Container {} as the Volume {} " +
               "has failed", c.getContainerData().getContainerID(),
-              c.getContainerData().getVolume());
-        } catch (StorageContainerException e) {
-          LOG.error("Failed to move container {} to UNHEALTHY state in "
-                  + "volume {}", c.getContainerData().getContainerID(),
-              c.getContainerData().getVolume(), e);
-        }
+            c.getContainerData().getVolume());
+        failedVolume.set(true);
+        containerCount.incrementAndGet();
       }
     });
+
+    if (failedVolume.get()) {
+      try {
+        LOG.info("Removed {} containers on failed volumes",
+            containerCount.get());
+        // There are some failed volume(container), send FCR to SCM
+        Message report = context.getFullContainerReportDiscardPendingICR();
+        context.refreshFullReport(report);
+        context.getParent().triggerHeartbeat();
+      } catch (Exception e) {
+        LOG.error("Failed to send FCR in Volume failure", e);
+      }
+    }
+  }
+
+  @Override
+  public Iterator<Container<?>> iterator() {
+    return containerMap.values().iterator();
   }
 
   /**
-   * Return an container Iterator over {@link ContainerSet#containerMap}.
+   * Return an container Iterator over
+   * {@link ContainerSet#recoveringContainerMap}.
    * @return {@literal Iterator<Container<?>>}
    */
-  public Iterator<Container<?>> getContainerIterator() {
-    return containerMap.values().iterator();
+  public Iterator<Map.Entry<Long, Long>> getRecoveringContainerIterator() {
+    return recoveringContainerMap.entrySet().iterator();
   }
 
   /**
@@ -302,6 +387,5 @@ public class ContainerSet {
         }
       }
     });
-
   }
 }

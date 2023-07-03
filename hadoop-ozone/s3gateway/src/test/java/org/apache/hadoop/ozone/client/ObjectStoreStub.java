@@ -61,14 +61,15 @@ public class ObjectStoreStub extends ObjectStore {
 
   @Override
   public void createVolume(String volumeName, VolumeArgs volumeArgs) {
-    OzoneVolumeStub volume =
-        new OzoneVolumeStub(volumeName,
-            volumeArgs.getAdmin(),
-            volumeArgs.getOwner(),
-            volumeArgs.getQuotaInBytes(),
-            volumeArgs.getQuotaInNamespace(),
-            Time.now(),
-            volumeArgs.getAcls());
+    OzoneVolumeStub volume = OzoneVolumeStub.newBuilder()
+        .setName(volumeName)
+        .setAdmin(volumeArgs.getAdmin())
+        .setOwner(volumeArgs.getOwner())
+        .setQuotaInBytes(volumeArgs.getQuotaInBytes())
+        .setQuotaInNamespace(volumeArgs.getQuotaInNamespace())
+        .setCreationTime(Time.now())
+        .setAcls(volumeArgs.getAcls())
+        .build();
     volumes.put(volumeName, volume);
   }
 
@@ -160,4 +161,5 @@ public class ObjectStoreStub extends ObjectStore {
   public void setBucketEmptyStatus(String bucketName, boolean status) {
     bucketEmptyStatus.computeIfPresent(bucketName, (k, v) -> status);
   }
+
 }

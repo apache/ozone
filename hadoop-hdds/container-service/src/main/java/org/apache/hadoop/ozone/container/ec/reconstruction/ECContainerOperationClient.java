@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.collections.map.SingletonMap;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,8 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -111,6 +115,50 @@ public class ECContainerOperationClient implements Closeable {
     }
   }
 
+  /**
+   * Deletes the container at the given DN. Before deleting it will pre-check
+   * whether the container is in RECOVERING state. As this is not an atomic
+   * check for RECOVERING container, there is a chance non recovering containers
+   * could get deleted if they just created in the window time of RECOVERING
+   * container exist check and delete op. So, user of the API needs to keep this
+   * scenario in mind and use this API if it is still safe.
+   *
+   * TODO: Alternatively we can extend this API to pass the flag to perform the
+   *       check at server side. So, that it will become atomic op.
+   * @param containerID - Container ID.
+   * @param dn - Datanode details.
+   * @param repConfig - Replication config.
+   * @param encodedToken - Token
+   */
+  public void deleteContainerInState(long containerID, DatanodeDetails dn,
+         ECReplicationConfig repConfig, String encodedToken,
+         Set<State> acceptableStates) throws IOException {
+    XceiverClientSpi xceiverClient = this.xceiverClientManager
+        .acquireClient(singleNodePipeline(dn, repConfig));
+    try {
+      // Before deleting the recovering container, just make sure that state is
+      // Recovering & Unhealthy. There will be still race condition,
+      // but this will avoid most usual case.
+      ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
+          ContainerProtocolCalls
+              .readContainer(xceiverClient, containerID, encodedToken);
+      State currentState =
+              readContainerResponseProto.getContainerData().getState();
+      if (!Objects.isNull(acceptableStates)
+              && acceptableStates.contains(currentState)) {
+        ContainerProtocolCalls.deleteContainer(xceiverClient, containerID,
+                        true, encodedToken);
+      } else {
+        LOG.warn("Container {} will not be deleted as current state " +
+                "not in acceptable states. Current state: {}, " +
+                "Acceptable States: {}", containerID, currentState,
+                acceptableStates);
+      }
+    } finally {
+      this.xceiverClientManager.releaseClient(xceiverClient, false);
+    }
+  }
+
   public void createRecoveringContainer(long containerID, DatanodeDetails dn,
       ECReplicationConfig repConfig, String encodedToken, int replicaIndex)
       throws IOException {
@@ -127,12 +175,18 @@ public class ECContainerOperationClient implements Closeable {
 
   Pipeline singleNodePipeline(DatanodeDetails dn,
       ECReplicationConfig repConfig) {
+    return singleNodePipeline(dn, repConfig, 0);
+  }
+
+  Pipeline singleNodePipeline(DatanodeDetails dn,
+       ECReplicationConfig repConfig, int replicaIndex) {
     // To get the same client from cache, we try to use the DN UUID as
     // pipelineID for uniqueness. Please note, pipeline does not have any
     // significance after it's close. So, we are ok to use any ID.
     return Pipeline.newBuilder().setId(PipelineID.valueOf(dn.getUuid()))
-        .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
-        .setState(Pipeline.PipelineState.CLOSED).build();
+            .setReplicationConfig(repConfig).setNodes(ImmutableList.of(dn))
+            .setState(Pipeline.PipelineState.CLOSED)
+            .setReplicaIndexes(new SingletonMap(dn, replicaIndex)).build();
   }
 
   public XceiverClientManager getXceiverClientManager() {

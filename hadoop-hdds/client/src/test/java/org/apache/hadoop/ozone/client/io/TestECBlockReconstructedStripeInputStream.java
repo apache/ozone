@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
@@ -86,12 +87,32 @@ public class TestECBlockReconstructedStripeInputStream {
 
   @BeforeEach
   public void setup() {
+    polluteByteBufferPool();
     repConfig = new ECReplicationConfig(3, 2,
         ECReplicationConfig.EcCodec.RS, ONEMB);
     streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
 
     randomSeed = random.nextLong();
     dataGen = new SplittableRandom(randomSeed);
+  }
+
+  /**
+   * All the tests here use a chunk size of 1MB, but in a mixed workload
+   * cluster, it is possible to have multiple EC chunk sizes. This will result
+   * in the byte buffer pool having buffers of varying size and when a buffer is
+   * requested it can receive a buffer larger than the request size. That caused
+   * problems in HDDS-7304, so this method ensures the buffer pool has some
+   * larger buffers to return.
+   */
+  private void polluteByteBufferPool() {
+    List<ByteBuffer> bufs = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      ByteBuffer b = bufferPool.getBuffer(false, ONEMB * 3);
+      bufs.add(b);
+    }
+    for (ByteBuffer b : bufs) {
+      bufferPool.putBuffer(b);
+    }
   }
 
   @AfterEach
@@ -470,6 +491,71 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   @Test
+  void testNoErrorIfSpareLocationToRead() throws IOException {
+    int chunkSize = repConfig.getEcChunkSize();
+    int blockLength = chunkSize * 3 - 1;
+
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), 3 * ONEMB);
+    ECStreamTestUtil
+        .randomFill(dataBufs, repConfig.getEcChunkSize(), dataGen, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+
+    // We have a length that is less than a stripe, so chunks 1 and 2 are full.
+    // Block 1 is lost and needs recovered
+    // from the parity and padded blocks 2 and 3.
+
+    List<Map<DatanodeDetails, Integer>> locations = new ArrayList<>();
+    // Two data missing
+    locations.add(ECStreamTestUtil.createIndexMap(3, 4, 5));
+    // Two data missing
+    locations.add(ECStreamTestUtil.createIndexMap(1, 4, 5));
+    // One data missing - the last one
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 5));
+    // One data and one parity missing
+    locations.add(ECStreamTestUtil.createIndexMap(2, 3, 4));
+    // One data and one parity missing
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 4));
+    // No indexes missing
+    locations.add(ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
+
+    DatanodeDetails spare = MockDatanodeDetails.randomDatanodeDetails();
+
+    for (Map<DatanodeDetails, Integer> dnMap : locations) {
+      streamFactory = new TestBlockInputStreamFactory();
+      addDataStreamsToFactory(dataBufs, parity);
+      ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+
+      // this index fails, but has spare replica
+      int failing = dnMap.values().iterator().next();
+      streamFactory.setFailIndexes(failing);
+      dnMap.put(spare, failing);
+
+      BlockLocationInfo keyInfo =
+          ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+      streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+      dataGen = new SplittableRandom(randomSeed);
+      try (ECBlockReconstructedStripeInputStream ecb =
+               createInputStream(keyInfo)) {
+        int read = ecb.read(bufs);
+        Assertions.assertEquals(blockLength, read);
+        ECStreamTestUtil.assertBufferMatches(bufs[0], dataGen);
+        ECStreamTestUtil.assertBufferMatches(bufs[1], dataGen);
+        ECStreamTestUtil.assertBufferMatches(bufs[2], dataGen);
+        // Check the underlying streams have been advanced by 1 chunk:
+        for (TestBlockInputStream bis : streamFactory.getBlockStreams()) {
+          Assertions.assertEquals(0, bis.getRemaining());
+        }
+        Assertions.assertEquals(ecb.getPos(), blockLength);
+        clearBuffers(bufs);
+        // A further read should give EOF
+        read = ecb.read(bufs);
+        Assertions.assertEquals(-1, read);
+      }
+    }
+  }
+
+  @Test
   public void testSeek() throws IOException {
     // Generate the input data for 3 full stripes and generate the parity
     // and a partial stripe
@@ -668,7 +754,7 @@ public class TestECBlockReconstructedStripeInputStream {
     streamFactory = new TestBlockInputStreamFactory();
     addDataStreamsToFactory(dataBufs, parity);
     // Fail all the indexes containing data on their first read.
-    streamFactory.setFailIndexes(indexesToList(1, 4, 5));
+    streamFactory.setFailIndexes(1, 4, 5);
     // The locations contain the padded indexes, as will often be the case
     // when containers are reported by SCM.
     Map<DatanodeDetails, Integer> dnMap =
@@ -737,14 +823,6 @@ public class TestECBlockReconstructedStripeInputStream {
       BlockLocationInfo keyInfo) {
     return new ECBlockReconstructedStripeInputStream(repConfig, keyInfo, true,
         null, null, streamFactory, bufferPool, ecReconstructExecutor);
-  }
-
-  private List<Integer> indexesToList(int... indexes) {
-    List<Integer> list = new ArrayList<>();
-    for (int i : indexes) {
-      list.add(i);
-    }
-    return list;
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {

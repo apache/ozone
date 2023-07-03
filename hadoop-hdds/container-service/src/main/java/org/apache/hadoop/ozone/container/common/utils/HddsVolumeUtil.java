@@ -68,9 +68,9 @@ public final class HddsVolumeUtil {
    * @throws IOException
    */
   public static void initPerDiskDBStore(String containerDBPath,
-      ConfigurationSource conf) throws IOException {
+      ConfigurationSource conf, boolean readOnly) throws IOException {
     DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerDBPath,
-        OzoneConsts.SCHEMA_V3, conf, false);
+        OzoneConsts.SCHEMA_V3, conf, readOnly);
     BlockUtils.addDB(store, containerDBPath, conf, OzoneConsts.SCHEMA_V3);
   }
 
@@ -81,7 +81,7 @@ public final class HddsVolumeUtil {
    * @param logger
    */
   public static void loadAllHddsVolumeDbStore(MutableVolumeSet hddsVolumeSet,
-      MutableVolumeSet dbVolumeSet, Logger logger) {
+      MutableVolumeSet dbVolumeSet, boolean readOnly, Logger logger) {
     // Scan subdirs under the db volumes and build a one-to-one map
     // between each HddsVolume -> DbVolume.
     mapDbVolumesToDataVolumesIfNeeded(hddsVolumeSet, dbVolumeSet);
@@ -89,7 +89,7 @@ public final class HddsVolumeUtil {
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
       try {
-        volume.loadDbStore();
+        volume.loadDbStore(readOnly);
       } catch (IOException e) {
         onFailure(volume);
         if (logger != null) {

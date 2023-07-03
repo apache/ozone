@@ -17,9 +17,27 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.permission.FsPermission;
+
 /**
  * Minimal Ozone File System compatible with Hadoop 2.x.
  */
 public class OzoneFileSystem extends BasicOzoneFileSystem {
-
+  @Override
+  protected FileStatus constructFileStatus(
+          FileStatusAdapter fileStatusAdapter) {
+    return new FileStatus(fileStatusAdapter.getLength(),
+            fileStatusAdapter.isDir(),
+            fileStatusAdapter.getBlockReplication(),
+            fileStatusAdapter.getBlocksize(),
+            fileStatusAdapter.getModificationTime(),
+            fileStatusAdapter.getAccessTime(),
+            new FsPermission(fileStatusAdapter.getPermission()),
+            fileStatusAdapter.getOwner(),
+            fileStatusAdapter.getGroup(),
+            fileStatusAdapter.getSymlink(),
+            fileStatusAdapter.getPath()
+        );
+  }
 }

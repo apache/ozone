@@ -61,7 +61,8 @@ public interface CertificateStore {
    */
   @Replicate
   void storeValidCertificate(BigInteger serialID,
-      X509Certificate certificate, NodeType role) throws IOException;
+      X509Certificate certificate, NodeType role)
+      throws IOException;
 
   void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException;

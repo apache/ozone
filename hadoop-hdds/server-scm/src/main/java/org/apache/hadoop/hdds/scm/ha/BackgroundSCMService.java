@@ -98,7 +98,12 @@ public final class BackgroundSCMService implements SCMService {
     while (running.get()) {
       try {
         if (shouldRun()) {
-          periodicalTask.run();
+          try {
+            periodicalTask.run();
+          } catch (Throwable e) {
+            log.error("Caught Unhandled exception in {}. The task will be " +
+                "re-tried in {}ms", getServiceName(), intervalInMillis, e);
+          }
         }
         synchronized (this) {
           if (!runImmediately) {
@@ -121,8 +126,8 @@ public final class BackgroundSCMService implements SCMService {
         log.info("{} Service is not running, skip stop.", getServiceName());
         return;
       }
-      backgroundThread.interrupt();
     }
+    backgroundThread.interrupt();
     log.info("Stopping {} Service.", getServiceName());
   }
 

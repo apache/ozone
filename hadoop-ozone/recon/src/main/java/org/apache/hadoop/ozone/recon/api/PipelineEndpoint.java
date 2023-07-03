@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -39,7 +40,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -76,9 +76,9 @@ public class PipelineEndpoint {
 
     pipelines.forEach(pipeline -> {
       UUID pipelineId = pipeline.getId().getId();
-      List<String> datanodes = new ArrayList<>();
+      List<DatanodeDetails> datanodes = new ArrayList<>();
       PipelineMetadata.Builder builder = PipelineMetadata.newBuilder();
-      pipeline.getNodes().forEach(node -> datanodes.add(node.getHostName()));
+      pipeline.getNodes().forEach(node -> datanodes.add(node));
       long duration =
           Instant.now().toEpochMilli() -
               pipeline.getCreationTimestamp().toEpochMilli();
@@ -114,12 +114,12 @@ public class PipelineEndpoint {
         // is group-79DF51EE872D
         String[] splits = pipelineId.toString().split("-");
         String groupId = "group-" + splits[splits.length - 1].toUpperCase();
-        Optional<Long> leaderElectionCount = getMetricValue(
-            "ratis_leader_election_electionCount", groupId);
-        leaderElectionCount.ifPresent(pipelineBuilder::setLeaderElections);
-        Optional<Long> leaderElectionTime = getMetricValue(
-            "ratis_leader_election_lastLeaderElectionTime", groupId);
-        leaderElectionTime.ifPresent(pipelineBuilder::setLastLeaderElection);
+        Long leaderElectionCount = getElectionCountMetricValue(groupId);
+        pipelineBuilder.setLeaderElections(leaderElectionCount);
+        Long lastLeaderElectionElapsedTime
+                = getLastLeaderElectionElapsedTimeMetricValue(groupId,
+                pipeline.getLeaderId());
+        pipelineBuilder.setLastLeaderElection(lastLeaderElectionElapsedTime);
       }
 
       pipelinesList.add(pipelineBuilder.build());
@@ -130,25 +130,53 @@ public class PipelineEndpoint {
     return Response.ok(pipelinesResponse).build();
   }
 
-  private Optional<Long> getMetricValue(String metricName, String groupId) {
+  private Long getElectionCountMetricValue(String groupId) {
+    Long electionCount = 0L;
     String metricsQuery = String.format(
-        "query=%s{group=\"%s\"}", metricName, groupId);
+            "query=ratis_leader_election_electionCount{group=\"%s\"}", groupId);
     try {
       List<Metric> metrics = metricsServiceProvider.getMetricsInstant(
-          metricsQuery);
+              metricsQuery);
       if (!metrics.isEmpty()) {
-        TreeMap<Double, Double> values = (TreeMap<Double, Double>)
-            metrics.get(0).getValues();
-        if (!values.isEmpty()) {
-          return Optional.of(values.firstEntry().getValue().longValue());
+        for (Metric m : metrics) {
+          TreeMap<Double, Double> values = (TreeMap<Double, Double>)
+                  m.getValues();
+          if (!values.isEmpty()) {
+            electionCount += values.firstEntry().getValue().longValue();
+          }
         }
       }
     } catch (Exception ex) {
       if (LOG.isErrorEnabled()) {
-        LOG.error(String.format("Unable to get metrics value for %s",
-            metricName), ex);
+        LOG.error("Unable to get metrics value for " +
+                "ratis_leader_election_electionCount", ex);
       }
     }
-    return Optional.empty();
+    return electionCount;
+  }
+
+  private Long getLastLeaderElectionElapsedTimeMetricValue(String groupId,
+                                                           UUID uuid) {
+    String metricsQuery = String.format(
+            "query=ratis_leader_election_lastLeaderElectionElapsedTime{group=" +
+                    "\"%s\",exported_instance=\"%s\"}", groupId,
+            uuid.toString());
+    try {
+      List<Metric> metrics = metricsServiceProvider.getMetricsInstant(
+              metricsQuery);
+      if (!metrics.isEmpty()) {
+        TreeMap<Double, Double> values = (TreeMap<Double, Double>)
+                metrics.get(0).getValues();
+        if (!values.isEmpty()) {
+          return values.firstEntry().getValue().longValue();
+        }
+      }
+    } catch (Exception ex) {
+      if (LOG.isErrorEnabled()) {
+        LOG.error("Unable to get metrics value for " +
+                "ratis_leader_election_lastLeaderElectionElapsedTime", ex);
+      }
+    }
+    return 0L;
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_VALIDATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -55,16 +55,15 @@ public class DataNodeUpgradeFinalizer extends
       logAndEmit(msg);
       throw new UpgradeException(msg, PREFINALIZE_VALIDATION_FAILED);
     }
+    getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
   private boolean canFinalizeDataNode(DatanodeStateMachine dsm) {
     // Lets be sure that we do not have any open container before we return
     // from here. This function should be called in its own finalizer thread
     // context.
-    Iterator<Container<?>> containerIt =
-        dsm.getContainer().getController().getContainers();
-    while (containerIt.hasNext()) {
-      Container ctr = containerIt.next();
+    for (Container<?> ctr :
+        dsm.getContainer().getController().getContainers()) {
       ContainerProtos.ContainerDataProto.State state = ctr.getContainerState();
       long id = ctr.getContainerData().getContainerID();
       switch (state) {
@@ -74,7 +73,6 @@ public class DataNodeUpgradeFinalizer extends
             + "state is: {}", id, state);
         return false;
       default:
-        continue;
       }
     }
     return true;

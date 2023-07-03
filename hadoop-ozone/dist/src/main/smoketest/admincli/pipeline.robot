@@ -52,8 +52,9 @@ Activate pipeline
 
 Close pipeline
                         Execute          ozone admin pipeline close "${PIPELINE}"
-    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
-                        Should contain   ${output}   CLOSED
+    ${output} =         Execute          ozone admin pipeline list
+                        Pass Execution If     '${PIPELINE}' not in '''${output}'''    Pipeline already scrubbed
+                        Should Match Regexp   ${output}   ${PIPELINE}.*CLOSED
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin pipeline

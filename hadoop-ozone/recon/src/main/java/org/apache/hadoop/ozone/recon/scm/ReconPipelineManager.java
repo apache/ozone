@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,7 +41,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +63,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
                                SCMContext scmContext) {
     super(conf, scmhaManager, nodeManager, pipelineStateManager,
         pipelineFactory, eventPublisher, scmContext,
-        new MonotonicClock(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC));
   }
 
   public static ReconPipelineManager newReconPipelineManager(
@@ -95,7 +95,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @param pipelinesFromScm pipelines from SCM.
    * @throws IOException on exception.
    */
-  void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
+  void initializePipelines(List<Pipeline> pipelinesFromScm)
+      throws IOException {
 
     acquireWriteLock();
     try {
@@ -163,7 +164,8 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
    * @throws IOException
    */
   @VisibleForTesting
-  public void addPipeline(Pipeline pipeline) throws IOException {
+  public void addPipeline(Pipeline pipeline)
+      throws IOException {
     acquireWriteLock();
     try {
       getStateManager().addPipeline(

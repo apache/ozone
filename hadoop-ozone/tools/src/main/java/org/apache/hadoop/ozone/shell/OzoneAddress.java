@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -53,6 +54,8 @@ public class OzoneAddress {
   private String volumeName = "";
 
   private String bucketName = "";
+
+  private String snapshotNameWithIndicator = "";
 
   private String keyName = "";
 
@@ -143,7 +146,7 @@ public class OzoneAddress {
                   + ozoneURI.getHost() + "' is a logical (HA) OzoneManager "
                   + "and does not use port information.");
         }
-        client = createRpcClient(conf);
+        client = createRpcClientFromServiceId(ozoneURI.getHost(), conf);
       } else if (ozoneURI.getPort() == -1) {
         client = createRpcClientFromHostPort(ozoneURI.getHost(),
             OmUtils.getOmRpcPort(conf), conf);
@@ -184,6 +187,8 @@ public class OzoneAddress {
       String omServiceID
   )
       throws IOException, OzoneClientException {
+    Collection<String> serviceIds = conf.
+        getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY);
     if (omServiceID != null) {
       // OM HA cluster
       if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
@@ -192,20 +197,19 @@ public class OzoneAddress {
         throw new OzoneClientException("Service ID specified does not match" +
             " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
             "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+            serviceIds);
       }
-    } else {
-      // If om service id is not specified, consider it as a non-HA cluster.
-      // But before that check if serviceId is defined. If it is defined
-      // throw an error om service ID needs to be specified.
-      if (OmUtils.isServiceIdsDefined(conf)) {
-        throw new OzoneClientException("Service ID must not"
-            + " be omitted when " + OZONE_OM_SERVICE_IDS_KEY + " is defined. " +
-            "Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
-      }
-      return OzoneClientFactory.getRpcClient(conf);
+    } else if (serviceIds.size() > 1) {
+      // If multiple om service ids are there,
+      // throw an error "om service ID must not be omitted"
+      throw new OzoneClientException("Service ID must not"
+          + " be omitted when cluster has multiple OM Services." +
+          "  Configured " + OZONE_OM_SERVICE_IDS_KEY + " are "
+          + serviceIds);
     }
+    // for non-HA cluster and HA cluster with only 1 service ID
+    // get service ID from configurations
+    return OzoneClientFactory.getRpcClient(conf);
   }
 
   /**
@@ -293,6 +297,10 @@ public class OzoneAddress {
     return bucketName;
   }
 
+  public String getSnapshotNameWithIndicator() {
+    return snapshotNameWithIndicator;
+  }
+
   public String getKeyName() {
     return keyName;
   }
@@ -340,6 +348,35 @@ public class OzoneAddress {
     } else if (bucketName.length() == 0) {
       throw new OzoneClientException(
           "Bucket name is missing");
+    }
+  }
+
+  /**
+   * Checking for a volume and a bucket
+   * but also accepting a snapshot
+   * indicator and a snapshot name.
+   * If the keyName can't be considered
+   * a valid snapshot, an exception is thrown.
+   *
+   * @throws OzoneClientException
+   */
+  public void ensureSnapshotAddress()
+      throws OzoneClientException {
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        snapshotNameWithIndicator = keyName;
+      } else {
+        throw new OzoneClientException(
+            "Delimiters (/) not allowed following " +
+                "a bucket name. Only a snapshot name with " +
+                "a snapshot indicator is accepted");
+      }
+    } else if (volumeName.length() == 0) {
+      throw new OzoneClientException(
+          "Volume name is missing.");
+    } else if (bucketName.length() == 0) {
+      throw new OzoneClientException(
+          "Bucket name is missing.");
     }
   }
 
@@ -397,6 +434,24 @@ public class OzoneAddress {
     }
     if (!keyName.isEmpty()) {
       out.printf("Key Name : %s%n", keyName);
+    }
+  }
+
+  public void ensureVolumeOrBucketAddress() throws OzoneClientException {
+    if (keyName.length() > 0) {
+      if (OmUtils.isBucketSnapshotIndicator(keyName)) {
+        // If snapshot, ensure snapshot URI
+        ensureSnapshotAddress();
+        return;
+      }
+      throw new OzoneClientException(
+          "Key address is not supported.");
+    } else if (volumeName.length() == 0) {
+      // Volume must be present
+      // Bucket may or may not be present
+      // Depending on operation is on volume or bucket
+      throw new OzoneClientException(
+            "Volume name is missing.");
     }
   }
 }

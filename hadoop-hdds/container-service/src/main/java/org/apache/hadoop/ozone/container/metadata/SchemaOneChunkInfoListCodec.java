@@ -43,7 +43,19 @@ import java.io.IOException;
  * future, callers should be aware that the associated chunk information may not
  * always be present.
  */
-public class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
+public final class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
+
+  private static final Codec<ChunkInfoList> INSTANCE =
+      new SchemaOneChunkInfoListCodec();
+
+  public static Codec<ChunkInfoList> get() {
+    return INSTANCE;
+  }
+
+  private SchemaOneChunkInfoListCodec() {
+    // singleton
+  }
+
   @Override
   public byte[] toPersistedFormat(ChunkInfoList chunkList) {
     return chunkList.getProtoBufMessage().toByteArray();

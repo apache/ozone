@@ -32,7 +32,7 @@ ${BUCKET}             generated
 S3 Gateway Web UI
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
-                        Should contain      ${result}       Location
+                        Should contain      ${result}       Location:    ignore_case=True
                         Should contain      ${result}       /static/
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/static/index.html
                         Should contain      ${result}       Apache Ozone S3

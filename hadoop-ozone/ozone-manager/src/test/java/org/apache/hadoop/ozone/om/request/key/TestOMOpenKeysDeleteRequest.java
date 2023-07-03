@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
@@ -191,6 +192,71 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   }
 
   /**
+   * Tests removing keys from the open key table cache that have higher
+   * updateID than the transactionID. Those keys should be ignored.
+   * It is OK if updateID equals to or less than transactionID.
+   * See {@link WithObjectID#setUpdateID(long, boolean)}.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testDeleteKeyWithHigherUpdateID() throws Exception {
+    final String volume = UUID.randomUUID().toString();
+    final String bucket = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
+        omMetadataManager, getBucketLayout());
+
+    final long updateId = 200L;
+    final long transactionId = 100L;
+
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setUpdateID(updateId)
+        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS, ReplicationFactor.THREE));
+
+    if (getBucketLayout().isFileSystemOptimized()) {
+      builder.setParentObjectID(random.nextLong());
+    }
+
+    List<Pair<Long, OmKeyInfo>> keysWithHigherUpdateID = new ArrayList<>(1);
+    keysWithHigherUpdateID.add(Pair.of(clientID,
+        builder.setKeyName("key")
+            .setFileName("key")
+            .setUpdateID(updateId)
+            .build()));
+
+    List<Pair<Long, OmKeyInfo>> keysWithSameUpdateID = new ArrayList<>(1);
+    keysWithSameUpdateID.add(Pair.of(clientID,
+        builder.setKeyName("key2")
+            .setFileName("key2")
+            .setUpdateID(transactionId)
+            .build()));
+
+    List<Pair<Long, OmKeyInfo>> allKeys = new ArrayList<>(2);
+    allKeys.addAll(keysWithHigherUpdateID);
+    allKeys.addAll(keysWithSameUpdateID);
+
+    addToOpenKeyTableDB(allKeys);
+
+    OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(allKeys));
+    OMOpenKeysDeleteRequest openKeyDeleteRequest =
+        new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
+
+    OMClientResponse omClientResponse =
+        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
+            transactionId, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    assertInOpenKeyTable(keysWithHigherUpdateID);
+    assertNotInOpenKeyTable(keysWithSameUpdateID);
+  }
+
+  /**
    * Tests metrics set by {@link OMOpenKeysDeleteRequest}.
    * Submits a set of keys for deletion where only some of the keys actually
    * exist in the open key table, and asserts that the metrics count keys
@@ -289,10 +355,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       if (getBucketLayout().isFileSystemOptimized()) {
         OMRequestTestUtils.addFileToKeyTable(
             true, false, omKeyInfo.getFileName(),
-            omKeyInfo, clientID, 0L, omMetadataManager);
+            omKeyInfo, clientID, omKeyInfo.getUpdateID(), omMetadataManager);
       } else {
         OMRequestTestUtils.addKeyToTable(
-            true, false, omKeyInfo, clientID, 0L, omMetadataManager);
+            true, false,
+            omKeyInfo, clientID, omKeyInfo.getUpdateID(), omMetadataManager);
       }
     }
     assertInOpenKeyTable(openKeys);

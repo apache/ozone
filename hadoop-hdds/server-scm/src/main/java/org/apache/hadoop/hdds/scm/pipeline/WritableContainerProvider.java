@@ -52,6 +52,7 @@ public interface WritableContainerProvider<T extends ReplicationConfig> {
    * @throws IOException
    */
   ContainerInfo getContainer(long size, T repConfig,
-      String owner, ExcludeList excludeList) throws IOException;
+      String owner, ExcludeList excludeList)
+      throws IOException;
 
 }

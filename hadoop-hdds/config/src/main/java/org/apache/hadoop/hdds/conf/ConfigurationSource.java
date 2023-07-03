@@ -144,6 +144,14 @@ public interface ConfigurationSource {
   }
 
   /**
+   * Checks if the property <value> is set.
+   * @param key The property name.
+   * @return true if the value is set else false.
+   */
+  default boolean isConfigured(String key) {
+    return get(key) != null;
+  }
+  /**
    * Create a Configuration object and inject the required configuration values.
    *
    * @param configurationClass The class where the fields are annotated with
@@ -167,13 +175,22 @@ public interface ConfigurationSource {
 
     ConfigurationReflectionUtil
         .injectConfiguration(this, configurationClass, configObject,
-            prefix);
+            prefix, false);
 
-    ConfigurationReflectionUtil
-        .callPostConstruct(configurationClass, configObject);
+    ConfigurationReflectionUtil.callPostConstruct(configObject);
 
     return configObject;
 
+  }
+
+  /**
+   * Update {@code object}'s reconfigurable properties from this configuration.
+   */
+  default <T> void reconfigure(Class<T> configClass, T object) {
+    ConfigGroup configGroup = configClass.getAnnotation(ConfigGroup.class);
+    String prefix = configGroup.prefix();
+    ConfigurationReflectionUtil.injectConfiguration(
+        this, configClass, object, prefix, true);
   }
 
   /**

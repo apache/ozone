@@ -21,13 +21,19 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -37,6 +43,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -48,6 +55,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
@@ -62,12 +71,21 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -92,11 +110,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantGetUserInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantListUserRequest;
@@ -107,6 +129,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import com.google.common.collect.Lists;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -122,6 +145,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,6 +158,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
+  private static final int MAX_SIZE_KB = 2097151;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -208,6 +234,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getServiceListRequest());
         responseBuilder.setServiceListResponse(serviceListResponse);
         break;
+      case RangerBGSync:
+        RangerBGSyncResponse rangerBGSyncResponse = triggerRangerBGSync(
+            request.getRangerBGSyncRequest());
+        responseBuilder.setRangerBGSyncResponse(rangerBGSyncResponse);
+        break;
       case DBUpdates:
         DBUpdatesResponse dbUpdatesResponse = getOMDBUpdates(
             request.getDbUpdatesRequest());
@@ -266,6 +297,42 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getTenantListUserRequest());
         responseBuilder.setTenantListUserResponse(listUserResponse);
         break;
+      case GetKeyInfo:
+        responseBuilder.setGetKeyInfoResponse(
+            getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
+        break;
+      case ListSnapshot:
+        OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
+            getSnapshots(request.getListSnapshotRequest());
+        responseBuilder.setListSnapshotResponse(listSnapshotResponse);
+        break;
+      case SnapshotDiff:
+        SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
+            request.getSnapshotDiffRequest());
+        responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
+        break;
+      case CancelSnapshotDiff:
+        CancelSnapshotDiffResponse cancelSnapshotDiff = cancelSnapshotDiff(
+                request.getCancelSnapshotDiffRequest());
+        responseBuilder.setCancelSnapshotDiffResponse(cancelSnapshotDiff);
+        break;
+      case ListSnapshotDiffJobs:
+        ListSnapshotDiffJobResponse listSnapDiffResponse =
+            listSnapshotDiffJobs(request.getListSnapshotDiffJobRequest());
+        responseBuilder.setListSnapshotDiffJobResponse(listSnapDiffResponse);
+        break;
+      case EchoRPC:
+        EchoRPCResponse echoRPCResponse =
+            echoRPC(request.getEchoRPCRequest());
+        responseBuilder.setEchoRPCResponse(echoRPCResponse);
+        break;
+      case TransferLeadership:
+        responseBuilder.setTransferOmLeadershipResponse(transferLeadership(
+            request.getTransferOmLeadershipRequest()));
+        break;
+      case RefetchSecretKey:
+        responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -314,6 +381,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());
     builder.setLatestSequenceNumber(dbUpdatesWrapper.getLatestSequenceNumber());
+    builder.setDbUpdateSuccess(dbUpdatesWrapper.isDBUpdateSuccess());
     return builder.build();
   }
 
@@ -488,6 +556,25 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request,
+                                        int clientVersion) throws IOException {
+    KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
+        .setHeadOp(keyArgs.getHeadOp())
+        .setForceUpdateContainerCacheFromSCM(
+            keyArgs.getForceUpdateContainerCacheFromSCM())
+        .build();
+    KeyInfoWithVolumeContext keyInfo = impl.getKeyInfo(omKeyArgs,
+        request.getAssumeS3Context());
+
+    return keyInfo.toProtobuf(clientVersion);
+  }
+
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
@@ -557,7 +644,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getVolumeName(),
         request.getStartKey(),
         request.getPrefix(),
-        request.getCount());
+        request.getCount(),
+        request.getHasSnapshot());
     for (OmBucketInfo bucket : buckets) {
       resp.addBucketInfo(bucket.getProtobuf());
     }
@@ -864,13 +952,28 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
     rb.setStatus(impl.getFileStatus(omKeyArgs).getProtobuf(clientVersion));
 
     return rb.build();
+  }
+
+  private RangerBGSyncResponse triggerRangerBGSync(
+      RangerBGSyncRequest rangerBGSyncRequest) throws IOException {
+
+    boolean res = impl.triggerRangerBGSync(rangerBGSyncRequest.getNoWait());
+
+    return RangerBGSyncResponse.newBuilder().setRunSuccess(res).build();
+  }
+
+  private RefetchSecretKeyResponse refetchSecretKey() {
+    UUID uuid = impl.refetchSecretKey();
+    RefetchSecretKeyResponse response =
+        RefetchSecretKeyResponse.newBuilder()
+            .setId(ProtobufUtils.toProtobuf(uuid)).build();
+    return response;
   }
 
   @RequestFeatureValidator(
@@ -901,6 +1004,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
     return resp;
   }
+
 
   @RequestFeatureValidator(
       conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
@@ -943,7 +1047,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
         .setSortDatanodesInPipeline(keyArgs.getSortDatanodes())
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .build();
@@ -1018,7 +1121,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
-        .setRefreshPipeline(true)
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .setHeadOp(keyArgs.getHeadOp())
         .build();
@@ -1148,7 +1250,110 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl.getS3VolumeContext().getProtobuf();
   }
 
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private SnapshotDiffResponse snapshotDiff(
+      SnapshotDiffRequest snapshotDiffRequest) throws IOException {
+    org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse response =
+        impl.snapshotDiff(
+            snapshotDiffRequest.getVolumeName(),
+            snapshotDiffRequest.getBucketName(),
+            snapshotDiffRequest.getFromSnapshot(),
+            snapshotDiffRequest.getToSnapshot(),
+            snapshotDiffRequest.getToken(),
+            snapshotDiffRequest.getPageSize(),
+            snapshotDiffRequest.getForceFullDiff());
+
+    SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
+        .setJobStatus(response.getJobStatus().toProtobuf())
+        .setWaitTimeInMs(response.getWaitTimeInMs());
+
+    if (StringUtils.isNotEmpty(response.getReason())) {
+      builder.setReason(response.getReason());
+    }
+    if (response.getSnapshotDiffReport() != null) {
+      builder.setSnapshotDiffReport(
+          response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private CancelSnapshotDiffResponse cancelSnapshotDiff(
+      CancelSnapshotDiffRequest cancelSnapshotDiffRequest) throws IOException {
+
+    org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse response =
+        impl.cancelSnapshotDiff(
+            cancelSnapshotDiffRequest.getVolumeName(),
+            cancelSnapshotDiffRequest.getBucketName(),
+            cancelSnapshotDiffRequest.getFromSnapshot(),
+            cancelSnapshotDiffRequest.getToSnapshot());
+
+    CancelSnapshotDiffResponse.Builder builder = CancelSnapshotDiffResponse
+        .newBuilder();
+
+    if (StringUtils.isNotEmpty(response.getMessage())) {
+      builder.setReason(response.getMessage());
+    }
+
+    return builder.build();
+  }
+
+  private ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      ListSnapshotDiffJobRequest listSnapshotDiffJobRequest)
+      throws IOException {
+    List<SnapshotDiffJob> snapshotDiffJobs =
+        impl.listSnapshotDiffJobs(
+            listSnapshotDiffJobRequest.getVolumeName(),
+            listSnapshotDiffJobRequest.getBucketName(),
+            listSnapshotDiffJobRequest.getJobStatus(),
+            listSnapshotDiffJobRequest.getListAll());
+    ListSnapshotDiffJobResponse.Builder builder =
+        ListSnapshotDiffJobResponse.newBuilder();
+    for (SnapshotDiffJob diffJob : snapshotDiffJobs) {
+      builder.addSnapshotDiffJob(diffJob.toProtoBuf());
+    }
+    return builder.build();
+  }
+
+
   public OzoneManager getOzoneManager() {
     return impl;
+  }
+
+  private EchoRPCResponse echoRPC(EchoRPCRequest req) {
+    EchoRPCResponse.Builder builder =
+            EchoRPCResponse.newBuilder();
+
+    byte[] payloadBytes = new byte[0];
+    int payloadRespSize = Math.min(
+            req.getPayloadSizeResp()
+                    * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
+    if (payloadRespSize > 0) {
+      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    }
+    builder.setPayload(ByteString.copyFrom(payloadBytes));
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private OzoneManagerProtocolProtos.ListSnapshotResponse getSnapshots(
+      OzoneManagerProtocolProtos.ListSnapshotRequest request)
+      throws IOException {
+    List<SnapshotInfo> snapshotInfos = impl.listSnapshot(
+        request.getVolumeName(), request.getBucketName(), request.getPrefix(),
+        request.getPrevSnapshot(), request.getMaxListResult());
+    List<OzoneManagerProtocolProtos.SnapshotInfo> snapshotInfoList =
+        snapshotInfos.stream().map(SnapshotInfo::getProtobuf)
+            .collect(Collectors.toList());
+    return OzoneManagerProtocolProtos.ListSnapshotResponse.newBuilder()
+        .addAllSnapshotInfo(snapshotInfoList).build();
+  }
+
+  private TransferLeadershipResponseProto transferLeadership(
+      TransferLeadershipRequestProto req) throws IOException {
+    String newLeaderId = req.getNewLeaderId();
+    impl.transferLeadership(newLeaderId);
+    return TransferLeadershipResponseProto.getDefaultInstance();
   }
 }

@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 
@@ -33,7 +33,7 @@ public final class OmFailoverProxyUtil {
   /**
    * Get FailoverProxyProvider from RpcClient / ClientProtocol.
    */
-  public static OMFailoverProxyProvider getFailoverProxyProvider(
+  public static HadoopRpcOMFailoverProxyProvider getFailoverProxyProvider(
       ClientProtocol clientProtocol) {
 
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =

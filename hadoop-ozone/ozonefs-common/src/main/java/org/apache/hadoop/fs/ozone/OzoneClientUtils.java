@@ -29,25 +29,32 @@ import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.checksum.ReplicatedFileChecksumHelper;
+import org.apache.hadoop.ozone.client.checksum.ChecksumHelperFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Shared Utilities for Ozone FS and related classes.
  */
 public final class OzoneClientUtils {
+  static final Logger LOG =
+      LoggerFactory.getLogger(OzoneClientUtils.class);
   private OzoneClientUtils() {
     // Not used.
   }
@@ -64,9 +71,24 @@ public final class OzoneClientUtils {
             DETECTED_LOOP_IN_BUCKET_LINKS);
       }
 
-      OzoneBucket sourceBucket =
-          objectStore.getVolume(bucket.getSourceVolume())
-              .getBucket(bucket.getSourceBucket());
+      OzoneBucket sourceBucket;
+      try {
+        sourceBucket =
+            objectStore.getVolume(bucket.getSourceVolume())
+                .getBucket(bucket.getSourceBucket());
+      } catch (OMException ex) {
+        if (ex.getResult().equals(VOLUME_NOT_FOUND)
+            || ex.getResult().equals(BUCKET_NOT_FOUND)) {
+          // for orphan link bucket, return layout as link bucket
+          bucket.setSourcePathExist(false);
+          LOG.error("Source Bucket is not found, its orphan bucket and " +
+              "used link bucket {} layout {}", bucket.getName(),
+              bucket.getBucketLayout());
+          return bucket.getBucketLayout();
+        }
+        // other case throw exception
+        throw ex;
+      }
 
       /** If the source bucket is again a link, we recursively resolve the
        * link bucket.
@@ -209,19 +231,41 @@ public final class OzoneClientUtils {
     }
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
         .setBucketName(bucket.getName()).setKeyName(keyName)
-        .setRefreshPipeline(true).setSortDatanodesInPipeline(true)
+        .setSortDatanodesInPipeline(true)
         .setLatestVersionLocation(true).build();
     OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
-
-    // TODO: return null util ECFileChecksum is implemented.
-    if (keyInfo.getReplicationConfig()
-        .getReplicationType() == HddsProtos.ReplicationType.EC) {
-      return null;
-    }
-    BaseFileChecksumHelper helper =
-        new ReplicatedFileChecksumHelper(volume, bucket, keyName, length,
-            combineMode, rpcClient, keyInfo);
+    BaseFileChecksumHelper helper = ChecksumHelperFactory
+        .getChecksumHelper(keyInfo.getReplicationConfig().getReplicationType(),
+            volume, bucket, keyName, length, combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
   }
+
+  public static boolean isKeyErasureCode(OmKeyInfo keyInfo) {
+    return keyInfo.getReplicationConfig().getReplicationType() ==
+            HddsProtos.ReplicationType.EC;
+  }
+
+  public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {
+    return !Objects.isNull(keyInfo.getFileEncryptionInfo());
+  }
+
+  public static int limitValue(int confValue, String confName, int maxLimit) {
+    int limitVal = confValue;
+    if (confValue > maxLimit) {
+      LOG.warn("{} config value is greater than max value : {}, " +
+          "limiting the config value to max value..", confName, maxLimit);
+      limitVal = maxLimit;
+    }
+    // Below logic of limiting min page size as 2 is due to behavior of
+    // startKey for getting file status where startKey once reached at
+    // leaf/key level, then startKey itself being returned when page size is
+    // set as 1 and non-recursive listStatus API at client side will go into
+    // infinite loop.
+    if (limitVal <= 1) {
+      limitVal = 2;
+    }
+    return limitVal;
+  }
+
 }

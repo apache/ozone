@@ -105,6 +105,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
     conf = new OzoneConfiguration();
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         this.schemaV3Enabled);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
   }
 
   @Before
@@ -218,7 +222,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
-        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+        ContainerTestUtils.createDatanodeDetails(), conf);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
@@ -285,7 +289,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Add a new HddsVolume. It should have DB created after DN restart.
     addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
     for (StorageVolume vol:
         dsm.getContainer().getVolumeSet().getVolumesList()) {
       HddsVolume hddsVolume = (HddsVolume) vol;
@@ -319,7 +324,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Add a new DbVolume
     addDbVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     // HddsVolume should still use the rocksDB under it's volume
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
@@ -348,7 +354,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     addDbVolume();
     File newDataVolume = addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
@@ -420,7 +427,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set SchemaV3 enable status
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         enable);
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(), true);
+    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+        false);
 
     // Write new data
     final long containerID2 = addContainer(pipeline);
@@ -485,7 +493,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     layoutStorage.initialize();
     dsm = new DatanodeStateMachine(
-        ContainerTestUtils.createDatanodeDetails(), conf, null, null, null);
+        ContainerTestUtils.createDatanodeDetails(), conf);
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
@@ -584,8 +592,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
     // Build and start the datanode.
     DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
-    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd,
-        conf, null, null, null);
+    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
     int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
     Assert.assertEquals(
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(),
@@ -605,8 +612,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     dsm.close();
 
     // Start new datanode with the same configuration.
-    dsm = new DatanodeStateMachine(dd,
-        conf, null, null, null);
+    dsm = new DatanodeStateMachine(dd, conf);
     int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
     if (exactMatch) {
       Assert.assertEquals(expectedMlv, mlv);
@@ -665,7 +671,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
       long containerID, Pipeline pipeline) throws Exception {
     return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100, null);
+            ContainerTestHelper.getTestBlockID(containerID), 100);
   }
 
   public Pipeline getPipeline() {

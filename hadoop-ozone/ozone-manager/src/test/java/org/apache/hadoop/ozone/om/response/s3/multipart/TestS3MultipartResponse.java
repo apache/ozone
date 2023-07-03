@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -38,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -79,7 +77,7 @@ public class TestS3MultipartResponse {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -94,7 +92,7 @@ public class TestS3MultipartResponse {
 
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID) {
+      String multipartUploadID) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
@@ -145,7 +143,7 @@ public class TestS3MultipartResponse {
 
   public void addPart(int partNumber, PartKeyInfo partKeyInfo,
       OmMultipartKeyInfo omMultipartKeyInfo) {
-    omMultipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(partKeyInfo);
   }
 
   public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
@@ -162,6 +160,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
@@ -184,6 +183,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setParentID(parentID)
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
@@ -193,7 +193,7 @@ public class TestS3MultipartResponse {
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponseFSO(
       String volumeName, String bucketName, long parentID, String keyName,
       String multipartUploadID, List<OmDirectoryInfo> parentDirInfos,
-      long volumeId, long bucketId) {
+      long volumeId, long bucketId) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
             .setUploadID(multipartUploadID)
             .setCreationTime(Time.now())
@@ -232,9 +232,13 @@ public class TestS3MultipartResponse {
         omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
         keyName, multipartUploadID);
 
+    String buckDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+        omMetadataManager.getBucketTable().get(buckDBKey);
+
     return new S3InitiateMultipartUploadResponseWithFSO(omResponse,
         multipartKeyInfo, omKeyInfo, mpuKey, parentDirInfos, getBucketLayout(),
-        volumeId, bucketId);
+        volumeId, bucketId, omBucketInfo);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -296,9 +300,8 @@ public class TestS3MultipartResponse {
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.Status status,
-          List<OmKeyInfo> unUsedParts,
-          OmBucketInfo omBucketInfo,
-          RepeatedOmKeyInfo keysToDelete) throws IOException {
+          List<OmKeyInfo>  allKeyInfoToRemove,
+          OmBucketInfo omBucketInfo) throws IOException {
 
 
     String multipartKey = omMetadataManager
@@ -320,13 +323,13 @@ public class TestS3MultipartResponse {
                             .setVolume(volumeName).setKey(keyName)).build();
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
-        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, keysToDelete, volumeId);
+        multipartKey, multipartOpenKey, omKeyInfo,  allKeyInfoToRemove,
+        getBucketLayout(), omBucketInfo, volumeId, bucketId);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(
       OmMultipartKeyInfo multipartKeyInfo, OmKeyInfo omKeyInfo,
-      OMResponse omResponse, long volumeId, long bucketId) {
+      OMResponse omResponse, long volumeId, long bucketId) throws IOException {
     return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
         omKeyInfo, getBucketLayout());
   }
@@ -354,7 +357,7 @@ public class TestS3MultipartResponse {
 
     omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-            new CacheValue<>(Optional.of(volumeArgs), 1));
+            CacheValue.get(1, volumeArgs));
   }
 
   public void addBucketToDB(String volumeName, String bucketName)
@@ -370,6 +373,6 @@ public class TestS3MultipartResponse {
     omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getBucketKey(
                     volumeName, bucketName)),
-            new CacheValue<>(Optional.of(omBucketInfo), 1));
+            CacheValue.get(1, omBucketInfo));
   }
 }

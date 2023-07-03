@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,7 +46,7 @@ public class TestBackgroundSCMService {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  public void setup() throws IOException {
+  public void setup() throws IOException, TimeoutException {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     scmContext = SCMContext.emptyContext();
     this.pipelineManager = mock(PipelineManager.class);

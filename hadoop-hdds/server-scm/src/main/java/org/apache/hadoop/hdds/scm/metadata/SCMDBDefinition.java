@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.Map;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -27,48 +28,55 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
-import org.apache.hadoop.hdds.security.x509.crl.CRLInfoCodec;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.utils.TransactionInfoCodec;
+import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 
 /**
  * Class defines the structure and types of the scm.db.
  */
-public class SCMDBDefinition implements DBDefinition {
+public class SCMDBDefinition extends DBDefinition.WithMap {
+  public SCMDBDefinition() {
+    this(COLUMN_FAMILIES);
+  }
+
+  protected SCMDBDefinition(Map<String, DBColumnFamilyDefinition<?, ?>> map) {
+    super(map);
+  }
 
   public static final DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       DELETED_BLOCKS =
       new DBColumnFamilyDefinition<>(
           "deletedBlocks",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           DeletedBlocksTransaction.class,
-          new DeletedBlocksTransactionCodec());
+          Proto2Codec.get(DeletedBlocksTransaction.class));
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_CERTS =
       new DBColumnFamilyDefinition<>(
           "validCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_SCM_CERTS =
       new DBColumnFamilyDefinition<>(
           "validSCMCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   /**
    * This column family is Deprecated in favor of REVOKED_CERTS_V2.
@@ -79,71 +87,71 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "revokedCerts",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           X509Certificate.class,
-          new X509CertificateCodec());
+          X509CertificateCodec.get());
 
   public static final DBColumnFamilyDefinition<BigInteger, CertInfo>
       REVOKED_CERTS_V2 =
       new DBColumnFamilyDefinition<>(
           "revokedCertsV2",
           BigInteger.class,
-          new BigIntegerCodec(),
+          BigIntegerCodec.get(),
           CertInfo.class,
-          new CertInfoCodec());
+          CertInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<PipelineID, Pipeline>
       PIPELINES =
       new DBColumnFamilyDefinition<>(
           "pipelines",
           PipelineID.class,
-          new PipelineIDCodec(),
+          PipelineID.getCodec(),
           Pipeline.class,
-          new PipelineCodec());
+          Pipeline.getCodec());
 
   public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
       new DBColumnFamilyDefinition<>(
           "containers",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           ContainerInfo.class,
-          new ContainerInfoCodec());
+          ContainerInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
       new DBColumnFamilyDefinition<>(
           "scmTransactionInfos",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           TransactionInfo.class,
-          new TransactionInfoCodec());
+          TransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<Long, CRLInfo> CRLS =
       new DBColumnFamilyDefinition<>(
           "crls",
           Long.class,
-          new LongCodec(),
+          LongCodec.get(),
           CRLInfo.class,
-          new CRLInfoCodec());
+          CRLInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
       CRL_SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "crlSequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, Long>
       SEQUENCE_ID =
       new DBColumnFamilyDefinition<>(
           "sequenceId",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           Long.class,
-          new LongCodec());
+          LongCodec.get());
 
   public static final DBColumnFamilyDefinition<ContainerID,
       MoveDataNodePair>
@@ -151,9 +159,9 @@ public class SCMDBDefinition implements DBDefinition {
       new DBColumnFamilyDefinition<>(
           "move",
           ContainerID.class,
-          new ContainerIDCodec(),
+          ContainerID.getCodec(),
           MoveDataNodePair.class,
-          new MoveDataNodePairCodec());
+          MoveDataNodePair.getCodec());
 
   /**
    * Stores miscellaneous SCM metadata, including upgrade finalization status
@@ -163,18 +171,35 @@ public class SCMDBDefinition implements DBDefinition {
       META = new DBColumnFamilyDefinition<>(
           "meta",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           String.class,
-          new StringCodec());
+          StringCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ByteString>
       STATEFUL_SERVICE_CONFIG =
       new DBColumnFamilyDefinition<>(
           "statefulServiceConfig",
           String.class,
-          new StringCodec(),
+          StringCodec.get(),
           ByteString.class,
-          new ByteStringCodec());
+          ByteStringCodec.getInstance());
+
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          CONTAINERS,
+          CRLS,
+          CRL_SEQUENCE_ID,
+          DELETED_BLOCKS,
+          META,
+          MOVE,
+          PIPELINES,
+          REVOKED_CERTS,
+          REVOKED_CERTS_V2,
+          SEQUENCE_ID,
+          STATEFUL_SERVICE_CONFIG,
+          TRANSACTIONINFO,
+          VALID_CERTS,
+          VALID_SCM_CERTS);
 
   @Override
   public String getName() {
@@ -184,13 +209,5 @@ public class SCMDBDefinition implements DBDefinition {
   @Override
   public String getLocationConfigKey() {
     return ScmConfigKeys.OZONE_SCM_DB_DIRS;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DELETED_BLOCKS, VALID_CERTS,
-        VALID_SCM_CERTS, REVOKED_CERTS, REVOKED_CERTS_V2, PIPELINES, CONTAINERS,
-        TRANSACTIONINFO, CRLS, CRL_SEQUENCE_ID, SEQUENCE_ID, MOVE, META,
-        STATEFUL_SERVICE_CONFIG};
   }
 }

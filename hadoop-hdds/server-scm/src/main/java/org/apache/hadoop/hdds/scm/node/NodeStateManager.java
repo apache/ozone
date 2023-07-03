@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -216,8 +216,8 @@ public class NodeStateManager implements Runnable, Closeable {
     // to healthy readonly until SCM finishes updating its MLV, hence the
     // checkpoint check here.
     layoutMisMatchCondition = (layout) ->
-        scmContext.isFinalizationCheckpointCrossed(
-                    FinalizationCheckpoint.MLV_EQUALS_SLV) &&
+        FinalizationManager.shouldTellDatanodesToFinalize(
+            scmContext.getFinalizationCheckpoint()) &&
             !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
@@ -374,7 +374,12 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public DatanodeInfo getNode(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    return getNode(datanodeDetails.getUuid());
+  }
+
+  public DatanodeInfo getNode(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getNodeInfo(uuid);
   }
 
   /**
@@ -729,9 +734,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
-      List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
-      for (UUID id : nodes) {
-        DatanodeInfo node = nodeStateMap.getNodeInfo(id);
+      List<DatanodeInfo> nodes = nodeStateMap.filterNodes(null, HEALTHY);
+      for (DatanodeInfo node : nodes) {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {

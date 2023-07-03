@@ -138,8 +138,8 @@ public class TestReconAsPassiveScm {
     runTestOzoneContainerViaDataNode(containerID, client);
 
     // Verify Recon picked up the new container that was created.
-    assertEquals(scmContainerManager.getContainerIDs(),
-        reconContainerManager.getContainerIDs());
+    assertEquals(scmContainerManager.getContainers(),
+        reconContainerManager.getContainers());
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(ReconNodeManager.LOG);

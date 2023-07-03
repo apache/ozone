@@ -19,16 +19,16 @@ package org.apache.hadoop.ozone.om;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -47,6 +47,7 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.management.MBeanInfo;
@@ -150,14 +151,14 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   /**
-   * Test that OMFailoverProxyProvider creates an OM proxy for each OM in the
-   * cluster.
+   * Test that HadoopRpcOMFailoverProxyProvider creates an OM proxy
+   * for each OM in the cluster.
    */
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
-    OzoneClient rpcClient = getCluster().getRpcClient();
+    OzoneClient rpcClient = getClient();
 
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(
             rpcClient.getObjectStore().getClientProxy());
 
@@ -183,13 +184,14 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   /**
-   * Test OMFailoverProxyProvider failover on connection exception to OM client.
+   * Test HadoopRpcOMFailoverProxyProvider failover on connection exception
+   * to OM client.
    */
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
     ObjectStore objectStore = getObjectStore();
-    OMFailoverProxyProvider omFailoverProxyProvider =
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil
             .getFailoverProxyProvider(objectStore.getClientProxy());
     String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -215,20 +217,21 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   }
 
   /**
-   * Test OMFailoverProxyProvider failover when current OM proxy is not
+   * Test HadoopRpcOMFailoverProxyProvider failover when current OM proxy is not
    * the current OM Leader.
    */
   @Test
   public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy());
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+            OmFailoverProxyUtil
+                    .getFailoverProxyProvider(objectStore.getClientProxy());
 
     // Run couple of createVolume tests to discover the current Leader OM
     createVolumeTest(true);
     createVolumeTest(true);
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
+    // The oMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // Perform a manual failover of the proxy provider to move the
@@ -281,6 +284,53 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     }
   }
 
+  /**
+   * Choose a follower to send the request, the returned exception should
+   * include the suggested leader node.
+   */
+  @Test
+  public void testFailoverWithSuggestedLeader() throws Exception {
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+
+    // Make sure All OMs are ready.
+    createVolumeTest(true);
+
+    // The OMFailoverProxyProvider will point to the current leader OM node.
+    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    String leaderOMAddress = ((OMProxyInfo)
+        omFailoverProxyProvider.getOMProxyInfoMap().get(leaderOMNodeId))
+        .getAddress().getAddress().toString();
+    OzoneManager followerOM = null;
+    for (OzoneManager om: getCluster().getOzoneManagersList()) {
+      if (!om.isLeaderReady()) {
+        followerOM = om;
+        break;
+      }
+    }
+    assert followerOM != null;
+    Assertions.assertSame(followerOM.getOmRatisServer().checkLeaderStatus(),
+        OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
+
+    OzoneManagerProtocolProtos.OMRequest writeRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
+            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setClientId(UUID.randomUUID().toString())
+            .build();
+
+    try {
+      OzoneManagerProtocolProtos.OMResponse
+          omResponse = followerOM.getOmServerProtocol()
+          .submitRequest(null, writeRequest);
+      Assertions.fail("Test failure with NotLeaderException");
+    } catch (Exception ex) {
+      GenericTestUtils.assertExceptionContains("Suggested leader is OM:" +
+          leaderOMNodeId + "[" + leaderOMAddress + "]", ex);
+    }
+  }
+
   @Test
   @Flaky("HDDS-6644")
   public void testReadRequest() throws Exception {
@@ -288,21 +338,21 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
-    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy());
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+            OmFailoverProxyUtil
+                    .getFailoverProxyProvider(objectStore.getClientProxy());
 
     String currentLeaderNodeId = omFailoverProxyProvider
         .getCurrentProxyOMNodeId();
 
     // A read request from any proxy should failover to the current leader OM
     for (int i = 0; i < getNumOfOMs(); i++) {
-      // Failover OMFailoverProxyProvider to OM at index i
+      // Failover omFailoverProxyProvider to OM at index i
       OzoneManager ozoneManager = getCluster().getOzoneManager(i);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
-      final ObjectStore store = OzoneClientFactory.getRpcClient(
-          getOmServiceId(), getConf()).getObjectStore();
-      final OMFailoverProxyProvider proxyProvider =
+      final ObjectStore store = getClient().getObjectStore();
+      final HadoopRpcOMFailoverProxyProvider proxyProvider =
           OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
@@ -371,8 +421,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     objectStore.createVolume(UUID.randomUUID().toString());
 
 
-    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy());
+    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
+            OmFailoverProxyUtil
+                    .getFailoverProxyProvider(objectStore.getClientProxy());
 
     String currentLeaderNodeId = omFailoverProxyProvider
         .getCurrentProxyOMNodeId();

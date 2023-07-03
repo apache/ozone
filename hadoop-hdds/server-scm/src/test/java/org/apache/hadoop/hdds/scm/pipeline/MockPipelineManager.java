@@ -47,7 +47,7 @@ import java.util.stream.Stream;
  */
 public class MockPipelineManager implements PipelineManager {
 
-  private PipelineStateManager stateManager;
+  private final PipelineStateManager stateManager;
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager,
                              NodeManager nodeManager) throws IOException {
@@ -70,8 +70,20 @@ public class MockPipelineManager implements PipelineManager {
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
+    Pipeline pipeline = buildECPipeline(replicationConfig, excludedNodes,
+        favoredNodes);
+
+    stateManager.addPipeline(pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION));
+    return pipeline;
+  }
+
+  @Override
+  public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     final List<DatanodeDetails> nodes = Stream.generate(
-        MockDatanodeDetails::randomDatanodeDetails)
+            MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
     final Pipeline pipeline = Pipeline.newBuilder()
@@ -80,10 +92,14 @@ public class MockPipelineManager implements PipelineManager {
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
+    return pipeline;
+  }
 
+  @Override
+  public void addEcPipeline(Pipeline pipeline)
+      throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION));
-    return pipeline;
   }
 
   @Override
@@ -313,5 +329,10 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
+  }
+
+  @Override
+  public boolean isPipelineCreationFrozen() {
+    return false;
   }
 }

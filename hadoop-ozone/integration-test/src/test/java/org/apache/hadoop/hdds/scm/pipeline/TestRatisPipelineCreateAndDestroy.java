@@ -29,9 +29,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -48,7 +48,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests for RatisPipelineUtils.
  */
-@Disabled("HDDS-3419")
 public class TestRatisPipelineCreateAndDestroy {
 
   private MiniOzoneCluster cluster;
@@ -77,6 +76,7 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Flaky("HDDS-7886")
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -98,6 +98,7 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Flaky("HDDS-7886")
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -136,6 +137,11 @@ public class TestRatisPipelineCreateAndDestroy {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     }
 
+    GenericTestUtils.waitFor(() ->
+                    cluster.getStorageContainerManager().getScmNodeManager()
+                            .getNodeCount(NodeStatus.inServiceHealthy()) == 0,
+                    100, 10 * 1000);
+
     // try creating another pipeline now
     try {
       pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
@@ -145,7 +151,7 @@ public class TestRatisPipelineCreateAndDestroy {
       // As now all datanodes are shutdown, they move to stale state, there
       // will be no sufficient datanodes to create the pipeline.
       Assert.assertTrue(ioe instanceof SCMException);
-      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
           ((SCMException) ioe).getResult());
     }
 

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,7 +56,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
@@ -254,7 +254,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -281,7 +281,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -307,7 +307,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -340,7 +340,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
@@ -592,7 +592,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider<RatisReplicationConfig> mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -657,7 +657,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -665,8 +665,6 @@ public class TestSCMSafeModeManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
-    SafeModeEventHandler smHandler = new SafeModeEventHandler();
-    queue.addHandler(SCMEvents.SAFE_MODE_STATUS, smHandler);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, pipelineManager, queue, serviceManager,
         scmContext);
@@ -682,7 +680,6 @@ public class TestSCMSafeModeManager {
       assertFalse(scmSafeModeManager.getPreCheckComplete());
     }
     queue.processAll(5000);
-    assertEquals(0, smHandler.getInvokedCount());
 
     // Register last DataNode and check that the SafeModeEvent gets fired, but
     // SafeMode is still enabled with preCheck completed.
@@ -690,9 +687,8 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     queue.processAll(5000);
 
-    assertEquals(1, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertTrue(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertTrue(scmSafeModeManager.getInSafeMode());
 
     /* There is a race condition where the background pipeline creation
      * task creates the pipeline before the following create call.
@@ -716,9 +712,8 @@ public class TestSCMSafeModeManager {
     firePipelineEvent(pipelineManager, pipeline);
 
     queue.processAll(5000);
-    assertEquals(2, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertFalse(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertFalse(scmSafeModeManager.getInSafeMode());
   }
 
   private static class SafeModeEventHandler

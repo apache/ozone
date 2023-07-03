@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -34,27 +35,20 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
+@Timeout(300)
 public class TestPipelineManagerMXBean {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private MBeanServer mbs;
 
-  @Before
+  @BeforeEach
   public void init()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -79,11 +73,10 @@ public class TestPipelineManagerMXBean {
     verifyEquals(data, datanodeInfo);
   }
 
-  private void verifyEquals(TabularData actualData, Map<String, Integer>
-      expectedData) {
-    if (actualData == null || expectedData == null) {
-      fail("Data should not be null.");
-    }
+  private void verifyEquals(TabularData actualData,
+      Map<String, Integer> expectedData) {
+    assertNotNull(actualData);
+    assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
       assertTrue(obj instanceof CompositeData);
       CompositeData cds = (CompositeData) obj;
@@ -98,7 +91,7 @@ public class TestPipelineManagerMXBean {
     assertTrue(expectedData.isEmpty());
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     cluster.shutdown();
   }

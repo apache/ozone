@@ -19,7 +19,10 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -31,6 +34,7 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -138,7 +142,7 @@ public class TestContainerPlacementFactory {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
 
@@ -159,10 +163,13 @@ public class TestContainerPlacementFactory {
   }
 
   @Test
-  public void testDefaultPolicy() throws IOException {
+  public void testRackAwareContainerPolicy() throws IOException {
+    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+            SCMContainerPlacementRackAware.class.getName());
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, null, null, true, null);
-    Assertions.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+    Assertions.assertSame(SCMContainerPlacementRackAware.class,
+            policy.getClass());
   }
 
   @Test
@@ -176,10 +183,13 @@ public class TestContainerPlacementFactory {
   /**
    * A dummy container placement implementation for test.
    */
-  public static class DummyImpl implements PlacementPolicy {
+  public static class DummyImpl implements
+          PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
-        List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
+        List<DatanodeDetails> usedNodes,
+        List<DatanodeDetails> excludedNodes,
+        List<DatanodeDetails> favoredNodes,
         int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
       return null;
     }
@@ -189,6 +199,19 @@ public class TestContainerPlacementFactory {
         validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
       return new ContainerPlacementStatusDefault(1, 1, 1);
     }
+
+    @Override
+    public Set<ContainerReplica> replicasToCopyToFixMisreplication(
+            Map<ContainerReplica, Boolean> replicas) {
+      return Collections.emptySet();
+    }
+
+    @Override
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+      return null;
+    }
+
   }
 
   @Test

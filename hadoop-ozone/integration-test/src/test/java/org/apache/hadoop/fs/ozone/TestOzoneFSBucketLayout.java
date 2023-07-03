@@ -17,13 +17,14 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.BeforeClass;
@@ -63,6 +64,7 @@ public class TestOzoneFSBucketLayout {
   private static String defaultBucketLayout;
   private static MiniOzoneCluster cluster = null;
   private static ObjectStore objectStore;
+  private static OzoneClient client;
   private BasicRootedOzoneClientAdapterImpl adapter;
   private static String rootPath;
   private static String volumeName;
@@ -116,19 +118,21 @@ public class TestOzoneFSBucketLayout {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
-    objectStore = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    objectStore = client.getObjectStore();
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
 
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     volumeName =
-        TestDataUtil.createVolumeAndBucket(cluster)
+        TestDataUtil.createVolumeAndBucket(client)
             .getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
   }
 
   @AfterClass
   public static void teardown() throws IOException {
+    IOUtils.closeQuietly(client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();

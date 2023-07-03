@@ -26,13 +26,11 @@ import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -49,6 +47,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,7 +235,7 @@ public class ChunkInputStream extends InputStream
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (pos < 0 || pos >= length) {
+    if (pos < 0 || pos > length) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -276,12 +275,13 @@ public class ChunkInputStream extends InputStream
   }
 
   @Override
-  public boolean seekToNewSource(long targetPos) throws IOException {
+  public boolean seekToNewSource(long targetPos) {
     return false;
   }
 
   @Override
   public synchronized void close() {
+    releaseBuffers();
     releaseClient();
   }
 
@@ -324,7 +324,7 @@ public class ChunkInputStream extends InputStream
       if (buffersHaveData()) {
         // Data is available from buffers
         ByteBuffer bb = buffers[bufferIndex];
-        return len > bb.remaining() ? bb.remaining() : len;
+        return Math.min(len, bb.remaining());
       } else if (dataRemainingInChunk()) {
         // There is more data in the chunk stream which has not
         // been read into the buffers yet.
@@ -424,20 +424,11 @@ public class ChunkInputStream extends InputStream
       throws IOException {
     ReadChunkResponseProto readChunkResponse;
 
-    try {
-      List<CheckedBiFunction> validators =
-          ContainerProtocolCalls.getValidatorList();
-      validators.add(validator);
+    List<Validator> validators =
+        ContainerProtocolCalls.toValidatorList(validator);
 
-      readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
-          readChunkInfo, blockID, validators, token);
-
-    } catch (IOException e) {
-      if (e instanceof StorageContainerException) {
-        throw e;
-      }
-      throw new IOException("Unexpected OzoneException: " + e.toString(), e);
-    }
+    readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
+        readChunkInfo, blockID, validators, token);
 
     if (readChunkResponse.hasData()) {
       return readChunkResponse.getData().asReadOnlyByteBufferList()
@@ -452,8 +443,7 @@ public class ChunkInputStream extends InputStream
     }
   }
 
-  private CheckedBiFunction<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, IOException> validator =
+  private final Validator validator =
           (request, response) -> {
             final ChunkInfo reqChunkInfo =
                 request.getReadChunk().getChunkData();
@@ -651,15 +641,7 @@ public class ChunkInputStream extends InputStream
    * Check if current buffer had been read till the end.
    */
   private boolean bufferEOF() {
-    if (!allocated) {
-      // Chunk data has not been read yet
-      return false;
-    }
-
-    if (!buffers[bufferIndex].hasRemaining()) {
-      return true;
-    }
-    return false;
+    return allocated && !buffers[bufferIndex].hasRemaining();
   }
 
   /**

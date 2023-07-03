@@ -21,10 +21,9 @@ import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/overviewCard/overviewCard';
 import axios from 'axios';
 import {IStorageReport} from 'types/datanode.types';
-import {IMissingContainersResponse} from '../missingContainers/missingContainers';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {showDataFetchError} from 'utils/common';
+import {showDataFetchError,byteToSize} from 'utils/common';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import filesize from 'filesize';
 import './overview.less';
@@ -32,6 +31,7 @@ import './overview.less';
 const size = filesize.partial({round: 1});
 
 interface IClusterStateResponse {
+  missingContainers: number;
   totalDatanodes: number;
   healthyDatanodes: number;
   pipelines: number;
@@ -40,6 +40,9 @@ interface IClusterStateResponse {
   volumes: number;
   buckets: number;
   keys: number;
+  openContainers: number;
+  deletedContainers: number;
+  keysPendingDeletion: number;
 }
 
 interface IOverviewState {
@@ -52,7 +55,19 @@ interface IOverviewState {
   buckets: number;
   keys: number;
   missingContainersCount: number;
-  lastUpdated: number;
+  lastRefreshed: number;
+  lastUpdatedOMDBDelta: number;
+  lastUpdatedOMDBFull: number;
+  omStatus: string;
+  openContainers: number;
+  deletedContainers: number;
+  keysPendingDeletion: number;
+  openSummarytotalUnrepSize: number,
+  openSummarytotalRepSize: number,
+  openSummarytotalOpenKeys: number,
+  deletePendingSummarytotalUnrepSize: number,
+  deletePendingSummarytotalRepSize: number,
+  deletePendingSummarytotalDeletedKeys: number,
 }
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
@@ -75,7 +90,19 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       buckets: 0,
       keys: 0,
       missingContainersCount: 0,
-      lastUpdated: 0
+      lastRefreshed: 0,
+      lastUpdatedOMDBDelta: 0,
+      lastUpdatedOMDBFull: 0,
+      omStatus: '',
+      openContainers: 0,
+      deletedContainers: 0,
+      keysPendingDeletion: 0,
+      openSummarytotalUnrepSize: 0,
+      openSummarytotalRepSize: 0,
+      openSummarytotalOpenKeys: 0,
+      deletePendingSummarytotalUnrepSize: 0,
+      deletePendingSummarytotalRepSize: 0,
+      deletePendingSummarytotalDeletedKeys: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -86,11 +113,17 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
     axios.all([
       axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/containers/missing')
-    ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
+      axios.get('/api/v1/task/status'),
+      axios.get('/api/v1/keys/open?limit=0'),
+      axios.get('/api/v1/keys/deletePending?limit=1'),
+    ]).then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
+      
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
-      const missingContainers: IMissingContainersResponse = missingContainersResponse.data;
-      const missingContainersCount = missingContainers.totalCount;
+      const taskStatus = taskstatusResponse.data;
+      const missingContainersCount = clusterState.missingContainers;
+      const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
+      const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
+    
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -101,9 +134,40 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         buckets: clusterState.buckets,
         keys: clusterState.keys,
         missingContainersCount,
-        lastUpdated: Number(moment())
+        openContainers: clusterState.openContainers,
+        keysPendingDeletion: clusterState.keysPendingDeletion,
+        deletedContainers: clusterState.deletedContainers,
+        lastRefreshed: Number(moment()),
+        lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
+        lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
+        openSummarytotalUnrepSize: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalDeletedKeys
       });
     })).catch(error => {
+      this.setState({
+        loading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
+
+  omSyncData = () => {
+    this.setState({
+      loading: true
+    });
+
+    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+      const omStatus = omstatusResponse.data;
+      this.setState({
+        loading: false,
+        omStatus: omStatus
+      });
+    }).catch(error => {
       this.setState({
         loading: false
       });
@@ -121,31 +185,54 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
   }
 
   render() {
-    const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastUpdated} = this.state;
+    const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
+      deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,keysPendingDeletion,
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers } = this.state;
+      
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
       </span>
     );
+    const openSummaryData = (
+        <div>
+          {openSummarytotalRepSize!== undefined ? byteToSize(openSummarytotalRepSize, 1): '0'}   <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+          {openSummarytotalUnrepSize!== undefined ? byteToSize(openSummarytotalUnrepSize, 1): '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+          {openSummarytotalOpenKeys !== undefined ? openSummarytotalOpenKeys: '0'}  <span className='ant-card-meta-description meta'>Total Open Keys</span>
+        </div>
+    );
+    const deletePendingSummaryData = (
+      <div>
+        {deletePendingSummarytotalRepSize!== undefined ? byteToSize(deletePendingSummarytotalRepSize, 1): '0'}  <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+        {deletePendingSummarytotalUnrepSize!== undefined ? byteToSize(deletePendingSummarytotalUnrepSize,1): '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+        {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys: '0'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
+      </div>
+  );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
-    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '';
+    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
     const duLink = '/DiskUsage';
     const containersElement = missingContainersCount > 0 ? (
       <span>
-        <Tooltip placement='bottom' title={`${missingContainersCount} ${containersTooltip}`}>
+        <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
           <Icon type='exclamation-circle' theme='filled' className='icon-failure icon-small'/>
         </Tooltip>
         <span className='padded-text'>{containers - missingContainersCount}/{containers}</span>
       </span>
     ) :
-      containers.toString();
+      <div>
+          <span>{containers.toString()}   </span>
+        <Tooltip placement='bottom' title='Number of open containers'>
+          <span>({openContainers})</span>
+        </Tooltip>
+      </div>
     const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
     return (
       <div className='overview-content'>
         <div className='page-header'>
           Overview
-          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
+          lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
+          togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData} omSyncLoad={this.omSyncData} omStatus={omStatus}/>
         </div>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
@@ -178,10 +265,22 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={duLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open'/>
+            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl='/Buckets'/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
+            <OverviewCard loading={loading} title='Pending Key Deletions' data={keysPendingDeletion.toString()} icon='delete' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+            <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+            <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' />
           </Col>
         </Row>
       </div>

@@ -4,12 +4,14 @@ The Ozone project uses Github Actions, (GA), for its CI system.  GA are implemen
 
 ## Workflows
 
-### build-branch Workflow
-This is the most important [workflow](./workflows/post-commit.yml).  It runs the tests that verify the latest commits.
+### full-ci Workflow
+This is the most important [workflow](./workflows/ci.yml).  It runs the tests that verify the latest commits.
 
-It is triggered each time a pull request is created or synchronized, (ie when the remote branch is pushed to.)  It is also "scheduled" on the master branch twice a day, (00:30 and 12:30).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
+It is triggered each time a pull request is created or synchronized (i.e. when the remote branch is pushed to).  These trigger events are defined in the [build-branch workflow](./workflows/post-commit.yml).
 
-The build-branch workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
+It is also "scheduled" on the `master` branch twice a day (00:30 and 12:30), as defined in the [scheduled-ci workflow](./workflows/scheduled_ci.yml).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
+
+The full-ci workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
 
 Some of the jobs are defined using GA's "build matrix" feature.  This allows you define similar jobs with a single job definition. Any differences are specified by a list of values for a specific key.  For example, the "compile" job uses the matrix feature to generate the images with different versions of java.  There, the matrix is specified by the "java" key which has a list of values describing which version of java to use, (8 or 11.)
 
@@ -68,7 +70,7 @@ If they don't match, it describes how to make the updates to include the changes
 - integration
 
 ### Cancelling Workflow
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [build-branch](ci.md#build-branch-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it checks all PR workflows running at the time it is invoked. It cancels any of those which have a failed job, (at that time). Any PR workflows with jobs that fail after that will be caught by a subsequent run of the "Cancelling" workflow.
+[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [full-ci](ci.md#full-ci-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it checks all PR workflows running at the time it is invoked. It cancels any of those which have a failed job, (at that time). Any PR workflows with jobs that fail after that will be caught by a subsequent run of the "Cancelling" workflow.
 
 Note that it checks the status of all PR workflows running at that time, not just the one that triggered it.
 

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +26,10 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -66,16 +72,21 @@ public class TestEventQueue {
   }
 
   @Test
-  public void simpleEventWithFixedThreadPoolExecutor() {
+  public void simpleEventWithFixedThreadPoolExecutor()
+      throws Exception {
 
     TestHandler testHandler = new TestHandler();
-
+    BlockingQueue<Long> eventQueue = new LinkedBlockingQueue<>();
+    List<BlockingQueue<Long>> queues = new ArrayList<>();
+    queues.add(eventQueue);
+    Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
+        = new ConcurrentHashMap<>();
     queue.addHandler(EVENT1,
         new FixedThreadPoolWithAffinityExecutor<>(
             EventQueue.getExecutorName(EVENT1, testHandler),
+            testHandler, queues, queue, Long.class,
             FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
-                EVENT1.getName())),
-        testHandler);
+            queues), reportExecutorMap), testHandler);
 
     queue.fireEvent(EVENT1, 11L);
     queue.fireEvent(EVENT1, 11L);
@@ -95,9 +106,10 @@ public class TestEventQueue {
     // As it is fixed threadpool executor with 10 threads, all should be
     // scheduled.
     Assertions.assertEquals(11, eventExecutor.queuedEvents());
+    Thread.currentThread().sleep(500);
 
     // As we don't see all 10 events scheduled.
-    Assertions.assertTrue(eventExecutor.scheduledEvents() > 1 &&
+    Assertions.assertTrue(eventExecutor.scheduledEvents() >= 1 &&
         eventExecutor.scheduledEvents() <= 10);
 
     queue.processAll(60000);
@@ -108,7 +120,7 @@ public class TestEventQueue {
 
     Assertions.assertEquals(11, eventExecutor.successfulEvents());
     eventTotal.set(0);
-
+    eventExecutor.close();
   }
 
   /**

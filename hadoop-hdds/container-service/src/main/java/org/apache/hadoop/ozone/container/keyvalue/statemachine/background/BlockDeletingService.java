@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -86,6 +86,8 @@ public class BlockDeletingService extends BackgroundService {
 
   private final int blockLimitPerInterval;
 
+  private final BlockDeletingServiceMetrics metrics;
+
   // Task priority is useful when a to-delete block has weight.
   private static final int TASK_PRIORITY_DEFAULT = 1;
 
@@ -107,6 +109,7 @@ public class BlockDeletingService extends BackgroundService {
     this.conf = conf;
     DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
     this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    metrics = BlockDeletingServiceMetrics.create();
   }
 
   /**
@@ -154,6 +157,8 @@ public class BlockDeletingService extends BackgroundService {
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.numBlocksToDelete;
       }
+      metrics.incrTotalBlockChosenCount(totalBlocks);
+      metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
         LOG.debug("Queued {} blocks from {} containers for deletion",
             totalBlocks, containers.size());
@@ -164,9 +169,7 @@ public class BlockDeletingService extends BackgroundService {
           + "Retry in next interval. ", e);
     } catch (Exception e) {
       // In case listContainer call throws any uncaught RuntimeException.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unexpected error occurs during deleting blocks.", e);
-      }
+      LOG.error("Unexpected error occurs during deleting blocks.", e);
     }
     return queue;
   }
@@ -176,9 +179,18 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
+            .filter(e -> ((KeyValueContainerData) e.getValue()
+                .getContainerData()).getNumPendingDeletionBlocks() > 0)
             .filter(e -> isDeletionAllowed(e.getValue().getContainerData(),
                 deletionPolicy)).collect(Collectors
             .toMap(Map.Entry::getKey, e -> e.getValue().getContainerData()));
+
+    long totalPendingBlockCount =
+        containerDataMap.values().stream().mapToLong(
+            containerData -> ((KeyValueContainerData) containerData)
+            .getNumPendingDeletionBlocks())
+        .sum();
+    metrics.setTotalPendingBlockCount(totalPendingBlockCount);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
@@ -194,9 +206,22 @@ public class BlockDeletingService extends BackgroundService {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
         XceiverServerRatis ratisServer =
             (XceiverServerRatis) ozoneContainer.getWriteChannel();
-        PipelineID pipelineID = PipelineID
-            .valueOf(UUID.fromString(containerData.getOriginPipelineId()));
-        // in case te ratis group does not exist, just mark it for deletion.
+        final String originPipelineId = containerData.getOriginPipelineId();
+        if (originPipelineId == null || originPipelineId.isEmpty()) {
+          // In case the pipelineID is empty, just mark it for deletion.
+          // TODO: currently EC container goes through this path.
+          return true;
+        }
+        UUID pipelineUUID;
+        try {
+          pipelineUUID = UUID.fromString(originPipelineId);
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Invalid pipelineID {} for container {}",
+              originPipelineId, containerData.getContainerID());
+          return false;
+        }
+        PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
+        // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
           return true;
         }
@@ -204,7 +229,7 @@ public class BlockDeletingService extends BackgroundService {
           long minReplicatedIndex =
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
-          if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
+          if (minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
@@ -278,11 +303,11 @@ public class BlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
       try (DBHandle meta = BlockUtils.getDB(containerData, conf)) {
-        if (containerData.getSchemaVersion().equals(SCHEMA_V1)) {
+        if (containerData.hasSchema(SCHEMA_V1)) {
           crr = deleteViaSchema1(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V2)) {
+        } else if (containerData.hasSchema(SCHEMA_V2)) {
           crr = deleteViaSchema2(meta, container, dataDir, startTime);
-        } else if (containerData.getSchemaVersion().equals(SCHEMA_V3)) {
+        } else if (containerData.hasSchema(SCHEMA_V3)) {
           crr = deleteViaSchema3(meta, container, dataDir, startTime);
         } else {
           throw new UnsupportedOperationException(
@@ -373,6 +398,12 @@ public class BlockDeletingService extends BackgroundService {
           int deletedBlocksCount = succeedBlocks.size();
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status.
@@ -380,6 +411,8 @@ public class BlockDeletingService extends BackgroundService {
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
           containerData.getVolume().decrementUsedSpace(releasedBytes);
+          metrics.incrSuccessCount(deletedBlocksCount);
+          metrics.incrSuccessBytes(releasedBytes);
         }
 
         if (!succeedBlocks.isEmpty()) {
@@ -393,6 +426,7 @@ public class BlockDeletingService extends BackgroundService {
       } catch (IOException exception) {
         LOG.warn("Deletion operation was not successful for container: " +
             container.getContainerData().getContainerID(), exception);
+        metrics.incrFailureCount();
         throw exception;
       }
     }
@@ -408,9 +442,13 @@ public class BlockDeletingService extends BackgroundService {
       Table<Long, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<Long>) meta.getStore())
               .getDeleteTransactionTable();
-      return deleteViaTransactionStore(
-          deleteTxns.iterator(), meta,
-          container, dataDir, startTime, schema2Deleter);
+      try (TableIterator<Long,
+          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>>
+          iterator = deleteTxns.iterator()) {
+        return deleteViaTransactionStore(
+            iterator, meta,
+            container, dataDir, startTime, schema2Deleter);
+      }
     }
 
     public ContainerBackgroundTaskResult deleteViaSchema3(
@@ -419,17 +457,22 @@ public class BlockDeletingService extends BackgroundService {
       Deleter schema3Deleter = (table, batch, tid) -> {
         Table<String, DeletedBlocksTransaction> delTxTable =
             (Table<String, DeletedBlocksTransaction>) table;
-        delTxTable.deleteWithBatch(batch, containerData.deleteTxnKey(tid));
+        delTxTable.deleteWithBatch(batch,
+            containerData.getDeleteTxnKey(tid));
       };
       Table<String, DeletedBlocksTransaction> deleteTxns =
           ((DeleteTransactionStore<String>) meta.getStore())
               .getDeleteTransactionTable();
-      return deleteViaTransactionStore(
-          deleteTxns.iterator(containerData.containerPrefix()), meta,
-          container, dataDir, startTime, schema3Deleter);
+      try (TableIterator<String,
+          ? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+          iterator = deleteTxns.iterator(containerData.containerPrefix())) {
+        return deleteViaTransactionStore(
+            iterator, meta,
+            container, dataDir, startTime, schema3Deleter);
+      }
     }
 
-    public ContainerBackgroundTaskResult deleteViaTransactionStore(
+    private ContainerBackgroundTaskResult deleteViaTransactionStore(
         TableIterator<?, ? extends Table.KeyValue<?, DeletedBlocksTransaction>>
             iter, DBHandle meta, Container container, File dataDir,
         long startTime, Deleter deleter) throws IOException {
@@ -451,10 +494,16 @@ public class BlockDeletingService extends BackgroundService {
           numBlocks += delTx.getLocalIDList().size();
           delBlocks.add(delTx);
         }
-        iter.close();
         if (delBlocks.isEmpty()) {
-          LOG.debug("No transaction found in container : {}",
-              containerData.getContainerID());
+          LOG.info("No transaction found in container {} with pending delete " +
+                  "block count {}",
+              containerData.getContainerID(),
+              containerData.getNumPendingDeletionBlocks());
+          // If the container was queued for delete, it had a positive
+          // pending delete block count. After checking the DB there were
+          // actually no delete transactions for the container, so reset the
+          // pending delete block count to the correct value of zero.
+          containerData.resetPendingDeleteBlockCount(meta);
           return crr;
         }
 
@@ -464,10 +513,11 @@ public class BlockDeletingService extends BackgroundService {
         Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
             .getHandler(container.getContainerType()));
 
-        Pair<Integer, Long> deleteBlocksResult =
+        DeleteTransactionStats deleteBlocksResult =
             deleteTransactions(delBlocks, handler, blockDataTable, container);
-        int deletedBlocksCount = deleteBlocksResult.getLeft();
-        long releasedBytes = deleteBlocksResult.getRight();
+        int deletedBlocksProcessed = deleteBlocksResult.getBlocksProcessed();
+        int deletedBlocksCount = deleteBlocksResult.getBlocksDeleted();
+        long releasedBytes = deleteBlocksResult.getBytesReleased();
 
         // Once blocks are deleted... remove the blockID from blockDataTable
         // and also remove the transactions from txnTable.
@@ -476,8 +526,8 @@ public class BlockDeletingService extends BackgroundService {
           for (DeletedBlocksTransaction delTx : delBlocks) {
             deleter.apply(deleteTxns, batch, delTx.getTxID());
             for (Long blk : delTx.getLocalIDList()) {
-              String bID = blk.toString();
-              meta.getStore().getBlockDataTable().deleteWithBatch(batch, bID);
+              blockDataTable.deleteWithBatch(batch,
+                  containerData.getBlockKey(blk));
             }
           }
 
@@ -488,23 +538,32 @@ public class BlockDeletingService extends BackgroundService {
           // batched together while committing to DB.
           containerData.updateAndCommitDBCounters(meta, batch,
               deletedBlocksCount, releasedBytes);
+          // Once DB update is persisted, check if there are any blocks
+          // remaining in the DB. This will determine whether the container
+          // can be deleted by SCM.
+          if (!container.hasBlocks()) {
+            containerData.markAsEmpty();
+          }
 
           // update count of pending deletion blocks, block count and used
           // bytes in in-memory container status and used space in volume.
-          containerData.decrPendingDeletionBlocks(deletedBlocksCount);
+          containerData.decrPendingDeletionBlocks(deletedBlocksProcessed);
           containerData.decrBlockCount(deletedBlocksCount);
           containerData.decrBytesUsed(releasedBytes);
           containerData.getVolume().decrementUsedSpace(releasedBytes);
+          metrics.incrSuccessCount(deletedBlocksCount);
+          metrics.incrSuccessBytes(releasedBytes);
         }
 
         LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
                 "task elapsed time: {}ms", containerData.getContainerID(),
-            deletedBlocksCount, Time.monotonicNow() - startTime);
+            deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
         return crr;
       } catch (IOException exception) {
         LOG.warn("Deletion operation was not successful for container: " +
             container.getContainerData().getContainerID(), exception);
+        metrics.incrFailureCount();
         throw exception;
       }
     }
@@ -513,35 +572,59 @@ public class BlockDeletingService extends BackgroundService {
      * Delete the chunks for the given blocks.
      * Return the deletedBlocks count and number of bytes released.
      */
-    private Pair<Integer, Long> deleteTransactions(
+    private DeleteTransactionStats deleteTransactions(
         List<DeletedBlocksTransaction> delBlocks, Handler handler,
         Table<String, BlockData> blockDataTable, Container container)
         throws IOException {
+      int blocksProcessed = 0;
       int blocksDeleted = 0;
       long bytesReleased = 0;
       for (DeletedBlocksTransaction entry : delBlocks) {
         for (Long blkLong : entry.getLocalIDList()) {
-          String blk = containerData.blockKey(blkLong);
+          String blk = containerData.getBlockKey(blkLong);
           BlockData blkInfo = blockDataTable.get(blk);
           LOG.debug("Deleting block {}", blkLong);
           if (blkInfo == null) {
-            LOG.warn("Missing delete block(Container = " +
-                container.getContainerData().getContainerID() + ", Block = " +
-                blkLong);
+            try {
+              handler.deleteUnreferenced(container, blkLong);
+            } catch (IOException e) {
+              LOG.error("Failed to delete files for unreferenced block {} of" +
+                      " container {}", blkLong,
+                  container.getContainerData().getContainerID(), e);
+            } finally {
+              blocksProcessed++;
+            }
             continue;
           }
+
+          boolean deleted = false;
           try {
             handler.deleteBlock(container, blkInfo);
             blocksDeleted++;
-            bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
-          } catch (InvalidProtocolBufferException e) {
-            LOG.error("Failed to parse block info for block {}", blkLong, e);
+            deleted = true;
           } catch (IOException e) {
+            // TODO: if deletion of certain block retries exceed the certain
+            //  number of times, service should skip deleting it,
+            //  otherwise invalid numPendingDeletionBlocks could accumulate
+            //  beyond the limit and the following deletion will stop.
             LOG.error("Failed to delete files for block {}", blkLong, e);
+          } finally {
+            blocksProcessed++;
+          }
+
+          if (deleted) {
+            try {
+              bytesReleased += KeyValueContainerUtil.getBlockLength(blkInfo);
+            } catch (IOException e) {
+              // TODO: handle the bytesReleased correctly for the unexpected
+              //  exception.
+              LOG.error("Failed to get block length for block {}", blkLong, e);
+            }
           }
         }
       }
-      return Pair.of(blocksDeleted, bytesReleased);
+      return new DeleteTransactionStats(blocksProcessed,
+          blocksDeleted, bytesReleased);
     }
 
     @Override
@@ -553,5 +636,37 @@ public class BlockDeletingService extends BackgroundService {
   private interface Deleter {
     void apply(Table<?, DeletedBlocksTransaction> deleteTxnsTable,
         BatchOperation batch, long txnID) throws IOException;
+  }
+
+  public BlockDeletingServiceMetrics getMetrics() {
+    return metrics;
+  }
+
+  /**
+   * The wrapper class of the result of deleting transactions.
+   */
+  private static class DeleteTransactionStats {
+
+    private final int blocksProcessed;
+    private final int blocksDeleted;
+    private final long bytesReleased;
+
+    DeleteTransactionStats(int proceeded, int deleted, long released) {
+      blocksProcessed =  proceeded;
+      blocksDeleted = deleted;
+      bytesReleased = released;
+    }
+
+    public int getBlocksProcessed() {
+      return blocksProcessed;
+    }
+
+    public int getBlocksDeleted() {
+      return blocksDeleted;
+    }
+
+    public long getBytesReleased() {
+      return bytesReleased;
+    }
   }
 }

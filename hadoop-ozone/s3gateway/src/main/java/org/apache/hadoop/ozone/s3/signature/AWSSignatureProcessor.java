@@ -28,13 +28,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 
 /**
  * Parser to process AWS V2 & V4 auth request. Creates string to sign and auth
@@ -46,6 +54,9 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
+
+  private static final AuditLogger AUDIT =
+      new AuditLogger(AuditLoggerType.S3GLOGGER);
 
   @Context
   private ContainerRequestContext context;
@@ -67,7 +78,13 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     SignatureInfo signatureInfo = null;
     for (SignatureParser parser : signatureParsers) {
-      signatureInfo = parser.parseSignature();
+      try {
+        signatureInfo = parser.parseSignature();
+      } catch (MalformedResourceException e) {
+        AuditMessage message = buildAuthFailureMessage(e);
+        AUDIT.logAuthFailure(message);
+        throw S3ErrorTable.newError(MALFORMED_HEADER, e.getResource());
+      }
       if (signatureInfo != null) {
         break;
       }
@@ -79,6 +96,17 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       );
     }
     return signatureInfo;
+  }
+
+  private AuditMessage buildAuthFailureMessage(MalformedResourceException e) {
+    AuditMessage message = new AuditMessage.Builder()
+        .forOperation(AuthOperation.fromContext(context))
+        .withParams(AuditUtils.getAuditParameters(context))
+        .atIp(AuditUtils.getClientIpAddress(context))
+        .withResult(AuditEventStatus.FAILURE)
+        .withException(e)
+        .build();
+    return message;
   }
 
   @VisibleForTesting

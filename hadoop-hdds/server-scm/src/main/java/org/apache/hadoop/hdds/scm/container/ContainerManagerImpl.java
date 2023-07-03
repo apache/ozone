@@ -19,18 +19,17 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -54,37 +53,25 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static java.util.Comparator.reverseOrder;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CONTAINER_ID;
+import static org.apache.hadoop.hdds.utils.CollectionUtils.findTopN;
 
 /**
- * TODO: Add javadoc.
+ * {@link ContainerManager} implementation in SCM server.
  */
 public class ContainerManagerImpl implements ContainerManager {
 
-  /*
-   * TODO: Introduce container level locks.
-   */
-
-  /**
-   *
-   */
   private static final Logger LOG = LoggerFactory.getLogger(
       ContainerManagerImpl.class);
 
   /**
-   *
+   * Limit the number of on-going ratis operations.
    */
-  // Limit the number of on-going ratis operations.
   private final Lock lock;
 
-  /**
-   *
-   */
   private final PipelineManager pipelineManager;
 
-  /**
-   *
-   */
   private final ContainerStateManager containerStateManager;
 
   private final SCMHAManager haManager;
@@ -98,10 +85,6 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
-  // Used to track pending replication and delete for container replicas. In
-  // ContainerManager, we try to remove any replicas we see added or deleted
-  // in case they have been created by replication / delete command
-  private final ContainerReplicaPendingOps containerReplicaPendingOps;
 
   /**
    *
@@ -125,6 +108,7 @@ public class ContainerManagerImpl implements ContainerManager {
         .setRatisServer(scmHaManager.getRatisServer())
         .setContainerStore(containerStore)
         .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
+        .setContainerReplicaPendingOps(containerReplicaPendingOps)
         .build();
 
     this.numContainerPerVolume = conf
@@ -132,7 +116,6 @@ public class ContainerManagerImpl implements ContainerManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
-    this.containerReplicaPendingOps = containerReplicaPendingOps;
   }
 
   @Override
@@ -161,37 +144,23 @@ public class ContainerManagerImpl implements ContainerManager {
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();
-    // TODO: Remove the null check, startID should not be null. Fix the unit
-    //  test before removing the check.
-    final long start = startID == null ? 0 : startID.getId();
-    final List<ContainerID> containersIds =
-        new ArrayList<>(containerStateManager.getContainerIDs());
-    Collections.sort(containersIds);
-    List<ContainerInfo> containers;
-    lock.lock();
-    try {
-      containers = containersIds.stream()
-          .filter(id -> id.getId() >= start).limit(count)
-          .map(containerStateManager::getContainer)
-          .collect(Collectors.toList());
-    } finally {
-      lock.unlock();
-    }
-    return containers;
+    return toContainers(filterSortAndLimit(startID, count,
+        containerStateManager.getContainerIDs()));
   }
 
   @Override
   public List<ContainerInfo> getContainers(final LifeCycleState state) {
-    List<ContainerInfo> containers;
-    lock.lock();
-    try {
-      containers = containerStateManager.getContainerIDs(state).stream()
-          .map(containerStateManager::getContainer)
-          .filter(Objects::nonNull).collect(Collectors.toList());
-    } finally {
-      lock.unlock();
-    }
-    return containers;
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return toContainers(containerStateManager.getContainerIDs(state));
+  }
+
+  @Override
+  public List<ContainerInfo> getContainers(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return toContainers(filterSortAndLimit(startID, count,
+        containerStateManager.getContainerIDs(state)));
   }
 
   @Override
@@ -327,9 +296,6 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.updateContainerReplica(cid, replica);
-      // Clear any pending additions for this replica as we have now seen it.
-      containerReplicaPendingOps.completeAddReplica(cid,
-          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -341,10 +307,6 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     if (containerExist(cid)) {
       containerStateManager.removeContainerReplica(cid, replica);
-      // Remove any pending delete replication operations for the deleted
-      // replica.
-      containerReplicaPendingOps.completeDeleteReplica(cid,
-          replica.getDatanodeDetails(), replica.getReplicaIndex());
     } else {
       throwContainerNotFoundException(cid);
     }
@@ -437,17 +399,23 @@ public class ContainerManagerImpl implements ContainerManager {
   public void deleteContainer(final ContainerID cid)
       throws IOException {
     HddsProtos.ContainerID protoId = cid.getProtobuf();
+
+    final boolean found;
     lock.lock();
     try {
-      if (containerExist(cid)) {
+      found = containerExist(cid);
+      if (found) {
         containerStateManager.removeContainer(protoId);
-        scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
-      } else {
-        scmContainerManagerMetrics.incNumFailureDeleteContainers();
-        throwContainerNotFoundException(cid);
       }
     } finally {
       lock.unlock();
+    }
+
+    if (found) {
+      scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
+    } else {
+      scmContainerManagerMetrics.incNumFailureDeleteContainers();
+      throwContainerNotFoundException(cid);
     }
   }
 
@@ -478,7 +446,32 @@ public class ContainerManagerImpl implements ContainerManager {
     return haManager;
   }
 
-  public Set<ContainerID> getContainerIDs() {
-    return containerStateManager.getContainerIDs();
+  private static List<ContainerID> filterSortAndLimit(
+      ContainerID startID, int count, Set<ContainerID> set) {
+
+    if (ContainerID.MIN.equals(startID) && count >= set.size()) {
+      List<ContainerID> list = new ArrayList<>(set);
+      Collections.sort(list);
+      return list;
+    }
+
+    return findTopN(set, count, reverseOrder(),
+        id -> id.compareTo(startID) >= 0);
+  }
+
+  /**
+   * Returns a list of all containers identified by {@code ids}.
+   */
+  private List<ContainerInfo> toContainers(Collection<ContainerID> ids) {
+    List<ContainerInfo> containers = new ArrayList<>(ids.size());
+
+    for (ContainerID id : ids) {
+      ContainerInfo container = containerStateManager.getContainer(id);
+      if (container != null) {
+        containers.add(container);
+      }
+    }
+
+    return containers;
   }
 }

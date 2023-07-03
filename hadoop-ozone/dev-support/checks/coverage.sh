@@ -26,13 +26,15 @@ REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
+JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout)
+
 #Install jacoco cli
 mvn --non-recursive --no-transfer-progress \
   org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy \
-  -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
+  -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
 jacoco() {
-  java -jar target/dependency/org.jacoco.cli-0.8.5-nodeps.jar "$@"
+  java -jar target/dependency/org.jacoco.cli-${JACOCO_VERSION}-nodeps.jar "$@"
 }
 
 #Merge all the jacoco.exec files

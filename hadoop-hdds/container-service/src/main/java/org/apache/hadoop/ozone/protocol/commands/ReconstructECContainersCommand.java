@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -47,16 +48,10 @@ public class ReconstructECContainersCommand
       List<DatanodeDetailsAndReplicaIndex> sources,
       List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
-    super();
-    this.containerID = containerID;
-    this.sources = sources;
-    this.targetDatanodes = targetDatanodes;
-    this.missingContainerIndexes =
-        Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
-    this.ecReplicationConfig = ecReplicationConfig;
+    this(containerID, sources, targetDatanodes, missingContainerIndexes,
+        ecReplicationConfig, HddsIdFactory.getLongId());
   }
 
-  // Should be called only for protobuf conversion
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
       List<DatanodeDetails> targetDatanodes, byte[] missingContainerIndexes,
@@ -68,6 +63,10 @@ public class ReconstructECContainersCommand
     this.missingContainerIndexes =
         Arrays.copyOf(missingContainerIndexes, missingContainerIndexes.length);
     this.ecReplicationConfig = ecReplicationConfig;
+    if (targetDatanodes.size() != missingContainerIndexes.length) {
+      throw new IllegalArgumentException("Number of target datanodes and " +
+          "container indexes should be same");
+    }
   }
 
   @Override
@@ -135,6 +134,21 @@ public class ReconstructECContainersCommand
     return ecReplicationConfig;
   }
 
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": containerID: ").append(containerID)
+        .append(", replicationConfig: ").append(ecReplicationConfig)
+        .append(", sources: [").append(getSources().stream()
+            .map(a -> a.dnDetails
+                + " replicaIndex: " + a.getReplicaIndex())
+            .collect(Collectors.joining(", "))).append("]")
+        .append(", targets: ").append(getTargetDatanodes())
+        .append(", missingIndexes: ").append(
+            Arrays.toString(missingContainerIndexes));
+    return sb.toString();
+  }
   /**
    * To store the datanode details with replica index.
    */

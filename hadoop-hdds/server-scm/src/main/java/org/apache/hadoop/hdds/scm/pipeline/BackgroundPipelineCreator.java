@@ -109,9 +109,6 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    // start RatisPipelineUtilsThread
-    start();
   }
 
   /**
@@ -160,6 +157,10 @@ public class BackgroundPipelineCreator implements SCMService {
       LOG.warn("Interrupted during join {}.", THREAD_NAME);
       Thread.currentThread().interrupt();
     }
+  }
+
+  public boolean isRunning() {
+    return running.get();
   }
 
   private void run() {
@@ -228,7 +229,8 @@ public class BackgroundPipelineCreator implements SCMService {
           (ReplicationConfig) it.next();
 
       try {
-        pipelineManager.createPipeline(replicationConfig);
+        Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+        LOG.info("Created new pipeline {}", pipeline);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {

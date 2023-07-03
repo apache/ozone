@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
@@ -48,6 +51,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -62,6 +66,7 @@ public class TestMultiTenantVolume {
   private static final String USER_PRINCIPAL = "username";
   private static final String BUCKET_NAME = "bucket";
   private static final String ACCESS_ID = "tenant$username";
+  private static OzoneClient client;
 
   @BeforeClass
   public static void initClusterProvider() throws Exception {
@@ -73,6 +78,7 @@ public class TestMultiTenantVolume {
         .withoutDatanodes()
         .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     cluster = builder.build();
+    client = cluster.newClient();
     s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
 
     preFinalizationChecks(getStoreForAccessID(ACCESS_ID));
@@ -81,6 +87,7 @@ public class TestMultiTenantVolume {
 
   @AfterClass
   public static void shutdownClusterProvider() {
+    IOUtils.closeQuietly(client);
     cluster.shutdown();
   }
 
@@ -135,11 +142,11 @@ public class TestMultiTenantVolume {
       throws IOException, InterruptedException, TimeoutException {
 
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
-    final OzoneManagerProtocol client = cluster.getRpcClient().getObjectStore()
+    final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
     UpgradeFinalizer.StatusAndMessages finalizationResponse =
-        client.finalizeUpgrade(upgradeClientID);
+        omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
     Assert.assertTrue(isStarting(finalizationResponse.status()));
@@ -149,7 +156,7 @@ public class TestMultiTenantVolume {
     GenericTestUtils.waitFor(() -> {
       try {
         final UpgradeFinalizer.StatusAndMessages progress =
-            client.queryUpgradeFinalizationProgress(
+            omClient.queryUpgradeFinalizationProgress(
                 upgradeClientID, false, false);
         return isDone(progress.status());
       } catch (IOException e) {
@@ -165,7 +172,7 @@ public class TestMultiTenantVolume {
     final String bucketName = "bucket";
 
     // Default client not belonging to a tenant should end up in the S3 volume.
-    ObjectStore store = cluster.getClient().getObjectStore();
+    ObjectStore store = client.getObjectStore();
     Assert.assertEquals(s3VolumeName, store.getS3Volume().getName());
 
     // Create bucket.
@@ -205,6 +212,7 @@ public class TestMultiTenantVolume {
 
     store.tenantRevokeUserAccessId(ACCESS_ID);
     store.deleteTenant(TENANT_ID);
+    store.deleteVolume(TENANT_ID);
   }
 
   /**
@@ -239,11 +247,11 @@ public class TestMultiTenantVolume {
     OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
     // Manually construct an object store instead of using the cluster
     // provided one so we can specify the access ID.
-    RpcClient client = new RpcClient(conf, null);
+    RpcClient rpcClient = new RpcClient(conf, null);
     // userPrincipal is set to be the same as accessId for the test
-    client.setThreadLocalS3Auth(
+    rpcClient.setThreadLocalS3Auth(
         new S3Auth("unused1", "unused2", accessID, accessID));
-    return new ObjectStore(conf, client);
+    return new ObjectStore(conf, rpcClient);
   }
 
   @Test
@@ -260,5 +268,49 @@ public class TestMultiTenantVolume {
     long readBackVersion = Long.parseLong(readBackVersionStr);
 
     Assert.assertEquals(writtenVersion, readBackVersion);
+  }
+
+  @Test
+  public void testTenantVolumeQuota() throws Exception {
+
+    ObjectStore store = getStoreForAccessID(ACCESS_ID);
+
+    // Create Tenant and check default quota
+    store.createTenant(TENANT_ID);
+    OzoneVolume volume;
+    volume = store.getVolume(TENANT_ID);
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInNamespace());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
+
+    long spaceQuota = 10;
+    long namespaceQuota = 20;
+    OzoneQuota quota = OzoneQuota.getOzoneQuota(spaceQuota, namespaceQuota);
+    volume.setQuota(quota);
+
+    // Check quota
+    volume = store.getVolume(TENANT_ID);
+    Assert.assertEquals(namespaceQuota, volume.getQuotaInNamespace());
+    Assert.assertEquals(spaceQuota, volume.getQuotaInBytes());
+
+    // Delete tenant and volume
+    store.deleteTenant(TENANT_ID);
+    store.deleteVolume(TENANT_ID);
+  }
+
+  @Test
+  public void testRejectNonS3CompliantTenantIdCreationWithDefaultStrictS3True()
+      throws Exception {
+    ObjectStore store = getStoreForAccessID(ACCESS_ID);
+    String[] nonS3CompliantTenantId =
+        {"tenantid_underscore", "_tenantid___multi_underscore_", "tenantid_"};
+
+    for (String tenantId : nonS3CompliantTenantId) {
+      OMException e = assertThrows(
+          OMException.class,
+          () -> store.createTenant(tenantId));
+
+      Assert.assertTrue(e.getMessage().contains("Invalid volume name: "
+          + tenantId));
+    }
   }
 }

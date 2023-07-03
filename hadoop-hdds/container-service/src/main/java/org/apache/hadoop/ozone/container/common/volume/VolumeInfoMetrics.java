@@ -75,6 +75,11 @@ public class VolumeInfoMetrics {
     return volume.getLayoutVersion();
   }
 
+  @Metric("Returns the Volume State")
+  public String getVolumeState() {
+    return volume.getStorageState().name();
+  }
+
   @Metric("Returns the Volume Type")
   public String getVolumeType() {
     return volume.getType().name();
@@ -99,7 +104,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Returns the Used space")
   public long getUsed() {
-    return volume.getVolumeInfo().getScmUsed();
+    return volume.getVolumeInfo().map(VolumeInfo::getScmUsed)
+            .orElse(0L);
   }
 
   /**
@@ -107,7 +113,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Returns the Available space")
   public long getAvailable() {
-    return volume.getVolumeInfo().getAvailable();
+    return volume.getVolumeInfo().map(VolumeInfo::getAvailable)
+            .orElse(0L);
   }
 
   /**
@@ -115,7 +122,8 @@ public class VolumeInfoMetrics {
    */
   @Metric("Fetches the Reserved Space")
   public long getReserved() {
-    return volume.getVolumeInfo().getReservedInBytes();
+    return volume.getVolumeInfo().map(VolumeInfo::getReservedInBytes)
+            .orElse(0L);
   }
 
   /**

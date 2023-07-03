@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -63,6 +64,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public boolean triggerSnapshot() throws IOException {
+        throw new IOException("submitSnapshotRequest is called.");
+      }
+
+      @Override
       public void stop() throws IOException {
       }
 
@@ -93,6 +99,11 @@ public class TestReplicationAnnotation {
       }
 
       @Override
+      public boolean removeSCM(RemoveSCMRequest request) throws IOException {
+        return false;
+      }
+
+      @Override
       public SCMStateMachine getSCMStateMachine() {
         return null;
       }
@@ -119,10 +130,9 @@ public class TestReplicationAnnotation {
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
       Assertions.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assertions.assertNotNull(ignore.getMessage() != null);
-      Assertions.assertEquals("submitRequest is called.",
-          ignore.getMessage());
+    } catch (IOException e) {
+      Assertions.assertNotNull(e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
     }
 
     scmhaInvocationHandler = new SCMHAInvocationHandler(
@@ -140,10 +150,9 @@ public class TestReplicationAnnotation {
           KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
           "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
       Assertions.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assertions.assertNotNull(ignore.getMessage() != null);
-      Assertions.assertEquals("submitRequest is called.",
-          ignore.getMessage());
+    } catch (IOException e) {
+      Assertions.assertNotNull(e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
     }
 
   }

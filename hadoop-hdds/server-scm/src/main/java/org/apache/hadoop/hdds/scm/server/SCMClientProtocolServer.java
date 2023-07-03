@@ -23,6 +23,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -30,26 +31,37 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
+import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -60,6 +72,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -77,7 +90,10 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.com.google.common.base.Strings;
+import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,9 +113,11 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 /**
  * The RPC server that listens to requests from clients.
@@ -115,8 +133,11 @@ public class SCMClientProtocolServer implements
   private final StorageContainerManager scm;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
 
-  public SCMClientProtocolServer(OzoneConfiguration conf,
-      StorageContainerManager scm) throws IOException {
+  public SCMClientProtocolServer(
+      OzoneConfiguration conf,
+      StorageContainerManager scm,
+      ReconfigurationHandler reconfigurationHandler
+  ) throws IOException {
     this.scm = scm;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
@@ -145,6 +166,16 @@ public class SCMClientProtocolServer implements
             StorageContainerLocationProtocolPB.class,
             storageProtoPbService,
             handlerCount);
+
+    // Add reconfigureProtocolService.
+    ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
+        = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
+    BlockingService reconfigureService =
+        ReconfigureProtocolService.newReflectiveBlockingService(
+            reconfigureServerProtocol);
+    HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolPB.class,
+        reconfigureService, clientRpcServer);
+
     clientRpcAddress =
         updateRPCListenAddress(conf,
             scm.getScmNodeDetails().getClientProtocolServerAddressKey(),
@@ -188,9 +219,6 @@ public class SCMClientProtocolServer implements
     getClientRpcServer().join();
   }
 
-  public UserGroupInformation getRemoteUser() {
-    return Server.getRemoteUser();
-  }
   @Override
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
@@ -199,8 +227,7 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SafeModePrecheck failed for allocateContainer",
           ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    getScm().checkAdminAccess(getRemoteUser());
-
+    getScm().checkAdminAccess(getRemoteUser(), false);
     final ContainerInfo container = scm.getContainerManager()
         .allocateContainer(
             ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
@@ -215,7 +242,7 @@ public class SCMClientProtocolServer implements
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), true);
     try {
       return scm.getContainerManager()
           .getContainer(ContainerID.valueOf(containerID));
@@ -272,7 +299,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(null);
+    getScm().checkAdminAccess(null, true);
 
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
@@ -315,8 +342,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(null);
+      Iterable<? extends Long> containerIDs) throws IOException {
+    getScm().checkAdminAccess(null, true);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
@@ -545,27 +572,20 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void deleteContainer(long containerID) throws IOException {
-    boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
     UserGroupInformation remoteUser = getRemoteUser();
     auditMap.put("remoteUser", remoteUser.getUserName());
     try {
-      getScm().checkAdminAccess(remoteUser);
+      getScm().checkAdminAccess(remoteUser, false);
       scm.getContainerManager().deleteContainer(
           ContainerID.valueOf(containerID));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.DELETE_CONTAINER, auditMap));
     } catch (Exception ex) {
-      auditSuccess = false;
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(SCMAction.DELETE_CONTAINER, auditMap, ex)
-      );
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.DELETE_CONTAINER, auditMap, ex));
       throw ex;
-    } finally {
-      if (auditSuccess) {
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.DELETE_CONTAINER, auditMap)
-        );
-      }
     }
   }
 
@@ -600,7 +620,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager().decommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to decommission nodes", ex);
@@ -612,7 +632,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager().recommissionNodes(nodes);
     } catch (Exception ex) {
       LOG.error("Failed to recommission nodes", ex);
@@ -624,7 +644,7 @@ public class SCMClientProtocolServer implements
   public List<DatanodeAdminError> startMaintenanceNodes(List<String> nodes,
       int endInHours) throws IOException {
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
       return scm.getScmDecommissionManager()
           .startMaintenanceNodes(nodes, endInHours);
     } catch (Exception ex) {
@@ -640,7 +660,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", String.valueOf(containerID));
     auditMap.put("remoteUser", remoteUser.getUserName());
     try {
-      scm.checkAdminAccess(remoteUser);
+      scm.checkAdminAccess(remoteUser, false);
       final ContainerID cid = ContainerID.valueOf(containerID);
       final HddsProtos.LifeCycleState state = scm.getContainerManager()
           .getContainer(cid).getState();
@@ -663,11 +683,17 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
-    Pipeline result = scm.getPipelineManager()
-        .createPipeline(ReplicationConfig.fromProtoTypeAndFactor(type, factor));
-    AUDIT.logWriteSuccess(
-        buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
-    return result;
+    try {
+      Pipeline result = scm.getPipelineManager().createPipeline(
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.CREATE_PIPELINE, null));
+      return result;
+    } catch (SCMException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.CREATE_PIPELINE, null, e));
+      throw e;
+    }
   }
 
   @Override
@@ -687,39 +713,55 @@ public class SCMClientProtocolServer implements
   @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.ACTIVATE_PIPELINE, null));
-    scm.getPipelineManager().activatePipeline(
-        PipelineID.getFromProtobuf(pipelineID));
+    try {
+      scm.getPipelineManager().activatePipeline(
+          PipelineID.getFromProtobuf(pipelineID));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.ACTIVATE_PIPELINE, null));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.ACTIVATE_PIPELINE, null, ex));
+      throw ex;
+    }
   }
 
   @Override
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.DEACTIVATE_PIPELINE, null));
-    scm.getPipelineManager().deactivatePipeline(
-        PipelineID.getFromProtobuf(pipelineID));
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      scm.getPipelineManager().deactivatePipeline(
+          PipelineID.getFromProtobuf(pipelineID));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.DEACTIVATE_PIPELINE, null));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.DEACTIVATE_PIPELINE, null, ex));
+      throw ex;
+    }
   }
 
   @Override
   public void closePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
     Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("pipelineID", pipelineID.getId());
-    PipelineManager pipelineManager = scm.getPipelineManager();
-    Pipeline pipeline =
-        pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-    pipelineManager.closePipeline(pipeline, true);
-    AUDIT.logWriteSuccess(
-        buildAuditMessageForSuccess(SCMAction.CLOSE_PIPELINE, null)
-    );
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      auditMap.put("pipelineID", pipelineID.getId());
+      PipelineManager pipelineManager = scm.getPipelineManager();
+      Pipeline pipeline =
+          pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
+      pipelineManager.closePipeline(pipeline, true);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.CLOSE_PIPELINE, auditMap));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.CLOSE_PIPELINE, auditMap, ex));
+    }
   }
 
   @Override
-  public ScmInfo getScmInfo() throws IOException {
+  public ScmInfo getScmInfo() {
     boolean auditSuccess = true;
     try {
       ScmInfo.Builder builder =
@@ -733,9 +775,9 @@ public class SCMClientProtocolServer implements
         // In case, there is no ratis, there is no ratis role.
         // This will just print the hostname with ratis port as the default
         // behaviour.
-        String adddress = scm.getSCMHANodeDetails().getLocalNodeDetails()
+        String address = scm.getSCMHANodeDetails().getLocalNodeDetails()
             .getRatisHostPortStr();
-        builder.setRatisPeerRoles(Arrays.asList(adddress));
+        builder.setRatisPeerRoles(Arrays.asList(address));
       }
       return builder.build();
     } catch (Exception ex) {
@@ -750,6 +792,89 @@ public class SCMClientProtocolServer implements
             buildAuditMessageForSuccess(SCMAction.GET_SCM_INFO, null)
         );
       }
+    }
+  }
+
+  @Override
+  public void transferLeadership(String newLeaderId)
+      throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
+      throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
+    }
+    boolean auditSuccess = true;
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("newLeaderId", newLeaderId);
+    try {
+      SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
+      RaftGroup group = scmRatisServer.getDivision().getGroup();
+      RaftPeerId targetPeerId;
+      if (newLeaderId.isEmpty()) {
+        RaftPeer curLeader = ((SCMRatisServerImpl) scm.getScmHAManager()
+            .getRatisServer()).getLeader();
+        targetPeerId = group.getPeers()
+            .stream()
+            .filter(a -> !a.equals(curLeader)).findFirst()
+            .map(RaftPeer::getId)
+            .orElseThrow(() -> new IOException("Cannot" +
+                " find a new leader to transfer leadership."));
+      } else {
+        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+      }
+      final GrpcTlsConfig tlsConfig =
+          createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
+          scm.getScmCertificateClient());
+
+      RatisHelper.transferRatisLeadership(scm.getConfiguration(), group,
+          targetPeerId, tlsConfig);
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.TRANSFER_LEADERSHIP, auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            SCMAction.TRANSFER_LEADERSHIP, auditMap));
+      }
+    }
+  }
+
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException {
+    List<DeletedBlocksTransactionInfo> result;
+    try {
+      result = scm.getScmBlockManager().getDeletedBlockLog()
+          .getFailedTransactions(count, startTxId).stream()
+          .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
+          .collect(Collectors.toList());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(
+          buildAuditMessageForFailure(
+              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null, ex)
+      );
+      throw ex;
+    }
+  }
+
+  @Override
+  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    try {
+      int count = scm.getScmBlockManager().getDeletedBlockLog().
+          resetCount(txIDs);
+      auditMap.put("txIDs", txIDs.toString());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
+      return count;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
+      throw ex;
     }
   }
 
@@ -781,7 +906,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public boolean forceExitSafeMode() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.FORCE_EXIT_SAFE_MODE, null)
     );
@@ -790,7 +915,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void startReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.START_REPLICATION_MANAGER, null));
     scm.getReplicationManager().start();
@@ -798,7 +923,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopReplicationManager() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.STOP_REPLICATION_MANAGER, null));
     scm.getReplicationManager().stop();
@@ -814,7 +939,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ReplicationManagerReport getReplicationManagerReport()
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), true);
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
@@ -825,7 +950,7 @@ public class SCMClientProtocolServer implements
       IOException {
     // check admin authorization
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
       LOG.error("Authorization failed for finalize scm upgrade", e);
       throw e;
@@ -842,7 +967,7 @@ public class SCMClientProtocolServer implements
     if (!readonly) {
       // check admin authorization
       try {
-        getScm().checkAdminAccess(getRemoteUser());
+        getScm().checkAdminAccess(getRemoteUser(), true);
       } catch (IOException e) {
         LOG.error("Authorization failed for query scm upgrade finalization " +
             "progress", e);
@@ -861,7 +986,7 @@ public class SCMClientProtocolServer implements
       Optional<Long> maxSizeToMovePerIterationInGB,
       Optional<Long> maxSizeEnteringTarget,
       Optional<Long> maxSizeLeavingSource) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
     if (threshold.isPresent()) {
@@ -931,7 +1056,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void stopContainerBalancer() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser());
+    getScm().checkAdminAccess(getRemoteUser(), false);
     try {
       scm.getContainerBalancer().stopBalancer();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -965,7 +1090,7 @@ public class SCMClientProtocolServer implements
 
     // check admin authorisation
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), true);
     } catch (IOException e) {
       LOG.error("Authorization failed", e);
       throw e;
@@ -1000,18 +1125,8 @@ public class SCMClientProtocolServer implements
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
       DatanodeDetails node, int clientVersion) {
-    SCMNodeStat stat = scm.getScmNodeManager().getNodeStat(node).get();
-
-    long capacity = stat.getCapacity().get();
-    long used = stat.getScmUsed().get();
-    long remaining = stat.getRemaining().get();
-
-    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
-        .setCapacity(capacity)
-        .setUsed(used)
-        .setRemaining(remaining)
-        .setNode(node.toProto(clientVersion))
-        .build();
+    DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
+    return usageInfo.toProto(clientVersion);
   }
 
   /**
@@ -1033,7 +1148,7 @@ public class SCMClientProtocolServer implements
 
     // check admin authorisation
     try {
-      getScm().checkAdminAccess(getRemoteUser());
+      getScm().checkAdminAccess(getRemoteUser(), true);
     } catch (IOException e) {
       LOG.error("Authorization failed", e);
       throw e;
@@ -1064,7 +1179,7 @@ public class SCMClientProtocolServer implements
   public Token<?> getContainerToken(ContainerID containerID)
       throws IOException {
     UserGroupInformation remoteUser = getRemoteUser();
-    getScm().checkAdminAccess(remoteUser);
+    getScm().checkAdminAccess(remoteUser, true);
 
     return scm.getContainerTokenGenerator()
         .generateToken(remoteUser.getUserName(), containerID);
@@ -1073,6 +1188,20 @@ public class SCMClientProtocolServer implements
   @Override
   public long getContainerCount() throws IOException {
     return scm.getContainerManager().getContainers().size();
+  }
+
+  @Override
+  public long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(state).size();
+  }
+
+  @Override
+  public List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scm.getContainerManager().getContainers(
+        ContainerID.valueOf(startContainerID), count, state);
   }
 
   /**
@@ -1156,5 +1285,22 @@ public class SCMClientProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @Override
+  public DecommissionScmResponseProto decommissionScm(
+      String scmId) {
+    Builder decommissionScmResponseBuilder =
+        DecommissionScmResponseProto.newBuilder();
+
+    try {
+      decommissionScmResponseBuilder
+          .setSuccess(scm.removePeerFromHARing(scmId));
+    } catch (IOException ex) {
+      decommissionScmResponseBuilder
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage());
+    }
+    return decommissionScmResponseBuilder.build();
   }
 }

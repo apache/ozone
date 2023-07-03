@@ -42,17 +42,34 @@ Follow [this guide]({{< ref "interface/S3.md" >}}) the cluster to set up at leas
 First make sure ACL is enabled, and `RangerOzoneAuthorizer` is the effective ACL authorizer implementation in-use for Ozone.
 If that is not the case, [follow this]({{< ref "security/SecurityWithRanger.md" >}}). 
 
-Then add the following configs to all Ozone Managers' `ozone-site.xml`:
+Add the following configs to all Ozone Managers' `ozone-site.xml`:
 
 ```xml
 <property>
-   <name>ozone.om.multitenancy.enabled</name>
-   <value>true</value>
+	<name>ozone.om.multitenancy.enabled</name>
+	<value>true</value>
 </property>
 <property>
 	<name>ozone.om.ranger.https-address</name>
-	<value>https://RANGER_HOSTNAME:6182</value>
+	<value>https://RANGER_HOST:6182</value>
 </property>
+<property>
+	<name>ozone.om.ranger.service</name>
+	<value>RANGER_OZONE_SERVICE_NAME</value>
+</property>
+```
+
+The value of `ozone.om.ranger.service` should match Ozone's "Service Name" as configured under "Service Manager" page in Ranger Admin Server Web UI. e.g. `cm_ozone`.
+
+To authenticate to Apache Ranger Admin Server, `ozone.om.kerberos.principal` and `ozone.om.kerberos.keytab.file` will be picked up from the existing configs used for Kerberos security setup.
+
+- Note: Make sure the user behind the Kerberos principal (e.g. `om`) has Admin privilege in Ranger, otherwise some functionality will break.
+This is a limitation of Apache Ranger at the moment.
+e.g. background sync won't be able to get the policyVersion to function properly, and create/update/delete Ranger role will fail.
+
+In addition, if one wants to test Ranger with user name and clear text password login (not recommended in production), add the following configs to Ozone Manager:
+
+```xml
 <property>
 	<name>ozone.om.ranger.https.admin.api.user</name>
 	<value>RANGER_ADMIN_USERNAME</value>
@@ -62,6 +79,8 @@ Then add the following configs to all Ozone Managers' `ozone-site.xml`:
 	<value>RANGER_ADMIN_PASSWORD</value>
 </property>
 ```
+
+Note if both Ranger user name and password are configured, it will be chosen over the (default and recommended) Kerberos keytab authentication method.
 
 Finally restart all OzoneManagers to apply the new configs.
 

@@ -21,8 +21,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -54,6 +56,7 @@ public class TestHadoopDirTreeGenerator {
   private ObjectStore store = null;
   private static final Logger LOG =
           LoggerFactory.getLogger(TestHadoopDirTreeGenerator.class);
+  private OzoneClient client;
 
   @Before
   public void setup() {
@@ -69,6 +72,7 @@ public class TestHadoopDirTreeGenerator {
    * Shutdown MiniDFSCluster.
    */
   private void shutdown() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       FileUtils.deleteDirectory(new File(path));
@@ -88,7 +92,8 @@ public class TestHadoopDirTreeGenerator {
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
 
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
   }
 
   protected OzoneConfiguration getOzoneConfiguration() {

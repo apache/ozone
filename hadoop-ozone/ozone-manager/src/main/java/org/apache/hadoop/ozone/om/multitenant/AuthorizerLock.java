@@ -42,10 +42,19 @@ public interface AuthorizerLock {
   void unlockRead(long stamp);
 
   /**
-   * A wrapper around tryReadLock() that throws when timed out.
-   * @return stamp
+   * @return stamp that can be passed to
+   *    {@link this#validateOptimisticRead(long)} to check if a write lock was
+   *    acquired since the stamp was issued.
+   * @throws IOException If an ongoing write prevents the lock from moving to
+   *    the read state for longer than the timeout.
    */
-  long tryReadLockThrowOnTimeout() throws IOException;
+  long tryOptimisticReadThrowOnTimeout() throws IOException;
+
+  /**
+   * @return True if the write lock was not acquired since this stamp was
+   *    issued for an optimistic read. False otherwise.
+   */
+  boolean validateOptimisticRead(long stamp);
 
   /**
    * Attempt to acquire the write lock to authorizer with a timeout.

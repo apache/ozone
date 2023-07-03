@@ -146,7 +146,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new FilePerBlockStrategy(true, blockManager, volumeSet);
 
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
     ozoneContainer = mock(OzoneContainer.class);
@@ -317,9 +317,9 @@ public class TestSchemaTwoBackwardsCompatibility {
 
           // update delete related metadata
           db.getStore().getMetadataTable().putWithBatch(batch,
-              cData.latestDeleteTxnKey(), txn.getTxID());
+              cData.getLatestDeleteTxnKey(), txn.getTxID());
           db.getStore().getMetadataTable().putWithBatch(batch,
-              cData.pendingDeleteBlockCountKey(),
+              cData.getPendingDeleteBlockCountKey(),
               cData.getNumPendingDeletionBlocks() + BLOCKS_PER_TXN);
           db.getStore().getBatchHandler().commitBatchOperation(batch);
 

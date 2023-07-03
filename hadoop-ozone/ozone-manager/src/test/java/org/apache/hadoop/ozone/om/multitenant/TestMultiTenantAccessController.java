@@ -22,9 +22,14 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Acl;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ranger.RangerClient;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +39,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 
 /**
  * To test MultiTenantAccessController with Ranger Client.
@@ -61,14 +72,52 @@ public class TestMultiTenantAccessController {
   /**
    * Use this setup to test against a live Ranger instance.
    */
-  //  @Before
+//  @Before
   public void setupClusterTest() throws Exception {
-    // These config keys must be set when the test is run:
+
+    // Set up truststore
+    System.setProperty("javax.net.ssl.trustStore",
+        "/path/to/cm-auto-global_truststore.jks");
+
+    // Specify Kerberos client config (krb5.conf) path
+    System.setProperty("java.security.krb5.conf", "/etc/krb5.conf");
+
+    // Enable Kerberos debugging
+    System.setProperty("sun.security.krb5.debug", "true");
+
+    // DEFAULT rule uses the default realm configured in krb5.conf
+    KerberosName.setRules("DEFAULT");
+
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // These config keys must be properly set when the test is run:
+    //
     // OZONE_RANGER_HTTPS_ADDRESS_KEY
     // OZONE_RANGER_SERVICE
     // OZONE_OM_KERBEROS_PRINCIPAL_KEY
     // OZONE_OM_KERBEROS_KEYTAB_FILE_KEY
-    OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.policy.rest.url
+    conf.set(OZONE_RANGER_HTTPS_ADDRESS_KEY,
+        "https://RANGER_HOST:6182/");
+
+    // Same as OM ranger-ozone-security.xml ranger.plugin.ozone.service.name
+    conf.set(OZONE_RANGER_SERVICE, "cm_ozone");
+
+    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+        "om/instance@REALM");
+
+    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
+        "/path/to/ozone.keytab");
+
+    // TODO: Test with clear text username and password as well.
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_USER, "rangeruser");
+//    conf.set(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD, "passwd");
+
+    // (Optional) Enable RangerClient debug log
+    GenericTestUtils.setLogLevel(
+        LoggerFactory.getLogger(RangerClient.class), Level.DEBUG);
+
     controller = new RangerClientMultiTenantAccessController(conf);
   }
 
@@ -91,6 +140,9 @@ public class TestMultiTenantAccessController {
             .addLabel("label2")
             .build();
 
+    // Get the starting service version
+    long prevPolicyVersion = controller.getRangerServicePolicyVersion();
+
     // create in ranger.
     controller.createPolicy(originalPolicy);
     // get to check it's there with all attributes.
@@ -98,8 +150,17 @@ public class TestMultiTenantAccessController {
         controller.getPolicy(policyName);
     Assert.assertEquals(originalPolicy, retrievedPolicy);
 
+    // Service policy version should have been bumped by 1 at this point
+    long currPolicyVersion = controller.getRangerServicePolicyVersion();
+    Assert.assertEquals(prevPolicyVersion + 1L, currPolicyVersion);
+
     // delete policy.
     controller.deletePolicy(policyName);
+
+    // Service policy version should have been bumped again
+    currPolicyVersion = controller.getRangerServicePolicyVersion();
+    Assert.assertEquals(prevPolicyVersion + 2L, currPolicyVersion);
+
     // get to check it is deleted.
     try {
       controller.getPolicy(policyName);
@@ -261,12 +322,12 @@ public class TestMultiTenantAccessController {
     // get one of the roles to check it is there but empty.
     Role retrievedRole = controller.getRole(roleName);
     Assert.assertFalse(retrievedRole.getDescription().isPresent());
-    Assert.assertTrue(retrievedRole.getUsers().isEmpty());
-    Assert.assertTrue(retrievedRole.getRoleID().isPresent());
+    Assert.assertTrue(retrievedRole.getUsersMap().isEmpty());
+    Assert.assertTrue(retrievedRole.getId().isPresent());
 
     // Add a user to the role.
-    retrievedRole.getUsers().add(users.get(0));
-    controller.updateRole(retrievedRole.getRoleID().get(), retrievedRole);
+    retrievedRole.getUsersMap().put(users.get(0), false);
+    controller.updateRole(retrievedRole.getId().get(), retrievedRole);
 
     // Create a new policy containing the role. This should not overwrite the
     // role.
@@ -293,6 +354,7 @@ public class TestMultiTenantAccessController {
         new Role.Builder()
             .setName(roleName)
             .addUsers(users)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
 
     // create in ranger.
@@ -300,7 +362,7 @@ public class TestMultiTenantAccessController {
     // get to check it's there with all attributes.
     Role retrievedRole = controller.getRole(roleName);
     // Role ID should have been added by Ranger.
-    Assert.assertTrue(retrievedRole.getRoleID().isPresent());
+    Assert.assertTrue(retrievedRole.getId().isPresent());
     Assert.assertEquals(originalRole, retrievedRole);
 
     // delete role.
@@ -319,6 +381,7 @@ public class TestMultiTenantAccessController {
     final String roleName = "test-role";
     Role originalRole = new Role.Builder()
             .setName(roleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
     // create in Ranger.
     controller.createRole(originalRole);
@@ -327,6 +390,7 @@ public class TestMultiTenantAccessController {
     // Create a role with the same name and check for error.
     Role sameNameRole = new Role.Builder()
             .setName(roleName)
+            .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
             .build();
     try {
       controller.createRole(sameNameRole);
@@ -345,24 +409,25 @@ public class TestMultiTenantAccessController {
     Role originalRole = new Role.Builder()
         .setName(roleName)
         .addUsers(users)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
         .build();
     // create in Ranger.
     controller.createRole(originalRole);
 
     Role retrievedRole = controller.getRole(roleName);
     Assert.assertEquals(originalRole, retrievedRole);
-    Assert.assertTrue(retrievedRole.getRoleID().isPresent());
-    long roleID = retrievedRole.getRoleID().get();
+    Assert.assertTrue(retrievedRole.getId().isPresent());
+    long roleId = retrievedRole.getId().get();
 
     // Remove a user from the role and update it.
-    retrievedRole.getUsers().remove(users.get(0));
-    Assert.assertEquals(originalRole.getUsers().size() - 1,
-        retrievedRole.getUsers().size());
-    controller.updateRole(roleID, retrievedRole);
+    retrievedRole.getUsersMap().remove(users.get(0));
+    Assert.assertEquals(originalRole.getUsersMap().size() - 1,
+        retrievedRole.getUsersMap().size());
+    controller.updateRole(roleId, retrievedRole);
     Role retrievedUpdatedRole = controller.getRole(roleName);
     Assert.assertEquals(retrievedRole, retrievedUpdatedRole);
-    Assert.assertEquals(originalRole.getUsers().size() - 1,
-        retrievedUpdatedRole.getUsers().size());
+    Assert.assertEquals(originalRole.getUsersMap().size() - 1,
+        retrievedUpdatedRole.getUsersMap().size());
 
     // Cleanup.
     controller.deleteRole(roleName);

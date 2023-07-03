@@ -65,6 +65,18 @@ public class TestOzoneAddressClientCreation {
   }
 
   @Test
+  public void explicitHaMultipleServiceId()
+      throws OzoneClientException, IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("o3://service1/vol1/bucket1/key1");
+    address.createClient(
+        new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
+            "service1,service2"));
+    Assert.assertFalse(address.simpleCreation);
+    Assert.assertEquals("service1", address.serviceId);
+  }
+
+  @Test
   public void explicitNonHAHostPort() throws OzoneClientException, IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");

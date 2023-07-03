@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.SCMCertStore;
 import org.apache.hadoop.hdds.scm.update.client.CRLStore;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Mock CRL Store impl for test.
@@ -97,7 +98,8 @@ public class MockCRLStore implements CRLStore {
   }
 
   public Optional<Long> revokeCert(List<BigInteger> certs,
-                                   Instant revokeTime) throws IOException {
+                                   Instant revokeTime)
+      throws IOException, TimeoutException {
     log.debug("Revoke certs: {}", certs);
     Optional<Long> crlId = scmCertStore.revokeCertificates(certs,
         caCertificateHolder,

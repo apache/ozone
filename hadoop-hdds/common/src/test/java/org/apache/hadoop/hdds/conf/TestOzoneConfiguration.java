@@ -33,6 +33,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test class for OzoneConfiguration.
@@ -112,6 +114,7 @@ public class TestOzoneConfiguration {
     ozoneConfig.setInt("test.scm.client.port", 5555);
     ozoneConfig.setTimeDuration("test.scm.client.wait", 10, TimeUnit.MINUTES);
     ozoneConfig.set("test.scm.client.class", Integer.class.getName());
+    ozoneConfig.setDouble("test.scm.client.threshold", 10.5);
 
     SimpleConfiguration configuration =
         ozoneConfig.getObject(SimpleConfiguration.class);
@@ -122,6 +125,7 @@ public class TestOzoneConfiguration {
     Assertions.assertEquals(5555, configuration.getPort());
     Assertions.assertEquals(600, configuration.getWaitTime());
     Assertions.assertSame(Integer.class, configuration.getMyClass());
+    Assertions.assertEquals(10.5, configuration.getThreshold());
   }
 
   @Test
@@ -134,6 +138,7 @@ public class TestOzoneConfiguration {
     Assertions.assertTrue(configuration.isEnabled());
     Assertions.assertEquals(9878, configuration.getPort());
     Assertions.assertSame(Object.class, configuration.getMyClass());
+    Assertions.assertEquals(10, configuration.getThreshold());
   }
 
   @Test
@@ -146,6 +151,7 @@ public class TestOzoneConfiguration {
     object.setPort(5555);
     object.setWaitTime(600);
     object.setMyClass(this.getClass());
+    object.setThreshold(10.5);
 
     OzoneConfiguration subject = new OzoneConfiguration();
 
@@ -165,6 +171,8 @@ public class TestOzoneConfiguration {
         subject.getTimeDuration("test.scm.client.wait", 0, TimeUnit.MINUTES));
     Assertions.assertSame(this.getClass(),
         subject.getClass("test.scm.client.class", null));
+    Assertions.assertEquals(object.getThreshold(),
+        subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test
@@ -187,6 +195,8 @@ public class TestOzoneConfiguration {
         subject.getInt("test.scm.client.port", 123));
     Assertions.assertEquals(TimeUnit.MINUTES.toSeconds(30),
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
+    Assertions.assertEquals(10,
+        subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test
@@ -236,6 +246,8 @@ public class TestOzoneConfiguration {
         subject.getInt("test.scm.client.port", 123));
     Assertions.assertEquals(0,
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
+    Assertions.assertEquals(0,
+        subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test
@@ -245,6 +257,20 @@ public class TestOzoneConfiguration {
 
     Assertions.assertThrows(NumberFormatException.class,
         () -> ozoneConfiguration.getObject(SimpleConfiguration.class));
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void tagIsRecognized(ConfigTag tag) {
+    OzoneConfiguration subject = new OzoneConfiguration();
+    Assertions.assertTrue(subject.isPropertyTag(tag.name()),
+        () -> tag + " should be recognized as config tag");
+  }
+
+  @Test
+  void unknownTag() {
+    OzoneConfiguration subject = new OzoneConfiguration();
+    Assertions.assertFalse(subject.isPropertyTag("not-a-tag"));
   }
 
   private void appendProperty(BufferedWriter out, String name, String val)

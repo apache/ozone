@@ -42,6 +42,40 @@ function ozone_debug
   fi
 }
 
+## @description Displays usage text for the '--validate' option
+## @audience private
+## @stability evolving
+## @replaceable yes
+function ozone_validate_classpath_usage
+{
+  description=$'The --validate flag validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present\n\n'
+  usage_text=$'Usage I: ozone --validate classpath <ARTIFACTNAME>\nUsage II: ozone --validate [OPTIONS] --daemon start|status|stop csi|datanode|om|recon|s3g|scm\n\n'
+  options=$'  OPTIONS is none or any of:\n\ncontinue\tcommand execution shall continue even if validation fails'
+  ozone_error "${description}${usage_text}${options}"
+  exit 1
+}
+
+## @description Validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present
+## @audience private
+## @stability evolving
+## @replaceable yes
+function ozone_validate_classpath
+{
+  local OZONE_OPTION_DAEMON
+  [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == true && "${OZONE_DAEMON_MODE}" =~ ^st(art|op|atus)$ ]] &&
+  OZONE_OPTION_DAEMON=true || OZONE_OPTION_DAEMON=false
+
+  if [[ "${OZONE_VALIDATE_CLASSPATH}" == true ]]; then
+    if [[ ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == true && ( "${OZONE_OPTION_DAEMON}" == true ||
+          "${OZONE_SUBCMD}" == classpath ) ) || ( "${OZONE_VALIDATE_FAIL_ON_MISSING_JARS}" == false &&
+          "${OZONE_OPTION_DAEMON}" == true ) ]]; then
+      ozone_validate_classpath_util
+    else
+      ozone_validate_classpath_usage
+    fi
+  fi
+}
+
 ## @description  Given a filename or dir, return the absolute version of it
 ## @description  This works as an alternative to readlink, which isn't
 ## @description  portable.
@@ -611,6 +645,8 @@ function ozone_bootstrap
   OZONE_REEXECED_CMD=false
   OZONE_SUBCMD_SECURESERVICE=false
   OZONE_SUBCMD_SUPPORTDAEMONIZATION=false
+  OZONE_VALIDATE_CLASSPATH=false
+  OZONE_VALIDATE_FAIL_ON_MISSING_JARS=true
 
   ozone_set_deprecated_var HADOOP_OZONE_HOME OZONE_HOME
   ozone_set_deprecated_hadoop_vars HOME LIBEXEC_DIR OPTS OS_TYPE
@@ -838,6 +874,9 @@ function ozone_basic_init
 
   # default policy file for service-level authorization
   OZONE_POLICYFILE=${OZONE_POLICYFILE:-"hadoop-policy.xml"}
+
+  OZONE_ORIGINAL_LOGLEVEL="${OZONE_LOGLEVEL:-}"
+  OZONE_ORIGINAL_ROOT_LOGGER="${OZONE_ROOT_LOGGER:-}"
 
   # if for some reason the shell doesn't have $USER defined
   # (e.g., ssh'd in to execute a command)
@@ -2512,6 +2551,16 @@ function ozone_parse_args
           ozone_exit_with_usage 1
         fi
       ;;
+      --validate)
+        shift
+        OZONE_VALIDATE_CLASSPATH=true
+        ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+1))
+        if [[ "${1}" == "continue" ]]; then
+          OZONE_VALIDATE_FAIL_ON_MISSING_JARS=false
+          shift
+          ((OZONE_PARSE_COUNTER=OZONE_PARSE_COUNTER+1))
+        fi
+      ;;
       --debug)
         shift
         OZONE_SHELL_SCRIPT_DEBUG=true
@@ -2661,6 +2710,44 @@ function ozone_generic_java_subcmd_handler
   fi
 }
 
+## @description Utility function of ozone_validate_classpath
+## @audience private
+## @stability evolving
+## @replaceable yes
+function ozone_validate_classpath_util
+{
+  local CLASSPATH_FILE
+  CLASSPATH_FILE="${OZONE_HOME}/share/ozone/classpath/${OZONE_RUN_ARTIFACT_NAME}.classpath"
+  echo "Validating classpath file: $CLASSPATH_FILE"
+  if [[ ! -e "$CLASSPATH_FILE" ]]; then
+    echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
+    exit 1
+  fi
+
+  source "$CLASSPATH_FILE"
+  OIFS=$IFS
+  IFS=':'
+
+  local found_missing_jars
+  found_missing_jars=false
+  for jar in $classpath; do
+    if [[ ! -e "$jar" ]]; then
+      found_missing_jars=true
+      echo "ERROR: Jar file $jar is missing"
+    fi
+  done
+
+  IFS=$OIFS
+
+  if [[ "$found_missing_jars" == true && "$OZONE_VALIDATE_FAIL_ON_MISSING_JARS" == false ]]; then
+    echo "Validation FAILED due to missing jar files! Continuing command execution..."
+  elif [[ "$found_missing_jars" == true && "$OZONE_VALIDATE_FAIL_ON_MISSING_JARS" == true ]]; then
+    echo "Validation FAILED due to missing jar files!"
+    exit 1
+  else
+    echo "Validation SUCCESSFUL, all required jars are present!"
+  fi
+}
 
 ## @description Add all the required jar files to the classpath
 ## @audience private

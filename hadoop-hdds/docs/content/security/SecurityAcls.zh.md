@@ -25,7 +25,12 @@ icon: transfer
   limitations under the License.
 -->
 
-Ozone 既支持原生的 ACL，也支持类似 Ranger 这样的 ACL 插件，如果启用了 Ranger 插件，则以 Ranger 中的 ACL 为准。
+Ozone 既支持类似 Ranger 这样的 ACL 插件，也支持原生的 ACL。如果需要启用原生的 ACL，在 ozone-site.xml 中添加下面的参数：
+
+Property|Value
+--------|------------------------------------------------------------
+ozone.acl.enabled         | true
+ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.OzoneNativeAuthorizer
 
 Ozone 的 ACL 是 Posix ACL 和 S3 ACL 的超集。
 

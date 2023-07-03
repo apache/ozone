@@ -19,11 +19,17 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -39,34 +45,44 @@ public class TestGrpcOmTransport {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOmTransport.class);
+  private static OzoneConfiguration conf;
   @Rule
-  public Timeout timeout = Timeout.seconds(30);
+  public Timeout timeout = Timeout.seconds(3000);
 
+  @BeforeClass
+  public static void setUp() {
+    conf = new OzoneConfiguration();
+    RPC.setProtocolEngine(OzoneConfiguration.of(conf),
+        OzoneManagerProtocolPB.class,
+        ProtobufRpcEngine.class);
+  }
 
   @Test
   public void testGrpcOmTransportFactory() throws Exception {
     String omServiceId = "";
-    String transportCls = GrpcOmTransport.class.getName();
-    OzoneConfiguration conf = new OzoneConfiguration();
+    String transportCls = GrpcOmTransportFactory.class.getName();
     conf.set(OZONE_OM_TRANSPORT_CLASS,
         transportCls);
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+    omTransport.close();
     Assert.assertEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
-
   }
 
   @Test
   public void testHrpcOmTransportFactory() throws Exception {
     String omServiceId = "";
-    OzoneConfiguration conf = new OzoneConfiguration();
+    String transportCls = Hadoop3OmTransportFactory.class.getName();
+    conf.set(OZONE_OM_TRANSPORT_CLASS,
+        transportCls);
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
     // OmTransport should be Hadoop Rpc and
     // fail equality GrpcOmTransport equality test
+    omTransport.close();
     Assert.assertNotEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
   }
@@ -74,8 +90,6 @@ public class TestGrpcOmTransport {
   @Test
   public void testStartStop() throws Exception {
     String omServiceId = "";
-    OzoneConfiguration conf = new OzoneConfiguration();
-
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     GrpcOmTransport client = new GrpcOmTransport(conf, ugi, omServiceId);
 

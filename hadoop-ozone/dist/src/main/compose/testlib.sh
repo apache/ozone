@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
+set -e -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -39,12 +39,12 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
-## @description find all the test.sh scripts in the immediate child dirs
+## @description find all the test*.sh scripts in the immediate child dirs
 all_tests_in_immediate_child_dirs() {
-  find . -mindepth 2 -maxdepth 2 -name test.sh | cut -c3- | sort
+  find . -mindepth 2 -maxdepth 2 -name 'test*.sh' | cut -c3- | sort
 }
 
-## @description Find all test.sh scripts in immediate child dirs,
+## @description Find all test*.sh scripts in immediate child dirs,
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
   if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
@@ -120,12 +120,22 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER || true)
     else
-      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER || true)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
+
+      local grep_command="grep -e FOLLOWER -e LEADER | sort -r -k3 | awk '{ print \$1 }' | xargs echo | sed 's/ /,/g'"
+      local new_order
+      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+        new_order=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command | ${grep_command}")
+      else
+        new_order=$(docker-compose exec -T ${SCM} bash -c "$command | ${grep_command}")
+      fi
+
+      reorder_om_nodes "${new_order}"
       return
     else
       echo "Waiting for OM leader for service ${OM_SERVICE_ID}"
@@ -148,13 +158,12 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
   docker-compose --ansi never down
-  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit \
-      && wait_for_om_leader ; }; then
-    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
-    stop_docker_env
-    return 1
-  fi
+
+  trap stop_docker_env EXIT HUP INT TERM
+
+  docker-compose --ansi never up -d --scale datanode="${datanode_count}"
+  wait_for_safemode_exit
+  wait_for_om_leader
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -169,20 +178,22 @@ execute_robot_test(){
   unset 'ARGUMENTS[${#ARGUMENTS[@]}-1]' #Remove the last element, remainings are the custom parameters
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
-  set +e
   [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
   OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
   while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let i++
+    let ++i
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
+
+  set +e
+
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
@@ -199,19 +210,26 @@ execute_robot_test(){
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
-  copy_daemon_logs
-
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
     create_stack_dumps
   fi
 
   set -e
 
-  if [[ ${rc} -gt 0 ]]; then
-    stop_docker_env
-  fi
-
   return ${rc}
+}
+
+## @description Replace OM node order in config
+reorder_om_nodes() {
+  local c pid procname new_order
+  local new_order="$1"
+
+  if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
+      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
+      echo "Replaced OM order with ${new_order} in ${c}"
+    done
+  fi
 }
 
 ## @description Create stack dump of each java process in each container
@@ -240,27 +258,37 @@ copy_daemon_logs() {
 ## @param        container name
 ## @param        specific command to execute
 execute_command_in_container(){
-  set -e
   # shellcheck disable=SC2068
   docker-compose exec -T "$@"
-  set +e
 }
 
 ## @description Stop a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
-  set -e
   docker-compose --ansi never stop $@
-  set +e
 }
 
 
 ## @description Start a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
-  set -e
   docker-compose --ansi never start $@
-  set +e
+}
+
+create_containers() {
+  docker-compose --ansi never up -d $@
+}
+
+save_container_logs() {
+  local output_name="${OUTPUT_NAME:-}"
+  if [[ -z "${output_name}" ]]; then
+    output_name="$COMPOSE_ENV_NAME"
+  fi
+  if [[ -z "${output_name}" ]]; then
+    output_name="$(basename $(pwd))"
+  fi
+
+  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-${output_name}.log"
 }
 
 
@@ -277,13 +305,9 @@ wait_for_port(){
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "Port $port is available on $host"
-         return;
+     if docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"; then
+       echo "Port $port is available on $host"
+       return
      fi
      echo "Port $port is not available on $host yet"
      sleep 1
@@ -292,10 +316,34 @@ wait_for_port(){
    return 1
 }
 
+## @description wait for the stat to be ready
+## @param The container ID
+## @param The maximum time to wait in seconds
+## @param The command line to be executed
+wait_for_execute_command(){
+  local container=$1
+  local timeout=$2
+  local command=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     if docker-compose exec -T $container bash -c '$command'; then
+       echo "$command succeed"
+       return
+     fi
+     echo "$command hasn't succeed yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $command to be successful"
+   return 1
+}
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  copy_daemon_logs
+  save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
      docker-compose --ansi never down
   fi
@@ -331,35 +379,44 @@ generate_report(){
 copy_results() {
   local test_dir="$1"
   local all_result_dir="$2"
+  local test_script="${3:-test.sh}"
 
   local result_dir="${test_dir}/result"
-  local test_dir_name=$(basename ${test_dir})
+  local test_dir_name="$(basename ${test_dir})"
+  local test_name="${test_dir_name}"
+  local target_dir="${all_result_dir}"/"${test_dir_name}"
+
+  if [[ -n "${test_script}" ]] && [[ "${test_script}" != "test.sh" ]]; then
+    local test_script_name=${test_script}
+    test_script_name=${test_script_name#test-}
+    test_script_name=${test_script_name#test_}
+    test_script_name=${test_script_name%.sh}
+    test_name="${test_name}-${test_script_name}"
+    target_dir="${target_dir}/${test_script_name}"
+  fi
+
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_dir_name}" -l NONE -r NONE -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}"/*.xml
+    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml
     rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
-  mkdir -p "${all_result_dir}"/"${test_dir_name}"
-  mv -v "${result_dir}"/* "${all_result_dir}"/"${test_dir_name}"/
+  mkdir -p "${target_dir}"
+  mv -v "${result_dir}"/* "${target_dir}"/
 }
 
 run_test_script() {
   local d="$1"
-  local test_script="$2"
+  local test_script="${2:-test.sh}"
 
-  if [[ -z "$test_script" ]]; then
-    test_script=./test.sh
-  fi
-
-  echo "Executing test in ${d}"
+  echo "Executing test ${d}/${test_script}"
 
   #required to read the .env file from the right location
   cd "${d}" || return
 
   local ret=0
-  if ! "$test_script"; then
+  if ! ./"$test_script"; then
     ret=1
-    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+    echo "ERROR: Test execution of ${d}/${test_script} is FAILED!!!!"
   fi
 
   cd - > /dev/null
@@ -369,15 +426,17 @@ run_test_script() {
 
 run_test_scripts() {
   local ret=0
+  local d f t
 
   for t in "$@"; do
     d="$(dirname "${t}")"
+    f="$(basename "${t}")"
 
-    if ! run_test_script "${d}"; then
+    if ! run_test_script "${d}" "${f}"; then
       ret=1
     fi
 
-    copy_results "${d}" "${ALL_RESULT_DIR}"
+    copy_results "${d}" "${ALL_RESULT_DIR}" "${f}"
 
     if [[ "${ret}" == "1" ]] && [[ "${FAIL_FAST:-}" == "true" ]]; then
       break

@@ -21,8 +21,8 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -61,8 +61,8 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
           resultSet.getInt("DATA_TYPE")));
     }
 
-    Assert.assertEquals(3, actualPairs.size());
-    Assert.assertEquals(expectedPairs, actualPairs);
+    Assertions.assertEquals(3, actualPairs.size());
+    Assertions.assertEquals(expectedPairs, actualPairs);
   }
 
   @Test
@@ -74,7 +74,7 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
         GLOBAL_STATS_TABLE_NAME, null);
 
     while (resultSet.next()) {
-      Assert.assertEquals(GLOBAL_STATS_TABLE_NAME,
+      Assertions.assertEquals(GLOBAL_STATS_TABLE_NAME,
           resultSet.getString("TABLE_NAME"));
     }
 
@@ -97,14 +97,15 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     // Read
     GlobalStats dbRecord = dao.findById("key1");
 
-    Assert.assertEquals("key1", dbRecord.getKey());
-    Assert.assertEquals(Long.valueOf(500), dbRecord.getValue());
-    Assert.assertEquals(new Timestamp(now), dbRecord.getLastUpdatedTimestamp());
+    Assertions.assertEquals("key1", dbRecord.getKey());
+    Assertions.assertEquals(Long.valueOf(500), dbRecord.getValue());
+    Assertions.assertEquals(new Timestamp(now),
+        dbRecord.getLastUpdatedTimestamp());
 
     dbRecord = dao.findById("key2");
-    Assert.assertEquals("key2", dbRecord.getKey());
-    Assert.assertEquals(Long.valueOf(10), dbRecord.getValue());
-    Assert.assertEquals(new Timestamp(now + 1000L),
+    Assertions.assertEquals("key2", dbRecord.getKey());
+    Assertions.assertEquals(Long.valueOf(10), dbRecord.getValue());
+    Assertions.assertEquals(new Timestamp(now + 1000L),
         dbRecord.getLastUpdatedTimestamp());
 
     // Update
@@ -115,9 +116,9 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     // Read updated
     dbRecord = dao.findById("key2");
 
-    Assert.assertEquals(new Timestamp(now + 2000L),
+    Assertions.assertEquals(new Timestamp(now + 2000L),
         dbRecord.getLastUpdatedTimestamp());
-    Assert.assertEquals(Long.valueOf(100L), dbRecord.getValue());
+    Assertions.assertEquals(Long.valueOf(100L), dbRecord.getValue());
 
     // Delete
     dao.deleteById("key1");
@@ -125,6 +126,6 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     // Verify
     dbRecord = dao.findById("key1");
 
-    Assert.assertNull(dbRecord);
+    Assertions.assertNull(dbRecord);
   }
 }

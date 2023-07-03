@@ -59,16 +59,16 @@ public class TestReplicationConfig {
   public static Stream<Arguments> ecType() {
     return Stream.of(
         arguments("RS", 3, 2, MB),
-        arguments("RS", 3, 2, KB),
+        arguments("RS", 3, 2, 2 * MB),
         arguments("RS", 6, 3, MB),
-        arguments("RS", 6, 3, KB),
+        arguments("RS", 6, 3, 2 * MB),
         arguments("RS", 10, 4, MB),
-        arguments("RS", 10, 4, KB)
+        arguments("RS", 10, 4, 2 * MB)
     );
   }
 
   @Test
-  public void testGetDefaultShouldReturnRatisThreeIfNotSetClientSide() {
+  void testGetDefaultShouldReturnRatisThreeIfNotSetClientSide() {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     ReplicationConfig replicationConfig = ReplicationConfig.getDefault(conf);
@@ -80,7 +80,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testGetDefaultShouldCreateReplicationConfFromConfValues(
+  void testGetDefaultShouldCreateReplicationConfFromConfValues(
       String type, String factor, Class<?> replicationConfigClass) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_REPLICATION_TYPE, type);
@@ -96,7 +96,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("ecType")
-  public void testGetDefaultShouldCreateECReplicationConfFromConfValues(
+  void testGetDefaultShouldCreateECReplicationConfFromConfValues(
       String codec, int data, int parity, int chunkSize) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_REPLICATION_TYPE, "EC");
@@ -110,7 +110,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void deserialize(String type, String factor,
+  void deserialize(String type, String factor,
       Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig =
         ReplicationConfig.fromProtoTypeAndFactor(
@@ -125,7 +125,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("ecType")
-  public void deserializeEC(String codec, int data, int parity, int chunkSize) {
+  void deserializeEC(String codec, int data, int parity, int chunkSize) {
     HddsProtos.ECReplicationConfig proto =
         HddsProtos.ECReplicationConfig.newBuilder()
             .setCodec(codec)
@@ -142,7 +142,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("ecType")
-  public void testECReplicationConfigGetReplication(
+  void testECReplicationConfigGetReplication(
       String codec, int data, int parity, int chunkSize) {
     HddsProtos.ECReplicationConfig proto =
         HddsProtos.ECReplicationConfig.newBuilder().setCodec(codec)
@@ -155,12 +155,12 @@ public class TestReplicationConfig {
         codec) + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + data + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
             + parity + ECReplicationConfig.EC_REPLICATION_PARAMS_DELIMITER
-            + chunkSize, config.getReplication());
+            + chunkSize / 1024 + "k", config.getReplication());
   }
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testReplicationConfigGetReplication(String type, String factor,
+  void testReplicationConfigGetReplication(String type, String factor,
       Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig = ReplicationConfig
         .fromTypeAndFactor(
@@ -172,7 +172,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void fromJavaObjects(String type, String factor,
+  void fromJavaObjects(String type, String factor,
       Class<?> replicationConfigClass) {
     final ReplicationConfig replicationConfig =
         ReplicationConfig.fromTypeAndFactor(
@@ -187,7 +187,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testParseFromTypeAndFactorAsString(String type, String factor,
+  void testParseFromTypeAndFactorAsString(String type, String factor,
       Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
@@ -202,7 +202,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testParseFromTypeAndFactorAsStringifiedInteger(
+  void testParseFromTypeAndFactorAsStringifiedInteger(
       String type, String factor, Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     String f =
@@ -222,7 +222,7 @@ public class TestReplicationConfig {
 
   @ParameterizedTest
   @MethodSource("ecType")
-  public void testParseECReplicationConfigFromString(
+  void testParseECReplicationConfigFromString(
       String codec, int data, int parity, int chunkSize) {
 
     ConfigurationSource conf = new OzoneConfiguration();
@@ -243,7 +243,7 @@ public class TestReplicationConfig {
    */
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testAdjustReplication(String type, String factor,
+  void testAdjustReplication(String type, String factor,
       Class<?> replicationConfigClass) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
@@ -273,7 +273,7 @@ public class TestReplicationConfig {
    */
   @ParameterizedTest
   @MethodSource("ecType")
-  public void testAdjustECReplication(String codec, int data, int parity,
+  void testAdjustECReplication(String codec, int data, int parity,
       int chunkSize) {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationConfig replicationConfig = ReplicationConfig.parse(
@@ -301,20 +301,21 @@ public class TestReplicationConfig {
    */
   @ParameterizedTest
   @MethodSource("replicaType")
-  public void testValidationBasedOnConfig(String type, String factor,
+  void testValidationBasedOnConfig(String type, String factor,
       Class<?> replicationConfigClass) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_REPLICATION + ".allowed-configs",
         "^STANDALONE/ONE|RATIS/THREE$");
     conf.set(OZONE_REPLICATION, factor);
     conf.set(OZONE_REPLICATION_TYPE, type);
+    org.apache.hadoop.hdds.client.ReplicationType replicationType =
+        org.apache.hadoop.hdds.client.ReplicationType.valueOf(type);
 
     // in case of allowed configurations
     if ((type.equals("RATIS") && factor.equals("THREE"))
         || (type.equals("STAND_ALONE") && factor.equals("ONE"))) {
       ReplicationConfig replicationConfig = ReplicationConfig.parse(
-          org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-          factor, conf);
+              replicationType, factor, conf);
       // check if adjust throws exception when adjusting to a config that is
       // not allowed
       if (type.equals("RATIS")) {
@@ -331,8 +332,7 @@ public class TestReplicationConfig {
       // parse should fail in case of a configuration that is not allowed.
       assertThrows(IllegalArgumentException.class,
           () -> ReplicationConfig.parse(
-              org.apache.hadoop.hdds.client.ReplicationType.valueOf(type),
-              factor, conf));
+                  replicationType, factor, conf));
       // default can not be a configuration that is not allowed.
       assertThrows(IllegalArgumentException.class,
           () -> ReplicationConfig.getDefault(conf));
@@ -391,7 +391,7 @@ public class TestReplicationConfig {
   private String ecDescriptor(String codec, int data, int parity,
       int chunkSize) {
     return codec.toUpperCase() + "-" + data + "-" + parity + "-" +
-        (chunkSize == MB ? "1024K" : "1024");
+        (chunkSize / 1024) + "k";
   }
 
 }

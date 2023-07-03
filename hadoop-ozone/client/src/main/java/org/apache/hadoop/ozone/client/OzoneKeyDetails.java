@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.ratis.util.function.CheckedSupplier;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -33,29 +36,11 @@ public class OzoneKeyDetails extends OzoneKey {
   /**
    * A list of block location information to specify replica locations.
    */
-  private List<OzoneKeyLocation> ozoneKeyLocations;
+  private final List<OzoneKeyLocation> ozoneKeyLocations;
 
-  private Map<String, String> metadata;
+  private final FileEncryptionInfo feInfo;
 
-  private FileEncryptionInfo feInfo;
-
-  /**
-   * Constructs OzoneKeyDetails from OmKeyInfo.
-   */
-  @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-                         long size, long creationTime, long modificationTime,
-                         List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationType type, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo, int replicationFactor) {
-    super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
-    this.ozoneKeyLocations = ozoneKeyLocations;
-    this.metadata = metadata;
-    this.feInfo = feInfo;
-  }
-
+  private final CheckedSupplier<OzoneInputStream, IOException> contentSupplier;
 
   /**
    * Constructs OzoneKeyDetails from OmKeyInfo.
@@ -66,12 +51,14 @@ public class OzoneKeyDetails extends OzoneKey {
       List<OzoneKeyLocation> ozoneKeyLocations,
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
-      FileEncryptionInfo feInfo) {
+      FileEncryptionInfo feInfo,
+      CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
+      boolean isFile) {
     super(volumeName, bucketName, keyName, size, creationTime,
-            modificationTime, replicationConfig);
+        modificationTime, replicationConfig, metadata, isFile);
     this.ozoneKeyLocations = ozoneKeyLocations;
-    this.metadata = metadata;
     this.feInfo = feInfo;
+    this.contentSupplier = contentSupplier;
   }
 
   /**
@@ -81,18 +68,17 @@ public class OzoneKeyDetails extends OzoneKey {
     return ozoneKeyLocations;
   }
 
-  public Map<String, String> getMetadata() {
-    return metadata;
-  }
-
   public FileEncryptionInfo getFileEncryptionInfo() {
     return feInfo;
   }
+
   /**
-   * Set details of key location.
-   * @param ozoneKeyLocations - details of key location
+   * Get OzoneInputStream to read the content of the key.
+   * @return OzoneInputStream
+   * @throws IOException
    */
-  public void setOzoneKeyLocations(List<OzoneKeyLocation> ozoneKeyLocations) {
-    this.ozoneKeyLocations = ozoneKeyLocations;
+  @JsonIgnore
+  public OzoneInputStream getContent() throws IOException {
+    return this.contentSupplier.get();
   }
 }

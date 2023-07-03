@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -72,6 +73,11 @@ public class TestOzoneManagerListVolumes {
   private static UserGroupInformation user2 =
       UserGroupInformation.createUserForTesting("user2", new String[]{"test"});
 
+  // Typycal kerberos user, with shortname different from username.
+  private static UserGroupInformation user3 =
+      UserGroupInformation.createUserForTesting("user3@example.com",
+          new String[]{"test"});
+
   @Before
   public void init() throws Exception {
     // loginUser is the user running this test.
@@ -103,19 +109,21 @@ public class TestOzoneManagerListVolumes {
     cluster.waitForClusterToBeReady();
 
     // Create volumes with non-default owners and ACLs
-    OzoneClient client = cluster.getClient();
-    ObjectStore objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
 
-    /* r = READ, w = WRITE, c = CREATE, d = DELETE
-       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
-    String aclUser1All = "user:user1:a";
-    String aclUser2All = "user:user2:a";
-    String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
-    createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+      /* r = READ, w = WRITE, c = CREATE, d = DELETE
+         l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
+      String aclUser1All = "user:user1:a";
+      String aclUser2All = "user:user2:a";
+      String aclWorldAll = "world::a";
+      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
+      createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+    }
+
     OzoneManager om = cluster.getOzoneManager();
     om.stop();
     om.join();
@@ -156,11 +164,17 @@ public class TestOzoneManagerListVolumes {
     setVolumeAcl(objectStore, volumeName, aclString);
   }
 
+  private void checkUser(UserGroupInformation user,
+                         List<String> expectVol, boolean expectListAllSuccess)
+          throws IOException {
+    checkUser(user, expectVol, expectListAllSuccess, true);
+  }
+
   /**
    * Helper function to set volume ACL.
    */
   private static void setVolumeAcl(ObjectStore objectStore, String volumeName,
-      String aclString) throws IOException {
+                                   String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
     Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
@@ -171,21 +185,47 @@ public class TestOzoneManagerListVolumes {
    * under different config combination.
    */
   private void checkUser(UserGroupInformation user,
-      List<String> expectVol, boolean expectListAllSuccess) throws IOException {
+      List<String> expectVol, boolean expectListAllSuccess,
+                         boolean expectListByUserSuccess) throws IOException {
+    try (OzoneClient client = cluster.newClient()) {
+      checkUser(client, user,
+          expectVol, expectListAllSuccess, expectListByUserSuccess);
+    }
+  }
 
-    OzoneClient client = cluster.getClient();
+  private static void checkUser(OzoneClient client, UserGroupInformation user,
+      List<String> expectVol, boolean expectListAllSuccess,
+      boolean expectListByUserSuccess) throws IOException {
+
     ObjectStore objectStore = client.getObjectStore();
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
-    Iterator<? extends OzoneVolume> it = objectStore.listVolumesByUser(
-        user.getUserName(), "", "");
-    Set<String> accessibleVolumes = new HashSet<>();
-    while (it.hasNext()) {
-      OzoneVolume vol = it.next();
-      String volumeName = vol.getName();
-      accessibleVolumes.add(volumeName);
+    Iterator<? extends OzoneVolume> it;
+    try {
+      it = objectStore.listVolumesByUser(
+              user.getUserName(), "", "");
+      Set<String> accessibleVolumes = new HashSet<>();
+      while (it.hasNext()) {
+        OzoneVolume vol = it.next();
+        String volumeName = vol.getName();
+        accessibleVolumes.add(volumeName);
+      }
+      Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+    } catch (RuntimeException ex) {
+      if (expectListByUserSuccess) {
+        throw ex;
+      }
+      if (ex.getCause() instanceof OMException) {
+        // Expect PERMISSION_DENIED
+        if (((OMException) ex.getCause()).getResult() !=
+                OMException.ResultCodes.PERMISSION_DENIED) {
+          throw ex;
+        }
+      } else {
+        throw ex;
+      }
     }
-    Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+
 
     // `ozone sh volume list --all` returns all volumes,
     //  or throws exception (for non-admin if acl enabled & listall disallowed).
@@ -216,6 +256,7 @@ public class TestOzoneManagerListVolumes {
     }
   }
 
+
   /**
    * Check if listVolume of other users than the login user works as expected.
    * ozone.om.volume.listall.allowed = true
@@ -229,7 +270,7 @@ public class TestOzoneManagerListVolumes {
     // Login as user1, list other users' volumes
     UserGroupInformation.setLoginUser(user1);
     checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
-        "volume5"), true);
+        "volume5"), true, false);
 
     // Add "s3v" created default by OM.
     checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
@@ -240,6 +281,11 @@ public class TestOzoneManagerListVolumes {
         "volume5"), true);
     checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
         "volume4", "volume5", "s3v"), true);
+
+    // list volumes should success for user with shortname different from
+    // full name.
+    UserGroupInformation.setLoginUser(user3);
+    checkUser(user3, Collections.singletonList("volume5"), true, true);
   }
 
   /**
@@ -255,10 +301,10 @@ public class TestOzoneManagerListVolumes {
     // Login as user1, list other users' volumes, expect failure
     UserGroupInformation.setLoginUser(user1);
     checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
-        "volume5"), false);
+        "volume5"), false, false);
     // Add "s3v" created default by OM.
     checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5", "s3v"), false);
+        "volume4", "volume5", "s3v"), false, false);
 
     // While admin should be able to list volumes just fine.
     UserGroupInformation.setLoginUser(adminUser);

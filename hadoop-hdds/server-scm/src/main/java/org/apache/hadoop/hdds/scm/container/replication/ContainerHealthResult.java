@@ -32,15 +32,18 @@ public class ContainerHealthResult {
    */
   public enum HealthState {
     HEALTHY,
+    UNHEALTHY,
     UNDER_REPLICATED,
-    OVER_REPLICATED
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
   private final List<SCMCommand> commands = new ArrayList<>();
 
-  ContainerHealthResult(ContainerInfo containerInfo, HealthState healthState) {
+  public ContainerHealthResult(ContainerInfo containerInfo,
+      HealthState healthState) {
     this.containerInfo = containerInfo;
     this.healthState = healthState;
   }
@@ -66,8 +69,19 @@ public class ContainerHealthResult {
    */
   public static class HealthyResult extends ContainerHealthResult {
 
-    HealthyResult(ContainerInfo containerInfo) {
+    public HealthyResult(ContainerInfo containerInfo) {
       super(containerInfo, HealthState.HEALTHY);
+    }
+  }
+
+  /**
+   * Class for Unhealthy container check results, where the container has some
+   * issue other than over- or under-replication.
+   */
+  public static class UnHealthyResult extends ContainerHealthResult {
+
+    public UnHealthyResult(ContainerInfo containerInfo) {
+      super(containerInfo, HealthState.UNHEALTHY);
     }
   }
 
@@ -77,23 +91,47 @@ public class ContainerHealthResult {
   public static class UnderReplicatedHealthResult
       extends ContainerHealthResult {
 
+    // For under-replicated containers, the best remaining redundancy we can
+    // have is 3 for EC-10-4, 2 for EC-6-3, 1 for EC-3-2 and 2 for Ratis.
+    // A container which is under-replicated due to decommission or maintenance
+    // will have one more, ie 4, 3, 2, 3 respectively. Ideally we want to sort
+    // such under-replication after all other under-replicated containers.
+    // It may also make sense to allow under-replicated containers a chance to
+    // retry once before processing the out-of-service under-replication.
+    // Therefore, we should adjust the weighted remaining redundancy of
+    // containers under-replicated only due to out-of-service to 5, so they
+    // sort after an under-replicated container with 3 remaining replicas
+    // (EC-10-4) and plus one retry.
+    private static final int OUT_OF_SERVICE_REDUNDANCY = 5;
+
     private final int remainingRedundancy;
-    private final boolean dueToDecommission;
+    private final boolean dueToOutOfService;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
+    private boolean hasHealthyReplicas;
+    private boolean hasUnReplicatedOfflineIndexes = false;
+    private int requeueCount = 0;
 
-    UnderReplicatedHealthResult(ContainerInfo containerInfo,
-        int remainingRedundancy, boolean dueToDecommission,
+    public UnderReplicatedHealthResult(ContainerInfo containerInfo,
+        int remainingRedundancy, boolean dueToOutOfService,
         boolean replicatedOkWithPending, boolean unrecoverable) {
-      super(containerInfo, HealthState.UNDER_REPLICATED);
+      this(containerInfo, remainingRedundancy, dueToOutOfService,
+          replicatedOkWithPending, unrecoverable, HealthState.UNDER_REPLICATED);
+    }
+
+    protected UnderReplicatedHealthResult(ContainerInfo containerInfo,
+        int remainingRedundancy, boolean dueToOutOfService,
+        boolean replicatedOkWithPending, boolean unrecoverable,
+        HealthState healthState) {
+      super(containerInfo, healthState);
       this.remainingRedundancy = remainingRedundancy;
-      this.dueToDecommission = dueToDecommission;
+      this.dueToOutOfService = dueToOutOfService;
       this.sufficientlyReplicatedAfterPending = replicatedOkWithPending;
       this.unrecoverable = unrecoverable;
     }
 
     /**
-     * How many more replicas can be lost before the the container is
+     * How many more replicas can be lost before the container is
      * unreadable. For containers which are under-replicated due to decommission
      * or maintenance only, the remaining redundancy will include those
      * decommissioning or maintenance replicas, as they are technically still
@@ -105,13 +143,48 @@ public class ContainerHealthResult {
     }
 
     /**
+     * The weightedRedundancy, is the remaining redundancy + the requeue count.
+     * When this value is used for ordering in a priority queue it ensures the
+     * priority is reduced each time it is requeued, to prevent it from blocking
+     * other containers from being processed.
+     * Additionally, so that decommission and maintenance replicas are not
+     * ordered ahead of under-replicated replicas, a redundancy of
+     * DECOMMISSION_REDUNDANCY is used for the decommission redundancy rather
+     * than its real redundancy.
+     * @return The weightedRedundancy of this result.
+     */
+    public int getWeightedRedundancy() {
+      int result = requeueCount;
+      if (dueToOutOfService) {
+        result += OUT_OF_SERVICE_REDUNDANCY;
+      } else {
+        result += getRemainingRedundancy();
+      }
+      return result;
+    }
+
+    /**
+     * If there is an attempt to process this under-replicated result, and it
+     * fails and has to be requeued, this method should be called to increment
+     * the requeue count to ensure the result is not placed back at the head
+     * of the queue.
+     */
+    public void incrementRequeueCount() {
+      ++requeueCount;
+    }
+
+    public int getRequeueCount() {
+      return requeueCount;
+    }
+
+    /**
      * Indicates whether the under-replication is caused only by replicas
      * being decommissioned or entering maintenance. Ie, there are not replicas
      * unavailable.
      * @return True is the under-replication is caused by decommission.
      */
-    public boolean underReplicatedDueToDecommission() {
-      return dueToDecommission;
+    public boolean underReplicatedDueToOutOfService() {
+      return dueToOutOfService;
     }
 
     /**
@@ -121,7 +194,7 @@ public class ContainerHealthResult {
      * @return True if the under-replication is corrected by the pending
      *         replicas. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
     }
 
@@ -135,6 +208,98 @@ public class ContainerHealthResult {
     public boolean isUnrecoverable() {
       return unrecoverable;
     }
+
+    /**
+     * Pass true if a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @param val pass true if the container has indexes on nodes going offline
+     *            or false otherwise.
+     */
+    public void setHasUnReplicatedOfflineIndexes(boolean val) {
+      hasUnReplicatedOfflineIndexes = val;
+    }
+    /**
+     * Indicates whether a container has some indexes which are only on nodes
+     * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
+     * need to be processed even if they are unrecoverable.
+     * @return True if the container has some decommission or maintenance only
+     *         indexes.
+     */
+    public boolean hasUnreplicatedOfflineIndexes() {
+      return hasUnReplicatedOfflineIndexes;
+    }
+
+    public boolean hasHealthyReplicas() {
+      return hasHealthyReplicas;
+    }
+
+    public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
+      this.hasHealthyReplicas = hasHealthyReplicas;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder("UnderReplicatedHealthResult{")
+          .append("containerId=").append(getContainerInfo().getContainerID())
+          .append(", state=").append(getHealthState())
+          .append(", remainingRedundancy=").append(remainingRedundancy);
+      if (dueToOutOfService) {
+        sb.append(" +dueToOutOfService");
+      }
+      if (sufficientlyReplicatedAfterPending) {
+        sb.append(" +sufficientlyReplicatedAfterPending");
+      }
+      if (unrecoverable) {
+        sb.append(" +unrecoverable");
+      }
+      if (hasHealthyReplicas) {
+        sb.append(" +hasHealthyReplicas");
+      }
+      if (hasUnReplicatedOfflineIndexes) {
+        sb.append(" +hasUnReplicatedOfflineIndexes");
+      }
+      if (requeueCount > 0) {
+        sb.append(" requeued:").append(requeueCount);
+      }
+      return sb.append("}").toString();
+    }
+  }
+
+  /**
+   * Class to represent a container healthy state which is mis-Replicated. This
+   * means the container is neither over- nor under-replicated, but its replicas
+   * don't meet the requirements of the container placement policy. Eg the
+   * containers are not spread across enough racks.
+   */
+  public static class MisReplicatedHealthResult
+      extends UnderReplicatedHealthResult {
+
+    /**
+     * In UnderReplicatedHealthState, DECOMMISSION_REDUNDANCY is defined as
+     * 5 so that containers which are really under-replicated get fixed as a
+     * priority over decommissioning hosts. We have defined that a container
+     * can only be mis-replicated if it is not over- or under-replicated. Fixing
+     * mis-replication is arguably less important than completing decommission.
+     * To avoid a lot of mis-replicated containers blocking decommission, we
+     * set the redundancy of mis-replicated containers to 6, so they sort after
+     * under/over-replicated and decommissioning replicas in the under
+     * replication queue.
+     */
+    private static final int MIS_REP_REDUNDANCY = 6;
+    private final String misReplicatedReason;
+
+    public MisReplicatedHealthResult(ContainerInfo containerInfo,
+        boolean replicatedOkAfterPending, String misReplicatedReason) {
+      super(containerInfo, MIS_REP_REDUNDANCY, false,
+          replicatedOkAfterPending, false,
+          HealthState.MIS_REPLICATED);
+      this.misReplicatedReason = misReplicatedReason;
+    }
+
+    public String getMisReplicatedReason() {
+      return misReplicatedReason;
+    }
   }
 
   /**
@@ -144,9 +309,10 @@ public class ContainerHealthResult {
 
     private final int excessRedundancy;
     private final boolean sufficientlyReplicatedAfterPending;
+    private boolean hasMismatchedReplicas;
+    private boolean isSafelyOverReplicated;
 
-
-    OverReplicatedHealthResult(ContainerInfo containerInfo,
+    public OverReplicatedHealthResult(ContainerInfo containerInfo,
         int excessRedundancy, boolean replicatedOkWithPending) {
       super(containerInfo, HealthState.OVER_REPLICATED);
       this.excessRedundancy = excessRedundancy;
@@ -173,8 +339,24 @@ public class ContainerHealthResult {
      * @return True if the over-replication is corrected by the pending
      *         deletes. False otherwise.
      */
-    public boolean isSufficientlyReplicatedAfterPending() {
+    public boolean isReplicatedOkAfterPending() {
       return sufficientlyReplicatedAfterPending;
+    }
+
+    public boolean hasMismatchedReplicas() {
+      return hasMismatchedReplicas;
+    }
+
+    public void setHasMismatchedReplicas(boolean hasMismatchedReplicas) {
+      this.hasMismatchedReplicas = hasMismatchedReplicas;
+    }
+
+    public boolean isSafelyOverReplicated() {
+      return isSafelyOverReplicated;
+    }
+
+    public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
+      this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
   }
 }

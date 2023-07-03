@@ -66,6 +66,13 @@ Verify Bucket 1 Owner
     ${result} =         Execute          ozone sh bucket info /tenantone/bucket-test1 | jq -r '.owner'
                         Should Be Equal  ${result}       testuser
 
+Put, get and delete a key in the tenant bucket
+                        Execute                 echo "Randomtext" > /tmp/testfile
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} put-object --bucket bucket-test1 --key mykey --body /tmp/testfile  0
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} head-object --bucket bucket-test1 --key mykey  0
+                        Execute and checkrc     aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-object --bucket bucket-test1 --key mykey  0
+
+
 SetSecret Success with Cluster Admin
     ${output} =         Execute          ozone tenant user setsecret 'tenantone$testuser' --secret=somesecret1
                         Should contain   ${output}         export AWS_SECRET_ACCESS_KEY='somesecret1'
@@ -94,10 +101,14 @@ Delete Tenant Failure Tenant Not Empty
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete tenantone
                         Should contain   ${output}         TENANT_NOT_EMPTY Tenant 'tenantone' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
 
+Trigger and wait for background Sync to recover Policies and Roles in Authorizer
+    ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger -host=om
+                        Should contain   ${output}         Operation completed successfully
+
 Create Tenant Failure with Regular User
     Run Keyword         Kinit test user     testuser2    testuser2.keytab
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant create tenanttwo
-                        Should contain   ${output}         PERMISSION_DENIED User 'testuser2/scm@EXAMPLE.COM' or 'testuser2' is not an Ozone admin
+                        Should contain   ${output}         PERMISSION_DENIED User 'testuser2' is not an Ozone admin
 
 SetSecret Failure with Regular User
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant user set-secret 'tenantone$testuser' --secret=somesecret2

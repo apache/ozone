@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -31,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -41,6 +44,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -80,12 +84,18 @@ public class OzoneListStatusHelper {
   private final OMMetadataManager metadataManager;
   private final long scmBlockSize;
   private final GetFileStatusHelper getStatusHelper;
+  private final ReplicationConfig omDefaultReplication;
 
-  OzoneListStatusHelper(OMMetadataManager metadataManager, long scmBlockSize,
-                        GetFileStatusHelper func) {
+  OzoneListStatusHelper(
+      OMMetadataManager metadataManager,
+      long scmBlockSize,
+      GetFileStatusHelper func,
+      ReplicationConfig omDefaultReplication
+  ) {
     this.metadataManager = metadataManager;
     this.scmBlockSize = scmBlockSize;
     this.getStatusHelper = func;
+    this.omDefaultReplication = omDefaultReplication;
   }
 
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
@@ -190,6 +200,10 @@ public class OzoneListStatusHelper {
     TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
 
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
+    ReplicationConfig replication =
+        Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+            .map(DefaultReplicationConfig::getReplicationConfig)
+            .orElse(omDefaultReplication);
 
     // fetch the sorted output using a min heap iterator where
     // every remove from the heap will give the smallest entry.
@@ -199,7 +213,7 @@ public class OzoneListStatusHelper {
       while (map.size() < numEntries && heapIterator.hasNext()) {
         HeapEntry entry = heapIterator.next();
         OzoneFileStatus status = entry.getStatus(prefixKey,
-            scmBlockSize, volumeName, bucketName);
+            scmBlockSize, volumeName, bucketName, replication);
         map.put(entry.key, status);
       }
     }
@@ -301,8 +315,13 @@ public class OzoneListStatusHelper {
       return key.hashCode();
     }
 
-    public OzoneFileStatus getStatus(String prefixPath, long scmBlockSize,
-                                     String volumeName, String bucketName) {
+    public OzoneFileStatus getStatus(
+        String prefixPath,
+        long scmBlockSize,
+        String volumeName,
+        String bucketName,
+        ReplicationConfig bucketReplication
+    ) {
       OmKeyInfo keyInfo;
       if (entryType.isDir()) {
         Preconditions.checkArgument(value instanceof OmDirectoryInfo);
@@ -311,6 +330,7 @@ public class OzoneListStatusHelper {
             dirInfo.getName());
         keyInfo = OMFileRequest.getOmKeyInfo(volumeName,
             bucketName, dirInfo, dirName);
+        keyInfo.setReplicationConfig(bucketReplication); // always overwrite
       } else {
         Preconditions.checkArgument(value instanceof OmKeyInfo);
         keyInfo = (OmKeyInfo) value;
@@ -339,13 +359,9 @@ public class OzoneListStatusHelper {
             String prefixKey, String startKey) throws IOException {
       this.iterType = iterType;
       this.table = table;
-      this.tableIterator = table.iterator();
+      this.tableIterator = table.iterator(prefixKey);
       this.prefixKey = prefixKey;
       this.currentKey = null;
-
-      if (!StringUtils.isBlank(prefixKey)) {
-        tableIterator.seek(prefixKey);
-      }
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
@@ -444,6 +460,10 @@ public class OzoneListStatusHelper {
           continue;
         }
 
+        // Copy cache value to local copy and work on it
+        if (cacheOmInfo instanceof CopyObject) {
+          cacheOmInfo = ((CopyObject<Value>) cacheOmInfo).copyObject();
+        }
         if (StringUtils.isBlank(startKey)) {
           // startKey is null or empty, then the seekKeyInDB="1024/"
           if (cacheKey.startsWith(prefixKey)) {
@@ -507,30 +527,31 @@ public class OzoneListStatusHelper {
 
       omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+      try {
+        // Initialize all the iterators
+        iterators.add(EntryType.DIR_CACHE.ordinal(),
+            new CacheIter<>(EntryType.DIR_CACHE,
+                omMetadataManager.getDirectoryTable().cacheIterator(),
+                startKey, prefixKey));
 
-      // Initialize all the iterators
-      iterators.add(EntryType.DIR_CACHE.ordinal(),
-          new CacheIter<>(EntryType.DIR_CACHE,
-              omMetadataManager.getDirectoryTable().cacheIterator(),
-              startKey, prefixKey));
+        iterators.add(EntryType.FILE_CACHE.ordinal(),
+            new CacheIter<>(EntryType.FILE_CACHE,
+                omMetadataManager.getKeyTable(bucketLayout).cacheIterator(),
+                startKey, prefixKey));
 
-      iterators.add(EntryType.FILE_CACHE.ordinal(),
-          new CacheIter<>(EntryType.FILE_CACHE,
-              omMetadataManager.getKeyTable(bucketLayout).cacheIterator(),
-              startKey, prefixKey));
+        iterators.add(EntryType.RAW_DIR_DB.ordinal(),
+            new RawIter<>(EntryType.RAW_DIR_DB,
+                omMetadataManager.getDirectoryTable(),
+                prefixKey, startKey));
 
-      iterators.add(EntryType.RAW_DIR_DB.ordinal(),
-          new RawIter<>(EntryType.RAW_DIR_DB,
-              omMetadataManager.getDirectoryTable(),
-              prefixKey, startKey));
-
-      iterators.add(EntryType.RAW_FILE_DB.ordinal(),
-          new RawIter<>(EntryType.RAW_FILE_DB,
-              omMetadataManager.getKeyTable(bucketLayout),
-              prefixKey, startKey));
-
-      omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
+        iterators.add(EntryType.RAW_FILE_DB.ordinal(),
+            new RawIter<>(EntryType.RAW_FILE_DB,
+                omMetadataManager.getKeyTable(bucketLayout),
+                prefixKey, startKey));
+      } finally {
+        omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
 
       // Insert the element from each of the iterator
       for (Iterator<HeapEntry> iter : iterators) {

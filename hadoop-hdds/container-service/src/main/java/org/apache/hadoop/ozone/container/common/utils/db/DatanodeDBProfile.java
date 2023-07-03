@@ -21,12 +21,14 @@ package org.apache.hadoop.ozone.container.common.utils.db;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
-import org.rocksdb.BlockBasedTableConfig;
-import org.rocksdb.DBOptions;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.LRUCache;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
+import org.apache.ratis.util.MemoizedSupplier;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
@@ -40,13 +42,13 @@ public abstract class DatanodeDBProfile {
   /**
    * Returns DBOptions to be used for rocksDB in datanodes.
    */
-  public abstract DBOptions getDBOptions();
+  public abstract ManagedDBOptions getDBOptions();
 
   /**
    * Returns ColumnFamilyOptions to be used for rocksDB column families in
    * datanodes.
    */
-  public abstract ColumnFamilyOptions getColumnFamilyOptions(
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(
       ConfigurationSource config);
 
   /**
@@ -57,6 +59,7 @@ public abstract class DatanodeDBProfile {
     case SSD:
       return new SSD();
     case DISK:
+    case TEST:
       return new Disk();
     default:
       throw new IllegalArgumentException(
@@ -72,12 +75,12 @@ public abstract class DatanodeDBProfile {
         new StorageBasedProfile(DBProfile.SSD);
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       return SSD_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions(
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
       return SSD_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
@@ -91,12 +94,12 @@ public abstract class DatanodeDBProfile {
         new StorageBasedProfile(DBProfile.DISK);
 
     @Override
-    public DBOptions getDBOptions() {
+    public ManagedDBOptions getDBOptions() {
       return DISK_STORAGE_BASED_PROFILE.getDBOptions();
     }
 
     @Override
-    public ColumnFamilyOptions getColumnFamilyOptions(
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
       return DISK_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
@@ -106,7 +109,7 @@ public abstract class DatanodeDBProfile {
    * Base profile for datanode storage disks.
    */
   private static final class StorageBasedProfile {
-    private final AtomicReference<ColumnFamilyOptions> cfOptions =
+    private final AtomicReference<Supplier<ManagedColumnFamilyOptions>> cfOpts =
         new AtomicReference<>();
     private final DBProfile baseProfile;
 
@@ -114,21 +117,30 @@ public abstract class DatanodeDBProfile {
       baseProfile = profile;
     }
 
-    private DBOptions getDBOptions() {
+    private ManagedDBOptions getDBOptions() {
       return baseProfile.getDBOptions();
     }
 
-    private ColumnFamilyOptions getColumnFamilyOptions(
+    private ManagedColumnFamilyOptions getColumnFamilyOptions(
         ConfigurationSource config) {
-      cfOptions.updateAndGet(op -> op != null ? op :
-          baseProfile.getColumnFamilyOptions()
-              .setTableFormatConfig(getBlockBasedTableConfig(config)));
-      return cfOptions.get();
+      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier =
+          MemoizedSupplier.valueOf(() -> createColumnFamilyOptions(config));
+      cfOpts.compareAndSet(null, supplier);
+      return cfOpts.get().get();
     }
 
-    private BlockBasedTableConfig getBlockBasedTableConfig(
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
         ConfigurationSource config) {
-      BlockBasedTableConfig blockBasedTableConfig =
+      ManagedColumnFamilyOptions options =
+          baseProfile.getColumnFamilyOptions();
+      options.setReused(true);
+      return options.closeAndSetTableFormatConfig(
+          getBlockBasedTableConfig(config));
+    }
+
+    private ManagedBlockBasedTableConfig getBlockBasedTableConfig(
+        ConfigurationSource config) {
+      ManagedBlockBasedTableConfig blockBasedTableConfig =
           baseProfile.getBlockBasedTableConfig();
       if (config == null) {
         return blockBasedTableConfig;
@@ -138,7 +150,8 @@ public abstract class DatanodeDBProfile {
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
               HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
               StorageUnit.BYTES);
-      blockBasedTableConfig.setBlockCache(new LRUCache(cacheSize));
+      blockBasedTableConfig.closeAndSetBlockCache(
+          new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
   }

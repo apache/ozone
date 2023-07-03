@@ -14,19 +14,86 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.function.IntFunction;
 
 /**
- * Codec interface to marshall/unmarshall data to/from a byte[] based
- * key/value store.
+ * Codec interface to serialize/deserialize objects to/from bytes.
+ * A codec implementation must support the byte[] methods
+ * and may optionally support the {@link CodecBuffer} methods.
  *
- * @param <T> Unserialized type
+ * @param <T> The object type.
  */
 public interface Codec<T> {
+  byte[] EMPTY_BYTE_ARRAY = {};
+
+  /**
+   * Does this {@link Codec} support the {@link CodecBuffer} methods?
+   * If this method returns true, this class must implement both
+   * {@link #toCodecBuffer(Object, IntFunction)} and
+   * {@link #fromCodecBuffer(CodecBuffer)}.
+   *
+   * @return ture iff this class supports the {@link CodecBuffer} methods.
+   */
+  default boolean supportCodecBuffer() {
+    return false;
+  }
+
+  /**
+   * @return an upper bound, which should be obtained without serialization,
+   *         of the serialized size of the given object.
+   */
+  default int getSerializedSizeUpperBound(T object) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Serialize the given object to bytes.
+   *
+   * @param object The object to be serialized.
+   * @param allocator To allocate a buffer.
+   * @return a buffer storing the serialized bytes.
+   */
+  default CodecBuffer toCodecBuffer(@Nonnull T object,
+      IntFunction<CodecBuffer> allocator) throws IOException {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Serialize the given object to bytes.
+   *
+   * @param object The object to be serialized.
+   * @return a direct buffer storing the serialized bytes.
+   */
+  default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
+      throws IOException {
+    return toCodecBuffer(object, CodecBuffer::allocateDirect);
+  }
+
+  /**
+   * Serialize the given object to bytes.
+   *
+   * @param object The object to be serialized.
+   * @return a heap buffer storing the serialized bytes.
+   */
+  default CodecBuffer toHeapCodecBuffer(@Nonnull T object)
+      throws IOException {
+    return toCodecBuffer(object, CodecBuffer::allocateHeap);
+  }
+
+  /**
+   * Deserialize an object from the given buffer.
+   *
+   * @param buffer Storing the serialized bytes of an object.
+   * @return the deserialized object.
+   */
+  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws IOException {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Convert object to raw persisted format.
@@ -42,8 +109,13 @@ public interface Codec<T> {
   T fromPersistedFormat(byte[] rawData) throws IOException;
 
   /**
-   * Copy Object from the provided object, and returns a new object.
-   * @param object
+   * Copy the given object.
+   * When the given object is immutable,
+   * the implementation of this method may safely return the given object.
+   *
+   * @param object The object to be copied.
+   * @return a copy of the given object.  When the given object is immutable,
+   *         the returned object can possibly be the same as the given object.
    */
   T copyObject(T object);
 }

@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import com.google.common.base.Optional;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,7 +59,7 @@ public class TestTableCache {
 
     for (int i = 0; i < 10; i++) {
       tableCache.put(new CacheKey<>(Integer.toString(i)),
-          new CacheValue<>(Optional.of(Integer.toString(i)), i));
+          CacheValue.get(i, Integer.toString(i)));
     }
 
 
@@ -82,6 +81,18 @@ public class TestTableCache {
       Assertions.assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
+
+    verifyStats(tableCache, 15, 0, 0);
+  }
+
+  private void verifyStats(TableCache<?, ?> cache,
+                           long expectedHits,
+                           long expectedMisses,
+                           long expectedIterations) {
+    CacheStats stats = cache.getStats();
+    Assertions.assertEquals(expectedHits, stats.getCacheHits());
+    Assertions.assertEquals(expectedMisses, stats.getCacheMisses());
+    Assertions.assertEquals(expectedIterations, stats.getIterationTimes());
   }
 
   @ParameterizedTest
@@ -93,9 +104,9 @@ public class TestTableCache {
     // putting cache with same epoch and different keyNames
     for (int i = 0; i < 3; i++) {
       tableCache.put(new CacheKey<>(Integer.toString(i).concat("A")),
-              new CacheValue<>(Optional.absent(), i));
+              CacheValue.get(i));
       tableCache.put(new CacheKey<>(Integer.toString(i).concat("B")),
-              new CacheValue<>(Optional.of(Integer.toString(i)), i));
+              CacheValue.get(i, Integer.toString(i)));
     }
 
     // Epoch entries should be like (long, (key1, key2, ...))
@@ -132,6 +143,7 @@ public class TestTableCache {
       Assertions.assertEquals(3, tableCache.size());
     }
 
+    verifyStats(tableCache, 6, 0, 0);
   }
 
   @ParameterizedTest
@@ -152,7 +164,7 @@ public class TestTableCache {
         epochs.add(i);
       }
       tableCache.put(new CacheKey<>(Long.toString(i)),
-          new CacheValue<>(Optional.of(Long.toString(i)), i));
+          CacheValue.get(i, Long.toString(i)));
       totalCount++;
     }
 
@@ -183,7 +195,6 @@ public class TestTableCache {
             tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
       }
     }
-
   }
 
   @ParameterizedTest
@@ -194,20 +205,20 @@ public class TestTableCache {
     createTableCache(cacheType);
 
     tableCache.put(new CacheKey<>(Long.toString(0)),
-          new CacheValue<>(Optional.of(Long.toString(0)), 0));
+          CacheValue.get(0, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+        CacheValue.get(1, Long.toString(1)));
     tableCache.put(new CacheKey<>(Long.toString(2)),
-        new CacheValue<>(Optional.of(Long.toString(2)), 2));
+        CacheValue.get(2, Long.toString(2)));
 
 
     //Override first 2 entries
     // This is to simulate a case like create mpu key, commit part1, commit
     // part2. They override the same key.
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(0)), 3));
+        CacheValue.get(3, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 4));
+        CacheValue.get(4, Long.toString(1)));
 
 
 
@@ -237,7 +248,7 @@ public class TestTableCache {
 
     // Add a new entry.
     tableCache.put(new CacheKey<>(Long.toString(5)),
-        new CacheValue<>(Optional.of(Long.toString(5)), 5));
+        CacheValue.get(5, Long.toString(5)));
 
     epochs = new ArrayList<>();
     epochs.add(5L);
@@ -250,7 +261,7 @@ public class TestTableCache {
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
-
+    verifyStats(tableCache, 0, 0, 0);
   }
 
   @ParameterizedTest
@@ -261,24 +272,24 @@ public class TestTableCache {
     createTableCache(cacheType);
 
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+        CacheValue.get(0, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+        CacheValue.get(1, Long.toString(1)));
     tableCache.put(new CacheKey<>(Long.toString(2)),
-        new CacheValue<>(Optional.of(Long.toString(2)), 2));
+        CacheValue.get(2, Long.toString(2)));
 
 
     // Override entries
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(0)), 3));
+        CacheValue.get(3, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 4));
+        CacheValue.get(4, Long.toString(1)));
 
     // Finally, mark them for deleted
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.absent(), 5));
+        CacheValue.get(5));
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.absent(), 6));
+        CacheValue.get(6));
 
     // So now our cache epoch entries looks like
     // 0-0, 1-1, 2-2, 0-3, 1-4, 0-5, 1-6
@@ -320,7 +331,7 @@ public class TestTableCache {
 
     // Add a new entry, now old override entries will be cleaned up.
     tableCache.put(new CacheKey<>(Long.toString(3)),
-        new CacheValue<>(Optional.of(Long.toString(3)), 7));
+        CacheValue.get(7, Long.toString(3)));
 
     epochs = new ArrayList<>();
     epochs.add(7L);
@@ -343,7 +354,7 @@ public class TestTableCache {
       Assertions.assertEquals(0, tableCache.getEpochEntries().size());
     }
 
-
+    verifyStats(tableCache, 0, 0, 0);
   }
 
   @ParameterizedTest
@@ -428,8 +439,6 @@ public class TestTableCache {
       tableCache.evictCache(epochs);
       Assertions.assertEquals(totalCount, tableCache.size());
     }
-
-
   }
 
   @ParameterizedTest
@@ -441,14 +450,14 @@ public class TestTableCache {
     // In non-HA epoch entries might be out of order.
     // Scenario is like create vol, set vol, set vol, delete vol
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+        CacheValue.get(0, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+        CacheValue.get(1, Long.toString(1)));
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(2)), 3));
+        CacheValue.get(3, Long.toString(2)));
 
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.absent(), 2));
+        CacheValue.get(2));
 
     List<Long> epochs = new ArrayList<>();
     epochs.add(0L);
@@ -460,6 +469,8 @@ public class TestTableCache {
 
     Assertions.assertEquals(0, tableCache.size());
     Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+
+    verifyStats(tableCache, 0, 0, 0);
   }
 
 
@@ -472,17 +483,17 @@ public class TestTableCache {
 
     // In non-HA epoch entries might be out of order.
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(0)), 0));
+        CacheValue.get(0, Long.toString(0)));
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 1));
+        CacheValue.get(1, Long.toString(1)));
     tableCache.put(new CacheKey<>(Long.toString(0)),
-        new CacheValue<>(Optional.of(Long.toString(3)), 3));
+        CacheValue.get(3, Long.toString(3)));
 
     tableCache.put(new CacheKey<>(Long.toString(0)),
-          new CacheValue<>(Optional.of(Long.toString(2)), 2));
+          CacheValue.get(2, Long.toString(2)));
 
     tableCache.put(new CacheKey<>(Long.toString(1)),
-        new CacheValue<>(Optional.of(Long.toString(1)), 4));
+        CacheValue.get(4, Long.toString(1)));
 
     List<Long> epochs = new ArrayList<>();
     epochs.add(0L);
@@ -527,7 +538,29 @@ public class TestTableCache {
       Assertions.assertEquals(4,
           tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
     }
+  }
 
+  @ParameterizedTest
+  @EnumSource(TableCache.CacheType.class)
+  public void testTableCacheStats(TableCache.CacheType cacheType) {
+
+    createTableCache(cacheType);
+
+    tableCache.put(new CacheKey<>("0"),
+        CacheValue.get(0, "0"));
+    tableCache.put(new CacheKey<>("1"),
+        CacheValue.get(1, "1"));
+
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
+    Assertions.assertNotNull(tableCache.get(new CacheKey<>("1")));
+    Assertions.assertNull(tableCache.get(new CacheKey<>("2")));
+    Assertions.assertNull(tableCache.get(new CacheKey<>("3")));
+
+    tableCache.iterator();
+    tableCache.iterator();
+
+    verifyStats(tableCache, 3, 2, 2);
   }
 
   private int writeToCache(int count, int startVal, long sleep)
@@ -535,7 +568,7 @@ public class TestTableCache {
     int counter = 1;
     while (counter <= count) {
       tableCache.put(new CacheKey<>(Integer.toString(startVal)),
-          new CacheValue<>(Optional.of(Integer.toString(startVal)), startVal));
+          CacheValue.get(startVal, Integer.toString(startVal)));
       startVal++;
       counter++;
       Thread.sleep(sleep);

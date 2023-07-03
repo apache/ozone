@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,10 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Unit test for ECReplicationConfig.
  */
-public class TestECReplicationConfig {
+class TestECReplicationConfig {
 
   @Test
-  public void testSuccessfulStringParsing() {
+  void testSuccessfulStringParsing() {
     Map<String, ECReplicationConfig> valid = new HashMap();
     valid.put("rs-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
     valid.put("RS-3-2-1024", new ECReplicationConfig(3, 2, RS, 1024));
@@ -52,25 +54,16 @@ public class TestECReplicationConfig {
     }
   }
 
-  @Test
-  public void testUnsuccessfulStringParsing() {
-    String[] invalid = {
-        "3-2-1024",
-        "rss-3-2-1024",
-        "rs-3-0-1024",
-        "rs-3-2-0k",
-        "rs-3-2",
-        "x3-2"
-    };
-    for (String s : invalid) {
-      assertThrows(IllegalArgumentException.class,
-          () -> new ECReplicationConfig(s));
-    }
+  @ParameterizedTest
+  @ValueSource(strings = {"3-2-1024", "rss-3-2-1024", "rs-3-0-1024",
+      "rs-3-2-0k", "rs-3-2", "x3-2"})
+  void testUnsuccessfulStringParsing(String invalidValue) {
+    assertThrows(IllegalArgumentException.class,
+            () -> new ECReplicationConfig(invalidValue));
   }
 
-
   @Test
-  public void testSerializeToProtoAndBack() {
+  void testSerializeToProtoAndBack() {
     ECReplicationConfig orig = new ECReplicationConfig(6, 3,
         ECReplicationConfig.EcCodec.XOR, 1024);
 

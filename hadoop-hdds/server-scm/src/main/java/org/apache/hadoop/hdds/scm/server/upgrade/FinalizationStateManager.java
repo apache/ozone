@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 
@@ -32,7 +33,8 @@ public interface FinalizationStateManager {
   void removeFinalizingMark() throws IOException;
 
   @Replicate
-  void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
+  void finalizeLayoutFeature(Integer layoutVersion)
+      throws IOException;
 
   /**
    * @param query The checkpoint to check for being crossed.
@@ -44,4 +46,10 @@ public interface FinalizationStateManager {
   FinalizationCheckpoint getFinalizationCheckpoint();
 
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
+
+  /**
+   * Called on snapshot installation.
+   */
+  void reinitialize(Table<String, String> newFinalizationStore)
+      throws IOException;
 }

@@ -21,8 +21,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashSet;
@@ -49,7 +49,7 @@ public class ExcludeList {
     datanodes = new ConcurrentHashMap<>();
     containerIds = new HashSet<>();
     pipelineIds = new HashSet<>();
-    clock = new MonotonicClock(ZoneOffset.UTC);
+    clock = Clock.system(ZoneOffset.UTC);
   }
 
   public ExcludeList(long autoExpiryTime, java.time.Clock clock) {

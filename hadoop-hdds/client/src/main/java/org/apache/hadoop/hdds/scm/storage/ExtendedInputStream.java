@@ -21,6 +21,8 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.util.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +33,7 @@ import java.nio.ByteBuffer;
  * various Ozone InputStream classes.
  */
 public abstract class ExtendedInputStream extends InputStream
-    implements Seekable, CanUnbuffer, ByteBufferReadable {
+    implements Seekable, CanUnbuffer, ByteBufferReadable, StreamCapabilities {
 
   protected static final int EOF = -1;
 
@@ -87,5 +89,16 @@ public abstract class ExtendedInputStream extends InputStream
   @Override
   public synchronized boolean seekToNewSource(long l) throws IOException {
     return false;
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    switch (StringUtils.toLowerCase(capability)) {
+    case StreamCapabilities.READBYTEBUFFER:
+    case StreamCapabilities.UNBUFFER:
+      return true;
+    default:
+      return false;
+    }
   }
 }

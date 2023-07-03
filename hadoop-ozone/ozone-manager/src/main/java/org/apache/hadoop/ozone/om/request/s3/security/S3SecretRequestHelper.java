@@ -18,15 +18,19 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 
 /**
  * Common helper function for S3 secret requests.
@@ -40,6 +44,22 @@ public final class S3SecretRequestHelper {
   }
 
   /**
+   * Retrieves thread-local UGI for request or construct new one
+   * based on provided accessId.
+   *
+   * @param accessId user identifier from request.
+   * @return {@link UserGroupInformation} instance.
+   */
+  public static UserGroupInformation getOrCreateUgi(String accessId) {
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (ugi == null && Strings.isNotEmpty(accessId)) {
+      return UserGroupInformation.createRemoteUser(accessId, KERBEROS);
+    } else {
+      return ugi;
+    }
+  }
+
+  /**
    * Checks whether the ugi has the permission to operate (get secret,
    * set secret, revoke secret) on the given access ID.
    *
@@ -48,8 +68,6 @@ public final class S3SecretRequestHelper {
   public static void checkAccessIdSecretOpPermission(
       OzoneManager ozoneManager, UserGroupInformation ugi, String accessId)
       throws IOException {
-
-    final String username = ugi.getShortUserName();
 
     // Flag indicating whether the accessId is assigned to a tenant
     // (under S3 Multi-Tenancy feature) or not.
@@ -74,12 +92,15 @@ public final class S3SecretRequestHelper {
             multiTenantManager.getUserNameGivenAccessId(accessId);
         final String tenantId = optionalTenantId.get();
 
+        // Access ID owner is short name
+        final String shortName = ugi.getShortUserName();
+
         // HDDS-6691: ugi should either own the access ID, or be an Ozone/tenant
         // admin to pass the check.
-        if (!username.equals(accessIdOwnerUsername) &&
+        if (!shortName.equals(accessIdOwnerUsername) &&
             !multiTenantManager.isTenantAdmin(ugi, tenantId, false)) {
           throw new OMException("Requested accessId '" + accessId + "' doesn't"
-              + " belong to current user '" + username + "', nor does"
+              + " belong to current user '" + shortName + "', nor does"
               + " current user have Ozone or tenant administrator privilege",
               ResultCodes.USER_MISMATCH);
           // Note: A more fitting result code could be PERMISSION_DENIED,
@@ -95,11 +116,12 @@ public final class S3SecretRequestHelper {
 
     // 2. If S3 multi-tenancy is disabled (or the access ID is not assigned
     // to a tenant), fall back to the old permission check.
+    final String fullPrincipal = ugi.getUserName();
     if (!isAccessIdAssignedToTenant &&
-        !username.equals(accessId) && !ozoneManager.isAdmin(ugi)) {
+        !fullPrincipal.equals(accessId) && !ozoneManager.isS3Admin(ugi)) {
 
       throw new OMException("Requested accessId '" + accessId +
-          "' doesn't match current user '" + username +
+          "' doesn't match current user '" + fullPrincipal +
           "', nor does current user has administrator privilege.",
           OMException.ResultCodes.USER_MISMATCH);
     }

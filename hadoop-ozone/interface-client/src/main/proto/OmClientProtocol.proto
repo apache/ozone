@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;
@@ -121,6 +122,23 @@ enum Type {
   SetS3Secret = 106;
 
   SetRangerServiceVersion = 107;
+  RangerBGSync = 109;
+
+  EchoRPC = 110;
+  GetKeyInfo = 111;
+
+  CreateSnapshot = 112;
+  ListSnapshot = 113;
+  SnapshotDiff = 114;
+  DeleteSnapshot = 115;
+  SnapshotMoveDeletedKeys = 116;
+  TransferLeadership = 117;
+  SnapshotPurge = 118;
+  RecoverLease = 119;
+  SetTimes = 120;
+  RefetchSecretKey = 121;
+  ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
 }
 
 message OMRequest {
@@ -224,6 +242,26 @@ message OMRequest {
   optional SetS3SecretRequest               SetS3SecretRequest             = 106;
 
   optional SetRangerServiceVersionRequest   SetRangerServiceVersionRequest = 107;
+  optional RangerBGSyncRequest              RangerBGSyncRequest            = 109;
+
+  optional EchoRPCRequest                   EchoRPCRequest                 = 110;
+  optional GetKeyInfoRequest                GetKeyInfoRequest              = 111;
+
+  optional CreateSnapshotRequest            CreateSnapshotRequest          = 112;
+  optional ListSnapshotRequest              ListSnapshotRequest            = 113;
+  optional SnapshotDiffRequest              snapshotDiffRequest            = 114;
+  optional DeleteSnapshotRequest            DeleteSnapshotRequest          = 115;
+  optional SnapshotMoveDeletedKeysRequest   SnapshotMoveDeletedKeysRequest = 116;
+
+  optional hdds.TransferLeadershipRequestProto      TransferOmLeadershipRequest    = 117;
+  optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
+
+  optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
+  optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
+
+  optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
 }
 
 message OMResponse {
@@ -320,6 +358,25 @@ message OMResponse {
   optional SetS3SecretResponse               SetS3SecretResponse           = 106;
 
   optional SetRangerServiceVersionResponse   SetRangerServiceVersionResponse = 107;
+  optional RangerBGSyncResponse              RangerBGSyncResponse          = 109;
+
+  optional EchoRPCResponse                   EchoRPCResponse               = 110;
+  optional GetKeyInfoResponse                GetKeyInfoResponse            = 111;
+
+  optional CreateSnapshotResponse            CreateSnapshotResponse        = 112;
+  optional ListSnapshotResponse              ListSnapshotResponse          = 113;
+  optional SnapshotDiffResponse              snapshotDiffResponse          = 114;
+  optional DeleteSnapshotResponse            DeleteSnapshotResponse        = 115;
+  optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
+
+  optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
+  optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
+
+  optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
 }
 
 enum Status {
@@ -430,6 +487,11 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+    INVALID_SNAPSHOT_ERROR = 87;
+
+    CONTAINS_SNAPSHOT = 88;
+    SSL_CONNECTION_FAILURE = 89;
+    RENAME_OPEN_FILE = 90;
 }
 
 /**
@@ -541,6 +603,14 @@ message SetVolumePropertyRequest {
 
 message SetVolumePropertyResponse {
     optional bool response = 1;
+}
+
+message RefetchSecretKeyRequest {
+
+}
+
+message RefetchSecretKeyResponse {
+    optional hdds.UUID id = 1;
 }
 
 /**
@@ -711,6 +781,48 @@ message PrefixInfo {
     optional uint64 updateID = 5;
 }
 
+/**
+ * SnapshotStatus - snapshot states.
+ * Snapshot in one of : active, deleted, or reclaimed state
+ */
+enum SnapshotStatusProto {
+  SNAPSHOT_ACTIVE = 1;
+  SNAPSHOT_DELETED = 2;
+  SNAPSHOT_RECLAIMED = 3;
+}
+
+/**
+ * SnapshotInfo table entry for Bucket/Volume snapshot metadata
+ */
+message SnapshotInfo {
+  optional hadoop.hdds.UUID snapshotID = 1;
+  optional string name = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+  optional SnapshotStatusProto snapshotStatus = 5;
+  optional uint64 creationTime = 6;
+  optional uint64 deletionTime = 7;
+  optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
+  optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
+  optional string snapshotPath = 10;
+  optional string checkpointDir = 11;
+  optional int64 dbTxSequenceNumber = 12;
+  optional bool deepClean = 13;
+ }
+
+message SnapshotDiffJobProto {
+  optional uint64 creationTime = 1;
+  optional string jobId = 2;
+  optional SnapshotDiffResponse.JobStatusProto status = 3;
+  optional string volume = 4;
+  optional string bucket = 5;
+  optional string fromSnapshot = 6;
+  optional string toSnapshot = 7;
+  optional bool forceFullDiff = 8;
+  optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
+}
+
 message OzoneObj {
   enum ObjectType {
     VOLUME = 1;
@@ -825,6 +937,7 @@ message ListBucketsRequest {
     optional string startKey = 2;
     optional string prefix = 3;
     optional int32 count = 4;
+    optional bool hasSnapshot = 5;
 }
 
 message ListBucketsResponse {
@@ -861,6 +974,8 @@ message KeyArgs {
     // When it is a head operation which is to check whether key exist
     optional bool headOp = 18;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 19;
+    // Force OM to update container cache location from SCL
+    optional bool forceUpdateContainerCacheFromSCM = 20;
 }
 
 message KeyLocation {
@@ -942,6 +1057,7 @@ message KeyInfo {
     optional uint64 parentID = 16;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
     optional FileChecksumProto fileChecksum = 18;
+    optional bool isFile = 19;
 }
 
 message DirectoryInfo {
@@ -1047,6 +1163,17 @@ message LookupKeyResponse {
     optional uint64 openVersion = 4;
 }
 
+message GetKeyInfoRequest {
+  required KeyArgs keyArgs = 1;
+  optional bool assumeS3Context = 2;
+}
+
+message GetKeyInfoResponse {
+  optional KeyInfo keyInfo = 1;
+  optional VolumeInfo volumeInfo = 2;
+  optional string UserPrincipal = 3;
+}
+
 message RenameKeysRequest {
     required RenameKeysArgs renameKeysArgs = 1;
 }
@@ -1110,10 +1237,11 @@ message DeletedKeys {
     repeated string keys = 3;
 }
 
-
-
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
+    // if set, will purge keys in a snapshot DB instead of active DB
+    optional string snapshotTableKey = 2;
+    repeated SnapshotMoveKeyInfos keysToUpdate = 3;
 }
 
 message PurgeKeysResponse {
@@ -1135,6 +1263,7 @@ message PurgePathsResponse {
 
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
+  optional string snapshotTableKey = 2;
 }
 
 message PurgeDirectoriesResponse {
@@ -1209,6 +1338,7 @@ message ListKeysResponse {
 message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
+    optional bool hsync = 3;
 }
 
 message CommitKeyResponse {
@@ -1252,6 +1382,15 @@ message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
     optional uint64 latestSequenceNumber = 3;
+    optional bool dbUpdateSuccess = 4;
+}
+
+message RangerBGSyncRequest {
+    optional bool noWait = 1;
+}
+
+message RangerBGSyncResponse {
+    optional bool runSuccess = 1;
 }
 
 message FinalizeUpgradeRequest {
@@ -1442,6 +1581,22 @@ message PartInfo {
     required uint64 size = 4;
 }
 
+/**
+ Rpc request with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCRequest {
+    optional bytes payloadReq = 1;
+    optional int32 payloadSizeResp = 2;
+}
+
+/**
+ Rpc response with optional payload, used in OmRPCLoadGenerator
+ */
+message EchoRPCResponse {
+    optional bytes payload = 1;
+}
+
+
 message GetDelegationTokenResponseProto {
 
     optional hadoop.common.GetDelegationTokenResponseProto response = 2;
@@ -1566,6 +1721,71 @@ message SetRangerServiceVersionRequest {
     required uint64 rangerServiceVersion = 1;
 }
 
+message CreateSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional hadoop.hdds.UUID snapshotId = 4;
+  optional uint64 creationTime = 5;
+}
+
+message ListSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string prefix = 3;
+  optional string prevSnapshot = 4;
+  optional uint32 maxListResult = 5;
+}
+
+message SnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  optional string token = 5;
+  optional uint32 pageSize = 6;
+  optional bool forceFullDiff = 7;
+}
+
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message ListSnapshotDiffJobRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string jobStatus = 3;
+  optional bool listAll = 4;
+}
+
+message DeleteSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+  optional uint64 deletionTime = 4;
+}
+
+message SnapshotMoveDeletedKeysRequest {
+  optional SnapshotInfo fromSnapshot = 1;
+  repeated SnapshotMoveKeyInfos nextDBKeys = 2;
+  repeated SnapshotMoveKeyInfos reclaimKeys = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+  repeated string deletedDirsToMove = 5;
+}
+
+message SnapshotMoveKeyInfos {
+  optional string key = 1;
+  repeated KeyInfo keyInfos = 2;
+}
+
+message SnapshotPurgeRequest {
+  repeated string snapshotDBKeys = 1;
+  repeated string updatedSnapshotDBKey = 2;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1601,6 +1821,71 @@ message CreateTenantResponse {
 }
 
 message SetRangerServiceVersionResponse {
+}
+
+message CreateSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
+message ListSnapshotResponse {
+  repeated SnapshotInfo snapshotInfo = 1;
+}
+
+message SnapshotDiffResponse {
+  enum JobStatusProto {
+    QUEUED = 1;
+    IN_PROGRESS = 2;
+    DONE = 3;
+    REJECTED = 4;
+    FAILED = 5;
+    CANCELLED = 6;
+  }
+
+  optional SnapshotDiffReportProto snapshotDiffReport = 1;
+  optional JobStatusProto jobStatus = 2;
+  optional int64 waitTimeInMs = 3;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
+}
+
+message ListSnapshotDiffJobResponse {
+  repeated SnapshotDiffJobProto snapshotDiffJob = 1;
+}
+
+message DeleteSnapshotResponse {
+
+}
+
+message SnapshotMoveDeletedKeysResponse {
+
+}
+
+message SnapshotPurgeResponse {
+
+}
+
+message SnapshotDiffReportProto {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+  repeated DiffReportEntryProto diffList = 5;
+  optional string token = 6;
+}
+
+message DiffReportEntryProto {
+  enum DiffTypeProto {
+    CREATE = 1;
+    MODIFY = 2;
+    DELETE= 3;
+    RENAME = 4;
+  }
+  optional DiffTypeProto diffType = 1;
+  optional string sourcePath = 2;
+  optional string targetPath = 3;
 }
 
 message DeleteTenantResponse {
@@ -1648,6 +1933,25 @@ message S3Authentication {
     optional string stringToSign = 1;
     optional string signature = 2;
     optional string accessId = 3;
+}
+
+message RecoverLeaseRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string keyName = 3;
+}
+
+message RecoverLeaseResponse {
+  optional bool response = 1;
+}
+
+message SetTimesRequest {
+  required KeyArgs keyArgs = 1;
+  required uint64 mtime    = 2;
+  required uint64 atime    = 3;
+}
+
+message SetTimesResponse {
 }
 
 /**

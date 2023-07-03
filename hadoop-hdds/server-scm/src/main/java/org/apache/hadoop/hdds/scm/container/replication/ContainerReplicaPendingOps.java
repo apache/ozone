@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 
@@ -28,9 +28,12 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
@@ -42,16 +45,49 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
  */
 public class ContainerReplicaPendingOps {
 
-  private final ConfigurationSource config;
+  private static final int RATIS_COUNTER_INDEX = 0;
+  private static final int EC_COUNTER_INDEX = 1;
+
   private final Clock clock;
   private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
       pendingOps = new ConcurrentHashMap<>();
   private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
+  private final ReentrantReadWriteLock globalLock =
+      new ReentrantReadWriteLock();
+  private final ConcurrentHashMap<PendingOpType, AtomicLong[]>
+      pendingOpCount = new ConcurrentHashMap<>();
+  private ReplicationManagerMetrics replicationMetrics = null;
+  private final List<ContainerReplicaPendingOpsSubscriber> subscribers =
+      new ArrayList<>();
 
-  public ContainerReplicaPendingOps(final ConfigurationSource conf,
-      Clock clock) {
-    this.config = conf;
+  public ContainerReplicaPendingOps(Clock clock) {
     this.clock = clock;
+    resetCounters();
+  }
+
+  private void resetCounters() {
+    for (PendingOpType opType: PendingOpType.values()) {
+      AtomicLong[] counters = new AtomicLong[2];
+      counters[RATIS_COUNTER_INDEX] = new AtomicLong(0);
+      counters[EC_COUNTER_INDEX] = new AtomicLong(0);
+      pendingOpCount.put(opType, counters);
+    }
+  }
+
+  /**
+   * Clears all pendingOps and resets all the counters to zero.
+   */
+  public void clear() {
+    // We block all other concurrent access with the global lock to prevent
+    // the map and counters getting out of sync if there are concurrent updates
+    // happening when the class is cleared.
+    globalLock.writeLock().lock();
+    try {
+      pendingOps.clear();
+      resetCounters();
+    } finally {
+      globalLock.writeLock().unlock();
+    }
   }
 
   /**
@@ -64,7 +100,7 @@ public class ContainerReplicaPendingOps {
    */
   public List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
     Lock lock = readLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.get(containerID);
       if (ops == null) {
@@ -72,7 +108,7 @@ public class ContainerReplicaPendingOps {
       }
       return new ArrayList<>(ops);
     } finally {
-      lock.unlock();
+      unlock(lock);
     }
   }
 
@@ -81,10 +117,13 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to add a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param deadlineEpochMillis The time by which the replica should have been
+   *                            added and reported by the datanode, or it will
+   *                            be discarded.
    */
   public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    addReplica(ADD, containerID, target, replicaIndex);
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+    addReplica(ADD, containerID, target, replicaIndex, deadlineEpochMillis);
   }
 
   /**
@@ -92,10 +131,13 @@ public class ContainerReplicaPendingOps {
    * @param containerID ContainerID for which to delete a replica
    * @param target The target datanode
    * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
+   * @param deadlineEpochMillis The time by which the replica should have been
+   *                            deleted and reported by the datanode, or it will
+   *                            be discarded.
    */
   public void scheduleDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    addReplica(DELETE, containerID, target, replicaIndex);
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+    addReplica(DELETE, containerID, target, replicaIndex, deadlineEpochMillis);
   }
 
   /**
@@ -108,7 +150,15 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeAddReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    return completeOp(ADD, containerID, target, replicaIndex);
+    boolean completed = completeOp(ADD, containerID, target, replicaIndex);
+    if (isMetricsNotNull() && completed) {
+      if (isEC(replicaIndex)) {
+        replicationMetrics.incrEcReplicasCreatedTotal();
+      } else {
+        replicationMetrics.incrReplicasCreatedTotal();
+      }
+    }
+    return completed;
   }
 
 
@@ -122,7 +172,15 @@ public class ContainerReplicaPendingOps {
    */
   public boolean completeDeleteReplica(ContainerID containerID,
       DatanodeDetails target, int replicaIndex) {
-    return completeOp(DELETE, containerID, target, replicaIndex);
+    boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
+    if (isMetricsNotNull() && completed) {
+      if (isEC(replicaIndex)) {
+        replicationMetrics.incrEcReplicasDeletedTotal();
+      } else {
+        replicationMetrics.incrReplicasDeletedTotal();
+      }
+    }
+    return completed;
   }
 
   /**
@@ -140,16 +198,18 @@ public class ContainerReplicaPendingOps {
   /**
    * Iterate over all pending entries and remove any which have expired, meaning
    * they have not completed the operation inside the given time.
-   * @param expiryMilliSeconds
    */
-  public void removeExpiredEntries(long expiryMilliSeconds) {
+  public void removeExpiredEntries() {
     for (ContainerID containerID : pendingOps.keySet()) {
+      // List of expired ops that subscribers will be notified about
+      List<ContainerReplicaOp> expiredOps = new ArrayList<>();
+
       // Rather than use an entry set, we get the map entry again. This is
       // to protect against another thread modifying the value after this
       // iterator started. Once we lock on the ContainerID object, no other
       // changes can occur to the list of ops associated with it.
       Lock lock = writeLock(containerID);
-      lock.lock();
+      lock(lock);
       try {
         List<ContainerReplicaOp> ops = pendingOps.get(containerID);
         if (ops == null) {
@@ -160,39 +220,66 @@ public class ContainerReplicaPendingOps {
         Iterator<ContainerReplicaOp> iterator = ops.listIterator();
         while (iterator.hasNext()) {
           ContainerReplicaOp op = iterator.next();
-          if (op.getScheduledEpochMillis() + expiryMilliSeconds
-              < clock.millis()) {
+          if (clock.millis() > op.getDeadlineEpochMillis()) {
             iterator.remove();
+            expiredOps.add(op);
+            decrementCounter(op.getOpType(), op.getReplicaIndex());
+            updateTimeoutMetrics(op);
           }
         }
         if (ops.size() == 0) {
           pendingOps.remove(containerID);
         }
       } finally {
-        lock.unlock();
+        unlock(lock);
+      }
+
+      // notify if there are expired ops
+      if (!expiredOps.isEmpty()) {
+        notifySubscribers(expiredOps, containerID, true);
+      }
+    }
+  }
+
+  private void updateTimeoutMetrics(ContainerReplicaOp op) {
+    if (op.getOpType() == ADD && isMetricsNotNull()) {
+      if (isEC(op.getReplicaIndex())) {
+        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
+      } else {
+        replicationMetrics.incrReplicaCreateTimeoutTotal();
+      }
+    } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
+      if (isEC(op.getReplicaIndex())) {
+        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
+      } else {
+        replicationMetrics.incrReplicaDeleteTimeoutTotal();
       }
     }
   }
 
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
-      ContainerID containerID, DatanodeDetails target, int replicaIndex) {
+      ContainerID containerID, DatanodeDetails target, int replicaIndex,
+      long deadlineEpochMillis) {
     Lock lock = writeLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
           containerID, s -> new ArrayList<>());
       ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, clock.millis()));
+          target, replicaIndex, deadlineEpochMillis));
+      incrementCounter(opType, replicaIndex);
     } finally {
-      lock.unlock();
+      unlock(lock);
     }
   }
 
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex) {
     boolean found = false;
+    // List of completed ops that subscribers will be notified about
+    List<ContainerReplicaOp> completedOps = new ArrayList<>();
     Lock lock = writeLock(containerID);
-    lock.lock();
+    lock(lock);
     try {
       List<ContainerReplicaOp> ops = pendingOps.get(containerID);
       if (ops != null) {
@@ -203,7 +290,9 @@ public class ContainerReplicaPendingOps {
               && op.getTarget().equals(target)
               && op.getReplicaIndex() == replicaIndex) {
             found = true;
+            completedOps.add(op);
             iterator.remove();
+            decrementCounter(op.getOpType(), replicaIndex);
           }
         }
         if (ops.size() == 0) {
@@ -211,9 +300,40 @@ public class ContainerReplicaPendingOps {
         }
       }
     } finally {
-      lock.unlock();
+      unlock(lock);
+    }
+
+    if (found) {
+      notifySubscribers(completedOps, containerID, false);
     }
     return found;
+  }
+
+  /**
+   * Notifies subscribers about the specified ops by calling
+   * ContainerReplicaPendingOpsSubscriber#opCompleted.
+   *
+   * @param ops the ops to send notifications for
+   * @param containerID the container that ops belong to
+   * @param timedOut true if the ops (each one) expired, false if they completed
+   */
+  private void notifySubscribers(List<ContainerReplicaOp> ops,
+      ContainerID containerID, boolean timedOut) {
+    for (ContainerReplicaOp op : ops) {
+      for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
+        subscriber.opCompleted(op, containerID, timedOut);
+      }
+    }
+  }
+
+  /**
+   * Registers a subscriber that will be notified about completed ops.
+   *
+   * @param subscriber object that wants to subscribe
+   */
+  public void registerSubscriber(
+      ContainerReplicaPendingOpsSubscriber subscriber) {
+    subscribers.add(subscriber);
   }
 
   private Lock writeLock(ContainerID containerID) {
@@ -222,6 +342,66 @@ public class ContainerReplicaPendingOps {
 
   private Lock readLock(ContainerID containerID) {
     return stripedLock.get(containerID).readLock();
+  }
+
+  private void lock(Lock lock) {
+    // We always take the global lock in shared / read mode as the only time it
+    // will block is when the class is getting cleared to remove all operations.
+    globalLock.readLock().lock();
+    lock.lock();
+  }
+
+  private void unlock(Lock lock) {
+    globalLock.readLock().unlock();
+    lock.unlock();
+  }
+
+  private boolean isMetricsNotNull() {
+    return replicationMetrics != null;
+  }
+
+  public void setReplicationMetrics(
+      ReplicationManagerMetrics replicationMetrics) {
+    this.replicationMetrics = replicationMetrics;
+  }
+
+  public long getPendingOpCount(PendingOpType opType) {
+    AtomicLong[] counters = pendingOpCount.get(opType);
+    long count = 0;
+    for (AtomicLong counter : counters) {
+      count += counter.get();
+    }
+    return count;
+  }
+
+  public long getPendingOpCount(PendingOpType opType, ReplicationType type) {
+    int index = RATIS_COUNTER_INDEX;
+    if (type == ReplicationType.EC) {
+      index = EC_COUNTER_INDEX;
+    }
+    return pendingOpCount.get(opType)[index].get();
+  }
+
+  private long incrementCounter(PendingOpType type, int replicaIndex) {
+    return pendingOpCount.get(type)[counterIndex(replicaIndex)]
+        .incrementAndGet();
+  }
+
+  private long decrementCounter(PendingOpType type, int replicaIndex) {
+    return pendingOpCount.get(type)[counterIndex(replicaIndex)]
+        .decrementAndGet();
+  }
+
+  private int counterIndex(int replicaIndex) {
+    if (isEC(replicaIndex)) {
+      return EC_COUNTER_INDEX;
+    } else {
+      return RATIS_COUNTER_INDEX;
+    }
+  }
+
+  private boolean isEC(int replicaIndex) {
+    return replicaIndex > 0;
   }
 
 }

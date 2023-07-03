@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
@@ -39,6 +41,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -168,6 +172,32 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
+      throws Exception {
+    keyName = "test/" + keyName;
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
+        false, true);
+
+    // add volume and create bucket with quota limit 1
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setQuotaInNamespace(1));
+    
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
@@ -261,7 +291,12 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
-
+    
+    // 3 parent directory created c/d/e
+    Assert.assertEquals(omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getUsedNamespace(), 3);
+    
     // Add the key to key table
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         key, 0L,  HddsProtos.ReplicationType.RATIS,
@@ -300,6 +335,31 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // to true
     testNonRecursivePath(key, true, false, false);
     testNonRecursivePath(key, false, false, true);
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
+    String[] invalidKeyNames = {
+        OM_SNAPSHOT_INDICATOR + "/" + keyName,
+        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+        OM_SNAPSHOT_INDICATOR + "/a/b/" + keyName
+    };
+
+    for (String invalidKeyName : invalidKeyNames) {
+      OMRequest omRequest = createFileRequest(volumeName, bucketName,
+          invalidKeyName, HddsProtos.ReplicationFactor.ONE,
+          HddsProtos.ReplicationType.RATIS, false, false);
+
+      OMFileCreateRequest omFileCreateRequest =
+          getOMFileCreateRequest(omRequest);
+
+      OMException ex = Assert.assertThrows(OMException.class,
+          () -> omFileCreateRequest.preExecute(ozoneManager));
+
+      Assert.assertTrue(ex.getMessage().contains(
+          "Cannot create key under path reserved for snapshot: "
+              + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+    }
   }
 
   protected void testNonRecursivePath(String key,

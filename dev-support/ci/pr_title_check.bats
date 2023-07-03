@@ -66,6 +66,10 @@ load bats-assert/load.bash
   # case in summary does not matter
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. hello world in lower case'
   assert_output 'OK'
+
+  # starts with 'Revert "'
+  run dev-support/ci/pr_title_check.sh 'Revert "HDDS-1234. Hello World"'
+  assert_output -e 'OK$'
 }
 
 @test "check illegal PR title examples" {
@@ -97,6 +101,14 @@ load bats-assert/load.bash
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World '
   assert_output 'Fail: trailing space'
 
+  # trailing ellipsis
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World...'
+  assert_output 'Fail: trailing ellipsis indicates title is cut'
+
+  # trailing ellipsis
+  run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello World…'
+  assert_output 'Fail: trailing ellipsis indicates title is cut'
+
   # double spaces after Jira
   run dev-support/ci/pr_title_check.sh 'HDDS-1234.  Hello World'
   assert_output 'Fail: two consecutive spaces'
@@ -104,4 +116,28 @@ load bats-assert/load.bash
   # double spaces in summary
   run dev-support/ci/pr_title_check.sh 'HDDS-1234. Hello  World'
   assert_output 'Fail: two consecutive spaces'
+
+  # Invalid revert title 1
+  run dev-support/ci/pr_title_check.sh 'revert "HDDS-1234. Hello World'
+  assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 2
+  run dev-support/ci/pr_title_check.sh 'Revert"HDDS-1234. Hello World'
+  assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 3
+  run dev-support/ci/pr_title_check.sh 'Revert HDDS-1234. Hello World'
+  assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 4
+  run dev-support/ci/pr_title_check.sh 'Revert: HDDS-1234. Hello World'
+  assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 5
+  run dev-support/ci/pr_title_check.sh 'Revert: "HDDS-1234. Hello World"'
+  assert_output 'Fail: must start with HDDS'
+
+  # Invalid revert title 6
+  run dev-support/ci/pr_title_check.sh 'Revert "Hello World"'
+  assert_output -e 'Fail: must start with HDDS$'
 }

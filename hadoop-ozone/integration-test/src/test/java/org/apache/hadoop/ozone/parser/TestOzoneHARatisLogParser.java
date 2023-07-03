@@ -22,26 +22,27 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.segmentparser.OMRatisLogParser;
 import org.apache.hadoop.ozone.segmentparser.SCMRatisLogParser;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.UUID;
-
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -49,20 +50,17 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 /**
  * Test Ozone OM and SCM HA Ratis log parser.
  */
-public class TestOzoneHARatisLogParser {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
+@Flaky("HDDS-7008")
+@Timeout(300)
+class TestOzoneHARatisLogParser {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
+  private OzoneClient client;
 
-  @Before
-  public void setup() throws Exception {
+  @BeforeEach
+  void setup() throws Exception {
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
@@ -77,8 +75,8 @@ public class TestOzoneHARatisLogParser {
         .setNumOfStorageContainerManagers(3)
         .build();
     cluster.waitForClusterToBeReady();
-    ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    ObjectStore objectStore = client.getObjectStore();
     performFewRequests(objectStore);
     System.setOut(new PrintStream(out, false, UTF_8.name()));
     System.setErr(new PrintStream(err, false, UTF_8.name()));
@@ -91,8 +89,9 @@ public class TestOzoneHARatisLogParser {
         UUID.randomUUID().toString());
   }
 
-  @After
-  public void destroy() throws Exception {
+  @AfterEach
+  void destroy() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -102,7 +101,7 @@ public class TestOzoneHARatisLogParser {
   }
 
   @Test
-  public void testRatisLogParsing() throws Exception {
+  void testRatisLogParsing() throws Exception {
     OzoneConfiguration ozoneConfiguration =
         cluster.getOMLeader().getConfiguration();
 
@@ -114,20 +113,20 @@ public class TestOzoneHARatisLogParser {
 
     File omMetaDir = new File(ozoneConfiguration.get(OZONE_METADATA_DIRS),
         "ratis");
-    Assert.assertTrue(omMetaDir.isDirectory());
+    Assertions.assertTrue(omMetaDir.isDirectory());
 
     String[] ratisDirs = omMetaDir.list();
-    Assert.assertNotNull(ratisDirs);
-    Assert.assertEquals(1, ratisDirs.length);
+    Assertions.assertNotNull(ratisDirs);
+    Assertions.assertEquals(1, ratisDirs.length);
 
     File groupDir = new File(omMetaDir, ratisDirs[0]);
 
-    Assert.assertNotNull(groupDir);
-    Assert.assertTrue(groupDir.isDirectory());
+    Assertions.assertNotNull(groupDir);
+    Assertions.assertTrue(groupDir.isDirectory());
     File currentDir = new File(groupDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assert.assertTrue(logFile.isFile());
+    Assertions.assertTrue(logFile.isFile());
 
     OMRatisLogParser omRatisLogParser = new OMRatisLogParser();
     omRatisLogParser.setSegmentFile(logFile);
@@ -136,27 +135,27 @@ public class TestOzoneHARatisLogParser {
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
-    Assert.assertTrue(out.toString(UTF_8.name())
+    Assertions.assertTrue(out.toString(UTF_8.name())
         .contains("Num Total Entries:"));
     out.reset();
 
     // Now check for SCM.
     File scmMetadataDir =
         new File(RatisUtil.getRatisStorageDir(leaderSCMConfig));
-    Assert.assertTrue(scmMetadataDir.isDirectory());
+    Assertions.assertTrue(scmMetadataDir.isDirectory());
 
     ratisDirs = scmMetadataDir.list();
-    Assert.assertNotNull(ratisDirs);
-    Assert.assertEquals(1, ratisDirs.length);
+    Assertions.assertNotNull(ratisDirs);
+    Assertions.assertEquals(1, ratisDirs.length);
 
     groupDir = new File(scmMetadataDir, ratisDirs[0]);
 
-    Assert.assertNotNull(groupDir);
-    Assert.assertTrue(groupDir.isDirectory());
+    Assertions.assertNotNull(groupDir);
+    Assertions.assertTrue(groupDir.isDirectory());
     currentDir = new File(groupDir, "current");
     logFile = new File(currentDir, "log_inprogress_1");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assert.assertTrue(logFile.isFile());
+    Assertions.assertTrue(logFile.isFile());
 
     SCMRatisLogParser scmRatisLogParser = new SCMRatisLogParser();
     scmRatisLogParser.setSegmentFile(logFile);
@@ -164,7 +163,7 @@ public class TestOzoneHARatisLogParser {
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
-    Assert.assertTrue(out.toString(UTF_8.name())
+    Assertions.assertTrue(out.toString(UTF_8.name())
         .contains("Num Total Entries:"));
   }
 }

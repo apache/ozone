@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecuto
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.BEFORE_PRE_FINALIZE_UPGRADE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
@@ -73,8 +72,6 @@ public class InjectedUpgradeFinalizationExecutor<T> extends
     try {
       injectTestFunctionAtThisPoint(BEFORE_PRE_FINALIZE_UPGRADE);
       finalizer.emitStartingMsg();
-      finalizer.getVersionManager()
-          .setUpgradeState(FINALIZATION_IN_PROGRESS);
 
       finalizer.preFinalizeUpgrade(component);
       injectTestFunctionAtThisPoint(AFTER_PRE_FINALIZE_UPGRADE);

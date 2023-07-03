@@ -42,6 +42,7 @@ import org.junit.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentMatchers;
@@ -60,6 +61,10 @@ import java.util.UUID;
 public class TestScmFinalization {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmFinalization.class);
+
+  // Indicates the current state of the mock pipeline manager's pipeline
+  // creation.
+  private boolean pipelineCreationFrozen = false;
 
   /**
    * Order of finalization checkpoints within the enum is used to determine
@@ -89,6 +94,8 @@ public class TestScmFinalization {
     HDDSLayoutVersionManager versionManager =
         new HDDSLayoutVersionManager(
             HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    PipelineManager pipelineManager =
+        getMockPipelineManager(FinalizationCheckpoint.FINALIZATION_REQUIRED);
     // State manager keeps upgrade information in memory as well as writing
     // it to disk, so we can mock the classes that handle disk ops for this
     // test.
@@ -111,7 +118,7 @@ public class TestScmFinalization {
         .setStorage(Mockito.mock(SCMStorageConfig.class))
         .setLayoutVersionManager(versionManager)
         .setSCMContext(scmContext)
-        .setPipelineManager(Mockito.mock(PipelineManager.class))
+        .setPipelineManager(pipelineManager)
         .setNodeManager(Mockito.mock(NodeManager.class))
         .build();
     stateManager.setUpgradeContext(context);
@@ -149,7 +156,9 @@ public class TestScmFinalization {
       FinalizationStateManager stateManager,
       FinalizationCheckpoint expectedCheckpoint) {
 
-    assertTrue(context.isFinalizationCheckpointCrossed(expectedCheckpoint));
+    // SCM context should have been updated with the current checkpoint.
+    assertTrue(context.getFinalizationCheckpoint()
+        .hasCrossed(expectedCheckpoint));
     for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
       LOG.info("Comparing expected checkpoint {} to {}", expectedCheckpoint,
           checkpoint);
@@ -179,12 +188,6 @@ public class TestScmFinalization {
     LOG.info("Testing finalization beginning at checkpoint {}",
         initialCheckpoint);
 
-    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
-    // After finalization, SCM will wait for at least one pipeline to be
-    // created. It does not care about the contents of the pipeline list, so
-    // just return something with length >= 1.
-    Mockito.when(pipelineManager.getPipelines(Mockito.any(),
-        Mockito.any())).thenReturn(Arrays.asList(null, null, null));
     // Create the table and version manager to appear as if we left off from in
     // progress finalization.
     Table<String, String> finalizationStore =
@@ -198,6 +201,8 @@ public class TestScmFinalization {
     SCMStorageConfig storage = Mockito.mock(SCMStorageConfig.class);
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(initialCheckpoint);
+    PipelineManager pipelineManager =
+        getMockPipelineManager(initialCheckpoint);
 
     FinalizationStateManager stateManager =
         new FinalizationStateManagerTestImpl.Builder()
@@ -242,12 +247,12 @@ public class TestScmFinalization {
         ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY),
         ArgumentMatchers.matches(""));
 
+    // Next, all pipeline creation should be stopped.
+    inOrder.verify(pipelineManager, count).freezePipelineCreation();
+
     if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_STARTED) {
       count = Mockito.times(1);
     }
-
-    // Next, all pipeline creation should be stopped.
-    inOrder.verify(pipelineManager, count).freezePipelineCreation();
 
     // Next, each layout feature should be finalized.
     for (HDDSLayoutFeature feature: HDDSLayoutFeature.values()) {
@@ -329,5 +334,30 @@ public class TestScmFinalization {
     } else {
       return UpgradeFinalizer.STARTING_MSG;
     }
+  }
+
+  private PipelineManager getMockPipelineManager(
+      FinalizationCheckpoint inititalCheckpoint) {
+    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
+    // After finalization, SCM will wait for at least one pipeline to be
+    // created. It does not care about the contents of the pipeline list, so
+    // just return something with length >= 1.
+    Mockito.when(pipelineManager.getPipelines(Mockito.any(),
+        Mockito.any())).thenReturn(Arrays.asList(null, null, null));
+
+    // Set the initial value for pipeline creation based on the checkpoint.
+    // In a real cluster, this would be set on startup of the
+    // PipelineManagerImpl.
+    pipelineCreationFrozen =
+        !FinalizationManager.shouldCreateNewPipelines(inititalCheckpoint);
+    Mockito.doAnswer(args -> pipelineCreationFrozen = true)
+        .when(pipelineManager).freezePipelineCreation();
+    Mockito.doAnswer(args -> pipelineCreationFrozen = false)
+        .when(pipelineManager).resumePipelineCreation();
+
+    Mockito.doAnswer(args -> pipelineCreationFrozen)
+        .when(pipelineManager).isPipelineCreationFrozen();
+
+    return pipelineManager;
   }
 }

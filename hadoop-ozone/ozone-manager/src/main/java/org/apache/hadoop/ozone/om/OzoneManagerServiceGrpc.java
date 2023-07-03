@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om;
 import io.grpc.Status;
 import com.google.protobuf.RpcController;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ipc.ClientId;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -47,8 +47,8 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-  private OzoneManagerProtocolServerSideTranslatorPB omTranslator;
-  private OzoneDelegationTokenSecretManager delegationTokenMgr;
+  private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
+  private final OzoneDelegationTokenSecretManager delegationTokenMgr;
   private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(
@@ -87,11 +87,12 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
           submitRequest(NULL_RPC_CONTROLLER, request);
       responseObserver.onNext(omResponse);
     } catch (Throwable e) {
+      LOG.error("Failed to submit request", e);
       IOException ex = new IOException(e.getCause());
-      responseObserver.onError(Status
-          .INTERNAL
-          .withDescription(ex.getMessage())
-          .asRuntimeException());
+      responseObserver.onError(
+          Status.INTERNAL.withDescription(ex.getMessage())
+              .asRuntimeException());
+      return;
     }
     responseObserver.onCompleted();
   }

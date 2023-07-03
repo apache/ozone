@@ -72,6 +72,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 /**
  * Access controller for multi-tenancy implemented using Ranger's REST API.
  * This class is for testing and is not intended for production use.
+ *
+ * TODO: REMOVE.
  */
 public class RangerRestMultiTenantAccessController
     implements MultiTenantAccessController {
@@ -214,7 +216,7 @@ public class RangerRestMultiTenantAccessController
 
 
   @Override
-  public void createPolicy(Policy policy) throws IOException {
+  public Policy createPolicy(Policy policy) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_RANGER_POLICY_HTTP_ENDPOINT;
     HttpsURLConnection conn = makeHttpsPostCall(rangerAdminUrl,
@@ -224,6 +226,9 @@ public class RangerRestMultiTenantAccessController
           "Http response code: %d", policy.getName(), conn.getResponseCode()));
     }
     getResponseData(conn);
+
+    // TODO: Should reconstruct from response data.
+    return policy;
   }
 
   @Override
@@ -281,12 +286,12 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public List<Policy> getLabeledPolicies(String label) throws Exception {
+  public List<Policy> getLabeledPolicies(String label) throws IOException {
     throw new NotImplementedException("Not Implemented");
   }
 
   @Override
-  public void updatePolicy(Policy policy) throws Exception {
+  public Policy updatePolicy(Policy policy) throws IOException {
     throw new NotImplementedException("Not Implemented");
   }
 
@@ -303,7 +308,7 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public void createRole(Role role) throws IOException {
+  public Role createRole(Role role) throws IOException {
     String rangerAdminUrl =
         rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT;
 
@@ -317,6 +322,9 @@ public class RangerRestMultiTenantAccessController
     JsonObject jObject = new JsonParser().parse(responseString)
         .getAsJsonObject();
 //    return jObject.get("id").getAsLong();
+
+    // TODO: Should reconstruct from response data.
+    return role;
   }
 
   @Override
@@ -330,7 +338,7 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public long getRangerServiceVersion() throws Exception {
+  public long getRangerServicePolicyVersion() throws IOException {
     throw new NotImplementedException("Not Implemented");
   }
 
@@ -369,16 +377,19 @@ public class RangerRestMultiTenantAccessController
   }
 
   @Override
-  public void updateRole(long roleID, Role role) throws IOException {
+  public Role updateRole(long roleId, Role role) throws IOException {
     String rangerAdminUrl =
-        rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT + roleID;
+        rangerHttpsAddress + OZONE_RANGER_ROLE_HTTP_ENDPOINT + roleId;
 
     HttpsURLConnection conn = makeHttpsPutCall(rangerAdminUrl,
         jsonConverter.toJsonTree(role));
     if (!successfulResponseCode(conn.getResponseCode())) {
       throw new IOException(String.format("Failed to update role %d. " +
-          "Http response code: %d", roleID, conn.getResponseCode()));
+          "Http response code: %d", roleId, conn.getResponseCode()));
     }
+
+    // TODO: Should reconstruct from response data.
+    return role;
   }
 
   private HttpsURLConnection makeHttpsPutCall(String url, JsonElement content)
@@ -535,7 +546,7 @@ public class RangerRestMultiTenantAccessController
           for (JsonElement jsonUser : roleJson.get("users").getAsJsonArray()) {
             String userName =
                 jsonUser.getAsJsonObject().get("name").getAsString();
-            role.addUser(userName);
+            role.addUser(userName, false);
           }
 
           return role.build();
@@ -636,7 +647,7 @@ public class RangerRestMultiTenantAccessController
           jsonRole.addProperty("name", javaRole.getName());
 
           JsonArray jsonUserArray = new JsonArray();
-          for (String javaUser : javaRole.getUsers()) {
+          for (String javaUser : javaRole.getUsersMap().keySet()) {
             jsonUserArray.add(jsonConverter.toJsonTree(javaUser));
           }
 

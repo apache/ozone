@@ -66,6 +66,11 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+    table.deleteRange(beginKey, endKey);
+  }
+
+  @Override
   public void deleteWithBatch(BatchOperation batch, KEY key)
           throws IOException {
     table.deleteWithBatch(batch, key);

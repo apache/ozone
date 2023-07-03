@@ -92,6 +92,9 @@ public class TestUsageInfoSubcommand {
         json.get(0).get("ozoneUsedPercent").doubleValue(), 0.001);
     Assertions.assertEquals(80.00,
         json.get(0).get("remainingPercent").doubleValue(), 0.001);
+
+    Assertions.assertEquals(5,
+            json.get(0).get("containerCount").longValue());
   }
 
   private List<HddsProtos.DatanodeUsageInfoProto> getUsageProto() {
@@ -101,6 +104,7 @@ public class TestUsageInfoSubcommand {
         .setCapacity(100)
         .setRemaining(80)
         .setUsed(10)
+        .setContainerCount(5)
         .build());
     return result;
   }

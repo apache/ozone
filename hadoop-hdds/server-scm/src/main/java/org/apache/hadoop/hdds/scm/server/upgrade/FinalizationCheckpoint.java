@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+
 /**
  * A finalization checkpoint is an abstraction over SCM's disk state,
  * indicating where finalization left off so it can be resumed on leader
@@ -28,18 +30,27 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
  * layout version.
  */
 public enum FinalizationCheckpoint {
-  FINALIZATION_REQUIRED(false, true),
-  FINALIZATION_STARTED(true, true),
-  MLV_EQUALS_SLV(true, false),
-  FINALIZATION_COMPLETE(false, false);
+  FINALIZATION_REQUIRED(false, true,
+      UpgradeFinalizer.Status.FINALIZATION_REQUIRED),
+  FINALIZATION_STARTED(true, true,
+      UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS),
+  MLV_EQUALS_SLV(true, false,
+      UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS),
+  FINALIZATION_COMPLETE(false, false,
+      UpgradeFinalizer.Status.FINALIZATION_DONE);
 
   private final boolean needsFinalizingMark;
   private final boolean needsMlvBehindSlv;
+  // The upgrade status that should be reported back to the client when this
+  // checkpoint is crossed.
+  private final UpgradeFinalizer.Status status;
 
   FinalizationCheckpoint(boolean needsFinalizingMark,
-                         boolean needsMlvBehindSlv) {
+                         boolean needsMlvBehindSlv,
+                         UpgradeFinalizer.Status status) {
     this.needsFinalizingMark = needsFinalizingMark;
     this.needsMlvBehindSlv = needsMlvBehindSlv;
+    this.status = status;
   }
 
   /**
@@ -69,5 +80,9 @@ public enum FinalizationCheckpoint {
 
   public boolean hasCrossed(FinalizationCheckpoint query) {
     return this.compareTo(query) >= 0;
+  }
+
+  public UpgradeFinalizer.Status getStatus() {
+    return status;
   }
 }

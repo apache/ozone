@@ -51,7 +51,7 @@ public class InfoBucketHandler extends BucketHandler {
   /**
    * Class used for link buckets.
    */
-  private static class LinkBucket {
+  public static class LinkBucket {
     private String volumeName;
     private String bucketName;
     private String sourceVolume;

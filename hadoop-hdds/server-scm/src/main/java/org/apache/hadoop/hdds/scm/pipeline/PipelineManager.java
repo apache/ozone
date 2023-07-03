@@ -36,14 +36,20 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
-  Pipeline createPipeline(
-      ReplicationConfig replicationConfig
-  )
+  Pipeline createPipeline(ReplicationConfig replicationConfig)
       throws IOException;
 
-  Pipeline createPipeline(
-      ReplicationConfig replicationConfig, List<DatanodeDetails> excludedNodes,
-      List<DatanodeDetails> favoredNodes) throws IOException;
+  Pipeline createPipeline(ReplicationConfig replicationConfig,
+                          List<DatanodeDetails> excludedNodes,
+                          List<DatanodeDetails> favoredNodes)
+      throws IOException;
+
+  Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+                           List<DatanodeDetails> excludedNodes,
+                           List<DatanodeDetails> favoredNodes)
+      throws IOException;
+
+  void addEcPipeline(Pipeline pipeline) throws IOException;
 
 
   Pipeline createPipeline(
@@ -109,7 +115,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
-  void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
+  void closePipeline(Pipeline pipeline, boolean onTimeout)
+      throws IOException;
 
   void closeStalePipelines(DatanodeDetails datanodeDetails);
 
@@ -131,7 +138,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @param pipelineID ID of the pipeline to activate.
    * @throws IOException in case of any Exception
    */
-  void activatePipeline(PipelineID pipelineID) throws IOException;
+  void activatePipeline(PipelineID pipelineID)
+      throws IOException;
 
   /**
    * Deactivates an active pipeline.
@@ -139,7 +147,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @param pipelineID ID of the pipeline to deactivate.
    * @throws IOException in case of any Exception
    */
-  void deactivatePipeline(PipelineID pipelineID) throws IOException;
+  void deactivatePipeline(PipelineID pipelineID)
+      throws IOException;
 
   /**
    * Wait a pipeline to be OPEN.
@@ -187,6 +196,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Ask pipeline manager to resume creating new pipelines.
    */
   void resumePipelineCreation();
+
+  boolean isPipelineCreationFrozen();
 
   /**
    * Acquire read lock.

@@ -27,7 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.Time;
@@ -41,11 +44,68 @@ public class OzoneVolumeStub extends OzoneVolume {
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
 
-  public OzoneVolumeStub(String name, String admin, String owner,
-      long quotaInBytes, long quotaInNamespace, long creationTime,
-      List<OzoneAcl> acls) {
-    super(name, admin, owner, quotaInBytes, quotaInNamespace, creationTime,
-        acls);
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  public OzoneVolumeStub(Builder b) {
+    super(b);
+  }
+
+  /**
+   * Inner builder for OzoneVolumeStub.
+   */
+  public static final class Builder extends OzoneVolume.Builder {
+
+    private Builder() {
+    }
+
+    @Override
+    public Builder setName(String name) {
+      super.setName(name);
+      return this;
+    }
+
+    @Override
+    public Builder setAdmin(String admin) {
+      super.setAdmin(admin);
+      return this;
+    }
+
+    @Override
+    public Builder setOwner(String owner) {
+      super.setOwner(owner);
+      return this;
+    }
+
+    @Override
+    public Builder setQuotaInBytes(long quotaInBytes) {
+      super.setQuotaInBytes(quotaInBytes);
+      return this;
+    }
+
+    @Override
+    public Builder setQuotaInNamespace(long quotaInNamespace) {
+      super.setQuotaInNamespace(quotaInNamespace);
+      return this;
+    }
+
+    @Override
+    public Builder setCreationTime(long creationTime) {
+      super.setCreationTime(creationTime);
+      return this;
+    }
+
+    @Override
+    public Builder setAcls(List<OzoneAcl> acls) {
+      super.setAcls(acls);
+      return this;
+    }
+
+    @Override
+    public OzoneVolumeStub build() {
+      return new OzoneVolumeStub(this);
+    }
   }
 
   @Override
@@ -58,12 +118,16 @@ public class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public void createBucket(String bucketName, BucketArgs bucketArgs) {
-    buckets.put(bucketName, new OzoneBucketStub(
-        getName(),
-        bucketName,
-        bucketArgs.getStorageType(),
-        bucketArgs.getVersioning(),
-        Time.now()));
+    buckets.put(bucketName, OzoneBucketStub.newBuilder()
+        .setVolumeName(getName())
+        .setName(bucketName)
+        .setDefaultReplicationConfig(new DefaultReplicationConfig(
+            RatisReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.THREE)))
+        .setStorageType(bucketArgs.getStorageType())
+        .setVersioning(bucketArgs.getVersioning())
+        .setCreationTime(Time.now())
+        .build());
   }
 
   @Override

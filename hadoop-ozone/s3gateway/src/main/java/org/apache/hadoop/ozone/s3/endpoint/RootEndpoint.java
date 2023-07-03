@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,7 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
+    long startNanos = Time.monotonicNowNanos();
     boolean auditSuccess = true;
     try {
       ListBucketResponse response = new ListBucketResponse();
@@ -58,7 +60,7 @@ public class RootEndpoint extends EndpointBase {
       try {
         bucketIterator = listS3Buckets(null);
       } catch (Exception e) {
-        getMetrics().incListS3BucketsFailure();
+        getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
 
@@ -70,7 +72,7 @@ public class RootEndpoint extends EndpointBase {
         response.addBucket(bucketMetadata);
       }
 
-      getMetrics().incListS3BucketsSuccess();
+      getMetrics().updateListS3BucketsSuccessStats(startNanos);
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;

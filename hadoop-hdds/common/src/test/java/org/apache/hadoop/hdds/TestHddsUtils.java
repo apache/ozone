@@ -31,8 +31,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
@@ -49,6 +51,11 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Testing HddsUtils.
  */
 public class TestHddsUtils {
+
+  private static final String REDACTED_TEXT = "<redacted>";
+  private static final String ORIGINAL_VALUE = "Hello, World!";
+  private static final String SENSITIVE_CONFIG_KEYS =
+          CommonConfigurationKeysPublic.HADOOP_SECURITY_SENSITIVE_CONFIG_KEYS;
 
   @Test
   public void testGetHostName() {
@@ -247,5 +254,25 @@ public class TestHddsUtils {
             ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
                 serviceId, nodeId),
             OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT).orElse(0));
+  }
+
+  @Test
+  public void testRedactSensitivePropsForLogging() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(SENSITIVE_CONFIG_KEYS, String.join("\n",
+            "password$",
+            "key$"));
+    /* Sensitive properties */
+    conf.set("ozone.test.password", ORIGINAL_VALUE);
+    conf.set("hdds.test.secret.key", ORIGINAL_VALUE);
+    /* Non-Sensitive properties */
+    conf.set("ozone.normal.config", ORIGINAL_VALUE);
+    Map<String, String> processedConf = processForLogging(conf);
+
+    /* Verify that sensitive properties are redacted */
+    assertEquals(processedConf.get("ozone.test.password"), REDACTED_TEXT);
+    assertEquals(processedConf.get("hdds.test.secret.key"), REDACTED_TEXT);
+    /* Verify that non-sensitive properties retain their value */
+    assertEquals(processedConf.get("ozone.normal.config"), ORIGINAL_VALUE);
   }
 }

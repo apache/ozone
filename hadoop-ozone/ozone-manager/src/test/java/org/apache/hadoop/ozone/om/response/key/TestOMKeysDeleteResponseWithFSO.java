@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -53,6 +52,7 @@ public class TestOMKeysDeleteResponseWithFSO
 
   private List<OmKeyInfo> dirDeleteList = new ArrayList<>();
   private List<String> dirDBKeys = new ArrayList<>();
+  private List<String> dirDelDBKeys = new ArrayList<>();
   private long volId;
 
   @Override
@@ -82,6 +82,8 @@ public class TestOMKeysDeleteResponseWithFSO
         bucketName, dirInfo, dir);
     dirDeleteList.add(dirKeyInfo);
     dirDBKeys.add(dirOzoneDBKey);
+    dirDelDBKeys.add(omMetadataManager.getOzoneDeletePathKey(
+        dirKeyInfo.getObjectID(), dirOzoneDBKey));
 
     // create set of keys directly under the bucket
     String ozoneDBKey = "";
@@ -150,10 +152,12 @@ public class TestOMKeysDeleteResponseWithFSO
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(dirDBKey);
       Assert.assertNull(repeatedOmKeyInfo);
+    }
 
+    for (String dirDelDBKey : dirDelDBKeys) {
       // dir added to the deleted dir table, for deep cleanups
       OmKeyInfo omDirInfo =
-          omMetadataManager.getDeletedDirTable().get(dirDBKey);
+          omMetadataManager.getDeletedDirTable().get(dirDelDBKey);
       Assert.assertNotNull(omDirInfo);
     }
 
@@ -162,7 +166,7 @@ public class TestOMKeysDeleteResponseWithFSO
   private void deleteBucket() throws IOException {
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.absent(), 10001));
+        CacheValue.get(10001));
 
     OMBucketDeleteResponse omBucketDeleteResponse =
         new OMBucketDeleteResponse(OMResponse.newBuilder()

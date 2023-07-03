@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -73,7 +72,7 @@ public class TestOMKeyResponse {
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();
@@ -94,7 +93,7 @@ public class TestOMKeyResponse {
 
     omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
-            new CacheValue<>(Optional.of(volumeArgs), 1));
+            CacheValue.get(1, volumeArgs));
 
     omBucketInfo = OmBucketInfo.newBuilder()
             .setVolumeName(volumeName)
@@ -107,7 +106,7 @@ public class TestOMKeyResponse {
     omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getBucketKey(
                     volumeName, bucketName)),
-            new CacheValue<>(Optional.of(omBucketInfo), 1));
+            CacheValue.get(1, omBucketInfo));
   }
 
   @NotNull

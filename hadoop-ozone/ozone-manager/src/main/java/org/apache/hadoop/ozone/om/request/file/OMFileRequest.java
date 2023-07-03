@@ -26,11 +26,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -48,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -283,10 +285,10 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfoWithFSO extends OMPathInfo {
-    private String leafNodeName;
+    private final String leafNodeName;
+    private final String fileExistsInPath;
     private long lastKnownParentId;
     private long leafNodeObjectId;
-    private String fileExistsInPath;
 
     public OMPathInfoWithFSO(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
@@ -335,9 +337,9 @@ public final class OMFileRequest {
    * the directory search result code.
    */
   public static class OMPathInfo {
-    private OMDirectoryResult directoryResult;
-    private List<String> missingParents;
-    private List<OzoneAcl> acls;
+    private final OMDirectoryResult directoryResult;
+    private final List<String> missingParents;
+    private final List<OzoneAcl> acls;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
         List<OzoneAcl> aclList) {
@@ -346,7 +348,7 @@ public final class OMFileRequest {
       this.acls = aclList;
     }
 
-    public List getMissingParents() {
+    public List<String> getMissingParents() {
       return missingParents;
     }
 
@@ -410,23 +412,21 @@ public final class OMFileRequest {
    */
   public static void addKeyTableCacheEntries(
       OMMetadataManager omMetadataManager, String volumeName,
-      String bucketName, Optional<OmKeyInfo> keyInfo,
-      Optional<List<OmKeyInfo>> parentInfoList,
+      String bucketName, BucketLayout layout,
+      OmKeyInfo keyInfo, List<OmKeyInfo> parentInfoList,
       long index) throws IOException {
-    for (OmKeyInfo parentInfo : parentInfoList.get()) {
-      omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
-          .addCacheEntry(new CacheKey<>(omMetadataManager
-          .getOzoneKey(volumeName, bucketName, parentInfo.getKeyName())),
-              new CacheValue<>(Optional.of(parentInfo), index));
+    final Table<String, OmKeyInfo> table
+        = omMetadataManager.getKeyTable(layout);
+    for (OmKeyInfo parentInfo : parentInfoList) {
+      table.addCacheEntry(omMetadataManager.getOzoneKey(
+          volumeName, bucketName, parentInfo.getKeyName()),
+          parentInfo, index);
     }
 
-    if (keyInfo.isPresent()) {
-      omMetadataManager.getKeyTable(
-          getBucketLayout(omMetadataManager, volumeName, bucketName))
-          .addCacheEntry(new CacheKey<>(omMetadataManager
-          .getOzoneKey(volumeName, bucketName, keyInfo.get().getKeyName())),
-              new CacheValue<>(keyInfo, index));
+    if (keyInfo != null) {
+      table.addCacheEntry(omMetadataManager.getOzoneKey(
+          volumeName, bucketName, keyInfo.getKeyName()),
+          keyInfo, index);
     }
   }
 
@@ -443,23 +443,21 @@ public final class OMFileRequest {
   public static void addDirectoryTableCacheEntries(
           OMMetadataManager omMetadataManager,
           long volumeId, long bucketId, long trxnLogIndex,
-          Optional<List<OmDirectoryInfo>> missingParentInfos,
-          Optional<OmDirectoryInfo> dirInfo) {
+          List<OmDirectoryInfo> missingParentInfos,
+          OmDirectoryInfo dirInfo) {
 
-    for (OmDirectoryInfo subDirInfo : missingParentInfos.get()) {
-      omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzonePathKey(
-                      volumeId, bucketId, subDirInfo.getParentObjectID(),
-                      subDirInfo.getName())),
-              new CacheValue<>(Optional.of(subDirInfo), trxnLogIndex));
+    final Table<String, OmDirectoryInfo> table
+        = omMetadataManager.getDirectoryTable();
+    for (OmDirectoryInfo subDirInfo : missingParentInfos) {
+      table.addCacheEntry(omMetadataManager.getOzonePathKey(
+          volumeId, bucketId, subDirInfo),
+          subDirInfo, trxnLogIndex);
     }
 
-    if (dirInfo.isPresent()) {
-      omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzonePathKey(
-                      volumeId, bucketId, dirInfo.get().getParentObjectID(),
-                      dirInfo.get().getName())),
-              new CacheValue<>(dirInfo, trxnLogIndex));
+    if (dirInfo != null) {
+      table.addCacheEntry(omMetadataManager.getOzonePathKey(
+          volumeId, bucketId, dirInfo),
+          dirInfo, trxnLogIndex);
     }
   }
 
@@ -476,19 +474,18 @@ public final class OMFileRequest {
           OMMetadataManager omMetadataManager, String dbOpenFileName,
           @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
 
-    Optional<OmKeyInfo> keyInfoOptional = Optional.absent();
+    final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     if (omFileInfo != null) {
       // New key format for the openFileTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores only the leaf node name, which is 'file1'.
       omFileInfo.setKeyName(fileName);
       omFileInfo.setFileName(fileName);
-      keyInfoOptional = Optional.of(omFileInfo);
+      table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
+    } else {
+      table.addCacheEntry(dbOpenFileName, trxnLogIndex);
     }
-
-    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-        .addCacheEntry(new CacheKey<>(dbOpenFileName),
-            new CacheValue<>(keyInfoOptional, trxnLogIndex));
   }
 
   /**
@@ -516,24 +513,7 @@ public final class OMFileRequest {
             omFileInfo.getBucketName());
 
     omMetadataManager.getKeyTable(bucketLayout)
-        .addCacheEntry(new CacheKey<>(dbFileKey),
-            new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
-  }
-
-  /**
-   * Updating the list of OmKeyInfo eligible for deleting blocks.
-   *
-   * @param omMetadataManager OM Metadata Manager
-   * @param dbDeletedKey      Ozone key in deletion table
-   * @param keysToDelete      Repeated OMKeyInfos
-   * @param trxnLogIndex      transaction log index
-   */
-  public static void addDeletedTableCacheEntry(
-          OMMetadataManager omMetadataManager, String dbDeletedKey,
-          RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
-    omMetadataManager.getDeletedTable().addCacheEntry(
-            new CacheKey<>(dbDeletedKey),
-            new CacheValue<>(Optional.of(keysToDelete), trxnLogIndex));
+        .addCacheEntry(dbFileKey, omFileInfo, trxnLogIndex);
   }
 
   /**
@@ -567,7 +547,8 @@ public final class OMFileRequest {
    * @return multipartFileKey
    * @throws IOException DB failure
    */
-  public static String addToOpenFileTable(OMMetadataManager omMetadataMgr,
+  public static String addToOpenFileTableForMultipart(
+      OMMetadataManager omMetadataMgr,
       BatchOperation batchOp, OmKeyInfo omFileInfo, String uploadID,
       long volumeId, long bucketId) throws IOException {
 
@@ -652,8 +633,10 @@ public final class OMFileRequest {
    */
   @Nullable
   public static OzoneFileStatus getOMKeyInfoIfExists(
-      OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
-      String keyName, long scmBlockSize) throws IOException {
+      OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize, ReplicationConfig defaultReplication
+  ) throws IOException {
 
     OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
 
@@ -698,6 +681,11 @@ public final class OMFileRequest {
     if (omDirInfo != null) {
       OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
               keyName);
+      ReplicationConfig replicationConfig =
+          Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+              .map(DefaultReplicationConfig::getReplicationConfig)
+              .orElse(defaultReplication);
+      omKeyInfo.setReplicationConfig(replicationConfig);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
 
@@ -803,47 +791,44 @@ public final class OMFileRequest {
 
   /**
    * Verify parent exists for the destination path and return destination
-   * path parent Id.
+   * path parent.
    * <p>
    * Check whether dst parent dir exists or not. If the parent exists, then the
    * source can be renamed to dst path.
    *
-   * @param volumeName  volume name
-   * @param bucketName  bucket name
-   * @param toKeyName   destination path
-   * @param fromKeyName source path
-   * @param metaMgr     metadata manager
-   * @throws IOException if the destination parent dir doesn't exists.
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param toKeyName destination path
+   * @param ozoneManager
+   * @param metaMgr metadata manager
+   * @return omDirectoryInfo object of destination path's parent
+   * or null if parent is bucket
+   * @throws IOException if the destination parent is not a directory.
    */
-  public static long getToKeyNameParentId(String volumeName,
-      String bucketName, String toKeyName, String fromKeyName,
-      OMMetadataManager metaMgr) throws IOException {
-
+  public static OmKeyInfo getKeyParentDir(
+      String volumeName, String bucketName, String toKeyName,
+      OzoneManager ozoneManager, OMMetadataManager metaMgr) throws IOException {
     int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
     // skip parent is root '/'
     if (totalDirsCount <= 1) {
-      String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo =
-              metaMgr.getBucketTable().get(bucketKey);
-      return omBucketInfo.getObjectID();
+      return null;
     }
-
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
-
-    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
-            volumeName, bucketName, toKeyParentDir, 0);
+    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(
+        metaMgr, volumeName, bucketName, toKeyParentDir, 0,
+        ozoneManager.getDefaultReplicationConfig());
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(
-              "Failed to rename %s to %s, %s doesn't exist", fromKeyName,
+              "Failed to get parent dir %s, %s doesn't exist",
               toKeyName, toKeyParentDir),
               OMException.ResultCodes.KEY_RENAME_ERROR);
     } else if (toKeyParentDirStatus.isFile()) {
       throw new OMException(String.format(
-              "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
+              "Failed to get parent dir %s, %s is a file", toKeyName,
               toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);
     }
-    return toKeyParentDirStatus.getKeyInfo().getObjectID();
+    return toKeyParentDirStatus.getKeyInfo();
   }
 
   /**
@@ -887,16 +872,19 @@ public final class OMFileRequest {
     // Check dirTable entries for any sub paths.
     String seekDirInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator();
+    try (TableIterator<String, ? extends
+        Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = dirTable.iterator()) {
 
-    iterator.seek(seekDirInDB);
+      iterator.seek(seekDirInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      return isImmediateChild(dirInfo.getParentObjectID(),
-              omKeyInfo.getObjectID());
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        return isImmediateChild(dirInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+      }
+
     }
     return false; // no sub paths found
   }
@@ -931,16 +919,17 @@ public final class OMFileRequest {
     // Check fileTable entries for any sub paths.
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = fileTable.iterator();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = fileTable.iterator()) {
 
-    iterator.seek(seekFileInDB);
+      iterator.seek(seekFileInDB);
 
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-      OmKeyInfo fileInfo = entry.getValue();
-      return isImmediateChild(fileInfo.getParentObjectID(),
-              omKeyInfo.getObjectID()); // found a sub path file
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        OmKeyInfo fileInfo = entry.getValue();
+        return isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID()); // found a sub path file
+      }
     }
     return false; // no sub paths found
   }

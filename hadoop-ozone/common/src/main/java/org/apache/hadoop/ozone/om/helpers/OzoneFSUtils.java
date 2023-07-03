@@ -176,6 +176,26 @@ public final class OzoneFSUtils {
     return childParent == parentParent;
   }
 
+  public static boolean isAncestorPath(String parentKey, String childKey) {
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    java.nio.file.Path parentParent = parentPath.getParent();
+
+    if (childParent != null && parentParent != null) {
+      return childParent.startsWith(parentParent) ||
+          childParent.equals(parentParent);
+    }
+
+    return childParent == parentParent;
+  }
+
+
   /**
    * Verifies whether the childKey is an immediate path under the given
    * parentKey.

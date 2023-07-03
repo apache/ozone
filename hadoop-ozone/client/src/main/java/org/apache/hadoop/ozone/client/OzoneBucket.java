@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -47,11 +47,11 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -131,6 +131,7 @@ public class OzoneBucket extends WithMetadata {
 
   private String sourceVolume;
   private String sourceBucket;
+  private boolean sourcePathExist = true;
 
   /**
    * Quota of bytes allocated for the bucket.
@@ -149,193 +150,45 @@ public class OzoneBucket extends WithMetadata {
    */
   private String owner;
 
-  private OzoneBucket(ConfigurationSource conf, String volumeName,
-      String bucketName, ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
-    this.volumeName = volumeName;
-    this.name = bucketName;
-
+  protected OzoneBucket(Builder builder) {
+    this.metadata = builder.metadata;
+    this.proxy = builder.proxy;
+    this.volumeName = builder.volumeName;
+    this.name = builder.name;  // bucket name
     // Bucket level replication is not configured by default.
-    this.defaultReplication = null;
-
-    this.proxy = proxy;
-    this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(OzoneObj.StoreType.OZONE).build();
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName,
-      String sourceVolume, String sourceBucket) {
-    this(conf, volumeName, bucketName, proxy);
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.metadata = metadata;
-    this.encryptionKeyName = encryptionKeyName;
-    this.sourceVolume = sourceVolume;
-    this.sourceBucket = sourceBucket;
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    this.defaultReplication = builder.defaultReplicationConfig != null ?
+        builder.defaultReplicationConfig.getReplicationConfig() : null;
+    this.storageType = builder.storageType;
+    this.versioning = builder.versioning;
+    if (builder.conf != null) {
+      this.listCacheSize = HddsClientUtils.getListCacheSize(builder.conf);
     }
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
-    this.usedBytes = usedBytes;
-    this.usedNamespace = usedNamespace;
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.quotaInBytes = quotaInBytes;
-    this.quotaInNamespace = quotaInNamespace;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketLayout bucketLayout) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace);
-    this.bucketLayout = bucketLayout;
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName,
-      String sourceVolume, String sourceBucket, long usedBytes,
-      long usedNamespace, long quotaInBytes, long quotaInNamespace,
-      BucketLayout bucketLayout, String owner,
-      DefaultReplicationConfig defaultReplicationConfig) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace, bucketLayout, owner);
-    this.bucketLayout = bucketLayout;
-    if (defaultReplicationConfig != null) {
-      this.defaultReplication =
-          defaultReplicationConfig.getType() == ReplicationType.EC ?
-              defaultReplicationConfig.getEcReplicationConfig() :
-              ReplicationConfig
-                  .fromTypeAndFactor(defaultReplicationConfig.getType(),
-                      defaultReplicationConfig.getFactor());
+    this.usedBytes = builder.usedBytes;
+    this.usedNamespace = builder.usedNamespace;
+    this.creationTime = Instant.ofEpochMilli(builder.creationTime);
+    if (builder.modificationTime != 0) {
+      this.modificationTime = Instant.ofEpochMilli(builder.modificationTime);
     } else {
-      // Bucket level replication is not configured by default.
-      this.defaultReplication = null;
+      modificationTime = Instant.now();
+      if (modificationTime.isBefore(this.creationTime)) {
+        modificationTime = Instant.ofEpochSecond(
+            this.creationTime.getEpochSecond(), this.creationTime.getNano());
+      }
     }
-  }
-
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-       String volumeName, String bucketName, StorageType storageType,
-       Boolean versioning, long creationTime, long modificationTime,
-       Map<String, String> metadata, String encryptionKeyName,
-       String sourceVolume, String sourceBucket, long usedBytes,
-       long usedNamespace, long quotaInBytes, long quotaInNamespace,
-       BucketLayout bucketLayout, String owner) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, modificationTime, metadata, encryptionKeyName,
-        sourceVolume, sourceBucket, usedBytes, usedNamespace, quotaInBytes,
-        quotaInNamespace, bucketLayout);
-    this.owner = owner;
-  }
-
-  /**
-   * Constructs OzoneBucket instance.
-   * @param conf Configuration object.
-   * @param proxy ClientProtocol proxy.
-   * @param volumeName Name of the volume the bucket belongs to.
-   * @param bucketName Name of the bucket.
-   * @param storageType StorageType of the bucket.
-   * @param versioning versioning status of the bucket.
-   * @param creationTime creation time of the bucket.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, Map<String, String> metadata) {
-    this(conf, volumeName, bucketName, proxy);
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.metadata = metadata;
-    modificationTime = Instant.now();
-    if (modificationTime.isBefore(this.creationTime)) {
-      modificationTime = Instant.ofEpochSecond(
-          this.creationTime.getEpochSecond(), this.creationTime.getNano());
-    }
-  }
-
-  /**
-   * @param modificationTime modification time of the bucket.
-   */
-  @SuppressWarnings("parameternumber")
-  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
-      String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata) {
-    this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
-  @VisibleForTesting
-  @SuppressWarnings("parameternumber")
-  OzoneBucket(String volumeName, String name,
-      ReplicationConfig defaultReplication,
-      StorageType storageType,
-      Boolean versioning, long creationTime) {
-    this.proxy = null;
-    this.volumeName = volumeName;
-    this.name = name;
-    this.defaultReplication = defaultReplication;
-    this.storageType = storageType;
-    this.versioning = versioning;
-    this.creationTime = Instant.ofEpochMilli(creationTime);
+    this.encryptionKeyName = builder.encryptionKeyName;
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(name)
         .setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    this.sourceVolume = builder.sourceVolume;
+    this.sourceBucket = builder.sourceBucket;
+    this.quotaInBytes = builder.quotaInBytes;
+    this.quotaInNamespace = builder.quotaInNamespace;
+    if (builder.bucketLayout != null) {
+      this.bucketLayout = builder.bucketLayout;
     }
+    this.owner = builder.owner;
   }
 
   /**
@@ -600,6 +453,40 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a new key in the bucket, with default replication type RATIS and
+   * with replication factor THREE.
+   *
+   * @param key  Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size)
+      throws IOException {
+    return createStreamKey(key, size, defaultReplication,
+        Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKey(volumeName, name, key, size,
+        replicationConfig, keyMetadata);
+  }
+
+  /**
    * Reads an existing key from the bucket.
    *
    * @param key Name of the key to be read.
@@ -792,6 +679,21 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Create a part key for a multipart upload key.
+   * @param key
+   * @param size
+   * @param partNumber
+   * @param uploadID
+   * @return OzoneDataStreamOutput
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createMultipartStreamKey(String key,
+      long size, int partNumber, String uploadID) throws IOException {
+    return proxy.createMultipartStreamKey(volumeName, name,
+            key, size, partNumber, uploadID);
+  }
+
+  /**
    * Complete Multipart upload. This will combine all the parts and make the
    * key visible in ozone.
    * @param key
@@ -921,6 +823,13 @@ public class OzoneBucket extends WithMetadata {
             overWrite, recursive);
   }
 
+  public OzoneDataStreamOutput createStreamFile(String keyName, long size,
+      ReplicationConfig replicationConfig, boolean overWrite,
+      boolean recursive) throws IOException {
+    return proxy.createStreamFile(volumeName, name, keyName, size,
+        replicationConfig, overWrite, recursive);
+  }
+
   /**
    * List the status for a file or a directory and its contents.
    *
@@ -979,6 +888,157 @@ public class OzoneBucket extends WithMetadata {
     boolean result = proxy.setBucketOwner(volumeName, name, userName);
     this.owner = userName;
     return result;
+  }
+
+  /**
+   * Builder for OmBucketInfo.
+   /**
+   * Set time to a key in this bucket.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   * @throws IOException
+   */
+  public void setTimes(String keyName, long mtime, long atime)
+      throws IOException {
+    proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
+  public void setSourcePathExist(boolean b) {
+    this.sourcePathExist = b;
+  }
+
+  public boolean isSourcePathExist() {
+    return this.sourcePathExist;
+  }
+
+  public static Builder newBuilder(ConfigurationSource conf,
+      ClientProtocol proxy) {
+    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    return new Builder(conf, proxy);
+  }
+
+  /**
+   * Inner builder for OzoneBucket.
+   */
+  public static class Builder {
+    private Map<String, String> metadata;
+    private ConfigurationSource conf;
+    private ClientProtocol proxy;
+    private String volumeName;
+    private String name;
+    private DefaultReplicationConfig defaultReplicationConfig;
+    private StorageType storageType;
+    private Boolean versioning;
+    private long usedBytes;
+    private long usedNamespace;
+    private long creationTime;
+    private long modificationTime;
+    private String encryptionKeyName;
+    private String sourceVolume;
+    private String sourceBucket;
+    private long quotaInBytes;
+    private long quotaInNamespace;
+    private BucketLayout bucketLayout;
+    private String owner;
+
+    protected Builder() {
+    }
+
+    private Builder(ConfigurationSource conf, ClientProtocol proxy) {
+      this.conf = conf;
+      this.proxy = proxy;
+    }
+
+    public Builder setMetadata(Map<String, String> metadata) {
+      this.metadata = metadata;
+      return this;
+    }
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
+    public Builder setDefaultReplicationConfig(
+        DefaultReplicationConfig defaultReplicationConfig) {
+      this.defaultReplicationConfig = defaultReplicationConfig;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      this.storageType = storageType;
+      return this;
+    }
+
+    public Builder setVersioning(Boolean versioning) {
+      this.versioning = versioning;
+      return this;
+    }
+
+    public Builder setUsedBytes(long usedBytes) {
+      this.usedBytes = usedBytes;
+      return this;
+    }
+
+    public Builder setUsedNamespace(long usedNamespace) {
+      this.usedNamespace = usedNamespace;
+      return this;
+    }
+
+    public Builder setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
+      return this;
+    }
+
+    public Builder setModificationTime(long modificationTime) {
+      this.modificationTime = modificationTime;
+      return this;
+    }
+
+    public Builder setEncryptionKeyName(String encryptionKeyName) {
+      this.encryptionKeyName = encryptionKeyName;
+      return this;
+    }
+
+    public Builder setSourceVolume(String sourceVolume) {
+      this.sourceVolume = sourceVolume;
+      return this;
+    }
+
+    public Builder setSourceBucket(String sourceBucket) {
+      this.sourceBucket = sourceBucket;
+      return this;
+    }
+
+    public Builder setQuotaInBytes(long quotaInBytes) {
+      this.quotaInBytes = quotaInBytes;
+      return this;
+    }
+
+    public Builder setQuotaInNamespace(long quotaInNamespace) {
+      this.quotaInNamespace = quotaInNamespace;
+      return this;
+    }
+
+    public Builder setBucketLayout(BucketLayout bucketLayout) {
+      this.bucketLayout = bucketLayout;
+      return this;
+    }
+
+    public Builder setOwner(String owner) {
+      this.owner = owner;
+      return this;
+    }
+
+    public OzoneBucket build() {
+      return new OzoneBucket(this);
+    }
   }
 
   /**
@@ -1076,7 +1136,6 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorWithFSO extends KeyIterator {
 
     private Stack<Pair<String, String>> stack;
-    private List<OzoneKey> pendingItemsToBeBatched;
     private boolean addedKeyPrefix;
     private String removeStartKey = "";
 
@@ -1108,13 +1167,18 @@ public class OzoneBucket extends WithMetadata {
 
       String parentStartKeyPath = OzoneFSUtils.getParentDir(startKey);
 
-      if (StringUtils.isNotBlank(startKey) &&
-          StringUtils.compare(parentStartKeyPath, keyPrefix) >= 0) {
-        seekPaths.add(new ImmutablePair<>(parentStartKeyPath, startKey));
+      if (StringUtils.isNotBlank(startKey)) {
+        if (StringUtils.compare(parentStartKeyPath, keyPrefix) >= 0) {
+          seekPaths.add(new ImmutablePair<>(parentStartKeyPath, startKey));
 
-        // recursively fetch all the sub-paths between keyPrefix and prevKey
-        getSeekPathsBetweenKeyPrefixAndStartKey(keyPrefix, parentStartKeyPath,
-            seekPaths);
+          // recursively fetch all the sub-paths between keyPrefix and prevKey
+          getSeekPathsBetweenKeyPrefixAndStartKey(keyPrefix, parentStartKeyPath,
+              seekPaths);
+        } else if (StringUtils.compare(startKey, keyPrefix) >= 0) {
+          // Both keyPrefix and startKey reached at the same level.
+          // Adds partial keyPrefix and startKey for seek.
+          seekPaths.add(new ImmutablePair<>(keyPrefix, startKey));
+        }
       }
     }
 
@@ -1122,7 +1186,6 @@ public class OzoneBucket extends WithMetadata {
     List<OzoneKey> getNextListOfKeys(String prevKey) throws IOException {
       if (stack == null) {
         stack = new Stack();
-        pendingItemsToBeBatched = new ArrayList<>();
       }
 
       // normalize paths
@@ -1153,28 +1216,15 @@ public class OzoneBucket extends WithMetadata {
             List<Pair<String, String>> seekPaths = new ArrayList<>();
 
             if (StringUtils.isNotBlank(getKeyPrefix())) {
-              String parentStartKeyPath = OzoneFSUtils.getParentDir(prevKey);
-              if (StringUtils.compare(parentStartKeyPath, getKeyPrefix()) >=
-                  0) {
-                // Add the leaf node to the seek path. The idea is to search for
-                // sub-paths if the given start key is a directory.
-                seekPaths.add(new ImmutablePair<>(prevKey, ""));
-                removeStartKey = prevKey;
-                getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
-                    seekPaths);
-              } else if (StringUtils.compare(prevKey, getKeyPrefix()) >= 0) {
-                // Add the leaf node to the seek path. The idea is to search for
-                // sub-paths if the given start key is a directory.
-                seekPaths.add(new ImmutablePair<>(prevKey, ""));
-                removeStartKey = prevKey;
-              }
-            } else {
-              // Key Prefix is Blank. The seek all the keys with startKey.
-              seekPaths.add(new ImmutablePair<>(prevKey, ""));
-              removeStartKey = prevKey;
-              getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
-                  seekPaths);
+              // If the prev key is a dir then seek its sub-paths
+              // Say, prevKey="a1/b2/d2"
+              addPrevDirectoryToSeekPath(prevKey, seekPaths);
             }
+
+            // Key Prefix is Blank. The seek all the keys with startKey.
+            removeStartKey = prevKey;
+            getSeekPathsBetweenKeyPrefixAndStartKey(getKeyPrefix(), prevKey,
+                seekPaths);
 
             // 2. Push elements in reverse order so that the FS tree traversal
             // will occur in left-to-right fashion[Depth-First Search]
@@ -1183,9 +1233,10 @@ public class OzoneBucket extends WithMetadata {
               stack.push(seekDirPath);
             }
           } else if (StringUtils.isNotBlank(getKeyPrefix())) {
-            if (!OzoneFSUtils.isSibling(prevKey, getKeyPrefix())) {
+            if (!OzoneFSUtils.isAncestorPath(getKeyPrefix(), prevKey)) {
               // Case-1 - sibling: keyPrefix="a1/b2", startKey="a0/b123Invalid"
               // Skip traversing, if the startKey is not a sibling.
+              // "a1/b", "a1/b1/e/"
               return new ArrayList<>();
             } else if (StringUtils.compare(prevKey, getKeyPrefix()) < 0) {
               // Case-2 - compare: keyPrefix="a1/b2", startKey="a1/b123Invalid"
@@ -1197,19 +1248,43 @@ public class OzoneBucket extends WithMetadata {
         }
       }
 
-      // 3. Pop out top pair and get its immediate children
+      // 1. Pop out top pair and get its immediate children
       List<OzoneKey> keysResultList = new ArrayList<>();
       if (stack.isEmpty()) {
         // case: startKey is empty
-        getChildrenKeys(getKeyPrefix(), prevKey, keysResultList);
-      } else {
-        // case: startKey is non-empty
-        Pair<String, String> keyPrefixPath = stack.pop();
-        getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-            keysResultList);
+        if (getChildrenKeys(getKeyPrefix(), prevKey, keysResultList)) {
+          return keysResultList;
+        }
       }
 
+      // 2. Pop element and seek for its sub-child path(s). Basically moving
+      // seek pointer to next level(depth) in FS tree.
+      // case: startKey is non-empty
+      while (!stack.isEmpty()) {
+        Pair<String, String> keyPrefixPath = stack.pop();
+        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
+            keysResultList)) {
+          // reached limit batch size.
+          break;
+        }
+      }
       return keysResultList;
+    }
+
+    private void addPrevDirectoryToSeekPath(String prevKey,
+        List<Pair<String, String>> seekPaths)
+        throws IOException {
+      try {
+        OzoneFileStatus prevStatus =
+            proxy.getOzoneFileStatus(volumeName, name, prevKey);
+        if (prevStatus != null) {
+          if (prevStatus.isDirectory()) {
+            seekPaths.add(new ImmutablePair<>(prevKey, ""));
+          }
+        }
+      } catch (OMException ome) {
+        // ignore exception
+      }
     }
 
     /**
@@ -1258,82 +1333,61 @@ public class OzoneBucket extends WithMetadata {
       // listStatus API expects a not null 'startKey' value
       startKey = startKey == null ? "" : startKey;
 
-      // 1. Add pending items to the user key resultList
-      if (addAllPendingItemsToResultList(keysResultList)) {
-        // reached limit batch size.
-        return true;
-      }
-
-      // 2. Get immediate children of keyPrefix, starting with startKey
+      // 1. Get immediate children of keyPrefix, starting with startKey
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-              keyPrefix, false, startKey, listCacheSize, true);
+          keyPrefix, false, startKey, listCacheSize, true);
+      boolean reachedLimitCacheSize = statuses.size() == listCacheSize;
 
-      // 3. Special case: ListKey expects keyPrefix element should present in
+      // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank
       // then resultList shouldn't contain the startKey element.
       // Since proxy#listStatus API won't return keyPrefix element in the
       // resultList. So, this is to add user given keyPrefix to the return list.
       addKeyPrefixInfoToResultList(keyPrefix, startKey, keysResultList);
 
-      // 4. Special case: ListKey expects startKey shouldn't present in the
+      // 3. Special case: ListKey expects startKey shouldn't present in the
       // resultList. Since proxy#listStatus API returns startKey element to
       // the returnList, this function is to remove the startKey element.
       removeStartKeyIfExistsInStatusList(startKey, statuses);
 
-      boolean reachedLimitCacheSize = false;
-      // This dirList is used to store paths elements in left-to-right order.
-      List<String> dirList = new ArrayList<>();
-
-      // 5. Iterating over the resultStatuses list and add each key to the
-      // resultList. If the listCacheSize reaches then it will add the rest
-      // of the statuses to pendingItemsToBeBatched
+      // 4. Iterating over the resultStatuses list and add each key to the
+      // resultList.
       for (int indx = 0; indx < statuses.size(); indx++) {
         OzoneFileStatus status = statuses.get(indx);
         OmKeyInfo keyInfo = status.getKeyInfo();
         String keyName = keyInfo.getKeyName();
 
+        OzoneKey ozoneKey;
         // Add dir to the dirList
         if (status.isDirectory()) {
-          dirList.add(keyInfo.getKeyName());
           // add trailing slash to represent directory
           keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
         }
+        ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
+            keyInfo.getBucketName(), keyName,
+            keyInfo.getDataSize(), keyInfo.getCreationTime(),
+            keyInfo.getModificationTime(),
+            keyInfo.getReplicationConfig(),
+            keyInfo.isFile());
 
-        OzoneKey ozoneKey = new OzoneKey(keyInfo.getVolumeName(),
-                keyInfo.getBucketName(), keyName,
-                keyInfo.getDataSize(), keyInfo.getCreationTime(),
-                keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig());
+        keysResultList.add(ozoneKey);
 
-        // 5.1) Add to the resultList till it reaches limit batch size.
-        // Once it reaches limit, then add rest of the items to
-        // pendingItemsToBeBatched and this will picked in next batch iteration
-        if (!reachedLimitCacheSize && listCacheSize > keysResultList.size()) {
-          keysResultList.add(ozoneKey);
-          reachedLimitCacheSize = listCacheSize <= keysResultList.size();
-        } else {
-          pendingItemsToBeBatched.add(ozoneKey);
-        }
-      }
-
-      // 6. Push elements in reverse order so that the FS tree traversal will
-      // occur in left-to-right fashion.
-      for (int indx = dirList.size() - 1; indx >= 0; indx--) {
-        String dirPathComponent = dirList.get(indx);
-        stack.push(new ImmutablePair<>(dirPathComponent, ""));
-      }
-
-      if (reachedLimitCacheSize) {
-        return true;
-      }
-
-      // 7. Pop element and seek for its sub-child path(s). Basically moving
-      // seek pointer to next level(depth) in FS tree.
-      while (!stack.isEmpty()) {
-        Pair<String, String> keyPrefixPath = stack.pop();
-        if (getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-            keysResultList)) {
-          // reached limit batch size.
+        if (status.isDirectory()) {
+          // Adding in-progress keyPath back to the stack to make sure
+          // all the siblings will be fetched.
+          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          // Adding current directory to the stack, so that this dir will be
+          // the top element. Moving seek pointer to fetch sub-paths
+          stack.push(new ImmutablePair<>(keyInfo.getKeyName(), ""));
+          // Return it so that the next iteration will be
+          // started using the stacked items.
+          return true;
+        } else if (reachedLimitCacheSize && indx == statuses.size() - 1) {
+          // The last element is a FILE and reaches the listCacheSize.
+          // Now, sets next seek key to this element
+          stack.push(new ImmutablePair<>(keyPrefix, keyInfo.getKeyName()));
+          // Return it so that the next iteration will be
+          // started using the stacked items.
           return true;
         }
       }
@@ -1364,20 +1418,6 @@ public class OzoneBucket extends WithMetadata {
       }
     }
 
-    private boolean addAllPendingItemsToResultList(List<OzoneKey> keys) {
-
-      Iterator<OzoneKey> ozoneKeyItr = pendingItemsToBeBatched.iterator();
-      while (ozoneKeyItr.hasNext()) {
-        if (listCacheSize <= keys.size()) {
-          // reached limit batch size.
-          return true;
-        }
-        keys.add(ozoneKeyItr.next());
-        ozoneKeyItr.remove();
-      }
-      return false;
-    }
-
     private void addKeyPrefixInfoToResultList(String keyPrefix,
         String startKey, List<OzoneKey> keysResultList) throws IOException {
 
@@ -1389,9 +1429,12 @@ public class OzoneBucket extends WithMetadata {
       addedKeyPrefix = true;
 
       // not required to addKeyPrefix
-      // case-1) if keyPrefix is null or empty
+      // case-1) if keyPrefix is null/empty/just contains snapshot indicator
+      // (The snapshot indicator is the null prefix equivalent for snapshot
+      //  reads.)
       // case-2) if startKey is not null or empty
-      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey)) {
+      if (StringUtils.isBlank(keyPrefix) || StringUtils.isNotBlank(startKey) ||
+          OmUtils.isBucketSnapshotIndicator(keyPrefix)) {
         return;
       }
 
@@ -1426,7 +1469,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getBucketName(), keyName,
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig());
+            keyInfo.getReplicationConfig(),
+            keyInfo.isFile());
         keysResultList.add(ozoneKey);
       }
     }

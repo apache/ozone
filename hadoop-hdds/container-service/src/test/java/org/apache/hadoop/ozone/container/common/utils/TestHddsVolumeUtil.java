@@ -104,7 +104,7 @@ public class TestHddsVolumeUtil {
 
     // Reinitialize all the volumes to simulate a DN restart.
     reinitVolumes();
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, null, null);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, null, false, null);
 
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
@@ -136,7 +136,8 @@ public class TestHddsVolumeUtil {
 
     // Reinitialize all the volumes to simulate a DN restart.
     reinitVolumes();
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, dbVolumeSet, null);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(
+        hddsVolumeSet, dbVolumeSet, false, null);
 
     for (HddsVolume hddsVolume : StorageVolumeUtil.getHddsVolumesList(
         hddsVolumeSet.getVolumesList())) {
@@ -191,7 +192,8 @@ public class TestHddsVolumeUtil {
     reinitVolumes();
     assertEquals(1, dbVolumeSet.getFailedVolumesList().size());
     assertEquals(VOLUMNE_NUM - 1, dbVolumeSet.getVolumesList().size());
-    HddsVolumeUtil.loadAllHddsVolumeDbStore(hddsVolumeSet, dbVolumeSet, null);
+    HddsVolumeUtil.loadAllHddsVolumeDbStore(
+        hddsVolumeSet, dbVolumeSet, false, null);
 
     int affectedVolumeCount = 0;
 
