@@ -128,8 +128,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
 
-      acquiredLock = omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
+      getOmLockDetails().merge(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
@@ -205,11 +206,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());

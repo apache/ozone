@@ -124,8 +124,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
             null, null);
       }
 
-      acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquireVolumeLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
       if (checkQuotaBytesValid(omMetadataManager,
@@ -165,7 +166,11 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquireVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

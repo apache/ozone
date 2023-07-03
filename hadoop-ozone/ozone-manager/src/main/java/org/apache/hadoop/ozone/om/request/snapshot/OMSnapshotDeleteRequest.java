@@ -139,13 +139,15 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     try {
       // Acquire bucket lock
-      acquiredBucketLock =
+      getOmLockDetails().merge(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+              volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
-      acquiredSnapshotLock =
+      getOmLockDetails().merge(
           omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
-              volumeName, bucketName, snapshotName);
+              volumeName, bucketName, snapshotName));
+      acquiredSnapshotLock = getOmLockDetails().isLockAcquired();
 
       // Retrieve SnapshotInfo from the table
       String tableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
@@ -195,12 +197,17 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredSnapshotLock) {
-        omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
-            bucketName, snapshotName);
+        getOmLockDetails().merge(
+            omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
+                volumeName, bucketName, snapshotName));
       }
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

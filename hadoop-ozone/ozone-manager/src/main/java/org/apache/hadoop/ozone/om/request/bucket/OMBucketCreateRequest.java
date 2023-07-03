@@ -196,10 +196,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
             volumeName, bucketName, null);
       }
 
-      acquiredVolumeLock =
-          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock = metadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      getOmLockDetails().merge(
+          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+
+      getOmLockDetails().merge(metadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs =
           metadataManager.getVolumeTable().getReadCopy(volumeKey);
@@ -254,11 +257,16 @@ public class OMBucketCreateRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(
+            metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                bucketName));
       }
       if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        getOmLockDetails().merge(
+            metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

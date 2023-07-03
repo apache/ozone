@@ -119,8 +119,9 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       }
 
       // acquire lock.
-      acquiredBucketLock =  omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo omBucketInfo =
@@ -176,8 +177,11 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

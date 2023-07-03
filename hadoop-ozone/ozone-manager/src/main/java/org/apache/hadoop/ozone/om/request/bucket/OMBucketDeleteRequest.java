@@ -116,11 +116,13 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       }
 
       // acquire lock
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      getOmLockDetails().merge(
+          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+      getOmLockDetails().merge(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       // No need to check volume exists here, as bucket cannot be created
       // with out volume creation. Check if bucket exists
@@ -192,11 +194,15 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

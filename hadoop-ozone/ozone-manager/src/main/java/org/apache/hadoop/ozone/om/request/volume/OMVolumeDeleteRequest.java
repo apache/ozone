@@ -95,8 +95,9 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
             null, null);
       }
 
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      getOmLockDetails().merge(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
@@ -111,8 +112,9 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       }
 
       owner = omVolumeArgs.getOwnerName();
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      getOmLockDetails().merge(
+          omMetadataManager.getLock().acquireWriteLock(USER_LOCK, owner));
+      acquiredUserLock = getOmLockDetails().isLockAcquired();
 
       String dbUserKey = omMetadataManager.getUserKey(owner);
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
@@ -149,10 +151,15 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
-        omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

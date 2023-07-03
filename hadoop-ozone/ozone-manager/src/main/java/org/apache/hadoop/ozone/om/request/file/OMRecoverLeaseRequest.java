@@ -135,9 +135,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
+      getOmLockDetails().merge(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String openKeyEntryName = doWork(ozoneManager, transactionLogIndex);
@@ -168,8 +169,12 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

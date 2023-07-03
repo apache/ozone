@@ -89,8 +89,9 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      lockAcquired = omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volume, bucket);
+      getOmLockDetails().merge(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volume, bucket));
+      lockAcquired = getOmLockDetails().isLockAcquired();
       OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
           omMetadataManager, volume, bucket, key, 0,
           ozoneManager.getDefaultReplicationConfig());
@@ -132,8 +133,11 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volume, bucket);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volume, bucket));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

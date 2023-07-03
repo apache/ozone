@@ -103,8 +103,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       checkACLsWithFSO(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE);
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      getOmLockDetails().merge(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -180,8 +180,11 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

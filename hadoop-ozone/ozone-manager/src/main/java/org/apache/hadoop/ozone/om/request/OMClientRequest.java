@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -76,6 +77,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private UserGroupInformation userGroupInformation;
   private InetAddress inetAddress;
+  private OMLockDetails omLockDetails;
 
   /**
    * Stores the result of request execution in
@@ -90,6 +92,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
     this.omRequest = omRequest;
+    this.omLockDetails = new OMLockDetails();
   }
   /**
    * Perform pre-execute steps on a OMRequest.
@@ -570,5 +573,14 @@ public abstract class OMClientRequest implements RequestAuditor {
     } else {
       throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
     }
+  }
+
+  public OMLockDetails getOmLockDetails() {
+    return omLockDetails;
+  }
+
+  public void setOmLockDetails(
+      OMLockDetails omLockDetails) {
+    this.omLockDetails = omLockDetails;
   }
 }

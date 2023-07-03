@@ -67,6 +67,50 @@ public class TestOzoneManagerLock {
     }
   }
 
+//  protected OMLockDetails acquireWriteLock(OzoneManagerLock lock,
+//                                     OzoneManagerLock.Resource resource,
+//                                     String[] resourceName) {
+//    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+//      return lock.acquireWriteHashedLock(resource,
+//          generateResourceHashCode(resource, resourceName));
+//    } else {
+//      return lock.acquireWriteLock(resource, resourceName);
+//    }
+//  }
+//
+//  protected void releaseWriteLock(OzoneManagerLock lock,
+//                                     OzoneManagerLock.Resource resource,
+//                                     String[] resourceName) {
+//    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+//      lock.releaseWriteHashedLock(resource,
+//          generateResourceHashCode(resource, resourceName));
+//    } else {
+//      lock.releaseWriteLock(resource, resourceName);
+//    }
+//  }
+//
+//  protected OMLockDetails acquireReadLock(OzoneManagerLock lock,
+//                                     OzoneManagerLock.Resource resource,
+//                                     String[] resourceName) {
+//    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+//      return lock.acquireReadHashedLock(resource,
+//          generateResourceHashCode(resource, resourceName));
+//    } else {
+//      return lock.acquireReadLock(resource, resourceName);
+//    }
+//  }
+//
+//  protected void releaseReadLock(OzoneManagerLock lock,
+//                                     OzoneManagerLock.Resource resource,
+//                                     String[] resourceName) {
+//    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+//      lock.releaseReadHashedLock(resource,
+//          generateResourceHashCode(resource, resourceName));
+//    } else {
+//      lock.releaseReadLock(resource, resourceName);
+//    }
+//  }
+
   private void testResourceReacquireLock(String[] resourceName,
                                          Resource resource) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());

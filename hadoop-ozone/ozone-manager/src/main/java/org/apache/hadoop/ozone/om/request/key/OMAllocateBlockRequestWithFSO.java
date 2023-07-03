@@ -140,8 +140,10 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
               OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      getOmLockDetails().merge(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()
@@ -186,8 +188,12 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        getOmLockDetails().merge(
+            omMetadataManager.getLock().releaseWriteLock(
+                BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

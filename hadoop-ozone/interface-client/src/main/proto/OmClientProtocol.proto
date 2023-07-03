@@ -399,6 +399,7 @@ message OMResponse {
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
+  optional OMLockDetailsProto                omLockDetailsProto            = 130;
 }
 
 enum Status {
@@ -2074,6 +2075,13 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message OMLockDetailsProto {
+  optional bool isLockAcquired = 1;
+  optional uint64 waitLockNanos    = 2;
+  optional uint64 readLockNanos    = 3;
+  optional uint64 writeLockNanos   = 4;
 }
 
 /**
