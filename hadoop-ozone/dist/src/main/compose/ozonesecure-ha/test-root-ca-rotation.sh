@@ -66,8 +66,7 @@ wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm | grep sc
 wait_for_execute_command scm4.org 180 "ozone admin cert info 4"
 
 #transfer leader to scm4.org
-export TARGET_SCM=scm4.org
-execute_robot_test scm4.org scmha/scm-leader-transfer.robot
+execute_robot_test scm4.org -v "TARGET_SCM:scm4.org" scmha/scm-leader-transfer.robot
 
 # add new datanode4 and verify certificate
 docker-compose up -d datanode4
@@ -76,8 +75,7 @@ wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4
 
 #transfer leader to scm3.org
 execute_robot_test scm3.org kinit.robot
-export TARGET_SCM=scm3.org
-execute_robot_test scm4.org scmha/scm-leader-transfer.robot
+execute_robot_test scm4.org  -v "TARGET_SCM:scm3.org" scmha/scm-leader-transfer.robot
 
 # wait for next root CA rotation
 wait_for_execute_command scm3.org 180 "ozone admin cert info 5"

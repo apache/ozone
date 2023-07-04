@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.security;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 /**
  * This interface defines APIs for sub-ca rotation instructions.
@@ -36,19 +35,19 @@ public interface RootCARotationHandler {
    */
   @Replicate
   void rotationPrepare(String rootCertId)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   @Replicate
   void rotationPrepareAck(String rootCertId, String scmCertId, String scmId)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   @Replicate
   void rotationCommit(String rootCertId)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   @Replicate
   void rotationCommitted(String rootCertId)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   int rotationPrepareAcks();
 

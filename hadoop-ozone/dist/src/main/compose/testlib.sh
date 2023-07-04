@@ -203,7 +203,6 @@ execute_robot_test(){
       -v OZONE_DIR:"${OZONE_DIR}" \
       -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
-      -v TARGET_SCM:"${TARGET_SCM:-scm2.org}" \
       ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
@@ -271,10 +270,8 @@ execute_commands_in_container(){
   shift 1
   local command=$@
 
-  set -e
   # shellcheck disable=SC2068
   docker-compose exec -T $container /bin/bash -c "$command"
-  set +e
 }
 
 ## @description Stop a list of named containers
@@ -345,16 +342,12 @@ wait_for_execute_command(){
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T $container /bin/bash -c "$command"
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "$command succeed"
-         return;
+     if docker-compose exec -T $container /bin/bash -c "$command"; then
+        echo "$command succeed"
+        return
      fi
-     echo "$command hasn't succeed yet"
-     sleep 1
+        echo "$command hasn't succeed yet"
+        sleep 1
    done
    echo "Timed out waiting on $command to be successful"
    return 1

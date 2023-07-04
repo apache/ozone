@@ -34,7 +34,6 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAME_SUFFIX;
@@ -77,7 +76,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
 
   @Override
   public void rotationPrepare(String rootCertId)
-      throws IOException, TimeoutException {
+      throws IOException {
     LOG.info("Received rotation prepare command of root certificate {}",
         rootCertId);
     if (rotationManager.shouldSkipRootCert(rootCertId)) {
@@ -92,7 +91,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
 
   @Override
   public void rotationPrepareAck(String rootCertId,
-      String scmCertId, String scmId) throws IOException, TimeoutException {
+      String scmCertId, String scmId) throws IOException {
     LOG.info("Received rotation prepare ack of root certificate {} from scm {}",
         rootCertId, scmId);
 
@@ -109,7 +108,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
 
   @Override
   public void rotationCommit(String rootCertId)
-      throws IOException, TimeoutException {
+      throws IOException {
     LOG.info("Received rotation commit command of root certificate {}",
         rootCertId);
     if (rotationManager.shouldSkipRootCert(rootCertId)) {
@@ -163,7 +162,7 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
 
   @Override
   public void rotationCommitted(String rootCertId)
-      throws IOException, TimeoutException {
+      throws IOException {
     LOG.info("Received rotation committed command of root certificate {}",
         rootCertId);
     if (rotationManager.shouldSkipRootCert(rootCertId)) {

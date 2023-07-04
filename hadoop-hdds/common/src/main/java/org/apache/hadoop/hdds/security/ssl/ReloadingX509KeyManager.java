@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 /**
  * An implementation of <code>X509KeyManager</code> that exposes a method,
@@ -127,11 +126,9 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
        */
       ret = alias;
       LOG.info("Engine client aliases for {}, {}, {} is returned as {}",
-          strings == null ? "" : Arrays.stream(strings).map(Object::toString)
-              .collect(Collectors.joining(", ")),
-          principals == null ? "" : Arrays.stream(principals)
-              .map(Object::toString).collect(Collectors.joining(", ")),
-          sslEngine == null ? "" : sslEngine.toString(), ret);
+          strings == null ? "" : Arrays.toString(strings),
+          principals == null ? "" : Arrays.toString(principals),
+          sslEngine == null ? "" : sslEngine, ret);
     }
     return ret;
   }
@@ -143,9 +140,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
         .chooseEngineServerAlias(s, principals, sslEngine);
     if (ret == null && LOG.isDebugEnabled()) {
       LOG.debug("Engine server aliases for {}, {}, {} is null", s,
-          principals == null ? "" : Arrays.stream(principals)
-              .map(Object::toString).collect(Collectors.joining(", ")),
-          sslEngine == null ? "" : sslEngine.toString());
+          principals == null ? "" : Arrays.toString(principals),
+          sslEngine == null ? "" : sslEngine);
     }
     return ret;
   }

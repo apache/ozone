@@ -21,7 +21,7 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${TARGET_SCM}=      %{TARGET_SCM=scm2.org}
+${TARGET_SCM}=      scm2.org
 
 ** Keywords ***
 Get SCM Leader Node
