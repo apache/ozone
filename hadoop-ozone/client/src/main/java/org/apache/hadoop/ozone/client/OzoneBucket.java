@@ -1064,6 +1064,7 @@ public class OzoneBucket extends WithMetadata {
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
     private boolean addedKeyPrefix;
+    private String delimiterKeyPrefix;
     private final boolean shallow;
 
     String getKeyPrefix() {
@@ -1200,41 +1201,51 @@ public class OzoneBucket extends WithMetadata {
         if (nextOneKeys.isEmpty()) {
           return nextOneKeys;
         }
+        // startKey is guaranteed to be sorted after keyPrefix
         startKey = nextOneKeys.get(0).getName();
 
-        // prepare keyPrefix
+        // prepare delimiterKeyPrefix
+        delimiterKeyPrefix = getKeyPrefix();
         if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
           int lastIndex = getKeyPrefix().lastIndexOf(OZONE_URI_DELIMITER);
           if (lastIndex != -1) {
-            setKeyPrefix(getKeyPrefix().substring(0, lastIndex));
+            delimiterKeyPrefix = getKeyPrefix().substring(0, lastIndex);
           } else {
-            setKeyPrefix("");
+            delimiterKeyPrefix = "";
           }
         }
       }
 
+      // Elements in statuses must be sorted after startKey,
+      // which means they come after the keyPrefix.
       List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
-          getKeyPrefix(), false, startKey, listCacheSize, true);
+          delimiterKeyPrefix, false, startKey, listCacheSize);
 
       if (addedKeyPrefix) {
         // previous round already include the startKey, so remove it
         statuses.remove(0);
+      } else {
+        setAddedKeyPrefix(true);
       }
-      setAddedKeyPrefix(true);
 
-      return statuses.stream().map(status -> {
-        OmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-        }
-        return new OzoneKey(keyInfo.getVolumeName(),
-            keyInfo.getBucketName(), keyName,
-            keyInfo.getDataSize(), keyInfo.getCreationTime(),
-            keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig());
-      }).collect(Collectors.toList());
+      // If statuses is empty after filtering, indicating that
+      // already no result matching the keyPrefix.
+      return statuses.stream()
+          .map(status -> {
+            OmKeyInfo keyInfo = status.getKeyInfo();
+            String keyName = keyInfo.getKeyName();
+            if (status.isDirectory()) {
+              // add trailing slash to represent directory
+              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+            }
+            return new OzoneKey(keyInfo.getVolumeName(),
+                keyInfo.getBucketName(), keyName,
+                keyInfo.getDataSize(), keyInfo.getCreationTime(),
+                keyInfo.getModificationTime(),
+                keyInfo.getReplicationConfig());
+          })
+          .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
+          .collect(Collectors.toList());
     }
   }
 
