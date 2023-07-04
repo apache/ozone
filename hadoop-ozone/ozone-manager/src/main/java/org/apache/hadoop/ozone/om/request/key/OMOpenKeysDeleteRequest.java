@@ -192,8 +192,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         }
       }
     } finally {
-      getOmLockDetails().merge(omMetadataManager.getLock()
-          .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      if (acquiredLock) {
+        getOmLockDetails().merge(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
     }
   }
 

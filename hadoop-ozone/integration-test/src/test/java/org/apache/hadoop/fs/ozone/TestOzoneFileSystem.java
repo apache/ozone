@@ -1814,9 +1814,9 @@ public class TestOzoneFileSystem {
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
-    // Create single replica 1024 byte key.
     int keySize = 1024;
-    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize]));
+    TestDataUtil.createKey(ozoneBucket, "key1", new String(new byte[keySize],
+        UTF_8));
     logCapturer.stopCapturing();
     String logContent = logCapturer.getOutput();
 
