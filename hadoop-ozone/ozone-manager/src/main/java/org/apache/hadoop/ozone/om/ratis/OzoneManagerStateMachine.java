@@ -581,8 +581,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           handler.handleWriteRequest(request, trxLogIndex);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
-      return omResponse.toBuilder()
-          .setOmLockDetailsProto(omLockDetails.toProtobufBuilder()).build();
+      if (omLockDetails != null) {
+        return omResponse.toBuilder()
+            .setOmLockDetailsProto(omLockDetails.toProtobufBuilder()).build();
+      } else {
+        return omResponse;
+      }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e);
