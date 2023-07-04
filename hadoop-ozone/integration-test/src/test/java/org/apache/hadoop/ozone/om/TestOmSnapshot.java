@@ -674,7 +674,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(1, diff3.getDiffList().size());
     Assert.assertTrue(diff3.getDiffList().contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.RENAME,  key2,
+            SnapshotDiffReportOzone.DiffType.RENAME, key2,
              key2Renamed)));
 
 
