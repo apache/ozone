@@ -191,7 +191,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       if (acquiredVolumeLock) {
         getOmLockDetails().merge(omMetadataManager.getLock()
             .releaseWriteLock(VOLUME_LOCK, volume));
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
       }
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
