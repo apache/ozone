@@ -703,7 +703,7 @@ public class TestOmSnapshot {
         diff5 = getSnapDiffReport(volume, bucket, snap6, snap7);
     List<SnapshotDiffReport.DiffReportEntry> expectedDiffList =
         Arrays.asList(SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.RENAME,  key3,
+            SnapshotDiffReport.DiffType.RENAME, key3,
              renamedKey3),
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.MODIFY, key3)
