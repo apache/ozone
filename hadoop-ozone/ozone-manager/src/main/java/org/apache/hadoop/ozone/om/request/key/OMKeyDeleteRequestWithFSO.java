@@ -105,6 +105,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
       getOmLockDetails().merge(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
