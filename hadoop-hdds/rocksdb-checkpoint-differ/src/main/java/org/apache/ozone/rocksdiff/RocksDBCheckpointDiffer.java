@@ -35,9 +35,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.AbstractEventListener;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -675,22 +673,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
     return filename.substring("/".length(),
         filename.length() - SST_FILE_EXTENSION_LENGTH);
-  }
-
-  /**
-   * Get a list of relevant column family descriptors.
-   * @param cfOpts ColumnFamilyOptions
-   * @return List of ColumnFamilyDescriptor
-   */
-  @VisibleForTesting
-  static List<ColumnFamilyDescriptor> getCFDescriptorList(
-      ColumnFamilyOptions cfOpts) {
-    return asList(
-        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
-        new ColumnFamilyDescriptor("keyTable".getBytes(UTF_8), cfOpts),
-        new ColumnFamilyDescriptor("directoryTable".getBytes(UTF_8), cfOpts),
-        new ColumnFamilyDescriptor("fileTable".getBytes(UTF_8), cfOpts)
-    );
   }
 
   /**

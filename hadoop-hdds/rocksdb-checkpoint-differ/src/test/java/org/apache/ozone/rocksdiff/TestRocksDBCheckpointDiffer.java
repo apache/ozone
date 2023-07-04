@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+
 import com.google.common.graph.GraphBuilder;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -469,6 +470,21 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
+  /**
+   * Get a list of relevant column family descriptors.
+   * @param cfOpts ColumnFamilyOptions
+   * @return List of ColumnFamilyDescriptor
+   */
+  static List<ColumnFamilyDescriptor> getCFDescriptorList(
+      ColumnFamilyOptions cfOpts) {
+    return asList(
+        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
+        new ColumnFamilyDescriptor("keyTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("directoryTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("fileTable".getBytes(UTF_8), cfOpts)
+    );
+  }
+
   // Test Code to create sample RocksDB instance.
   private RocksDB createRocksDBInstanceAndWriteKeys(String dbPathArg,
       RocksDBCheckpointDiffer differ) throws RocksDBException {
@@ -484,7 +500,7 @@ public class TestRocksDBCheckpointDiffer {
     final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
         .optimizeUniversalStyleCompaction();
     final List<ColumnFamilyDescriptor> cfDescriptors =
-        RocksDBCheckpointDiffer.getCFDescriptorList(cfOpts);
+        getCFDescriptorList(cfOpts);
     List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
 
     // Create a RocksDB instance with compaction tracking

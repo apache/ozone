@@ -392,14 +392,15 @@ public class SnapshotDiffManager implements AutoCloseable {
         snapshotId,
         dbTxSequenceNumber,
         getTablePrefixes(snapshotOMMM, volumeName, bucketName),
-        ((RDBStore)snapshotOMMM.getStore()).getDb().getDb());
+        ((RDBStore)snapshotOMMM.getStore()).getDb().getManagedRocksDb());
   }
 
   @VisibleForTesting
   protected Set<String> getSSTFileListForSnapshot(OmSnapshot snapshot,
                                                   List<String> tablesToLookUp) {
     return RdbUtil.getSSTFilesForComparison(((RDBStore)snapshot
-        .getMetadataManager().getStore()).getDb().getDb(), tablesToLookUp);
+        .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
+        tablesToLookUp);
   }
 
   /**
@@ -1233,12 +1234,12 @@ public class SnapshotDiffManager implements AutoCloseable {
       Set<String> fromSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(
               ((RDBStore)fromSnapshot.getMetadataManager().getStore())
-                  .getDb().getDb(),
+                  .getDb().getManagedRocksDb(),
               tablesToLookUp);
       Set<String> toSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(
               ((RDBStore)toSnapshot.getMetadataManager().getStore()).getDb()
-                  .getDb(),
+                  .getManagedRocksDb(),
               tablesToLookUp);
 
       deltaFiles.addAll(fromSnapshotFiles);
