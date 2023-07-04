@@ -172,6 +172,10 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
+  @Override
+  protected boolean shouldStartCertificateMonitor() {
+    return false;
+  }
 
   @Override
   public Logger getLogger() {

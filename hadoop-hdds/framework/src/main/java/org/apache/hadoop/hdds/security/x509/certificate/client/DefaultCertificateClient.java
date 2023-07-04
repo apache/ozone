@@ -177,6 +177,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           getLogger().warn("Component certificate was not loaded.");
         }
       }
+    } else {
+      getLogger().info("CertificateLifetimeMonitor is disabled for {}",
+          component);
     }
   }
 
