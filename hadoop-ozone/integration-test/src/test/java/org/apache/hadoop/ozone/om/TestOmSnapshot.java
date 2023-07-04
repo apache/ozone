@@ -706,7 +706,7 @@ public class TestOmSnapshot {
             SnapshotDiffReport.DiffType.RENAME,  key3,
              renamedKey3),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY,  key3)
+                SnapshotDiffReport.DiffType.MODIFY, key3)
         );
     assertEquals(expectedDiffList, diff5.getDiffList());
   }
