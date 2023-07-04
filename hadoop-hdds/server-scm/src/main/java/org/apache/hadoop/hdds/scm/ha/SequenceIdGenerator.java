@@ -122,22 +122,22 @@ public class SequenceIdGenerator {
       }
 
       Preconditions.checkArgument(batch.nextId == batch.lastId + 1);
-      Long prevLastId = batch.lastId;
       while (true) {
+        Long prevLastId = batch.lastId;
         batch.nextId = prevLastId + 1;
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
 
         if (stateManager.allocateBatch(sequenceIdName,
-            prevLastId, prevLastId + batchSize)) {
-          batch.lastId = prevLastId + batchSize;
+            prevLastId, batch.lastId + batchSize)) {
+          batch.lastId += batchSize;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
               sequenceIdName, prevLastId, batch.lastId);
           break;
         }
 
         // reload lastId from RocksDB.
-        prevLastId = stateManager.getLastId(sequenceIdName);
+        batch.lastId = stateManager.getLastId(sequenceIdName);
       }
 
       Preconditions.checkArgument(batch.nextId <= batch.lastId);
