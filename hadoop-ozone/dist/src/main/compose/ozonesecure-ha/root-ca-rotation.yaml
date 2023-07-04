@@ -20,7 +20,7 @@ x-root-cert-rotation-config:
   &root-cert-rotation-config
   environment:
     - OZONE-SITE.XML_hdds.x509.grace.duration.token.checks.enabled=false
-    - OZONE-SITE.XML_hdds.x509.max.duration=PT180S
+    - OZONE-SITE.XML_hdds.x509.max.duration=PT240S
     - OZONE-SITE.XML_hdds.x509.default.duration=PT60S
     - OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT45S
     - OZONE-SITE.XML_hdds.x509.ca.rotation.check.interval=PT1S
