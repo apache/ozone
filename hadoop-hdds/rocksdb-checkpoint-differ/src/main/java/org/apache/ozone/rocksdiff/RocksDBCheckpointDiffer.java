@@ -516,7 +516,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       @Override
       public void onCompactionCompleted(RocksDB db,
           CompactionJobInfo compactionJobInfo) {
-
+        LOG.info("###CompactionCompleted###");
         if (compactionJobInfo.inputFiles().isEmpty()) {
           LOG.error("Compaction input files list is empty");
           return;

@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -98,6 +99,23 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     this.deletedKeyCount = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
+  }
+
+  @VisibleForTesting
+  public boolean isReclaimable(Table<String, OmKeyInfo> previousKeyTable,
+      Table<String, String> renamedTable,
+      OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
+      long volumeId, HddsProtos.KeyValue.Builder renamedKeyBuilder)
+      throws IOException {
+    return isKeyReclaimable(previousKeyTable, renamedTable,
+        deletedKeyInfo, bucketInfo, volumeId, renamedKeyBuilder);
+  }
+
+  @VisibleForTesting
+  public SnapshotInfo previousActiveSnapshot(SnapshotInfo snapInfo,
+      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+      throws IOException {
+    return getPreviousActiveSnapshot(snapInfo, chainManager, omSnapshotManager);
   }
 
   /**
