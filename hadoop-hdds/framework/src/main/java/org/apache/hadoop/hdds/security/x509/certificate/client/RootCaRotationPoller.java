@@ -65,7 +65,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         new ThreadFactoryBuilder().setNameFormat(
                 this.getClass().getSimpleName())
             .setDaemon(true).build());
-    pollingInterval = securityConfig.getRootCaClientPollingInterval();
+    pollingInterval = securityConfig.getRootCaCertificatePollingInterval();
     rootCARotationProcessors = new ArrayList<>();
   }
 
