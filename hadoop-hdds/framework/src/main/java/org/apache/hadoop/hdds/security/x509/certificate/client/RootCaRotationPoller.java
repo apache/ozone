@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -64,7 +63,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
     this.knownRootCerts = initiallyKnownRootCaCerts;
     poller = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(
-                "RootCaRotationPoller")
+                this.getClass().getSimpleName())
             .setDaemon(true).build());
     pollingInterval = securityConfig.getRootCaClientPollingInterval();
     rootCARotationProcessors = new ArrayList<>();
@@ -99,7 +98,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         }
       });
     } catch (IOException e) {
-      LOG.error("Error while trying to rotate root ca certificate", e);
+      LOG.error("Error while trying to poll root ca certificate", e);
     }
   }
 
@@ -126,19 +125,19 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         executor.shutdownNow();
       }
       if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-        LOG.error("Unable to shutdown root ca certificate rotation poller.");
+        LOG.warn("{} couldn't be shut down gracefully",
+            getClass().getSimpleName());
       }
     } catch (InterruptedException e) {
-      LOG.error("Error attempting to shutdown.", e);
-      executor.shutdownNow();
+      LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
       Thread.currentThread().interrupt();
     }
   }
 
   private String getPrintableCertIds(Collection<X509Certificate> certs) {
-    return StringUtils.join(certs.stream()
+    return certs.stream()
         .map(X509Certificate::getSerialNumber)
         .map(BigInteger::toString)
-        .collect(Collectors.toList()), ", ");
+        .collect(Collectors.joining(", "));
   }
 }

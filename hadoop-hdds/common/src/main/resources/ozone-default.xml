@@ -2269,7 +2269,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.x509.rootca.client.polling.interval</name>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
     <value>PT2h</value>
     <description>Interval to use for polling in certificate clients for a new
       root ca certificate. Every time the specified time duration elapses,

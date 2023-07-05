@@ -52,8 +52,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_O
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE;
@@ -232,8 +232,8 @@ public class SecurityConfig {
     validateCertificateValidityConfig();
 
     String rootCaClientPollingIntervalString = configuration.get(
-        HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL,
-        HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL_DEFAULT);
+        HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL,
+        HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL_DEFAULT);
 
     this.rootCaClientPollingInterval =
         Duration.parse(rootCaClientPollingIntervalString);
