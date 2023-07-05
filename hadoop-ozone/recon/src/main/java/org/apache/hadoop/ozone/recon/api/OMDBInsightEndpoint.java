@@ -174,8 +174,6 @@ public class OMDBInsightEndpoint {
     List<KeyEntityInfo> nonFSOKeyInfoList =
         openKeyInsightInfo.getNonFSOKeyInfoList();
 
-    // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
     boolean skipPrevKeyDone = false;
     boolean isLegacyBucketLayout = true;
     boolean recordsFetchedLimitReached = false;
@@ -255,13 +253,37 @@ public class OMDBInsightEndpoint {
         break;
       }
     }
-    // Populate the keysSummary map
-    createKeysSummaryForOpenKey(keysSummary);
-
-    openKeyInsightInfo.setKeysSummary(keysSummary);
 
     openKeyInsightInfo.setLastKey(lastKey);
     return Response.ok(openKeyInsightInfo).build();
+  }
+
+  /**
+   * Retrieves the summary of open keys.
+   *
+   * This method calculates and returns a summary of open keys.
+   *
+   * @return The HTTP  response body includes a map with the following entries:
+   * - "totalOpenKeys": the total number of open keys
+   * - "totalReplicatedDataSize": the total replicated size for open keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open keys
+   *
+   *
+   * Example response:
+   *   {
+   *    "totalOpenKeys": 8,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/open/summary")
+  public Response getOpenKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for open keys
+    createKeysSummaryForOpenKey(keysSummary);
+    return Response.ok(keysSummary).build();
   }
 
   /**
@@ -310,8 +332,6 @@ public class OMDBInsightEndpoint {
         deletedKeyAndDirInsightInfo.getRepeatedOmKeyInfoList();
     Table<String, RepeatedOmKeyInfo> deletedTable =
         omMetadataManager.getDeletedTable();
-    // Create a HashMap for the keysSummary
-    Map<String, Long> keysSummary = new HashMap<>();
     try (
         TableIterator<String, ? extends Table.KeyValue<String,
             RepeatedOmKeyInfo>>
@@ -348,10 +368,6 @@ public class OMDBInsightEndpoint {
           break;
         }
       }
-      // Create the keysSummary for deleted keys
-      createKeysSummaryForDeletedKey(keysSummary);
-      // Set the keysSummary and lastKey in the response
-      deletedKeyAndDirInsightInfo.setKeysSummary(keysSummary);
       deletedKeyAndDirInsightInfo.setLastKey(lastKey);
     } catch (IOException ex) {
       throw new WebApplicationException(ex,
@@ -362,6 +378,33 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /** Retrieves the summary of deleted keys.
+   *
+   * This method calculates and returns a summary of deleted keys.
+   *
+   * @return The HTTP  response body includes a map with the following entries:
+   * - "totalDeletedKeys": the total number of deleted keys
+   * - "totalReplicatedDataSize": the total replicated size for deleted keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for deleted keys
+   *
+   *
+   * Example response:
+   *   {
+   *    "totalDeletedKeys": 8,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalUnreplicatedDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/deletePending/summary")
+  public Response getDeletedKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for deleted keys
+    createKeysSummaryForDeletedKey(keysSummary);
+    return Response.ok(keysSummary).build();
   }
 
   /**
