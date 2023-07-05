@@ -177,6 +177,7 @@ public class TestS3InitiateMultipartUploadRequest
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
     acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
 
     // create bucket with DEFAULT acls
@@ -224,12 +225,22 @@ public class TestS3InitiateMultipartUploadRequest
   private void verifyKeyInheritAcls(List<OzoneAcl> keyAcls,
       List<OzoneAcl> bucketAcls) {
 
-    Assert.assertTrue(bucketAcls.stream().allMatch(
-        acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT));
-    Assert.assertEquals("Failed to inherit parent acls!,",
-        bucketAcls.stream().map(
-            acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+    List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
+
+    OzoneAcl parentAccessAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
+        .findAny().orElse(null);
+
+    // Should inherit parent DEFAULT Acls
+    Assert.assertEquals("Failed to inherit parent DEFAULT acls!,",
+        parentDefaultAcl.stream()
+            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls);
+
+    // Should not inherit parent ACCESS Acls
+    Assert.assertFalse(keyAcls.contains(parentAccessAcl));
   }
 
 }

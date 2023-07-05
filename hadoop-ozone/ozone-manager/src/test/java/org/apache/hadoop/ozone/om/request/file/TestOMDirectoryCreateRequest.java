@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -435,6 +436,7 @@ public class TestOMDirectoryCreateRequest {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
     acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
 
     // create bucket with DEFAULT acls
@@ -479,7 +481,9 @@ public class TestOMDirectoryCreateRequest {
       throws IOException {
     List<String> nodes = Arrays.asList(keyName.split(OZONE_URI_DELIMITER));
 
-    List<OzoneAcl> expectedParentAcls = bucketAcls;
+    List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
     String prefix = "";
 
     for (int indx = 0; indx < nodes.size(); indx++) {
@@ -491,10 +495,10 @@ public class TestOMDirectoryCreateRequest {
       List<OzoneAcl> omKeyAcls = omKeyInfo.getAcls();
 
       Assert.assertEquals("Failed to inherit parent acls!,",
-          expectedParentAcls, omKeyAcls);
+          expectedInheritAcls, omKeyAcls);
 
       prefix = dirName + OZONE_URI_DELIMITER;
-      expectedParentAcls = omKeyAcls;
+      expectedInheritAcls = omKeyAcls;
     }
   }
 

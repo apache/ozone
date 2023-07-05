@@ -60,6 +60,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.mockito.ArgumentMatchers.any;
@@ -666,6 +667,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
     acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
 
     // create bucket with DEFAULT acls
@@ -712,7 +714,9 @@ public class TestOMDirectoryCreateRequestWithFSO {
       throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    List<OzoneAcl> expectedParentAcls = bucketAcls;
+    List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
 
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
@@ -724,11 +728,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
           omMetadataManager.getDirectoryTable().get(dbKey);
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
-      Assert.assertEquals("Failed to inherit parent acls!,",
-          expectedParentAcls, omDirAcls);
+      Assert.assertEquals("Failed to inherit parent DEAFULT acls!,",
+          expectedInheritAcls, omDirAcls);
 
       parentID = omDirInfo.getObjectID();
-      expectedParentAcls = omDirAcls;
+      expectedInheritAcls = omDirAcls;
     }
   }
 
