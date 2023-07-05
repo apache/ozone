@@ -214,6 +214,8 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
+            KeyValueContainerUtil.removeContainerDB(kvContainer.getContainerData(),
+                hddsVolume.getConf());
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());

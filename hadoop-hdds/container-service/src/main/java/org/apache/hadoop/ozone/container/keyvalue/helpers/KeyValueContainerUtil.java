@@ -149,7 +149,10 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
-    removeContainerDB(containerData, conf);
+    if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      // Close the DB connection and remove the DB handler from cache
+      BlockUtils.removeDB(containerData, conf);
+    }
 
     // Delete the Container MetaData path.
     FileUtils.deleteDirectory(containerMetaDataPath);
