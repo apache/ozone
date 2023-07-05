@@ -47,15 +47,13 @@ wait_for_startup(){
 }
 
 all_pods_are_running() {
-   RUNNING_COUNT=$(kubectl get pod --field-selector status.phase=Running | wc -l)
-   ALL_COUNT=$(kubectl get pod | wc -l)
-   RUNNING_COUNT=$((RUNNING_COUNT - 1))
-   ALL_COUNT=$((ALL_COUNT - 1))
-   if [ "$RUNNING_COUNT" -lt "3" ]; then
-      echo "$RUNNING_COUNT pods are running. Waiting for more."
+   local -i running=$(kubectl get pod --field-selector status.phase=Running | grep -v 'STATUS' | wc -l)
+   local -i all=$(kubectl get pod | grep -v 'STATUS' | wc -l)
+   if [ "$running" -lt "3" ]; then
+      echo "$running pods are running. Waiting for more."
       return 1
-   elif [ "$RUNNING_COUNT" -ne "$ALL_COUNT" ]; then
-      echo "$RUNNING_COUNT pods are running out from the $ALL_COUNT"
+   elif [ "$running" -ne "$all" ]; then
+      echo "$running pods are running out from the $all"
       return 2
    else
       STARTED=true
