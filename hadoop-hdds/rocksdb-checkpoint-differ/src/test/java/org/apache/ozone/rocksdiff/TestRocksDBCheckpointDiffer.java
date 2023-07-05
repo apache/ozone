@@ -49,10 +49,13 @@ import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,6 +109,8 @@ public class TestRocksDBCheckpointDiffer {
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
   private final List<DifferSnapshotInfo> snapshots = new ArrayList<>();
+
+  private final List<List<ColumnFamilyHandle>> colHandles = new ArrayList<>();
 
   private final String activeDbDirName = "./rocksdb-data";
   private final String metadataDirName = "./metadata";
@@ -349,7 +354,6 @@ public class TestRocksDBCheckpointDiffer {
             compactionLogDirName,
             activeDbDirName,
             config);
-
     RocksDB rocksDB =
         createRocksDBInstanceAndWriteKeys(activeDbDirName, differ);
     readRocksDBInstance(activeDbDirName, rocksDB, null, differ);
@@ -378,6 +382,24 @@ public class TestRocksDBCheckpointDiffer {
     }
 
     rocksDB.close();
+    cleanUp();
+  }
+
+  public void cleanup() {
+    for (DifferSnapshotInfo snap : snapshots) {
+      snap.getRocksDB().close();
+    }
+    for (List<ColumnFamilyHandle> colHandle : colHandles) {
+      for(ColumnFamilyHandle handle : colHandle) {
+        handle.close();
+      }
+    }
+  }
+
+  private static List<ColumnFamilyDescriptor> getColumnFamilyDescriptors() {
+    return Stream.of("fileTable", "directoryTable", "keyTable", "default")
+        .map(StringUtils::string2Bytes)
+        .map(ColumnFamilyDescriptor::new).collect(Collectors.toList());
   }
 
   /**
@@ -404,7 +426,7 @@ public class TestRocksDBCheckpointDiffer {
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstDiffList = differ.getSSTDiffList(src, snap);
-      LOG.debug("SST diff list from '{}' to '{}': {}",
+      LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
       Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
@@ -416,7 +438,7 @@ public class TestRocksDBCheckpointDiffer {
    * Helper function that creates an RDB checkpoint (= Ozone snapshot).
    */
   private void createCheckpoint(RocksDBCheckpointDiffer differ,
-      RocksDB rocksDB) {
+      RocksDB rocksDB) throws RocksDBException {
 
     LOG.trace("Current time: " + System.currentTimeMillis());
     long t1 = System.currentTimeMillis();
@@ -434,9 +456,11 @@ public class TestRocksDBCheckpointDiffer {
 
     createCheckPoint(activeDbDirName, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
+    List<ColumnFamilyHandle> colHandle = new ArrayList<>();
+    colHandles.add(colHandle);
     final DifferSnapshotInfo currentSnapshot =
         new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null,
-            null);
+            ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(), colHandle));
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
