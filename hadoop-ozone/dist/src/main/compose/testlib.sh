@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
+set -e -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -120,9 +120,9 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER || true)
     else
-      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER || true)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
@@ -158,13 +158,12 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
   docker-compose --ansi never down
-  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit \
-      && wait_for_om_leader ; }; then
-    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
-    stop_docker_env
-    return 1
-  fi
+
+  trap stop_docker_env EXIT HUP INT TERM
+
+  docker-compose --ansi never up -d --scale datanode="${datanode_count}"
+  wait_for_safemode_exit
+  wait_for_om_leader
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -179,20 +178,22 @@ execute_robot_test(){
   unset 'ARGUMENTS[${#ARGUMENTS[@]}-1]' #Remove the last element, remainings are the custom parameters
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
-  set +e
   [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
 
   # find unique filename
   declare -i i=0
   OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
   while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let i++
+    let ++i
     OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
+
+  set +e
+
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
@@ -209,17 +210,11 @@ execute_robot_test(){
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
-  copy_daemon_logs
-
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
     create_stack_dumps
   fi
 
   set -e
-
-  if [[ ${rc} -gt 0 ]]; then
-    stop_docker_env
-  fi
 
   return ${rc}
 }
@@ -263,37 +258,37 @@ copy_daemon_logs() {
 ## @param        container name
 ## @param        specific command to execute
 execute_command_in_container(){
-  set -e
   # shellcheck disable=SC2068
   docker-compose exec -T "$@"
-  set +e
 }
 
 ## @description Stop a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
-  set -e
   docker-compose --ansi never stop $@
-  set +e
 }
 
 
 ## @description Start a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
-  set -e
   docker-compose --ansi never start $@
-  set +e
 }
 
 create_containers() {
-  set -e
   docker-compose --ansi never up -d $@
-  set +e
 }
 
 save_container_logs() {
-  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  local output_name="${OUTPUT_NAME:-}"
+  if [[ -z "${output_name}" ]]; then
+    output_name="$COMPOSE_ENV_NAME"
+  fi
+  if [[ -z "${output_name}" ]]; then
+    output_name="$(basename $(pwd))"
+  fi
+
+  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-${output_name}.log"
 }
 
 
@@ -310,13 +305,9 @@ wait_for_port(){
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "Port $port is available on $host"
-         return;
+     if docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"; then
+       echo "Port $port is available on $host"
+       return
      fi
      echo "Port $port is not available on $host yet"
      sleep 1
@@ -338,13 +329,9 @@ wait_for_execute_command(){
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T $container bash -c '$command'
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "$command succeed"
-         return;
+     if docker-compose exec -T $container bash -c '$command'; then
+       echo "$command succeed"
+       return
      fi
      echo "$command hasn't succeed yet"
      sleep 1
@@ -355,6 +342,7 @@ wait_for_execute_command(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
+  copy_daemon_logs
   save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
      docker-compose --ansi never down

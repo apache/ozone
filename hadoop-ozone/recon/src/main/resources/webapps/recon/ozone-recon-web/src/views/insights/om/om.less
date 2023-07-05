@@ -16,47 +16,12 @@
  * limitations under the License.
  */
 
-@sidebar-collapsed-width: 50px;
-
-.logo {
-  color: #FFF;
-  font-size: 20px;
-  font-weight: 500;
-  padding: 10px;
-  background-color: #002040;
-  .logo-text {
-    margin-left: 10px;
+.ant-pagination-disabled a, .ant-pagination-disabled:hover a, .ant-pagination-disabled:focus a, .ant-pagination-disabled .ant-pagination-item-link, .ant-pagination-disabled:hover .ant-pagination-item-link, .ant-pagination-disabled:focus .ant-pagination-item-link {
+    color: rgba(0, 0, 0, 0.65);
+    cursor: pointer !important;
   }
-}
-
-.ant-layout-sider-collapsed .logo-text {
-  display: none;
-}
-
-.ant-menu {
-  &.ant-menu-inline-collapsed {
-    width: @sidebar-collapsed-width;
-    .ant-menu-item {
-      padding-left: 17px !important;
-    }
+  
+  .ant-pagination-disabled, .ant-pagination-disabled:hover, .ant-pagination-disabled:focus {
+    color: rgba(0, 0, 0, 0.65);
+    cursor: pointer !important;
   }
-  &.ant-menu-inline {
-    .ant-menu-item {
-      &.ant-menu-item-selected {
-        background-color: #0a2542;
-        &::after {
-          border-right: 5px solid #1DA57A;
-        }
-      }
-      .ant-menu-sub{
-        background-color: #0a2542;
-        color: #FFF;
-        &::after {
-          border-right: 5px solid #1DA57A;
-          color: #FFF;
-        }
-      }
-    }
-  }
-}
-
