@@ -370,13 +370,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     ContainerDataProto.State prevState = containerData.getState();
     try {
-      updateContainerData(() ->
-          containerData.setState(ContainerDataProto.State.DELETED));
-      clearPendingPutBlockCache();
+      containerData.setState(ContainerDataProto.State.DELETED);
+      File containerFile = getContainerFile();
+      // update the new container data to .container File
+      updateContainerFile(containerFile);
+    } catch (IOException ioe) {
+      LOG.error("Exception occur while update container {} state",
+          containerData.getContainerID(), ioe);
     } finally {
       writeUnlock();
     }
-    LOG.warn("Moving container {} to state {} from state:{}",
+    LOG.info("Moving container {} to state {} from state:{}",
         containerData.getContainerPath(), containerData.getState(),
         prevState);
   }

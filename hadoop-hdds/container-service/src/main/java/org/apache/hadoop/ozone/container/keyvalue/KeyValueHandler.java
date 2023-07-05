@@ -1337,6 +1337,7 @@ public class KeyValueHandler extends Handler {
         // Rename container location
         try {
           container.markContainerForDelete();
+          KeyValueContainerUtil.removeContainerDB(keyValueContainerData, conf);
           KeyValueContainerUtil.moveToDeletedContainerDir(keyValueContainerData,
               hddsVolume);
         } catch (IOException ioe) {
@@ -1377,7 +1378,6 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
-    container.getContainerData().setState(State.DELETED);
     sendICR(container);
   }
 

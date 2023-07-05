@@ -220,52 +220,6 @@ public class TestEndPoint {
   }
 
   @Test
-  public void testMarkedDeletedContainerClearedOnStartup() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
-        true);
-    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        true);
-    conf.setFromObject(new ReplicationConfig().setPort(0));
-    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
-        serverAddress, 1000)) {
-      OzoneContainer ozoneContainer = createVolume(conf);
-      HddsVolume hddsVolume = (HddsVolume) ozoneContainer.getVolumeSet()
-          .getVolumesList().get(0);
-      KeyValueContainer kvContainer = addContainerAndDBEntry(conf, hddsVolume);
-      ozoneContainer.getContainerSet().addContainer(kvContainer);
-
-      // mark container for delete, and during start, container should remove
-      kvContainer.markContainerForDelete();
-
-      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-
-      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
-          conf, ozoneContainer);
-      EndpointStateMachine.EndPointStates newState = versionTask.call();
-
-      Assertions.assertEquals(EndpointStateMachine.EndPointStates.REGISTER,
-          newState);
-
-      // assert that tmp dir is empty
-      File[] leftoverContainers =
-          hddsVolume.getDeletedContainerDir().listFiles();
-      Assertions.assertNotNull(leftoverContainers);
-      Assertions.assertEquals(0, leftoverContainers.length);
-      Assertions.assertEquals(0, ozoneContainer.getContainerSet()
-          .getContainerMap().size());
-      // All DB keys have been deleted, MetadataTable should be empty
-      try (DBHandle dbHandle = BlockUtils.getDB(
-          kvContainer.getContainerData(), conf)) {
-        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
-            dbHandle.getStore();
-        Assertions.assertEquals(0, store.getMetadataTable()
-            .getEstimatedKeyCount());
-      }
-    }
-  }
-
-  @Test
   public void testClearTmpContainerButKeepDbReferNormalContainerStartup()
       throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -756,5 +710,4 @@ public class TestEndPoint {
     }
     return container;
   }
-
 }

@@ -149,6 +149,28 @@ public final class KeyValueContainerUtil {
         .getMetadataPath());
     File chunksPath = new File(containerData.getChunksPath());
 
+    removeContainerDB(containerData, conf);
+
+    // Delete the Container MetaData path.
+    FileUtils.deleteDirectory(containerMetaDataPath);
+
+    //Delete the Container Chunks Path.
+    FileUtils.deleteDirectory(chunksPath);
+
+    //Delete Container directory
+    FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
+  }
+
+  /**
+   * remove Container db, the Level DB file.
+   *
+   * @param containerData - Data of the container to remove.
+   * @param conf - configuration of the cluster.
+   * @throws IOException
+   */
+  public static void removeContainerDB(
+      KeyValueContainerData containerData, ConfigurationSource conf)
+      throws IOException {
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // DB failure is catastrophic, the disk needs to be replaced.
       // In case of an exception, LOG the message and rethrow the exception.
@@ -163,15 +185,6 @@ public final class KeyValueContainerUtil {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);
     }
-
-    // Delete the Container MetaData path.
-    FileUtils.deleteDirectory(containerMetaDataPath);
-
-    //Delete the Container Chunks Path.
-    FileUtils.deleteDirectory(chunksPath);
-
-    //Delete Container directory
-    FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
   }
 
   /**

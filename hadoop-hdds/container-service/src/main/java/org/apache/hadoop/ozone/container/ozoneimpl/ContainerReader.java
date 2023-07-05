@@ -34,6 +34,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
 
@@ -218,6 +220,10 @@ public class ContainerReader implements Runnable {
           }
           return;
         }
+        if (kvContainer.getContainerState() == DELETED) {
+          cleanupDeletedContainer(hddsVolume, kvContainer);
+          return;
+        }
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
@@ -230,6 +236,22 @@ public class ContainerReader implements Runnable {
       throw new StorageContainerException("Unrecognized ContainerType " +
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
+    }
+  }
+
+  private void cleanupDeletedContainer(
+      HddsVolume volume, KeyValueContainer kvContainer) {
+    try {
+      LOG.info("Cleanup container {} with DELETED state.",
+          kvContainer.getContainerData().getContainerID());
+      KeyValueContainerUtil.removeContainerDB(kvContainer.getContainerData(),
+          volume.getConf());
+      KeyValueContainerUtil.moveToDeletedContainerDir(
+          kvContainer.getContainerData(), volume);
+      kvContainer.delete();
+    } catch (IOException ex) {
+      LOG.warn("Failed to remove container {} in DELETED state.",
+          kvContainer.getContainerData().getContainerID(), ex);
     }
   }
 }

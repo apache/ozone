@@ -17,21 +17,15 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -130,10 +124,6 @@ public class VersionEndpointTask implements
             ozoneContainer.getDbVolumeSet());
         if (!result) {
           volumeSet.failVolume(volume.getStorageDir().getPath());
-        } else {
-          if (volume instanceof HddsVolume) {
-            cleanupDeletedContainer((HddsVolume) volume);
-          }
         }
       }
       if (volumeSet.getVolumesList().size() == 0) {
@@ -143,29 +133,6 @@ public class VersionEndpointTask implements
       }
     } finally {
       volumeSet.writeUnlock();
-    }
-  }
-
-  private void cleanupDeletedContainer(HddsVolume volume) {
-    // cleanup deleted container in startup
-    Map<Long, Container<?>> containerMap = ozoneContainer.getContainerSet()
-        .getContainerMap();
-    for (Map.Entry<Long, Container<?>> e : containerMap.entrySet()) {
-      if (e.getValue().getContainerState()
-          == ContainerProtos.ContainerDataProto.State.DELETED) {
-        if (e.getValue() instanceof KeyValueContainer) {
-          try {
-            KeyValueContainerUtil.moveToDeletedContainerDir(
-                ((KeyValueContainer) e.getValue())
-                    .getContainerData(), volume);
-            ozoneContainer.getContainerSet().removeContainer(e.getKey());
-            e.getValue().delete();
-          } catch (IOException ex) {
-            LOG.warn("Failed to remove container {} in DELETED state.",
-                e.getKey(), ex);
-          }
-        }
-      }
     }
   }
 }
