@@ -62,7 +62,7 @@ public class TestSetRangerServiceVersionRequest {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     Mockito.when(ozoneManager.getMetadataManager())
-        .thenReturn(new OmMetadataManagerImpl(conf));
+        .thenReturn(new OmMetadataManagerImpl(conf, ozoneManager));
   }
 
   @After

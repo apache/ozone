@@ -54,7 +54,8 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     long mtime = 2000;
     executeAndReturn(mtime);
     OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-        omMetadataManager, volumeName, bucketName, keyName, 0);
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
@@ -63,7 +64,8 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     long newMtime = -1;
     executeAndReturn(newMtime);
     keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-        omMetadataManager, volumeName, bucketName, keyName, 0);
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();

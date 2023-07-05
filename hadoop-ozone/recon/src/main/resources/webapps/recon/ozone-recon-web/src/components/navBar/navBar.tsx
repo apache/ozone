@@ -71,6 +71,12 @@ class NavBar extends React.Component<INavBarProps> {
     });
   };
 
+  refresh = () => {
+    console.log("refresh");
+    this.props.history.push('/Heatmap');
+    window.location.reload();
+    }
+
   render() {
     const {location} = this.props;
     return (
@@ -111,11 +117,23 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Containers</span>
             <Link to='/Containers'/>
           </Menu.Item>
-          <Menu.Item key='/Insights'>
-            <Icon type='bar-chart'/>
-            <span>Insights</span>
-            <Link to='/Insights'/>
-          </Menu.Item>
+          <Menu.SubMenu
+            title={
+              <span><Icon type='bar-chart' />
+                <span>Insights</span>
+              </span>
+            }>
+              <Menu.Item key="/Insights">
+                <span><Icon type='bar-chart' /></span>
+                <span>Insights</span>
+                <Link to='/Insights' />
+              </Menu.Item>
+              <Menu.Item key="/Om">
+              <span> <Icon type="database"/></span>
+              <span>OM DB Insights</span>
+              <Link to='/Om' />
+              </Menu.Item>
+          </Menu.SubMenu>
           <Menu.Item key='/DiskUsage'>
             <Icon type='pie-chart'/>
             <span>Disk Usage</span>
@@ -126,7 +144,7 @@ class NavBar extends React.Component<INavBarProps> {
               <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
-                <Link to='/Heatmap' />
+                <Link to='/Heatmap' onClick={this.refresh}/>
               </Menu.Item> : ""
           }
         </Menu>

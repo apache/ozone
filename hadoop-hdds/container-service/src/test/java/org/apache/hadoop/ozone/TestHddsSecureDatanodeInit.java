@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
@@ -48,6 +48,7 @@ import org.apache.hadoop.util.ServicePlugin;
 import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.HddsDatanodeService.getLogger;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -86,6 +87,7 @@ public class TestHddsSecureDatanodeInit {
 
   private DNCertificateClient client;
   private static DatanodeDetails datanodeDetails;
+  private static SCMSecurityProtocolClientSideTranslatorPB scmClient;
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -102,9 +104,17 @@ public class TestHddsSecureDatanodeInit {
         ServicePlugin.class);
     conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT5S"); // 5s
     conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S"); // 1s
+    conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
+
     securityConfig = new SecurityConfig(conf);
 
-    service = HddsDatanodeService.createHddsDatanodeService(args);
+    service = new HddsDatanodeService(args) {
+      @Override
+      SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient()
+          throws IOException {
+        return mock(SCMSecurityProtocolClientSideTranslatorPB.class);
+      }
+    };
     dnLogs = GenericTestUtils.LogCapturer.captureLogs(getLogger());
     callQuietly(() -> {
       service.start(conf);
@@ -123,6 +133,8 @@ public class TestHddsSecureDatanodeInit {
     certHolder = generateX509CertHolder(new KeyPair(publicKey, privateKey),
         null, Duration.ofSeconds(CERT_LIFETIME));
     datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+
+    scmClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
   }
 
   @AfterAll
@@ -143,9 +155,8 @@ public class TestHddsSecureDatanodeInit {
         .getCertificateLocation(DN_COMPONENT).toString(),
         securityConfig.getCertificateFileName()).toFile());
     dnLogs.clearOutput();
-    client = new DNCertificateClient(securityConfig, datanodeDetails,
+    client = new DNCertificateClient(securityConfig, scmClient, datanodeDetails,
         certHolder.getSerialNumber().toString(), null, null);
-    service.setCertificateClient(client);
   }
 
   @AfterEach
@@ -278,6 +289,7 @@ public class TestHddsSecureDatanodeInit {
     try {
       closure.call();
     } catch (Throwable e) {
+      e.printStackTrace();
       // Ignore all Throwable,
     }
   }
@@ -286,11 +298,6 @@ public class TestHddsSecureDatanodeInit {
   public void testCertificateRotation() throws Exception {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);
-
-    // prepare a mocked scmClient to certificate signing
-    SCMSecurityProtocolClientSideTranslatorPB scmClient =
-        mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-    client.setSecureScmClient(scmClient);
 
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509CertificateHolder newCertHolder = generateX509CertHolder(null,
@@ -364,11 +371,6 @@ public class TestHddsSecureDatanodeInit {
     // save the certificate on dn
     certCodec.writeCertificate(certHolder);
 
-    // prepare a mocked scmClient to certificate signing
-    SCMSecurityProtocolClientSideTranslatorPB scmClient =
-        mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-    client.setSecureScmClient(scmClient);
-
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
     X509CertificateHolder newCertHolder = generateX509CertHolder(null,
         LocalDateTime.now().plus(gracePeriod),
@@ -437,7 +439,7 @@ public class TestHddsSecureDatanodeInit {
         .setClusterID("cluster")
         .setKey(keyPair)
         .setSubject("localhost")
-        .setConfiguration(conf)
+        .setConfiguration(securityConfig)
         .setScmID("test")
         .build();
   }

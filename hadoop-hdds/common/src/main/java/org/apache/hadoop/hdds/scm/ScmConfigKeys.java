@@ -346,6 +346,10 @@ public final class ScmConfigKeys {
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
+  public static final String OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE =
+      "ozone.scm.container.lock.stripes";
+  public static final int OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT = 512;
+
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
   public static final String OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY =

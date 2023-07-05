@@ -80,7 +80,3 @@ docker-compose stop scm4.org
 execute_robot_test scm3.org kinit.robot
 wait_for_execute_command scm3.org 60 "ozone admin scm decommission --nodeid=${SCMID} | grep Decommissioned"
 execute_robot_test scm3.org scmha/scm-decommission.robot
-
-stop_docker_env
-
-generate_report
