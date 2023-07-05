@@ -97,7 +97,7 @@ public final class OzoneConfigKeys {
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
       = "dfs.container.ratis.datastream.enabled";
   public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
-      = false;
+      = true;
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
       = "dfs.container.ratis.datastream.port";
   public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
