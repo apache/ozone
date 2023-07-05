@@ -1268,7 +1268,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               getComponentName() + "-CertificateLifetimeMonitor")
               .setDaemon(true).build());
     }
-    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
+    this.executorService.scheduleAtFixedRate(new CertificateRenewerService(),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1278,9 +1278,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   /**
    *  Task to monitor certificate lifetime and renew the certificate if needed.
    */
-  public class CertificateLifetimeMonitor implements Runnable {
+  public class CertificateRenewerService implements Runnable {
 
-    public CertificateLifetimeMonitor() {
+    public CertificateRenewerService() {
     }
 
     @Override
