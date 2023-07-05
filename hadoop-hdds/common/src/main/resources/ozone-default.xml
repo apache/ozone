@@ -2269,9 +2269,9 @@
     </description>
   </property>
   <property>
-    <name>hdds.x509.rootca.client.polling.frequency</name>
+    <name>hdds.x509.rootca.client.polling.interval</name>
     <value>PT2h</value>
-    <description>Frequency to use for polling in certificate clients for a new
+    <description>Interval to use for polling in certificate clients for a new
       root ca certificate. Every time the specified time duration elapses,
       the clients send a request to the SCMs to see if a new root ca
       certificate was generated. Once there is a change, the system

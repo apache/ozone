@@ -43,7 +43,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CLIENT_POLLING_FREQUENCY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL;
 
 /**
  * Test for Root Ca Rotation polling mechanism on client side.
@@ -59,7 +59,7 @@ public class TestRootCaRotationPoller {
   public void setup() {
     MockitoAnnotations.openMocks(this);
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HDDS_X509_ROOTCA_CLIENT_POLLING_FREQUENCY, "PT1s");
+    conf.set(HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL, "PT1s");
     secConf = new SecurityConfig(conf);
   }
 

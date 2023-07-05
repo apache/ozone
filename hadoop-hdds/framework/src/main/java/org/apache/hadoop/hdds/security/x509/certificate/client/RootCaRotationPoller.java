@@ -53,7 +53,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
   private final List<Function<List<X509Certificate>, CompletableFuture<Void>>>
       rootCARotationProcessors;
   private final ScheduledExecutorService poller;
-  private final Duration pollingRate;
+  private final Duration pollingInterval;
   private Set<X509Certificate> knownRootCerts;
   private final SCMSecurityProtocolClientSideTranslatorPB scmSecureClient;
 
@@ -66,7 +66,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         new ThreadFactoryBuilder().setNameFormat(
                 "RootCaRotationPoller")
             .setDaemon(true).build());
-    pollingRate = securityConfig.getRootCaClientPollingFrequency();
+    pollingInterval = securityConfig.getRootCaClientPollingInterval();
     rootCARotationProcessors = new ArrayList<>();
   }
 
@@ -111,7 +111,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
   @Override
   public void run() {
     poller.scheduleAtFixedRate(this::pollRootCas, 0,
-        pollingRate.getSeconds(), TimeUnit.SECONDS);
+        pollingInterval.getSeconds(), TimeUnit.SECONDS);
   }
 
   @Override
