@@ -26,14 +26,19 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import javax.security.auth.x500.X500Principal;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * A {@link TrustManager} implementation that exposes a method,
@@ -55,7 +60,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   /**
    * Current Root CA cert in trustManager, to detect if certificate is changed.
    */
-  private String currentRootCACertId = null;
+  private List<String> currentRootCACertIds = new ArrayList<>();
 
   /**
    * Creates a reloadable trustmanager. The trustmanager reloads itself
@@ -80,7 +85,16 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
       throws CertificateException {
     X509TrustManager tm = trustManagerRef.get();
     if (tm != null) {
-      tm.checkClientTrusted(chain, authType);
+      try {
+        tm.checkClientTrusted(chain, authType);
+      } catch (CertificateException e) {
+        LOG.info("Client certificate chain {} for authType {} is not trusted",
+            chain == null ? "" : Arrays.stream(chain)
+                .map(X509Certificate::getSubjectX500Principal)
+                .map(X500Principal::toString)
+                .collect(Collectors.joining(",")), authType);
+        throw e;
+      }
     } else {
       throw new CertificateException("Unknown client chain certificate: " +
           chain[0].toString());
@@ -92,7 +106,16 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
       throws CertificateException {
     X509TrustManager tm = trustManagerRef.get();
     if (tm != null) {
-      tm.checkServerTrusted(chain, authType);
+      try {
+        tm.checkServerTrusted(chain, authType);
+      } catch (CertificateException e) {
+        LOG.info("Client certificate chain {} for authType {} is not trusted",
+            chain == null ? "" : Arrays.stream(chain)
+                .map(X509Certificate::getSubjectX500Principal)
+                .map(X500Principal::toString)
+                .collect(Collectors.joining(",")), authType);
+        throw e;
+      }
     } else {
       throw new CertificateException("Unknown server chain certificate: " +
           chain[0].toString());
@@ -127,23 +150,22 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
   X509TrustManager loadTrustManager(CertificateClient caClient)
       throws GeneralSecurityException, IOException {
     // SCM certificate client sets root CA as CA cert instead of root CA cert
-    X509Certificate rootCACert = caClient.getRootCACertificate() == null ?
-        caClient.getCACertificate() : caClient.getRootCACertificate();
+    Set<X509Certificate> certList = caClient.getAllRootCaCerts();
+    Set<X509Certificate> rootCACerts = certList.isEmpty() ?
+        caClient.getAllCaCerts() : certList;
 
-    String rootCACertId = rootCACert.getSerialNumber().toString();
     // Certificate keeps the same.
-    if (currentRootCACertId != null &&
-        currentRootCACertId.equals(rootCACertId)) {
+    if (rootCACerts.size() > 0 &&
+        currentRootCACertIds.size() == rootCACerts.size() &&
+        rootCACerts.stream().allMatch(c ->
+            currentRootCACertIds.contains(c.getSerialNumber().toString()))) {
       return null;
     }
 
     X509TrustManager trustManager = null;
     KeyStore ks = KeyStore.getInstance(type);
     ks.load(null, null);
-    Set<X509Certificate> caCertsToInsert =
-        caClient.getRootCACertificate() == null ? caClient.getAllCaCerts() :
-            caClient.getAllRootCaCerts();
-    insertCertsToKeystore(caCertsToInsert, ks);
+    insertCertsToKeystore(rootCACerts, ks);
 
     TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
@@ -155,15 +177,19 @@ public final class ReloadingX509TrustManager implements X509TrustManager {
         break;
       }
     }
-    currentRootCACertId = rootCACertId;
+    currentRootCACertIds.clear();
+    rootCACerts.forEach(
+        c -> currentRootCACertIds.add(c.getSerialNumber().toString()));
     return trustManager;
   }
 
   private void insertCertsToKeystore(Iterable<X509Certificate> certs,
       KeyStore ks) throws KeyStoreException {
+    LOG.info("Trust manager is loaded with certificates");
     for (X509Certificate certToInsert : certs) {
       String certId = certToInsert.getSerialNumber().toString();
       ks.setCertificateEntry(certId, certToInsert);
+      LOG.info(certToInsert.toString());
     }
   }
 }

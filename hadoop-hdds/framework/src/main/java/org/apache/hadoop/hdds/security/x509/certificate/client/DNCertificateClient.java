@@ -99,7 +99,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath) throws CertificateException {
+      Path certificatePath, boolean renew) throws CertificateException {
     try {
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
@@ -113,16 +113,14 @@ public class DNCertificateClient extends DefaultCertificateClient {
             getSecurityConfig(), certificatePath);
         // Certs will be added to cert map after reloadAllCertificate called
         storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec,
-            false);
+            certCodec, false, !renew);
         storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE,
-            certCodec, false);
+            CAType.SUBORDINATE, certCodec, false, !renew);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
+              CAType.ROOT, certCodec, false, !renew);
         }
         // Return the default certificate ID
         return CertificateCodec.getX509Certificate(pemEncodedCert)
