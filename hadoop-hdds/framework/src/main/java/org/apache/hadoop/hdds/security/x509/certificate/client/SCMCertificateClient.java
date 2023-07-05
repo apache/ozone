@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,6 +32,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
@@ -183,8 +185,12 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
+  protected SCMGetCertResponseProto getCertificateSignResponse(PKCS10CertificationRequest request) throws IOException {
+    return null;
+  }
+
   public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath, boolean renew) throws CertificateException {
+      Path certPath, boolean renew) {
     try {
       HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
           HddsProtos.ScmNodeDetailsProto.newBuilder()
@@ -223,5 +229,10 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  protected void startRootCaRotationPoller() {
+    //SCM root CA rotation is handled separately from polling
   }
 }

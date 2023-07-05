@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
@@ -484,15 +484,14 @@ public class TestDefaultCertificateClient {
           }
 
           @Override
-          public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath) {
+          protected SCMGetCertResponseProto getCertificateSignResponse(
+              PKCS10CertificationRequest request) {
             return null;
           }
 
           @Override
           public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath,
-              boolean renew) throws CertificateException {
+              PKCS10CertificationRequest request) {
             return null;
           }
         }) {
@@ -536,10 +535,10 @@ public class TestDefaultCertificateClient {
 
     X509Certificate newCert = generateX509Cert(null);
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
-    SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
-        SCMSecurityProtocolProtos.SCMGetCertResponseProto
-            .newBuilder().setResponseCode(SCMSecurityProtocolProtos
-                .SCMGetCertResponseProto.ResponseCode.success)
+    SCMGetCertResponseProto responseProto =
+        SCMGetCertResponseProto
+            .newBuilder()
+            .setResponseCode(SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
@@ -626,17 +625,17 @@ public class TestDefaultCertificateClient {
     ) {
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath) {
-        return "";
+      protected SCMGetCertResponseProto getCertificateSignResponse(
+          PKCS10CertificationRequest request) {
+        return null;
       }
 
       @Override
-      protected String signAndStoreCertificate(
-          PKCS10CertificationRequest request, Path certificatePath,
-          boolean renew) throws CertificateException {
-        return null;
+      public String signAndStoreCertificate(
+          PKCS10CertificationRequest request) {
+        return "";
       }
+
     };
 
     Thread[] threads = new Thread[Thread.activeCount()];
