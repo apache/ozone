@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -390,7 +389,7 @@ public class TestRocksDBCheckpointDiffer {
       snap.getRocksDB().close();
     }
     for (List<ColumnFamilyHandle> colHandle : colHandles) {
-      for(ColumnFamilyHandle handle : colHandle) {
+      for (ColumnFamilyHandle handle : colHandle) {
         handle.close();
       }
     }
@@ -460,7 +459,8 @@ public class TestRocksDBCheckpointDiffer {
     colHandles.add(colHandle);
     final DifferSnapshotInfo currentSnapshot =
         new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null,
-            ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(), colHandle));
+            ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(),
+                colHandle));
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
