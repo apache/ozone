@@ -1295,38 +1295,39 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
-        if (timeLeft.isZero()) {
-          String newCertId;
-          try {
-            getLogger().info("Current certificate {} has entered the expiry" +
-                    " grace period {}. Starting renew key and certs.",
-                currentCert.getSerialNumber().toString(),
-                timeLeft, securityConfig.getRenewalGracePeriod());
-            newCertId = renewAndStoreKeyAndCertificate(false);
-          } catch (CertificateException e) {
-            if (e.errorCode() ==
-                CertificateException.ErrorCode.ROLLBACK_ERROR) {
-              if (shutdownCallback != null) {
-                getLogger().error("Failed to rollback key and cert after an " +
-                    " unsuccessful renew try.", e);
-                shutdownCallback.run();
-              }
-            }
-            getLogger().error("Failed to renew and store key and cert." +
-                " Keep using existing certificates.", e);
-            return;
-          }
-
-          // Persist new cert serial id in component VERSION file
-          if (certIdSaveCallback != null) {
-            certIdSaveCallback.accept(newCertId);
-          }
-
-          // reset and reload all certs
-          reloadKeyAndCertificate(newCertId);
-          // cleanup backup directory
-          cleanBackupDir();
+        if (!timeLeft.isZero()) {
+          return;
         }
+        String newCertId;
+        try {
+          getLogger().info("Current certificate {} has entered the expiry" +
+                  " grace period {}. Starting renew key and certs.",
+              currentCert.getSerialNumber().toString(),
+              timeLeft, securityConfig.getRenewalGracePeriod());
+          newCertId = renewAndStoreKeyAndCertificate(false);
+        } catch (CertificateException e) {
+          if (e.errorCode() ==
+              CertificateException.ErrorCode.ROLLBACK_ERROR) {
+            if (shutdownCallback != null) {
+              getLogger().error("Failed to rollback key and cert after an " +
+                  " unsuccessful renew try.", e);
+              shutdownCallback.run();
+            }
+          }
+          getLogger().error("Failed to renew and store key and cert." +
+              " Keep using existing certificates.", e);
+          return;
+        }
+
+        // Persist new cert serial id in component VERSION file
+        if (certIdSaveCallback != null) {
+          certIdSaveCallback.accept(newCertId);
+        }
+
+        // reset and reload all certs
+        reloadKeyAndCertificate(newCertId);
+        // cleanup backup directory
+        cleanBackupDir();
       }
     }
   }
