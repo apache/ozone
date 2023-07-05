@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
@@ -1235,9 +1236,47 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return signAndStoreCertificate(request, certificatePath, false);
   }
 
-  protected abstract String signAndStoreCertificate(
+  protected abstract SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) throws IOException;
+
+  protected String signAndStoreCertificate(
       PKCS10CertificationRequest request, Path certificatePath, boolean renew)
-      throws CertificateException;
+      throws CertificateException {
+    try {
+      SCMGetCertResponseProto response = getCertificateSignResponse(request);
+
+      // Persist certificates.
+      if (response.hasX509CACertificate()) {
+        String pemEncodedCert = response.getX509Certificate();
+        CertificateCodec certCodec = new CertificateCodec(
+            getSecurityConfig(), certificatePath);
+        // Certs will be added to cert map after reloadAllCertificate called
+        storeCertificate(pemEncodedCert, CAType.NONE,
+            certCodec, false, !renew);
+        storeCertificate(response.getX509CACertificate(),
+            CAType.SUBORDINATE, certCodec, false, !renew);
+
+        // Store Root CA certificate.
+        if (response.hasX509RootCACertificate()) {
+          storeCertificate(response.getX509RootCACertificate(),
+              CAType.ROOT, certCodec, false, !renew);
+        }
+        // Return the default certificate ID
+        return CertificateCodec.getX509Certificate(pemEncodedCert)
+            .getSerialNumber()
+            .toString();
+      } else {
+        throw new CertificateException("Unable to retrieve " +
+            "certificate chain.");
+      }
+    } catch (IOException | java.security.cert.CertificateException e) {
+      logger.error("Error while signing and storing SCM signed certificate.",
+          e);
+      throw new CertificateException(
+          "Error while signing and storing SCM signed certificate.", e);
+    }
+  }
+
 
   public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
