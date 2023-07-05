@@ -91,28 +91,47 @@ For reliable HA support choose 3 independent nodes to form a quorum.
 
 ## Bootstrap
 
-The initialization of the **first** SCM-HA node is the same as a none-HA SCM:
+The initialization of the **first** SCM-HA node is the same as a non-HA SCM:
 
 ```
-bin/ozone scm --init
+ozone scm --init
 ```
 
 Second and third nodes should be *bootstrapped* instead of init. These clusters will join to the configured RAFT quorum. The id of the current server is identified by DNS name or can be set explicitly by `ozone.scm.node.id`. Most of the time you don't need to set it as DNS based id detection can work well.
 
 ```
-bin/ozone scm --bootstrap
+ozone scm --bootstrap
 ```
+
+Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone scm --daemon start`.
 
 ## Auto-bootstrap
 
-In some environment -- such as containerized / K8s environment -- we need to have a common, unified way to initialize SCM HA quorum. As a remained, the standard initialization flow is the following:
+In some environments (e.g. Kubernetes) we need to have a common, unified way to initialize SCM HA quorum. As a reminder, the standard initialization flow is the following:
 
- 1. On the first, "primordial" node, call `scm --init`
- 2. On second/third nodes call `scm --bootstrap`
+ 1. On the first, "primordial" node: `ozone scm --init`
+ 2. On second/third nodes: `ozone scm --bootstrap`
 
-This can be changed with using `ozone.scm.primordial.node.id`. You can define the primordial node. After setting this node, you should execute **both** `scm --init` and `scm --bootstrap` on **all** nodes.
+This can be improved: primordial SCM can be configured by setting `ozone.scm.primordial.node.id` in the config to one of the nodes.
 
-Based on the `ozone.scm.primordial.node.id`, the init process will be ignored on the second/third nodes and bootstrap process will be ignored on all nodes except the primordial one.
+```XML
+<property>
+   <name>ozone.scm.primordial.node.id</name>
+   <value>scm1</value>
+</property>
+```
+
+With this configuration both `scm --init` and `scm --bootstrap` can be safely executed on **all** SCM nodes.  Each node will only perform the action applicable to it based on the `ozone.scm.primordial.node.id` and its own node ID.
+
+Note: SCM still needs to be started after the init/bootstrap process.
+
+```
+ozone scm --init
+ozone scm --bootstrap
+ozone scm --daemon start
+```
+
+For Docker/Kubernetes, use `ozone scm` to start it in the foreground.
 
 ## SCM HA Security
 
