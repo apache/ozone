@@ -103,7 +103,7 @@ Second and third nodes should be *bootstrapped* instead of init. These clusters 
 ozone scm --bootstrap
 ```
 
-Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone scm`.
+Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone scm --daemon start`.
 
 ## Auto-bootstrap
 
@@ -123,13 +123,15 @@ This can be improved: primordial SCM can be configured by setting `ozone.scm.pri
 
 With this configuration both `scm --init` and `scm --bootstrap` can be safely executed on **all** SCM nodes.  Each node will only perform the action applicable to it based on the `ozone.scm.primordial.node.id` and its own node ID.
 
-Note: SCM still needs to be started by running `ozone scm` after the init/bootstrap process.
+Note: SCM still needs to be started after the init/bootstrap process.
 
 ```
 ozone scm --init
 ozone scm --bootstrap
-ozone scm
+ozone scm --daemon start
 ```
+
+For Docker/Kubernetes, use `ozone scm` to start it in the foreground.
 
 ## SCM HA Security
 
