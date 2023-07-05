@@ -347,8 +347,11 @@ public class KeyValueContainerCheck {
         }
       } else if (chunk.getChecksumData().getType()
           != ContainerProtos.ChecksumType.NONE) {
-        return verifyChecksum(block, chunk, chunkFile, layout, throttler,
-            canceler);
+        ScanResult result = verifyChecksum(block, chunk, chunkFile, layout,
+            throttler, canceler);
+        if (!result.isHealthy()) {
+          return result;
+        }
       }
     }
 
