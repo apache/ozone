@@ -133,7 +133,7 @@ public class SecurityConfig {
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
   private final Duration caAckTimeout;
   private final SslProvider grpcSSLProvider;
-  private final Duration rootCaClientPollingFrequency;
+  private final Duration rootCaClientPollingInterval;
 
   /**
    * Constructs a SecurityConfig.
@@ -231,12 +231,12 @@ public class SecurityConfig {
 
     validateCertificateValidityConfig();
 
-    String rootCaClientPollingFrequencyString = configuration.get(
+    String rootCaClientPollingIntervalString = configuration.get(
         HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL,
         HDDS_X509_ROOTCA_CLIENT_POLLING_INTERVAL_DEFAULT);
 
-    this.rootCaClientPollingFrequency =
-        Duration.parse(rootCaClientPollingFrequencyString);
+    this.rootCaClientPollingInterval =
+        Duration.parse(rootCaClientPollingIntervalString);
 
     this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
@@ -563,7 +563,7 @@ public class SecurityConfig {
   }
 
   public Duration getRootCaClientPollingInterval() {
-    return rootCaClientPollingFrequency;
+    return rootCaClientPollingInterval;
   }
 
   /**
