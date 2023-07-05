@@ -16,15 +16,16 @@
 # limitations under the License.
 
 retry() {
-   n=0
-   until [ $n -ge 100 ]
+   local -i n=0
+   local -i attempts=${RETRY_ATTEMPTS:-100}
+   until [ $n -ge $attempts ]
    do
       "$@" && break
       n=$[$n+1]
       echo "$n '$@' is failed..."
       sleep ${RETRY_SLEEP:-3}
    done
-   if [ $n -eq 100 ]; then
+   if [ $n -eq $attempts ]; then
       return 255
    fi
 }
