@@ -44,7 +44,3 @@ done
 
 execute_robot_test ${SCM} freon
 execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
-
-stop_docker_env
-
-generate_report

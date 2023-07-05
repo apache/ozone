@@ -68,7 +68,3 @@ start_docker_env
 # Writes should now succeed.
 execute_robot_test scm topology/loaddata.robot
 execute_robot_test scm topology/readdata.robot
-
-stop_docker_env
-
-generate_report
