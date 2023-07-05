@@ -1262,7 +1262,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize(),
             snapshotDiffRequest.getForceFullDiff(),
-            snapshotDiffRequest.getForceNonNativeDiff());
+            snapshotDiffRequest.getDisableNativeDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())

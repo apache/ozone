@@ -727,7 +727,7 @@ public interface OzoneManagerProtocol
                                             String token,
                                             int pageSize,
                                             boolean forceFullDiff,
-                                            boolean forceNonNativeDiff)
+                                            boolean disableNativeDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

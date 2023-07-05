@@ -1076,7 +1076,7 @@ public interface ClientProtocol {
                                     String fromSnapshot, String toSnapshot,
                                     String token, int pageSize,
                                     boolean forceFullDiff,
-                                    boolean forceNonNativeDiff)
+                                    boolean disableNativeDiff)
       throws IOException;
 
   /**

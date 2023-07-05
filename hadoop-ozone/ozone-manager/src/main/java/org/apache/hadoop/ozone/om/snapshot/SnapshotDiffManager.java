@@ -787,14 +787,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       String fromSnapshotName,
       String toSnapshotName,
       boolean forceFullDiff,
-      boolean forceNonNativeDiff) {
+      boolean disableNativeDiff) {
     SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
 
     if (snapDiffJob == null) {
       String jobId = UUID.randomUUID().toString();
       snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
           QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, forceNonNativeDiff, 0L);
+          forceFullDiff, disableNativeDiff, 0L);
       snapDiffJobTable.put(jobKey, snapDiffJob);
     }
 
@@ -1698,7 +1698,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               snapshotDiffJob.getFromSnapshot(),
               snapshotDiffJob.getToSnapshot(),
               snapshotDiffJob.isForceFullDiff(),
-              snapshotDiffJob.isForceNonNativeDiff());
+              snapshotDiffJob.isNativeDiffDisabled());
         }
       }
     }

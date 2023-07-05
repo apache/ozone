@@ -181,7 +181,7 @@ public class TestOmSnapshot {
 
   public TestOmSnapshot(BucketLayout newBucketLayout,
       boolean newEnableFileSystemPaths, boolean forceFullSnapDiff,
-      boolean forceNonNativeSnapDiff)
+      boolean disableNativeDiff)
       throws Exception {
     // Checking whether 'newBucketLayout' and
     // 'newEnableFileSystemPaths' flags represents next parameter
@@ -192,9 +192,9 @@ public class TestOmSnapshot {
             TestOmSnapshot.bucketLayout != newBucketLayout ||
             TestOmSnapshot.forceFullSnapshotDiff != forceFullSnapDiff ||
             TestOmSnapshot.disableNativeDiff
-                != forceNonNativeSnapDiff) {
+                != disableNativeDiff) {
       setConfig(newBucketLayout, newEnableFileSystemPaths,
-          forceFullSnapDiff, forceNonNativeSnapDiff);
+          forceFullSnapDiff, disableNativeDiff);
       tearDown();
       init();
     }
@@ -696,13 +696,17 @@ public class TestOmSnapshot {
    * 3) Key k1 is deleted.
    * 4) Key k1 is recreated.
    * 5) Snapshot snap2 is created.
-   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 2 keys.
-   * 7) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 0 key.
+   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 2 keys.
+   * 7) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference
+   *    of 0 key.
    * 8) Checking rocks db to ensure the object created shouldn't be reclaimed
    *    as it is used by snapshot.
    * 9) Key k1 is deleted.
-   * 10) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key.
-   * 11) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 1 key.
+   * 10) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *     of 1 key.
+   * 11) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference
+   *     of 1 key.
    */
   @Test
   public void testSnapDiffReclaimWithKeyRecreation() throws Exception {
@@ -858,7 +862,8 @@ public class TestOmSnapshot {
    * 3) Key k1 is renamed to renamed-k1.
    * 4) Key k1 is recreated.
    * 5) Key k1 is deleted.
-   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key.
+   * 6) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 1 key.
    */
   @Test
   public void testSnapDiffWithKeyRenamesRecreationAndDelete()
@@ -901,8 +906,10 @@ public class TestOmSnapshot {
    * 2) Key k1 is created.
    * 3) Key k1 is deleted.
    * 4) Snapshot s2 is created before key k1 is reclaimed.
-   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 0 keys.
-   * 6) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 0 keys.
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 0 keys.
+   * 6) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference
+   *    of 0 keys.
    */
   @Test
   public void testSnapDiffReclaimWithDeferredKeyDeletion() throws Exception {
@@ -935,8 +942,8 @@ public class TestOmSnapshot {
    * 2) Snapshot snap1 created.
    * 3) Key k1 is renamed to key k1_renamed
    * 4) Key k1_renamed is renamed to key k1
-   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 1 key
-   *    with 1 Modified entry.
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 1 key with 1 Modified entry.
    */
   @Test
   public void testSnapDiffWithNoEffectiveRename() throws Exception {
@@ -975,7 +982,8 @@ public class TestOmSnapshot {
    * 2) Snapshot snap1 created.
    * 3) Dir dir1/dir2 is created.
    * 4) Key k1 is renamed to key dir1/dir2/k1_renamed
-   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 3 key
+   * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference
+   *    of 3 key
    *    with 1 rename entry & 2 dirs create entry.
    */
   @Test

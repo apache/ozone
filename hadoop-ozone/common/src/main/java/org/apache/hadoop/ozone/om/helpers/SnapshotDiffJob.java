@@ -48,7 +48,7 @@ public class SnapshotDiffJob {
   private String fromSnapshot;
   private String toSnapshot;
   private boolean forceFullDiff;
-  private boolean forceNonNativeDiff;
+  private boolean disableNativeDiff;
   private long totalDiffEntries;
 
   // Reason tells why the job was FAILED. It should be set only if job status
@@ -69,7 +69,7 @@ public class SnapshotDiffJob {
                          String fromSnapshot,
                          String toSnapshot,
                          boolean forceFullDiff,
-                         boolean forceNonNativeDiff,
+                         boolean disableNativeDiff,
                          long totalDiffEntries) {
     this.creationTime = creationTime;
     this.jobId = jobId;
@@ -79,7 +79,7 @@ public class SnapshotDiffJob {
     this.fromSnapshot = fromSnapshot;
     this.toSnapshot = toSnapshot;
     this.forceFullDiff = forceFullDiff;
-    this.forceNonNativeDiff = forceNonNativeDiff;
+    this.disableNativeDiff = disableNativeDiff;
     this.totalDiffEntries = totalDiffEntries;
     this.reason = StringUtils.EMPTY;
   }
@@ -164,12 +164,12 @@ public class SnapshotDiffJob {
     this.reason = reason;
   }
 
-  public boolean isForceNonNativeDiff() {
-    return forceNonNativeDiff;
+  public boolean isNativeDiffDisabled() {
+    return disableNativeDiff;
   }
 
-  public void setForceNonNativeDiff(boolean forceNonNativeDiff) {
-    this.forceNonNativeDiff = forceNonNativeDiff;
+  public void disableNativeDiff(boolean disableNativeDiffVal) {
+    this.disableNativeDiff = disableNativeDiffVal;
   }
 
   @Override
@@ -182,7 +182,7 @@ public class SnapshotDiffJob {
         .append(", fromSnapshot: ").append(fromSnapshot)
         .append(", toSnapshot: ").append(toSnapshot)
         .append(", forceFullDiff: ").append(forceFullDiff)
-        .append(", forceNonNativeDiff: ").append(forceNonNativeDiff)
+        .append(", disableNativeDiff: ").append(disableNativeDiff)
         .append(", totalDiffEntries: ").append(totalDiffEntries);
 
     if (StringUtils.isNotEmpty(reason)) {
@@ -208,7 +208,7 @@ public class SnapshotDiffJob {
           Objects.equals(this.toSnapshot, otherJob.toSnapshot) &&
           Objects.equals(this.forceFullDiff, otherJob.forceFullDiff) &&
           Objects.equals(this.totalDiffEntries, otherJob.totalDiffEntries) &&
-          Objects.equals(this.forceNonNativeDiff, otherJob.forceNonNativeDiff)
+          Objects.equals(this.disableNativeDiff, otherJob.disableNativeDiff)
           && Objects.equals(this.reason, otherJob.reason);
     }
     return false;
@@ -217,7 +217,7 @@ public class SnapshotDiffJob {
   @Override
   public int hashCode() {
     return Objects.hash(creationTime, jobId, status, volume, bucket,
-        fromSnapshot, toSnapshot, forceFullDiff, forceNonNativeDiff,
+        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff,
         totalDiffEntries, reason);
   }
 
@@ -231,7 +231,7 @@ public class SnapshotDiffJob {
         .setFromSnapshot(fromSnapshot)
         .setToSnapshot(toSnapshot)
         .setForceFullDiff(forceFullDiff)
-        .setForceNonNativeDiff(forceNonNativeDiff)
+        .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
         .build();
   }
@@ -247,7 +247,7 @@ public class SnapshotDiffJob {
         diffJobProto.getFromSnapshot(),
         diffJobProto.getToSnapshot(),
         diffJobProto.getForceFullDiff(),
-        diffJobProto.getForceNonNativeDiff(),
+        diffJobProto.getDisableNativeDiff(),
         diffJobProto.getTotalDiffEntries());
   }
 

@@ -639,7 +639,7 @@ public class ClientProtocolStub implements ClientProtocol {
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
-                                           boolean forceNonNativeDiff)
+                                           boolean disableNativeDiff)
       throws IOException {
     return null;
   }

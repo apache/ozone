@@ -1229,7 +1229,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
-                                           boolean forceNonNativeDiff)
+                                           boolean disableNativeDiff)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1240,7 +1240,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
             .setForceFullDiff(forceFullDiff)
-            .setForceNonNativeDiff(forceNonNativeDiff);
+            .setDisableNativeDiff(disableNativeDiff);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);
