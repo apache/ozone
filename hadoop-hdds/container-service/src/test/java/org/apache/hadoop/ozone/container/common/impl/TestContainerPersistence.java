@@ -352,6 +352,9 @@ public class TestContainerPersistence {
     // Block data and metadata tables should have data.
     assertContainerInSchema3DB(containerData, blockID);
 
+    KeyValueContainerUtil.removeContainerDB(
+        container.getContainerData(),
+        container.getContainerData().getVolume().getConf());
     container.delete();
     containerSet.removeContainer(testContainerID);
     Assert.assertFalse(containerSet.getContainerMapCopy()
@@ -482,6 +485,9 @@ public class TestContainerPersistence {
 
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
+    KeyValueContainerUtil.removeContainerDB(
+        container1.getContainerData(),
+        container1.getContainerData().getVolume().getConf());
     container1.delete();
     assertContainerNotInSchema3DB(container1Data, container1Block);
     assertContainerInSchema3DB(container2Data, container2Block);
@@ -493,6 +499,9 @@ public class TestContainerPersistence {
     Assert.assertEquals(deleteDirFilesArray[0], container2Dir);
 
     // Delete container2 from the disk.
+    KeyValueContainerUtil.removeContainerDB(
+        container2.getContainerData(),
+        container2.getContainerData().getVolume().getConf());
     container2.delete();
     assertContainerNotInSchema3DB(container1Data, container1Block);
     assertContainerNotInSchema3DB(container2Data, container2Block);
