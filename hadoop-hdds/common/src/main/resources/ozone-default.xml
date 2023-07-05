@@ -3943,7 +3943,7 @@
   </property>
 
   <property>
-    <name>ozone.om.snapshot.force.non.native.diff</name>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
     <description>

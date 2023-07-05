@@ -151,7 +151,7 @@ public class TestOmSnapshot {
   private static BucketLayout bucketLayout = BucketLayout.LEGACY;
   private static boolean enabledFileSystemPaths;
   private static boolean forceFullSnapshotDiff;
-  private static boolean forceNonNativeSnapshotDiff;
+  private static boolean disableNativeDiff;
   private static ObjectStore store;
   private static OzoneManager ozoneManager;
   private static RDBStore rdbStore;
@@ -191,7 +191,7 @@ public class TestOmSnapshot {
     if (TestOmSnapshot.enabledFileSystemPaths != newEnableFileSystemPaths ||
             TestOmSnapshot.bucketLayout != newBucketLayout ||
             TestOmSnapshot.forceFullSnapshotDiff != forceFullSnapDiff ||
-            TestOmSnapshot.forceNonNativeSnapshotDiff
+            TestOmSnapshot.disableNativeDiff
                 != forceNonNativeSnapDiff) {
       setConfig(newBucketLayout, newEnableFileSystemPaths,
           forceFullSnapDiff, forceNonNativeSnapDiff);
@@ -206,7 +206,7 @@ public class TestOmSnapshot {
     TestOmSnapshot.enabledFileSystemPaths = newEnableFileSystemPaths;
     TestOmSnapshot.bucketLayout = newBucketLayout;
     TestOmSnapshot.forceFullSnapshotDiff = forceFullSnapDiff;
-    TestOmSnapshot.forceNonNativeSnapshotDiff = forceNonNativeSnapDiff;
+    TestOmSnapshot.disableNativeDiff = forceNonNativeSnapDiff;
   }
 
   /**
@@ -222,8 +222,8 @@ public class TestOmSnapshot {
         bucketLayout.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         forceFullSnapshotDiff);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_NON_NATIVE_DIFF,
-        forceNonNativeSnapshotDiff);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
+        disableNativeDiff);
     String omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
@@ -285,7 +285,7 @@ public class TestOmSnapshot {
         store.snapshotDiff(volumeName, bucketName,
             UUID.randomUUID().toString(),
             UUID.randomUUID().toString(),
-          "", 1000, false, forceNonNativeSnapshotDiff));
+          "", 1000, false, disableNativeDiff));
     expectFailurePreFinalization(() ->
         store.deleteSnapshot(volumeName, bucketName,
             UUID.randomUUID().toString()));
@@ -598,8 +598,8 @@ public class TestOmSnapshot {
     }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             deletedDirTableIterator = metadataManager.getDeletedDirTable()
-            .iterator()) {
+         deletedDirTableIterator = metadataManager.getDeletedDirTable()
+        .iterator()) {
       while (deletedDirTableIterator.hasNext()) {
         deletedKeys.add(deletedDirTableIterator.next().getValue());
       }
@@ -685,8 +685,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
-    diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap2, snap3);
+    diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
   }
 
@@ -733,20 +732,17 @@ public class TestOmSnapshot {
             SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1),
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.CREATE, OZONE_URI_DELIMITER + key1)));
-    diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap2, snap3);
+    diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
     bucket.deleteKey(key1);
     String snap4 = "snap4";
     createSnapshot(testVolumeName, testBucketName, snap4);
-    diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap1, snap4);
+    diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap4);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
-    diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap2, snap4);
+    diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap4);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
@@ -778,12 +774,12 @@ public class TestOmSnapshot {
     bucket.renameKey(key1, renamedKey);
     GenericTestUtils.waitFor(() -> {
       try {
-          getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
-        } catch (IOException e) {
-          return false;
-        }
-        return true;
-      }, 1000, 10000);
+        getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 1000, 10000);
     getOmKeyInfo(testVolumeName, testBucketName, renamedKey);
     bucket.deleteKey(renamedKey);
     String snap2 = "snap2";
@@ -847,7 +843,7 @@ public class TestOmSnapshot {
     createSnapshot(testVolumeName, testBucketName,
             snap3);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap1, snap3);
+        snap1, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
@@ -884,12 +880,12 @@ public class TestOmSnapshot {
     String snap3 = "snap3";
     createSnapshot(testVolumeName, testBucketName, snap3);
     getSnapDiffReport(testVolumeName, testBucketName,
-            snap1, snap3);
+        snap1, snap3);
     bucket.deleteKey(key1);
     String activeSnap = "activefs";
     createSnapshot(testVolumeName, testBucketName, activeSnap);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap1, activeSnap);
+        snap1, activeSnap);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
@@ -904,7 +900,7 @@ public class TestOmSnapshot {
    * 1) Snapshot snap1 created.
    * 2) Key k1 is created.
    * 3) Key k1 is deleted.
-   * 4) Snapshot s2 is created instantly before the key k1 is deleted.
+   * 4) Snapshot s2 is created before key k1 is reclaimed.
    * 5) Snapdiff b/w snapshot of Active FS & snap1 taken to assert difference of 0 keys.
    * 6) Snapdiff b/w snapshot of Active FS & snap2 taken to assert difference of 0 keys.
    */
@@ -927,10 +923,9 @@ public class TestOmSnapshot {
     String activeSnap = "activefs";
     createSnapshot(testVolumeName, testBucketName, activeSnap);
     SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap1, activeSnap);
+        snap1, activeSnap);
     Assert.assertEquals(diff.getDiffList().size(), 0);
-    diff = getSnapDiffReport(testVolumeName, testBucketName,
-            snap2, activeSnap);
+    diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, activeSnap);
     Assert.assertEquals(diff.getDiffList().size(), 0);
   }
 
@@ -1319,7 +1314,7 @@ public class TestOmSnapshot {
     createSnapshot(volumeName, bucketName, toSnapName);
 
     SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
-        fromSnapName, toSnapName, null, 0, false, forceNonNativeSnapshotDiff);
+        fromSnapName, toSnapName, null, 0, false, disableNativeDiff);
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
@@ -1329,7 +1324,7 @@ public class TestOmSnapshot {
 
     assertEquals(CANCEL_SUCCEEDED.getMessage(), cancelResponse.getMessage());
     response = store.snapshotDiff(volumeName, bucketName, fromSnapName,
-        toSnapName, null, 0, false, forceNonNativeSnapshotDiff);
+        toSnapName, null, 0, false, disableNativeDiff);
 
     // Job status should be updated to CANCELLED.
     assertEquals(CANCELLED, response.getJobStatus());
@@ -1344,7 +1339,7 @@ public class TestOmSnapshot {
 
     response = store.snapshotDiff(volumeName,
         bucketName, fromSnapName, toSnapName,
-        null, 0, false, forceNonNativeSnapshotDiff);
+        null, 0, false, disableNativeDiff);
     assertEquals(CANCELLED, response.getJobStatus());
 
     String fromSnapshotTableKey =
@@ -1399,7 +1394,7 @@ public class TestOmSnapshot {
 
     SnapshotDiffResponse response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
-        null, 0, false, forceNonNativeSnapshotDiff);
+        null, 0, false, disableNativeDiff);
 
     Assert.assertEquals(IN_PROGRESS, response.getJobStatus());
 
@@ -1412,7 +1407,7 @@ public class TestOmSnapshot {
 
     response = store.snapshotDiff(
         volumeName, bucketName, fromSnapName, toSnapName,
-        null, 0, false, forceNonNativeSnapshotDiff);
+        null, 0, false, disableNativeDiff);
 
     Assert.assertEquals(CANCELLED, response.getJobStatus());
 
@@ -1432,7 +1427,7 @@ public class TestOmSnapshot {
     do {
       response = store.snapshotDiff(volume, bucket, fromSnapshot,
           toSnapshot, null, 0, forceFullSnapshotDiff,
-          forceNonNativeSnapshotDiff);
+          disableNativeDiff);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
 
@@ -1456,12 +1451,12 @@ public class TestOmSnapshot {
     // Destination snapshot is invalid
     OMException omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap1, snap2,
-            null, 0, false, forceNonNativeSnapshotDiff));
+            null, 0, false, disableNativeDiff));
     assertEquals(KEY_NOT_FOUND, omException.getResult());
     // From snapshot is invalid
     omException = assertThrows(OMException.class,
         () -> store.snapshotDiff(volume, bucket, snap2, snap1,
-            null, 0, false, forceNonNativeSnapshotDiff));
+            null, 0, false, disableNativeDiff));
 
     assertEquals(KEY_NOT_FOUND, omException.getResult());
 
@@ -1469,7 +1464,7 @@ public class TestOmSnapshot {
 
     omException = assertThrows(OMException.class, () ->
         store.snapshotDiff(volume, bucket, snap2, snap1, null, 0, false,
-            forceNonNativeSnapshotDiff)
+            disableNativeDiff)
     );
 
     assertEquals(INTERNAL_ERROR, omException.getResult());
@@ -1500,19 +1495,19 @@ public class TestOmSnapshot {
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
             () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff));
+                null, 0, forceFullSnapshotDiff, disableNativeDiff));
     // Volume is nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
             () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
                 null, 0, forceFullSnapshotDiff,
-                forceNonNativeSnapshotDiff));
+                disableNativeDiff));
     // Both volume and bucket are nonexistent
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
             () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
                 null, 0, forceFullSnapshotDiff,
-                forceNonNativeSnapshotDiff));
+                disableNativeDiff));
   }
 
   /**
@@ -1568,20 +1563,20 @@ public class TestOmSnapshot {
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
             () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff));
+                null, 0, forceFullSnapshotDiff, disableNativeDiff));
     // From snapshot is empty
     LambdaTestUtils.intercept(OMException.class,
             "KEY_NOT_FOUND",
             () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff));
+                null, 0, forceFullSnapshotDiff, disableNativeDiff));
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff));
+                null, 0, forceFullSnapshotDiff, disableNativeDiff));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.snapshotDiff(nullstr, bucket, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff));
+                null, 0, forceFullSnapshotDiff, disableNativeDiff));
   }
 
   @Test
@@ -1652,7 +1647,7 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap2);
 
     store.snapshotDiff(volume, bucket, snap1, snap2, null, 0,
-        forceFullSnapshotDiff, forceNonNativeSnapshotDiff);
+        forceFullSnapshotDiff, disableNativeDiff);
 
     String invalidStatus = "invalid";
     String statusErrorMessage = "Invalid job status: " + invalidStatus;
@@ -1707,7 +1702,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(4, getKeyTableSstFiles().size());
     SnapshotDiffReportOzone diff1 =
         store.snapshotDiff(volumeName1, bucketName1, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, forceNonNativeSnapshotDiff)
+                null, 0, forceFullSnapshotDiff, disableNativeDiff)
             .getSnapshotDiffReport();
     Assert.assertEquals(1, diff1.getDiffList().size());
   }
@@ -1900,7 +1895,7 @@ public class TestOmSnapshot {
 
     SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
         snapshot1, snapshot2, null, 0, forceFullSnapshotDiff,
-        forceNonNativeSnapshotDiff);
+        disableNativeDiff);
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
@@ -1912,7 +1907,7 @@ public class TestOmSnapshot {
 
     response = store.snapshotDiff(volumeName, bucketName,
         snapshot1, snapshot2, null, 0, forceFullSnapshotDiff,
-        forceNonNativeSnapshotDiff);
+        disableNativeDiff);
 
     // If job was IN_PROGRESS or DONE state when OM restarted, it should be
     // DONE by this time.
@@ -1971,7 +1966,7 @@ public class TestOmSnapshot {
     while (true) {
       SnapshotDiffResponse response = store.snapshotDiff(volumeName, bucketName,
           fromSnapshot, toSnapshot, token, pageSize, forceFullSnapshotDiff,
-          forceNonNativeSnapshotDiff);
+          disableNativeDiff);
       if (response.getJobStatus() == IN_PROGRESS) {
         Thread.sleep(response.getWaitTimeInMs());
       } else if (response.getJobStatus() == DONE) {

@@ -112,8 +112,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_NON_NATIVE_DIFF;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_NON_NATIVE_DIFF_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -186,7 +186,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean snapshotForceFullDiff;
 
-  private final boolean forceNonNativeSnapdiff;
+  private final boolean diffDisableNativeLibs;
 
   private final Optional<ManagedSSTDumpTool> sstDumpTool;
 
@@ -223,9 +223,9 @@ public class SnapshotDiffManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF,
         OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT);
 
-    this.forceNonNativeSnapdiff = ozoneManager.getConfiguration().getBoolean(
-        OZONE_OM_SNAPSHOT_FORCE_NON_NATIVE_DIFF,
-        OZONE_OM_SNAPSHOT_FORCE_NON_NATIVE_DIFF_DEFAULT);
+    this.diffDisableNativeLibs = ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
+        OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT);
 
     this.maxAllowedKeyChangesForASnapDiff = ozoneManager.getConfiguration()
         .getLong(
@@ -511,7 +511,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int index,
       final int pageSize,
       final boolean forceFullDiff,
-      final boolean forceNonNativeDiff
+      final boolean disableNativeDiff
   ) throws IOException {
 
     SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
@@ -523,7 +523,7 @@ public class SnapshotDiffManager implements AutoCloseable {
 
     SnapshotDiffJob snapDiffJob = getSnapDiffReportStatus(snapDiffJobKey,
         volumeName, bucketName, fromSnapshotName, toSnapshotName,
-        forceFullDiff, forceNonNativeDiff);
+        forceFullDiff, disableNativeDiff);
 
     OFSPath snapshotRoot = getSnapshotRootPath(volumeName, bucketName);
 
@@ -531,7 +531,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     case QUEUED:
       return submitSnapDiffJob(snapDiffJobKey, volumeName, bucketName,
           fromSnapshotName, toSnapshotName, index, pageSize, forceFullDiff,
-          forceNonNativeDiff);
+          disableNativeDiff);
     case IN_PROGRESS:
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
@@ -677,7 +677,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int index,
       final int pageSize,
       final boolean forceFullDiff,
-      final boolean forceNonNativeDiff
+      final boolean disableNativeDiff
   ) throws IOException {
 
     SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
@@ -715,7 +715,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
 
     return submitSnapDiffJob(jobKey, snapDiffJob.getJobId(), volume, bucket,
-        fromSnapshot, toSnapshot, forceFullDiff, forceNonNativeDiff);
+        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
   }
 
   @SuppressWarnings("parameternumber")
@@ -727,7 +727,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String fromSnapshotName,
       final String toSnapshotName,
       final boolean forceFullDiff,
-      final boolean forceNonNativeDiff) {
+      final boolean disableNativeDiff) {
 
     LOG.info("Submitting snap diff report generation request for" +
             " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
@@ -741,7 +741,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     try {
       snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, forceNonNativeDiff));
+          forceFullDiff, disableNativeDiff));
       updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
@@ -831,7 +831,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                                   final String fromSnapshotName,
                                   final String toSnapshotName,
                                   final boolean forceFullDiff,
-                                  final boolean forceNonNative) {
+                                  final boolean disableNativeDiff) {
     LOG.info("Started snap diff report generation for volume: '{}', " +
             "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
@@ -905,7 +905,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               bucketName);
 
       boolean useFullDiff = snapshotForceFullDiff || forceFullDiff;
-      boolean performNonNativeDiff = forceNonNativeSnapdiff || forceNonNative;
+      boolean performNonNativeDiff = diffDisableNativeLibs || disableNativeDiff;
 
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
           fromSnapshotName, toSnapshotName)) {

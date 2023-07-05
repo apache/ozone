@@ -68,11 +68,11 @@ public class SnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean cancel;
 
-  @CommandLine.Option(names = {"--fnnd", "--force-non-native-diff"},
+  @CommandLine.Option(names = {"--dnld", "--disable-native-libs-diff"},
       description = "perform diff of snapshot without using" +
           " native libs (optional)",
       hidden = true)
-  private boolean forceNonNativeDiff;
+  private boolean diffDisableNativeLibs;
 
   @Override
   protected OzoneAddress getAddress() {
@@ -99,7 +99,7 @@ public class SnapshotDiffHandler extends Handler {
                                String bucketName) throws IOException {
     try (PrintStream stream = out()) {
       stream.print(store.snapshotDiff(volumeName, bucketName, fromSnapshot,
-          toSnapshot, token, pageSize, forceFullDiff, forceNonNativeDiff));
+          toSnapshot, token, pageSize, forceFullDiff, diffDisableNativeLibs));
     }
   }
 

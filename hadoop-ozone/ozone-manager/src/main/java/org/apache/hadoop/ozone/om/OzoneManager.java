@@ -4602,11 +4602,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String token,
                                            int pageSize,
                                            boolean forceFullDiff,
-                                           boolean forceNonNativeDiff)
+                                           boolean disableNativeDiff)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
         fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
-        forceNonNativeDiff);
+        disableNativeDiff);
   }
 
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
