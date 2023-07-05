@@ -1265,10 +1265,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder().setNameFormat(
-              getComponentName() + "-CertificateLifetimeMonitor")
+                  getComponentName() + "-CertificateLifetimeMonitor")
               .setDaemon(true).build());
     }
-    this.executorService.scheduleAtFixedRate(new CertificateRenewerService(),
+    this.executorService.scheduleAtFixedRate(
+        new CertificateRenewerService(false),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1276,11 +1277,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   /**
-   *  Task to monitor certificate lifetime and renew the certificate if needed.
+   * Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateRenewerService implements Runnable {
+    private boolean forceRenewal;
 
-    public CertificateRenewerService() {
+    public CertificateRenewerService(boolean forceRenewal) {
+      this.forceRenewal = forceRenewal;
     }
 
     @Override
@@ -1295,7 +1298,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
-        if (!timeLeft.isZero()) {
+        if (forceRenewal && !timeLeft.isZero()) {
           return;
         }
         String newCertId;
@@ -1304,7 +1307,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
                   " grace period {}. Starting renew key and certs.",
               currentCert.getSerialNumber().toString(),
               timeLeft, securityConfig.getRenewalGracePeriod());
-          newCertId = renewAndStoreKeyAndCertificate(false);
+          newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
         } catch (CertificateException e) {
           if (e.errorCode() ==
               CertificateException.ErrorCode.ROLLBACK_ERROR) {
