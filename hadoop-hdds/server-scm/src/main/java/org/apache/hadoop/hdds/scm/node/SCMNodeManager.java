@@ -124,8 +124,7 @@ public class SCMNodeManager implements NodeManager {
   private final NetworkTopology clusterMap;
   private final DNSToSwitchMapping dnsToSwitchMapping;
   private final boolean useHostname;
-  private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
-      new ConcurrentHashMap<>();
+  private final Map<String, Set<UUID>> dnsToUuidMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
@@ -400,7 +399,7 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        addToDnsToUuidMap(dnsName, datanodeDetails.getUuid());
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
         LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
@@ -434,9 +433,7 @@ public class SCMNodeManager implements NodeManager {
           } else {
             oldDnsName = datanodeInfo.getIpAddress();
           }
-          updateDnsToUuidMap(oldDnsName,
-                  dnsName,
-                  datanodeDetails.getUuidString());
+          updateDnsToUuidMap(oldDnsName, dnsName, datanodeDetails.getUuid());
 
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
@@ -466,20 +463,20 @@ public class SCMNodeManager implements NodeManager {
    * @param addr the hostname or IP of the node
    * @param uuid the UUID of the registered node.
    */
-  private synchronized void addToDnsToUuidMap(String addr, String uuid) {
+  private synchronized void addToDnsToUuidMap(String addr, UUID uuid) {
     dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
         .add(uuid);
   }
 
-  private synchronized void removeFromDnsToUuidMap(String addr, String uuid) {
-    Set<String> dnSet = dnsToUuidMap.get(addr);
+  private synchronized void removeFromDnsToUuidMap(String addr, UUID uuid) {
+    Set<UUID> dnSet = dnsToUuidMap.get(addr);
     if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
       dnsToUuidMap.remove(addr);
     }
   }
 
   private synchronized void updateDnsToUuidMap(
-      String oldDnsName, String newDnsName, String uuid) {
+      String oldDnsName, String newDnsName, UUID uuid) {
     Preconditions.checkNotNull(oldDnsName, "old address == null");
     Preconditions.checkNotNull(newDnsName, "new address == null");
     if (!oldDnsName.equals(newDnsName)) {
@@ -976,7 +973,7 @@ public class SCMNodeManager implements NodeManager {
       return new SCMNodeStat(capacity, used, remaining);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          datanodeDetails.getUuid());
+          datanodeDetails.getUuidString());
       return null;
     }
   }
@@ -1350,8 +1347,7 @@ public class SCMNodeManager implements NodeManager {
     }
 
     try {
-      return nodeStateManager.getNode(
-          DatanodeDetails.newBuilder().setUuid(uuid).build());
+      return nodeStateManager.getNode(uuid);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
@@ -1372,17 +1368,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("address is null");
       return results;
     }
-    Set<String> uuids = dnsToUuidMap.get(address);
+    Set<UUID> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
       LOG.warn("Cannot find node for address {}", address);
       return results;
     }
 
-    for (String uuid : uuids) {
-      DatanodeDetails temp = DatanodeDetails.newBuilder()
-          .setUuid(UUID.fromString(uuid)).build();
+    for (UUID uuid : uuids) {
       try {
-        results.add(nodeStateManager.getNode(temp));
+        results.add(nodeStateManager.getNode(uuid));
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot find node for uuid {}", uuid);
       }

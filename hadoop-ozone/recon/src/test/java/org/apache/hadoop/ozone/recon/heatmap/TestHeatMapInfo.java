@@ -744,6 +744,100 @@ public class TestHeatMapInfo {
     JsonElement jsonElement = JsonParser.parseString(auditRespStr);
     JsonObject jsonObject = jsonElement.getAsJsonObject();
     JsonElement facets = jsonObject.get("facets");
+    JsonObject facetsBucketsObject =
+        facets.getAsJsonObject().get("resources")
+            .getAsJsonObject();
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    HeatMapProviderDataResource auditLogFacetsResources =
+        objectMapper.readValue(
+            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
+    List<EntityMetaData> entityMetaDataList =
+        Arrays.stream(entities).collect(Collectors.toList());
+    EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
+        heatMapService.generateHeatMap(entityMetaDataList);
+    Assertions.assertTrue(
+        entityReadAccessHeatMapResponse.getChildren().size() > 0);
+    Assertions.assertEquals(12,
+        entityReadAccessHeatMapResponse.getChildren().size());
+    Assertions.assertEquals(25600, entityReadAccessHeatMapResponse.
+        getSize());
+    Assertions.assertEquals(2924, entityReadAccessHeatMapResponse.
+        getMinAccessCount());
+    Assertions.assertEquals(155074, entityReadAccessHeatMapResponse.
+        getMaxAccessCount());
+    Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
+        getLabel());
+    Assertions.assertEquals(0.0,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+    Assertions.assertEquals(0.442,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+            .get(0).getChildren().get(1).getColor());
+    Assertions.assertEquals(0.058,
+        entityReadAccessHeatMapResponse.getChildren().get(0).getChildren()
+            .get(1).getChildren().get(3).getColor());
+  }
+
+  @Test
+  public void testHeatMapInfoResponseWithEntityTypeVolume() throws IOException {
+    // Run the test
+    String auditRespStrWithVolumeEntityType = "{\n" +
+        "  \"responseHeader\": {\n" +
+        "    \"zkConnected\": true,\n" +
+        "    \"status\": 0,\n" +
+        "    \"QTime\": 21,\n" +
+        "    \"params\": {\n" +
+        "      \"q\": \"*:*\",\n" +
+        "      \"json.facet\": \"{\\n    resources:{\\n      type : terms," +
+        "\\n      field : resource,\\n      sort : " +
+        "\\\"read_access_count desc\\\",\\n      limit : 100,\\n      " +
+        "facet:{\\n        read_access_count : \\\"sum(event_count)\\\"\\n" +
+        "      }\\n    }\\n  }\",\n" +
+        "      \"doAs\": " +
+        "\"solr/hdfs-ru11-5.hdfs-ru11.root.hwx.site@ROOT.HWX.SITE\",\n" +
+        "      \"fl\": " +
+        "\"access, agent, repo, resource, resType, event_count\",\n" +
+        "      \"start\": \"0\",\n" +
+        "      \"fq\": [\n" +
+        "        \"resType:volume\",\n" +
+        "        \"evtTime:[2023-06-14T03:59:44Z TO NOW]\",\n" +
+        "        \"access:read\",\n" +
+        "        \"repo:cm_ozone\"\n" +
+        "      ],\n" +
+        "      \"sort\": \"event_count desc\",\n" +
+        "      \"_forwardedCount\": \"1\",\n" +
+        "      \"rows\": \"0\",\n" +
+        "      \"wt\": \"json\"\n" +
+        "    }\n" +
+        "  },\n" +
+        "  \"response\": {\n" +
+        "    \"numFound\": 9248,\n" +
+        "    \"start\": 0,\n" +
+        "    \"docs\": []\n" +
+        "  },\n" +
+        "  \"facets\": {\n" +
+        "    \"count\": 9248,\n" +
+        "    \"resources\": {\n" +
+        "      \"buckets\": [\n" +
+        "        {\n" +
+        "          \"val\": \"s3v\",\n" +
+        "          \"count\": 8886,\n" +
+        "          \"read_access_count\": 19263\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2\",\n" +
+        "          \"count\": 362,\n" +
+        "          \"read_access_count\": 8590\n" +
+        "        }\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  }\n" +
+        "}";
+    JsonElement jsonElement =
+        JsonParser.parseString(auditRespStrWithVolumeEntityType);
+    JsonObject jsonObject = jsonElement.getAsJsonObject();
+    JsonElement facets = jsonObject.get("facets");
     JsonElement resources = facets.getAsJsonObject().get("resources");
     JsonObject facetsBucketsObject = new JsonObject();
     if (null != resources) {
@@ -758,28 +852,274 @@ public class TestHeatMapInfo {
     if (null != entities && entities.length > 0) {
       List<EntityMetaData> entityMetaDataList =
           Arrays.stream(entities).collect(Collectors.toList());
+      // Below heatmap response would be of format like:
+      //{
+      //  "label": "root",
+      //  "path": "/",
+      //  "children": [
+      //    {
+      //      "label": "s3v",
+      //      "path": "s3v",
+      //      "size": 256
+      //    },
+      //    {
+      //      "label": "testnewvol2",
+      //      "path": "testnewvol2",
+      //      "size": 256
+      //    }
+      //  ],
+      //  "size": 512,
+      //  "minAccessCount": 19263
+      //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
           heatMapService.generateHeatMap(entityMetaDataList);
       Assertions.assertTrue(
           entityReadAccessHeatMapResponse.getChildren().size() > 0);
-      Assertions.assertEquals(12,
+      Assertions.assertEquals(2,
           entityReadAccessHeatMapResponse.getChildren().size());
-      Assertions.assertEquals(25600, entityReadAccessHeatMapResponse.
+      Assertions.assertEquals(512, entityReadAccessHeatMapResponse.
           getSize());
-      Assertions.assertEquals(2924, entityReadAccessHeatMapResponse.
+      Assertions.assertEquals(8590, entityReadAccessHeatMapResponse.
           getMinAccessCount());
-      Assertions.assertEquals(155074, entityReadAccessHeatMapResponse.
+      Assertions.assertEquals(19263, entityReadAccessHeatMapResponse.
           getMaxAccessCount());
+      Assertions.assertEquals(1.0,
+          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
       Assertions.assertEquals("root", entityReadAccessHeatMapResponse.
           getLabel());
-      String path =
-          entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
-              .get(0).getChildren().get(0).getPath();
-      Assertions.assertEquals("/hivevol1675429570/hivebuck1675429570/" +
-          "reg_path/hive_tpcds/store_sales/store_sales.dat", path);
     } else {
       Assertions.assertNull(entities);
     }
   }
 
+  @Test
+  @SuppressWarnings("methodlength")
+  public void testHeatMapInfoResponseWithEntityTypeBucket() throws IOException {
+    // Run the test
+    String auditRespStrWithPathAndBucketEntityType = "{\n" +
+        "  \"responseHeader\": {\n" +
+        "    \"zkConnected\": true,\n" +
+        "    \"status\": 0,\n" +
+        "    \"QTime\": 11,\n" +
+        "    \"params\": {\n" +
+        "      \"q\": \"*:*\",\n" +
+        "      \"json.facet\": \"{\\n    resources:{\\n      type : terms," +
+        "\\n      field : resource,\\n      " +
+        "sort : \\\"read_access_count desc\\\",\\n      limit : 100,\\n      " +
+        "facet:{\\n        read_access_count : \\\"sum(event_count)\\\"\\n" +
+        "      }\\n    }\\n  }\",\n" +
+        "      \"doAs\": " +
+        "\"solr/hdfs-ru11-5.hdfs-ru11.root.hwx.site@ROOT.HWX.SITE\",\n" +
+        "      \"fl\": \"access, agent, repo, resource, resType, " +
+        "event_count\"" +
+        ",\n" +
+        "      \"start\": \"0\",\n" +
+        "      \"fq\": [\n" +
+        "        \"resType:bucket\",\n" +
+        "        \"evtTime:[2023-03-18T07:21:32Z TO NOW]\",\n" +
+        "        \"access:read\",\n" +
+        "        \"repo:cm_ozone\"\n" +
+        "      ],\n" +
+        "      \"sort\": \"event_count desc\",\n" +
+        "      \"_forwardedCount\": \"1\",\n" +
+        "      \"rows\": \"0\",\n" +
+        "      \"wt\": \"json\"\n" +
+        "    }\n" +
+        "  },\n" +
+        "  \"response\": {\n" +
+        "    \"numFound\": 7050,\n" +
+        "    \"start\": 0,\n" +
+        "    \"docs\": []\n" +
+        "  },\n" +
+        "  \"facets\": {\n" +
+        "    \"count\": 7050,\n" +
+        "    \"resources\": {\n" +
+        "      \"buckets\": [\n" +
+        "        {\n" +
+        "          \"val\": " +
+        "\"s3v/cloudera-health-monitoring-ozone-basic-canary-bucket\",\n" +
+        "          \"count\": 6951,\n" +
+        "          \"read_access_count\": 10653\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck11\",\n" +
+        "          \"count\": 12,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck12\",\n" +
+        "          \"count\": 18,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/fsobuck13\",\n" +
+        "          \"count\": 21,\n" +
+        "          \"read_access_count\": 701\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck11\",\n" +
+        "          \"count\": 18,\n" +
+        "          \"read_access_count\": 263\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck12\",\n" +
+        "          \"count\": 16,\n" +
+        "          \"read_access_count\": 200\n" +
+        "        },\n" +
+        "        {\n" +
+        "          \"val\": \"testnewvol2/obsbuck13\",\n" +
+        "          \"count\": 14,\n" +
+        "          \"read_access_count\": 200\n" +
+        "        }\n" +
+        "      ]\n" +
+        "    }\n" +
+        "  }\n" +
+        "}";
+    JsonElement jsonElement =
+        JsonParser.parseString(auditRespStrWithPathAndBucketEntityType);
+    JsonObject jsonObject = jsonElement.getAsJsonObject();
+    JsonElement facets = jsonObject.get("facets");
+    JsonElement resources = facets.getAsJsonObject().get("resources");
+    JsonObject facetsBucketsObject = new JsonObject();
+    if (null != resources) {
+      facetsBucketsObject = resources.getAsJsonObject();
+    }
+    ObjectMapper objectMapper = new ObjectMapper();
+
+    HeatMapProviderDataResource auditLogFacetsResources =
+        objectMapper.readValue(
+            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+    EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
+    if (null != entities && entities.length > 0) {
+      List<EntityMetaData> entityMetaDataList =
+          Arrays.stream(entities).collect(Collectors.toList());
+      // Below heatmap response would be of format like:
+      //{
+      //    "label": "root",
+      //    "path": "/",
+      //    "children": [
+      //        {
+      //            "label": "testnewvol2",
+      //            "path": "testnewvol2",
+      //            "children": [
+      //                {
+      //                    "label": "fsobuck11",
+      //                    "path": "/testnewvol2/fsobuck11",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck11/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "fsobuck12",
+      //                    "path": "/testnewvol2/fsobuck12",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck12/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "fsobuck13",
+      //                    "path": "/testnewvol2/fsobuck13",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/fsobuck13/",
+      //                            "size": 100,
+      //                            "accessCount": 701,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 701,
+      //                    "maxAccessCount": 701
+      //                },
+      //                {
+      //                    "label": "obsbuck11",
+      //                    "path": "/testnewvol2/obsbuck11",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck11/",
+      //                            "size": 107,
+      //                            "accessCount": 263,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 107,
+      //                    "minAccessCount": 263,
+      //                    "maxAccessCount": 263
+      //                },
+      //                {
+      //                    "label": "obsbuck12",
+      //                    "path": "/testnewvol2/obsbuck12",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck12/",
+      //                            "size": 100,
+      //                            "accessCount": 200,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 200,
+      //                    "maxAccessCount": 200
+      //                },
+      //                {
+      //                    "label": "obsbuck13",
+      //                    "path": "/testnewvol2/obsbuck13",
+      //                    "children": [
+      //                        {
+      //                            "label": "",
+      //                            "path": "/testnewvol2/obsbuck13/",
+      //                            "size": 100,
+      //                            "accessCount": 200,
+      //                            "color": 1.0
+      //                        }
+      //                    ],
+      //                    "size": 100,
+      //                    "minAccessCount": 200,
+      //                    "maxAccessCount": 200
+      //                }
+      //            ],
+      //            "size": 607
+      //        }
+      //    ],
+      //    "size": 607,
+      //    "minAccessCount": 200,
+      //    "maxAccessCount": 701
+      //}
+      EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
+          heatMapService.generateHeatMap(entityMetaDataList);
+      Assertions.assertTrue(
+          entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      Assertions.assertEquals(2,
+          entityReadAccessHeatMapResponse.getChildren().size());
+      Assertions.assertEquals(0.0,
+          entityReadAccessHeatMapResponse.getChildren().get(0).getColor());
+      String path =
+          entityReadAccessHeatMapResponse.getChildren().get(1).getChildren()
+              .get(0).getPath();
+      Assertions.assertEquals("/testnewvol2/fsobuck11", path);
+    } else {
+      Assertions.assertNull(entities);
+    }
+  }
 }

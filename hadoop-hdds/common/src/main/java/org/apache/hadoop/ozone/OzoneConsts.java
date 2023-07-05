@@ -149,6 +149,8 @@ public final class OzoneConsts {
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
 
+  public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
+
   /**
    * Supports Bucket Versioning.
    */
@@ -197,6 +199,7 @@ public final class OzoneConsts {
   public static final String OM_KEY_PREFIX = "/";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
+  public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
   public static final String OM_S3_VOLUME_PREFIX = "s3";
   public static final String OM_S3_SECRET = "S3Secret:";
   public static final String OM_PREFIX = "Prefix:";
@@ -477,8 +480,11 @@ public final class OzoneConsts {
   public static final String SCM_ROOT_CA_COMPONENT_NAME =
       Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
 
-  public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
-  public static final String SCM_ROOT_CA_PREFIX = "scm@";
+  // %s to distinguish different certificates
+  public static final String SCM_SUB_CA = "scm-sub";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "-%s@";
+  public static final String SCM_ROOT_CA = "scm";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "-%s@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";

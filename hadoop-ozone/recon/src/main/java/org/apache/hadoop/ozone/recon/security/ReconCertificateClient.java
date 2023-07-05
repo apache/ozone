@@ -19,7 +19,8 @@ package org.apache.hadoop.ozone.recon.security;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -54,10 +55,11 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   public ReconCertificateClient(
       SecurityConfig config,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
       ReconStorageConfig storage,
       Consumer<String> saveCertIdCallback,
       Runnable shutdownCallback) {
-    super(config, LOG, storage.getReconCertSerialId(),
+    super(config, scmSecurityClient, LOG, storage.getReconCertSerialId(),
         COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
     this.clusterID = storage.getClusterID();
     this.reconID = storage.getReconId();
@@ -75,7 +77,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
       builder.setCA(false)
           .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
-          .setConfiguration(getConfig())
+          .setConfiguration(getSecurityConfig())
           .setSubject(subject);
 
       return builder;
@@ -88,7 +90,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath) throws CertificateException {
+      Path certificatePath, boolean renew) throws CertificateException {
     try {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
       HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
@@ -106,17 +108,14 @@ public class ReconCertificateClient  extends CommonCertificateClient {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
             getSecurityConfig(), certificatePath);
-        storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec,
-            false);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec, false, !renew);
         storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE,
-            certCodec, false);
+            CAType.SUBORDINATE, certCodec, false, !renew);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
+              CAType.ROOT, certCodec, false, !renew);
         }
         return getX509Certificate(pemEncodedCert).getSerialNumber().toString();
       } else {

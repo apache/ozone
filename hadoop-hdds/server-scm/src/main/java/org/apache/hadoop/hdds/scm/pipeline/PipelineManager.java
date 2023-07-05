@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,12 +37,19 @@ import org.apache.hadoop.hdds.utils.db.Table;
 public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   Pipeline createPipeline(ReplicationConfig replicationConfig)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   Pipeline createPipeline(ReplicationConfig replicationConfig,
                           List<DatanodeDetails> excludedNodes,
                           List<DatanodeDetails> favoredNodes)
-      throws IOException, TimeoutException;
+      throws IOException;
+
+  Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+                           List<DatanodeDetails> excludedNodes,
+                           List<DatanodeDetails> favoredNodes)
+      throws IOException;
+
+  void addEcPipeline(Pipeline pipeline) throws IOException;
 
 
   Pipeline createPipeline(
@@ -107,14 +113,14 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
 
-  void openPipeline(PipelineID pipelineId) throws IOException, TimeoutException;
+  void openPipeline(PipelineID pipelineId) throws IOException;
 
   void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   void closeStalePipelines(DatanodeDetails datanodeDetails);
 
-  void scrubPipelines() throws IOException, TimeoutException;
+  void scrubPipelines() throws IOException;
 
   void startPipelineCreator();
 
@@ -133,7 +139,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @throws IOException in case of any Exception
    */
   void activatePipeline(PipelineID pipelineID)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Deactivates an active pipeline.
@@ -142,7 +148,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @throws IOException in case of any Exception
    */
   void deactivatePipeline(PipelineID pipelineID)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Wait a pipeline to be OPEN.

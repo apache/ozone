@@ -157,6 +157,8 @@ public class BlockDeletingService extends BackgroundService {
         queue.add(containerBlockInfos);
         totalBlocks += containerBlockInfo.numBlocksToDelete;
       }
+      metrics.incrTotalBlockChosenCount(totalBlocks);
+      metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
         LOG.debug("Queued {} blocks from {} containers for deletion",
             totalBlocks, containers.size());

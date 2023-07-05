@@ -22,7 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.FileWriterWithEncoding;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -99,6 +99,11 @@ public class KeyCodec {
     this.securityConfig = config;
     isPosixFileSystem = KeyCodec::isPosix;
     this.location = keyDir;
+    if (!location.toFile().exists()) {
+      if (!location.toFile().mkdirs()) {
+        throw new RuntimeException("Failed to create directory " + location);
+      }
+    }
   }
 
   /**
@@ -193,7 +198,7 @@ public class KeyCodec {
         securityConfig.getPublicKeyFileName()).toFile();
 
     if (Files.exists(publicKeyFile.toPath())) {
-      throw new IOException("Private key already exist.");
+      throw new IOException("Public key already exist.");
     }
 
     try (PemWriter keyWriter = new PemWriter(new

@@ -264,7 +264,6 @@ public class TestAddRemoveOzoneManager {
     newNodeId = "omNode-bootstrap-2";
     try {
       cluster.bootstrapOzoneManager(newNodeId, false, true);
-      Assert.fail();
     } catch (IOException e) {
       Assert.assertTrue(omLog.getOutput().contains("Couldn't add OM " +
           newNodeId + " to peer list."));

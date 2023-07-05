@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;
@@ -136,6 +137,16 @@ enum Type {
   RecoverLease = 119;
   SetTimes = 120;
   RefetchSecretKey = 121;
+  ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
+  SetSafeMode = 124;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
 }
 
 message OMRequest {
@@ -256,6 +267,9 @@ message OMRequest {
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
+  optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
 }
 
 message OMResponse {
@@ -368,6 +382,9 @@ message OMResponse {
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
+  optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
 }
 
 enum Status {
@@ -798,7 +815,21 @@ message SnapshotInfo {
   optional string snapshotPath = 10;
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
+  optional bool deepClean = 13;
  }
+
+message SnapshotDiffJobProto {
+  optional uint64 creationTime = 1;
+  optional string jobId = 2;
+  optional SnapshotDiffResponse.JobStatusProto status = 3;
+  optional string volume = 4;
+  optional string bucket = 5;
+  optional string fromSnapshot = 6;
+  optional string toSnapshot = 7;
+  optional bool forceFullDiff = 8;
+  optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
+}
 
 message OzoneObj {
   enum ObjectType {
@@ -1724,6 +1755,20 @@ message SnapshotDiffRequest {
   optional bool forceFullDiff = 7;
 }
 
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message ListSnapshotDiffJobRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string jobStatus = 3;
+  optional bool listAll = 4;
+}
+
 message DeleteSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -1746,6 +1791,7 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
+  repeated string updatedSnapshotDBKey = 2;
 }
 
 message DeleteTenantRequest {
@@ -1800,10 +1846,21 @@ message SnapshotDiffResponse {
     DONE = 3;
     REJECTED = 4;
     FAILED = 5;
+    CANCELLED = 6;
   }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
+}
+
+message ListSnapshotDiffJobResponse {
+  repeated SnapshotDiffJobProto snapshotDiffJob = 1;
 }
 
 message DeleteSnapshotResponse {
@@ -1903,6 +1960,14 @@ message SetTimesRequest {
 }
 
 message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
 }
 
 /**

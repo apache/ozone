@@ -111,4 +111,9 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     }
     return 0;
   }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime;
+  }
 }

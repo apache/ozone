@@ -21,19 +21,18 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.LocalSecretKeyStore;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStore;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -94,9 +93,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
           scheduler.schedule(() -> {
             try {
               secretKeyManager.checkAndInitialize();
-            } catch (TimeoutException e) {
+            } catch (Exception e) {
               throw new RuntimeException(
-                  "Timeout replicating initialized state.", e);
+                  "Error replicating initialized state.", e);
             }
           }, 0, TimeUnit.SECONDS);
         }
@@ -128,7 +127,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
     try {
       secretKeyManager.checkAndRotate();
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       LOG.error("Error occurred when updating SecretKeys.", e);
     }
   }

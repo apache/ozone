@@ -116,6 +116,24 @@ public class TestOmSnapshotManager {
   }
 
   @Test
+  public void testSnapshotFeatureFlagSafetyCheck() throws IOException {
+    // Verify that the snapshot feature config safety check method
+    // is returning the expected value.
+
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+
+    when(snapshotInfoTable.isEmpty()).thenReturn(false);
+    Assert.assertFalse(om.getOmSnapshotManager()
+        .canDisableFsSnapshot(om.getMetadataManager()));
+
+    when(snapshotInfoTable.isEmpty()).thenReturn(true);
+    Assert.assertTrue(om.getOmSnapshotManager()
+        .canDisableFsSnapshot(om.getMetadataManager()));
+  }
+
+  @Test
   public void testCloseOnEviction() throws IOException {
 
     // set up db tables
@@ -160,7 +178,7 @@ public class TestOmSnapshotManager {
     OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
     OmSnapshot firstSnapshot = (OmSnapshot) omSnapshotManager
         .checkForSnapshot(first.getVolumeName(),
-        first.getBucketName(), getSnapshotPrefix(first.getName()), false);
+        first.getBucketName(), getSnapshotPrefix(first.getName()), false).get();
     DBStore firstSnapshotStore = mock(DBStore.class);
     HddsWhiteboxTestUtils.setInternalState(
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
@@ -384,6 +402,57 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertTrue(copyFiles.contains(addNonSstToCopiedFiles));
+  }
+
+  @Test
+  public void testCreateSnapshotIdempotent() throws Exception {
+    // set up db tables
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(OmSnapshotManager.LOG);
+    Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), VOLUME_TABLE, volumeTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), BUCKET_TABLE, bucketTable);
+    HddsWhiteboxTestUtils.setInternalState(
+        om.getMetadataManager(), SNAPSHOT_INFO_TABLE, snapshotInfoTable);
+
+    final String volumeName = UUID.randomUUID().toString();
+    final String dbVolumeKey = om.getMetadataManager().getVolumeKey(volumeName);
+    final OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(volumeName)
+        .setAdminName("bilbo")
+        .setOwnerName("bilbo")
+        .build();
+    when(volumeTable.get(dbVolumeKey)).thenReturn(omVolumeArgs);
+
+    String bucketName = UUID.randomUUID().toString();
+    final String dbBucketKey = om.getMetadataManager().getBucketKey(
+        volumeName, bucketName);
+    final OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .build();
+    when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
+
+    SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
+
+    // Create first checkpoint for the snapshot checkpoint
+    OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+        first);
+    Assert.assertFalse(logCapturer.getOutput().contains(
+        "for snapshot " + first.getName() + " already exists."));
+    logCapturer.clearOutput();
+
+    // Create checkpoint again for the same snapshot.
+    OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
+        first);
+
+    Assert.assertTrue(logCapturer.getOutput().contains(
+        "for snapshot " + first.getName() + " already exists."));
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,

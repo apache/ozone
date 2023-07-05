@@ -30,6 +30,8 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
@@ -2481,9 +2483,11 @@ public class TestRootedOzoneFileSystem {
         diff.getDiffList().get(0).getType());
     Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
         diff.getDiffList().get(1).getType());
-    Assert.assertArrayEquals("key1".getBytes(StandardCharsets.UTF_8),
+    Assert.assertArrayEquals(
+        "/key1".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(0).getSourcePath());
-    Assert.assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8),
+    Assert.assertArrayEquals(
+        "/key2".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(1).getSourcePath());
 
     // test whether snapdiff returns aggregated response as
@@ -2542,5 +2546,20 @@ public class TestRootedOzoneFileSystem {
     fileStatus = fs.getFileStatus(path);
     // verify that mtime is NOT updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  @Test
+  public void testSafeMode() throws Exception {
+    SafeMode safeModeFS = (SafeMode) fs;
+    // safe mode is off
+    assertFalse(safeModeFS.setSafeMode(SafeModeAction.GET));
+    // shutdown datanodes and restart SCM
+    cluster.shutdownHddsDatanodes();
+    cluster.restartStorageContainerManager(false);
+    // SCM should be in safe mode
+    assertTrue(safeModeFS.setSafeMode(SafeModeAction.GET));
+    // force exit safe mode and verify that it's out of safe mode.
+    safeModeFS.setSafeMode(SafeModeAction.FORCE_EXIT);
+    assertFalse(safeModeFS.setSafeMode(SafeModeAction.GET));
   }
 }

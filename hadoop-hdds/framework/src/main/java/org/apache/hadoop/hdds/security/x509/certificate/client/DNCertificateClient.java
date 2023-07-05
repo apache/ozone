@@ -21,7 +21,8 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -51,10 +52,15 @@ public class DNCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME = "dn";
   private final DatanodeDetails dn;
 
-  public DNCertificateClient(SecurityConfig securityConfig,
-      DatanodeDetails datanodeDetails, String certSerialId,
-      Consumer<String> saveCertId, Runnable shutdown) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME,
+  public DNCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
+      DatanodeDetails datanodeDetails,
+      String certSerialId,
+      Consumer<String> saveCertId,
+      Runnable shutdown
+  ) {
+    super(securityConfig, scmSecurityClient, LOG, certSerialId, COMPONENT_NAME,
         saveCertId, shutdown);
     this.dn = datanodeDetails;
   }
@@ -79,7 +85,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
           .getShortUserName() + "@" + hostname;
       builder.setCA(false)
           .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
-          .setConfiguration(getConfig())
+          .setConfiguration(getSecurityConfig())
           .setSubject(subject);
 
       LOG.info("Created csr for DN-> subject:{}", subject);
@@ -93,7 +99,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath) throws CertificateException {
+      Path certificatePath, boolean renew) throws CertificateException {
     try {
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
@@ -107,16 +113,14 @@ public class DNCertificateClient extends DefaultCertificateClient {
             getSecurityConfig(), certificatePath);
         // Certs will be added to cert map after reloadAllCertificate called
         storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec,
-            false);
+            certCodec, false, !renew);
         storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE,
-            certCodec, false);
+            CAType.SUBORDINATE, certCodec, false, !renew);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
+              CAType.ROOT, certCodec, false, !renew);
         }
         // Return the default certificate ID
         return CertificateCodec.getX509Certificate(pemEncodedCert)
