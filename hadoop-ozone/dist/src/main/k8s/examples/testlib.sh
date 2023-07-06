@@ -54,7 +54,7 @@ all_pods_are_running() {
       echo "$running pods are running. Waiting for more."
       return 1
    elif [ "$running" -ne "$all" ]; then
-      echo "$running pods are running out from the $all"
+      echo "$running / $all pods are running"
       return 2
    else
       STARTED=true
