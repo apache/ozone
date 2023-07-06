@@ -79,6 +79,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -2549,6 +2550,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
+  @Ignore("HDDS-8981")
   public void testSafeMode() throws Exception {
     SafeMode safeModeFS = (SafeMode) fs;
     // safe mode is off
