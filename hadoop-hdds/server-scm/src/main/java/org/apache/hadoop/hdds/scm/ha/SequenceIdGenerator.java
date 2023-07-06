@@ -99,7 +99,13 @@ public class SequenceIdGenerator {
         OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT);
 
     Preconditions.checkNotNull(scmhaManager);
-    this.stateManager = new StateManagerImpl.Builder()
+    this.stateManager = createStateManager(scmhaManager, sequenceIdTable);
+  }
+
+  public StateManager createStateManager(SCMHAManager scmhaManager,
+      Table<String, Long> sequenceIdTable) {
+    Preconditions.checkNotNull(scmhaManager);
+    return new StateManagerImpl.Builder()
         .setRatisServer(scmhaManager.getRatisServer())
         .setDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setSequenceIdTable(sequenceIdTable).build();
@@ -125,11 +131,12 @@ public class SequenceIdGenerator {
         batch.nextId = prevLastId + 1;
 
         Preconditions.checkArgument(Long.MAX_VALUE - batch.lastId >= batchSize);
-        batch.lastId += sequenceIdName.equals(ROOT_CERTIFICATE_ID) ?
-            1 : batchSize;
+        long nextLastId = batch.lastId +
+            (sequenceIdName.equals(ROOT_CERTIFICATE_ID) ? 1 : batchSize);
 
         if (stateManager.allocateBatch(sequenceIdName,
-            prevLastId, batch.lastId)) {
+            prevLastId, nextLastId)) {
+          batch.lastId = nextLastId;
           LOG.info("Allocate a batch for {}, change lastId from {} to {}.",
               sequenceIdName, prevLastId, batch.lastId);
           break;
