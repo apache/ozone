@@ -2269,6 +2269,17 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
+    <value>PT2h</value>
+    <description>Interval to use for polling in certificate clients for a new
+      root ca certificate. Every time the specified time duration elapses,
+      the clients send a request to the SCMs to see if a new root ca
+      certificate was generated. Once there is a change, the system
+      automatically adds the new root ca to the clients'
+      trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.handler.count.key</name>
     <value>2</value>
     <tag>OZONE, HDDS, SECURITY</tag>
