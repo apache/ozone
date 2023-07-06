@@ -76,7 +76,7 @@ start_k8s_env() {
    kubectl delete pv --all
 
    print_phase "Applying k8s resources from $(basename $(pwd))"
-   kubectl apply -f .
+   kubectl apply -k .
    wait_for_startup
 }
 
@@ -92,7 +92,7 @@ get_logs() {
 
 stop_k8s_env() {
    if [ ! "$KEEP_RUNNING" ]; then
-     kubectl delete -f .
+     kubectl delete -k .
    fi
 }
 
