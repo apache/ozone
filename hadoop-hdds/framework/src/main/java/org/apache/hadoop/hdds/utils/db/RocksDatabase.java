@@ -632,7 +632,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public List<LiveFileMetaData> getLiveFilesMetaData() {
+  public List<LiveFileMetaData> getLiveFilesMetaData() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLiveFilesMetaData();
