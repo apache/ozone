@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -140,7 +141,9 @@ final class ObjectEndpointStreaming {
     } finally {
       if (streamOutput != null) {
         streamOutput.close();
-        eTag = streamOutput.getCommitUploadPartInfo().getPartName();
+        OmMultipartCommitUploadPartInfo commitUploadPartInfo =
+            streamOutput.getCommitUploadPartInfo();
+        eTag = commitUploadPartInfo.getPartName();
       }
     }
     return Response.ok().header("ETag", eTag).build();
