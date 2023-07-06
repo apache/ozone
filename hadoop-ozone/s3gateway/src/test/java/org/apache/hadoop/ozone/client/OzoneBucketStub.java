@@ -151,7 +151,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), replicationConfig, metadata, null,
-                () -> readKey(key)
+                () -> readKey(key), true
             ));
             super.close();
           }
@@ -183,7 +183,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), finalReplicationCon, metadata, null,
-                () -> readKey(key)
+                () -> readKey(key), true
             ));
             super.close();
           }
@@ -215,7 +215,8 @@ public class OzoneBucketStub extends OzoneBucket {
           ozoneKeyDetails.getDataSize(),
           ozoneKeyDetails.getCreationTime().toEpochMilli(),
           ozoneKeyDetails.getModificationTime().toEpochMilli(),
-          ozoneKeyDetails.getReplicationConfig());
+          ozoneKeyDetails.getReplicationConfig(),
+          ozoneKeyDetails.isFile());
     } else {
       throw new OMException(ResultCodes.KEY_NOT_FOUND);
     }
@@ -445,5 +446,18 @@ public class OzoneBucketStub extends OzoneBucket {
   @Override
   public ReplicationConfig getReplicationConfig() {
     return this.replicationConfig;
+  }
+
+  @Override
+  public void createDirectory(String keyName) throws IOException {
+    keyDetails.put(keyName, new OzoneKeyDetails(
+        getVolumeName(),
+        getName(),
+        keyName,
+        0,
+        System.currentTimeMillis(),
+        System.currentTimeMillis(),
+        new ArrayList<>(), replicationConfig, new HashMap<>(), null,
+        () -> readKey(keyName), false));
   }
 }

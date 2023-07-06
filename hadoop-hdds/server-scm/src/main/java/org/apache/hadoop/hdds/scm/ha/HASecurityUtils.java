@@ -53,8 +53,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.security.cert.CertPath;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -89,12 +89,11 @@ public final class HASecurityUtils {
    * signed certificate and persist to local disk.
    * @param scmStorageConfig
    * @param conf
-   * @param scmAddress
+   * @param scmHostname
    * @throws IOException
    */
   public static void initializeSecurity(SCMStorageConfig scmStorageConfig,
-      OzoneConfiguration conf,
-      InetSocketAddress scmAddress, boolean primaryscm)
+      OzoneConfiguration conf, String scmHostname, boolean primaryscm)
       throws IOException {
     LOG.info("Initializing secure StorageContainerManager.");
 
@@ -102,8 +101,9 @@ public final class HASecurityUtils {
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
     try (CertificateClient certClient =
-        new SCMCertificateClient(
-            securityConfig, scmSecurityClient, scmStorageConfig.getScmId())) {
+        new SCMCertificateClient(securityConfig, scmSecurityClient,
+            scmStorageConfig.getScmId(), scmStorageConfig.getClusterID(),
+            scmStorageConfig.getScmCertSerialId(), scmHostname)) {
       InitResponse response = certClient.init();
       LOG.info("Init response: {}", response);
       switch (response) {
@@ -113,10 +113,10 @@ public final class HASecurityUtils {
       case GETCERT:
         if (!primaryscm) {
           getRootCASignedSCMCert(conf, certClient, securityConfig,
-              scmStorageConfig, scmAddress);
+              scmStorageConfig, scmHostname);
         } else {
           getPrimarySCMSelfSignedCert(certClient, securityConfig,
-              scmStorageConfig, scmAddress);
+              scmStorageConfig, scmHostname);
         }
         LOG.info("Successfully stored SCM signed certificate.");
         break;
@@ -141,21 +141,18 @@ public final class HASecurityUtils {
    * client.
    */
   private static void getRootCASignedSCMCert(
-      OzoneConfiguration configuration,
-      CertificateClient client,
+      OzoneConfiguration configuration, CertificateClient client,
       SecurityConfig securityConfig,
-      SCMStorageConfig scmStorageConfig,
-      InetSocketAddress scmAddress
-  ) {
+      SCMStorageConfig scmStorageConfig, String scmHostname) {
     try {
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          securityConfig, scmAddress);
+          securityConfig, scmHostname);
 
       ScmNodeDetailsProto scmNodeDetailsProto =
           ScmNodeDetailsProto.newBuilder()
               .setClusterId(scmStorageConfig.getClusterID())
-              .setHostName(scmAddress.getHostName())
+              .setHostName(scmHostname)
               .setScmNodeId(scmStorageConfig.getScmId()).build();
 
       // Create SCM security client.
@@ -164,7 +161,7 @@ public final class HASecurityUtils {
 
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr));
+          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
       String pemEncodedCert = response.getX509Certificate();
 
       // Store SCM sub CA and root CA certificate.
@@ -198,7 +195,7 @@ public final class HASecurityUtils {
    */
   private static void getPrimarySCMSelfSignedCert(CertificateClient client,
       SecurityConfig config, SCMStorageConfig scmStorageConfig,
-      InetSocketAddress scmAddress) {
+      String scmHostname) {
 
     try {
 
@@ -207,7 +204,7 @@ public final class HASecurityUtils {
               new DefaultCAProfile());
 
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmAddress);
+          config, scmHostname);
 
       CertPath subSCMCertHolderList = rootCAServer.
           requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
@@ -251,18 +248,20 @@ public final class HASecurityUtils {
    * @param config
    * @param scmCertStore
    * @param scmStorageConfig
+   * @param pkiProfile
+   * @param component
    */
   public static CertificateServer initializeRootCertificateServer(
       SecurityConfig config, CertificateStore scmCertStore,
-      SCMStorageConfig scmStorageConfig, PKIProfile pkiProfile)
-      throws IOException {
-    String subject = SCM_ROOT_CA_PREFIX +
+      SCMStorageConfig scmStorageConfig, BigInteger rootCertId,
+      PKIProfile pkiProfile, String component) throws IOException {
+    String subject = String.format(SCM_ROOT_CA_PREFIX, rootCertId) +
         InetAddress.getLocalHost().getHostName();
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         scmStorageConfig.getClusterID(),
-        scmStorageConfig.getScmId(), scmCertStore, pkiProfile,
-        SCM_ROOT_CA_COMPONENT_NAME);
+        scmStorageConfig.getScmId(), scmCertStore, rootCertId, pkiProfile,
+        component);
 
     rootCAServer.init(config, CAType.ROOT);
 
@@ -270,28 +269,44 @@ public final class HASecurityUtils {
   }
 
   /**
+   * This function creates/initializes a certificate server as needed.
+   * This function is idempotent, so calling this again and again after the
+   * server is initialized is not a problem.
+   *
+   * @param config
+   * @param scmCertStore
+   * @param scmStorageConfig
+   * @param pkiProfile
+   */
+  public static CertificateServer initializeRootCertificateServer(
+      SecurityConfig config, CertificateStore scmCertStore,
+      SCMStorageConfig scmStorageConfig, PKIProfile pkiProfile)
+      throws IOException {
+    return initializeRootCertificateServer(config, scmCertStore,
+        scmStorageConfig, BigInteger.ONE, pkiProfile,
+        SCM_ROOT_CA_COMPONENT_NAME);
+  }
+
+  /**
    * Generate CSR to obtain SCM sub CA certificate.
    */
   private static PKCS10CertificationRequest generateCSR(
       CertificateClient client, SCMStorageConfig scmStorageConfig,
-      SecurityConfig config, InetSocketAddress scmAddress)
+      SecurityConfig config, String scmHostname)
       throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
 
     // Get host name.
-    String hostname = scmAddress.getHostName();
+    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
+        + scmHostname;
 
-    String subject = SCM_SUB_CA_PREFIX + hostname;
-
-    builder
-        .setConfiguration(config)
+    builder.setConfiguration(config)
         .setScmID(scmStorageConfig.getScmId())
         .setClusterID(scmStorageConfig.getClusterID())
         .setSubject(subject);
 
-
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", hostname, scmStorageConfig.getScmId(),
+            "subject:{}", scmHostname, scmStorageConfig.getScmId(),
         scmStorageConfig.getClusterID(), subject);
 
     return builder.build();
@@ -336,24 +351,23 @@ public final class HASecurityUtils {
   }
 
   /**
-   * Submit SCM certs request to ratis using RaftClient.
+   * Submit SCM request to ratis using RaftClient.
    * @param raftGroup
    * @param tlsConfig
    * @param message
    * @return SCMRatisResponse.
    * @throws Exception
    */
-  public static SCMRatisResponse submitScmCertsToRatis(RaftGroup raftGroup,
+  public static SCMRatisResponse submitScmRequestToRatis(RaftGroup raftGroup,
       GrpcTlsConfig tlsConfig, Message message) throws Exception {
 
     // TODO: GRPC TLS only for now, netty/hadoop RPC TLS support later.
     final SupportedRpcType rpc = SupportedRpcType.GRPC;
     final RaftProperties properties = RatisHelper.newRaftProperties(rpc);
 
-
     // For now not making anything configurable, RaftClient  is only used
     // in SCM for DB updates of sub-ca certs go via Ratis.
-    RaftClient.Builder builder =  RaftClient.newBuilder()
+    RaftClient.Builder builder = RaftClient.newBuilder()
         .setRaftGroup(raftGroup)
         .setLeaderId(null)
         .setProperties(properties)
@@ -391,5 +405,14 @@ public final class HASecurityUtils {
     return new SCMSecurityProtocolClientSideTranslatorPB(
         new SCMSecurityProtocolFailoverProxyProvider(conf,
             UserGroupInformation.getCurrentUser()));
+
+  }
+
+  public static boolean isSelfSignedCertificate(X509Certificate cert) {
+    return cert.getIssuerX500Principal().equals(cert.getSubjectX500Principal());
+  }
+
+  public static boolean isCACertificate(X509Certificate cert) {
+    return cert.getBasicConstraints() != -1;
   }
 }

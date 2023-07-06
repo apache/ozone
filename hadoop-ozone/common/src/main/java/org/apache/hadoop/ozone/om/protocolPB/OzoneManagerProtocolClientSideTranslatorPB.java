@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -169,6 +170,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SafeMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -176,6 +178,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
@@ -2329,6 +2333,38 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setSetTimesRequest(setTimesRequest).build();
 
     handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    SetSafeModeRequest setSafeModeRequest =
+        SetSafeModeRequest.newBuilder()
+            .setSafeMode(toProtoBuf(action))
+            .build();
+
+    OMRequest omRequest = createOMRequest(Type.SetSafeMode)
+        .setSetSafeModeRequest(setSafeModeRequest).build();
+
+    SetSafeModeResponse setSafeModeResponse =
+        handleError(submitRequest(omRequest)).getSetSafeModeResponse();
+    return setSafeModeResponse.getResponse();
+  }
+
+  private SafeMode toProtoBuf(SafeModeAction action) {
+    switch (action) {
+    case ENTER:
+      return SafeMode.ENTER;
+    case LEAVE:
+      return SafeMode.LEAVE;
+    case FORCE_EXIT:
+      return SafeMode.FORCE_EXIT;
+    case GET:
+      return SafeMode.GET;
+    default:
+      throw new IllegalArgumentException("Unsupported safe mode action " +
+          action);
+    }
   }
 
   @VisibleForTesting
