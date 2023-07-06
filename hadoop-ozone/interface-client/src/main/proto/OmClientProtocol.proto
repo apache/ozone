@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;

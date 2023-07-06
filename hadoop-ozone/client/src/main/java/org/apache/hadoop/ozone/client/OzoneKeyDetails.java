@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ratis.util.function.CheckedSupplier;
 
@@ -47,34 +46,16 @@ public class OzoneKeyDetails extends OzoneKey {
    * Constructs OzoneKeyDetails from OmKeyInfo.
    */
   @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
-                         long size, long creationTime, long modificationTime,
-                         List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationType type, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo, int replicationFactor) {
-    super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
-    this.ozoneKeyLocations = ozoneKeyLocations;
-    this.feInfo = feInfo;
-    contentSupplier = null;
-    this.setMetadata(metadata);
-  }
-
-
-  /**
-   * Constructs OzoneKeyDetails from OmKeyInfo.
-   */
-  @SuppressWarnings("parameternumber")
   public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
       long size, long creationTime, long modificationTime,
       List<OzoneKeyLocation> ozoneKeyLocations,
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
       FileEncryptionInfo feInfo,
-      CheckedSupplier<OzoneInputStream, IOException> contentSupplier) {
+      CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
+      boolean isFile) {
     super(volumeName, bucketName, keyName, size, creationTime,
-            modificationTime, replicationConfig, metadata);
+        modificationTime, replicationConfig, metadata, isFile);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;
@@ -93,6 +74,8 @@ public class OzoneKeyDetails extends OzoneKey {
 
   /**
    * Get OzoneInputStream to read the content of the key.
+   * @return OzoneInputStream
+   * @throws IOException
    */
   @JsonIgnore
   public OzoneInputStream getContent() throws IOException {
