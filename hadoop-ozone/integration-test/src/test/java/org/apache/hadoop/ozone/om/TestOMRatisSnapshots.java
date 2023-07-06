@@ -358,7 +358,24 @@ public class TestOMRatisSnapshots {
     }, 1000, 10000);
 
     // Check whether newly created keys data can be reclaimed
+    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
+        .getMetadataManager()
+        .getKeyTable(ozoneBucket.getBucketLayout());
+    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
+        OM_KEY_PREFIX + ozoneBucket.getName() +
+        OM_KEY_PREFIX + newKeys.get(0);
+    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
     ozoneBucket.deleteKeys(newKeys);
+    GenericTestUtils.waitFor(() -> {
+      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
+          .getMetadataManager()
+          .getKeyTable(ozoneBucket.getBucketLayout());
+      try {
+        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
 
     // Check whether differ service works
   }
