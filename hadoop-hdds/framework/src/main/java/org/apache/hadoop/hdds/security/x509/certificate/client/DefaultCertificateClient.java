@@ -1258,9 +1258,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
         getAndStoreAllRootCAs(certCodec, renew);
         // Return the default certificate ID
-        return updateCertSerialId(CertificateCodec.getX509Certificate(pemEncodedCert)
-            .getSerialNumber()
-            .toString());
+        return updateCertSerialId(CertificateCodec
+            .getX509Certificate(pemEncodedCert).getSerialNumber().toString());
       } else {
         throw new CertificateException("Unable to retrieve " +
             "certificate chain.");
