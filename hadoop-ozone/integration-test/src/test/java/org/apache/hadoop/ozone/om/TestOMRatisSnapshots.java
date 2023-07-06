@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -44,14 +43,11 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -100,7 +96,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -316,24 +311,23 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       try {
         followerOM.checkLeaderStatus();
-        LOG.info("###New leader elected###");
         return true;
       } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
-        LOG.info("###Exception occured message={}###", e.getMessage());
         return false;
       }
     }, 1000, 10000);
+    OzoneManager newLeaderOM = cluster.getOMLeader();
 
-    checkSnapshot(followerOM, leaderOM, snapshotName, keys, snapshotInfo);
+    checkSnapshot(newLeaderOM, leaderOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
     // Check whether newly created snapshot gets processed by SFS
     newKeys = writeKeys(1);
-    SnapshotInfo newSnapshot = createOzoneSnapshot(followerOM,
+    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
         snapshotName + RandomStringUtils.randomNumeric(5));
     Assertions.assertNotNull(newSnapshot);
     File omMetadataDir =
-        OMStorage.getOmDbDir(followerOM.getConfiguration());
+        OMStorage.getOmDbDir(newLeaderOM.getConfiguration());
     String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     Path filePath =
         Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
@@ -353,38 +347,18 @@ public class TestOMRatisSnapshots {
     // Check whether newly created snapshot data can be reclaimed
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
-    OmSnapshot omSnapshot = (OmSnapshot) followerOM.getOmSnapshotManager()
-        .checkForSnapshot(newSnapshot.getVolumeName(),
-            newSnapshot.getBucketName(),
-            getSnapshotPrefix(newSnapshot.getName()), true);
-    Table<String, RepeatedOmKeyInfo> snapshotDeletedTable =
-        omSnapshot.getMetadataManager().getDeletedTable();
-    Table<String, OmKeyInfo> snapshotDeletedDirTable =
-        omSnapshot.getMetadataManager().getDeletedDirTable();
-    String dbBucketKey = followerOM.getMetadataManager().getBucketKey(
-        newSnapshot.getVolumeName(), newSnapshot.getBucketName());
-    OmBucketInfo bucketInfo = followerOM.getMetadataManager()
-        .getBucketTable().get(dbBucketKey);
-    String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-    String dbBucketKeyForDir = followerOM.getMetadataManager()
-        .getBucketKey(Long.toString(followerOM.getMetadataManager()
-                .getVolumeId(newSnapshot.getVolumeName())),
-            Long.toString(bucketInfo.getObjectID())) + OM_KEY_PREFIX;
-    SnapshotDeletingService snapshotDeletingService =
-        followerOM.getKeyManager().getSnapshotDeletingService();
-    boolean isReclaimable = snapshotDeletingService.isSnapshotReclaimable(
-        snapshotDeletedTable, snapshotDeletedDirTable, snapshotBucketKey,
-        dbBucketKeyForDir);
-    Assertions.assertTrue(isReclaimable);
+    GenericTestUtils.waitFor(() -> {
+      Table<String, SnapshotInfo> snapshotInfoTable =
+          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
+      try {
+        return null == snapshotInfoTable.get(newSnapshot.getTableKey());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
 
     // Check whether newly created keys data can be reclaimed
-    /*
     ozoneBucket.deleteKeys(newKeys);
-    KeyDeletingService keyDeletingService =
-        followerOM.getKeyManager().getDeletingService();
-    keyDeletingService.previousActiveSnapshot(newSnapshot, SnapshotChain)
-    keyDeletingService.isReclaimable();
-     */
 
     // Check whether differ service works
   }

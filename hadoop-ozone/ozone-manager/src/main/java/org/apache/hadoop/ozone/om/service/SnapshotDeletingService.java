@@ -620,13 +620,4 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     successRunCount.getAndSet(num);
   }
 
-  @VisibleForTesting
-  public boolean isSnapshotReclaimable(
-      Table<String, RepeatedOmKeyInfo> snapshotDeletedTable,
-      Table<String, OmKeyInfo> snapshotDeletedDirTable,
-      String snapshotBucketKey, String dbBucketKeyForDir) throws IOException {
-    return new SnapshotDeletingTask().isSnapshotReclaimable(
-        snapshotDeletedTable, snapshotDeletedDirTable, snapshotBucketKey,
-        dbBucketKeyForDir);
-  }
 }
