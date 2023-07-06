@@ -218,7 +218,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), rConfig, metadata, null,
-                null
+                null, false
             ));
           }
 
