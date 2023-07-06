@@ -846,7 +846,7 @@ public class TestSnapshotDiffManager {
       actualOrder.add(entry.getType());
 
       long objectId = Long.parseLong(
-          DFSUtilClient.bytes2String(entry.getSourcePath()).substring(4));
+          DFSUtilClient.bytes2String(entry.getSourcePath()).substring(3));
       assertEquals(diffMap.get(objectId), entry.getType());
     }
     assertEquals(expectedOrder, actualOrder);

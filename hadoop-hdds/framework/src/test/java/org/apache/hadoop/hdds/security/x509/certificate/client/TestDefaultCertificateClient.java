@@ -488,6 +488,13 @@ public class TestDefaultCertificateClient {
               PKCS10CertificationRequest request, Path certificatePath) {
             return null;
           }
+
+          @Override
+          public String signAndStoreCertificate(
+              PKCS10CertificationRequest request, Path certificatePath,
+              boolean renew) throws CertificateException {
+            return null;
+          }
         }) {
 
       InitResponse resp = client.init();
@@ -581,7 +588,7 @@ public class TestDefaultCertificateClient {
         newCertDir.toPath());
     dnCertClient.storeCertificate(getPEMEncodedString(cert),
         CAType.NONE,
-        certCodec, false);
+        certCodec, false, false);
     // a success renew after auto cleanup new key and cert dir
     dnCertClient.renewAndStoreKeyAndCertificate(true);
   }
@@ -622,6 +629,13 @@ public class TestDefaultCertificateClient {
       protected String signAndStoreCertificate(
           PKCS10CertificationRequest request, Path certificatePath) {
         return "";
+      }
+
+      @Override
+      protected String signAndStoreCertificate(
+          PKCS10CertificationRequest request, Path certificatePath,
+          boolean renew) throws CertificateException {
+        return null;
       }
     };
 

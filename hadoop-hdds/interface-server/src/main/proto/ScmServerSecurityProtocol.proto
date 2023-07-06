@@ -147,6 +147,7 @@ message SCMGetCertRequestProto {
 message SCMGetSCMCertRequestProto {
     required ScmNodeDetailsProto scmDetails = 1;
     required string CSR = 2;
+    optional bool renew = 3[default = false];
 }
 
 /**

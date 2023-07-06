@@ -59,6 +59,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -132,8 +133,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       String certSerialId,
       String component,
       Consumer<String> saveCertId,
-      Runnable shutdown
-  ) {
+      Runnable shutdown) {
     Objects.requireNonNull(securityConfig);
     this.securityConfig = securityConfig;
     this.scmSecurityClient = scmSecurityClient;
@@ -154,8 +154,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Load all certificates from configured location.
    * */
   private synchronized void loadAllCertificates() {
-    try (Stream<Path> certFiles =
-             Files.list(securityConfig.getCertificateLocation(component))) {
+    Path path = securityConfig.getCertificateLocation(component);
+    if (!path.toFile().exists() && certSerialId == null) {
+      return;
+    }
+    try (Stream<Path> certFiles = Files.list(path)) {
       certFiles
           .filter(Files::isRegularFile)
           .forEach(this::readCertificateFile);
@@ -164,14 +167,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return;
     }
 
-    if (certPath != null && executorService == null) {
-      startCertificateMonitor();
-    } else {
-      if (executorService != null) {
-        getLogger().debug("CertificateLifetimeMonitor is already started.");
+    if (shouldStartCertificateMonitor()) {
+      if (certPath != null && executorService == null) {
+        startCertificateMonitor();
       } else {
-        getLogger().warn("Component certificate was not loaded.");
+        if (executorService != null) {
+          getLogger().debug("CertificateLifetimeMonitor is already started.");
+        } else {
+          getLogger().warn("Component certificate was not loaded.");
+        }
       }
+    } else {
+      getLogger().info("CertificateLifetimeMonitor is disabled for {}",
+          component);
     }
   }
 
@@ -188,7 +196,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       if (readCertSerialId.equals(certSerialId)) {
         this.certPath = allCertificates;
       }
-      certificateMap.putIfAbsent(readCertSerialId, allCertificates);
+      certificateMap.put(readCertSerialId, allCertificates);
       addCertsToSubCaMapIfNeeded(fileName, allCertificates);
       addCertToRootCaMapIfNeeded(fileName, allCertificates);
 
@@ -550,12 +558,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
         component);
     storeCertificate(pemEncodedCert, caType,
-        certificateCodec, true);
+        certificateCodec, true, false);
   }
 
   public synchronized void storeCertificate(String pemEncodedCert,
-      CAType caType, CertificateCodec codec, boolean addToCertMap)
-      throws CertificateException {
+      CAType caType, CertificateCodec codec, boolean addToCertMap,
+      boolean updateCA) throws CertificateException {
     try {
       CertPath certificatePath =
           CertificateCodec.getCertPathFromPemEncodedString(pemEncodedCert);
@@ -564,18 +572,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       String certName = String.format(CERT_FILE_NAME_FORMAT,
           caType.getFileNamePrefix() + cert.getSerialNumber().toString());
 
-      if (caType == CAType.SUBORDINATE) {
-        caCertId = cert.getSerialNumber().toString();
-      }
-      if (caType == CAType.ROOT) {
-        rootCaCertId = cert.getSerialNumber().toString();
+      if (updateCA) {
+        if (caType == CAType.SUBORDINATE) {
+          caCertId = cert.getSerialNumber().toString();
+        }
+        if (caType == CAType.ROOT) {
+          rootCaCertId = cert.getSerialNumber().toString();
+        }
       }
 
       codec.writeCertificate(certName,
           pemEncodedCert);
       if (addToCertMap) {
-        certificateMap.putIfAbsent(
-            cert.getSerialNumber().toString(), certificatePath);
+        certificateMap.put(cert.getSerialNumber().toString(), certificatePath);
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -894,12 +903,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   @Override
   public Set<X509Certificate> getAllRootCaCerts() {
-    return Collections.unmodifiableSet(rootCaCertificates);
+    Set<X509Certificate> certs =
+        Collections.unmodifiableSet(rootCaCertificates);
+    getLogger().info("{} has {} Root CA certificates", this.component,
+        certs.size());
+    return certs;
   }
 
   @Override
   public Set<X509Certificate> getAllCaCerts() {
-    return Collections.unmodifiableSet(caCertificates);
+    Set<X509Certificate> certs = Collections.unmodifiableSet(caCertificates);
+    getLogger().info("{} has {} CA certificates", this.component,
+        certs.size());
+    return certs;
   }
 
   @Override
@@ -1043,7 +1059,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       CertificateSignRequest.Builder csrBuilder = getCSRBuilder();
       csrBuilder.setKey(newKeyPair);
       newCertSerialId = signAndStoreCertificate(csrBuilder.build(),
-          Paths.get(newCertPath));
+          Paths.get(newCertPath), true);
     } catch (Exception e) {
       throw new CertificateException("Error while signing and storing new" +
           " certificates.", e, RENEW_ERROR);
@@ -1183,16 +1199,20 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-  synchronized void reloadKeyAndCertificate(String newCertId) {
-    // reset current value
+  public synchronized void reloadKeyAndCertificate(String newCertId) {
     privateKey = null;
     publicKey = null;
     certPath = null;
     caCertId = null;
     rootCaCertId = null;
 
-    updateCertSerialId(newCertId);
-    getLogger().info("Reset and reload key and all certificates.");
+    String oldCaCertId = updateCertSerialId(newCertId);
+    getLogger().info("Reset and reloaded key and all certificates for new " +
+        "certificate {}.", newCertId);
+
+    // notify notification receivers
+    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+        this, oldCaCertId, newCertId));
   }
 
   public SecurityConfig getSecurityConfig() {
@@ -1201,12 +1221,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
   private synchronized String updateCertSerialId(String newCertSerialId) {
     certSerialId = newCertSerialId;
+    getLogger().info("Certificate serial ID set to {}", certSerialId);
     loadAllCertificates();
     return certSerialId;
   }
 
-  protected abstract String signAndStoreCertificate(
+  protected String signAndStoreCertificate(
       PKCS10CertificationRequest request, Path certificatePath)
+      throws CertificateException {
+    return signAndStoreCertificate(request, certificatePath, false);
+  }
+
+  protected abstract String signAndStoreCertificate(
+      PKCS10CertificationRequest request, Path certificatePath, boolean renew)
       throws CertificateException;
 
   public String signAndStoreCertificate(
@@ -1218,6 +1245,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public SCMSecurityProtocolClientSideTranslatorPB getScmSecureClient()
       throws IOException {
     return scmSecurityClient;
+  }
+
+  protected boolean shouldStartCertificateMonitor() {
+    return true;
   }
 
   public synchronized void startCertificateMonitor() {
@@ -1237,8 +1268,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               getComponentName() + "-CertificateLifetimeMonitor")
               .setDaemon(true).build());
     }
-    this.executorService.scheduleAtFixedRate(
-        new CertificateLifetimeMonitor(this),
+    this.executorService.scheduleAtFixedRate(new CertificateLifetimeMonitor(),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateLifetimeMonitor for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1249,10 +1279,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *  Task to monitor certificate lifetime and renew the certificate if needed.
    */
   public class CertificateLifetimeMonitor implements Runnable {
-    private CertificateClient certClient;
 
-    public CertificateLifetimeMonitor(CertificateClient client) {
-      this.certClient = client;
+    public CertificateLifetimeMonitor() {
     }
 
     @Override
@@ -1270,8 +1298,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         if (timeLeft.isZero()) {
           String newCertId;
           try {
-            getLogger().info("Current certificate has entered the expiry" +
+            getLogger().info("Current certificate {} has entered the expiry" +
                     " grace period {}. Starting renew key and certs.",
+                currentCert.getSerialNumber().toString(),
                 timeLeft, securityConfig.getRenewalGracePeriod());
             newCertId = renewAndStoreKeyAndCertificate(false);
           } catch (CertificateException e) {
@@ -1297,11 +1326,20 @@ public abstract class DefaultCertificateClient implements CertificateClient {
           reloadKeyAndCertificate(newCertId);
           // cleanup backup directory
           cleanBackupDir();
-          // notify notification receivers
-          notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-              certClient, currentCert.getSerialNumber().toString(), newCertId));
         }
       }
     }
+  }
+
+  /**
+   * Set the CA certificate. For TEST only.
+   */
+  @VisibleForTesting
+  public synchronized void setCACertificate(X509Certificate cert)
+      throws Exception {
+    caCertId = cert.getSerialNumber().toString();
+    certificateMap.put(caCertId,
+        CertificateCodec.getCertPathFromPemEncodedString(
+            CertificateCodec.getPEMEncodedString(cert)));
   }
 }

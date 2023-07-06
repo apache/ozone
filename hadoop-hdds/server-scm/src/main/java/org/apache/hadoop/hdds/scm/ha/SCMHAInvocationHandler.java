@@ -120,14 +120,17 @@ public class SCMHAInvocationHandler implements InvocationHandler {
         method.getName(), method.getParameterTypes(), args);
 
     // Scm Cert DB updates should use RaftClient.
-    // As rootCA which is primary SCM only can issues certificates to sub-CA.
+    // As rootCA which is primary SCM only can issue certificates to sub-CA.
     // In case primary is not leader SCM, still sub-ca cert DB updates should go
     // via ratis. So, in this special scenario we use RaftClient.
+    // Or rotationPrepareAck which every SCM will send out to confirm that
+    // sub CA rotation preparation is done.
     final SCMRatisResponse response;
-    if (method.getName().equals("storeValidCertificate") &&
-        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) {
+    if ((method.getName().equals("storeValidCertificate") &&
+        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) ||
+        method.getName().equals("rotationPrepareAck")) {
       response =
-          HASecurityUtils.submitScmCertsToRatis(
+          HASecurityUtils.submitScmRequestToRatis(
               ratisHandler.getDivision().getGroup(),
               ratisHandler.getGrpcTlsConfig(),
               scmRatisRequest.encode());
