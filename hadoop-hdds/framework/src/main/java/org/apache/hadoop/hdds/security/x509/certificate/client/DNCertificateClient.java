@@ -20,11 +20,9 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -34,7 +32,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
@@ -98,43 +95,10 @@ public class DNCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath, boolean renew) throws CertificateException {
-    try {
-      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
-          getScmSecureClient().getDataNodeCertificateChain(
-              dn.getProtoBufMessage(), getEncodedString(csr));
-
-      // Persist certificates.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certificatePath);
-        // Certs will be added to cert map after reloadAllCertificate called
-        storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec, false, !renew);
-        storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE, certCodec, false, !renew);
-
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false, !renew);
-        }
-        // Return the default certificate ID
-        return CertificateCodec.getX509Certificate(pemEncodedCert)
-            .getSerialNumber()
-            .toString();
-      } else {
-        throw new CertificateException("Unable to retrieve datanode " +
-            "certificate chain.");
-      }
-    } catch (IOException | java.security.cert.CertificateException e) {
-      LOG.error("Error while signing and storing SCM signed certificate.", e);
-      throw new CertificateException(
-          "Error while signing and storing SCM signed certificate.", e);
-    }
+  public SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest csr) throws IOException {
+    return getScmSecureClient().getDataNodeCertificateChain(
+        dn.getProtoBufMessage(), getEncodedString(csr));
   }
 
   @Override
