@@ -161,11 +161,15 @@ public class SequenceIdGenerator {
   public void invalidateBatch() {
     lock.lock();
     try {
-      sequenceIdToBatchMap.forEach(
-          (sequenceId, batch) -> batch.nextId = batch.lastId + 1);
+      invalidateBatchInternal();
     } finally {
       lock.unlock();
     }
+  }
+
+  private void invalidateBatchInternal() {
+    sequenceIdToBatchMap
+        .forEach((sequenceId, batch) -> batch.nextId = batch.lastId + 1);
   }
 
   /**
@@ -177,7 +181,7 @@ public class SequenceIdGenerator {
     lock.lock();
     try {
       LOG.info("reinitialize SequenceIdGenerator.");
-      invalidateBatch();
+      invalidateBatchInternal();
       stateManager.reinitialize(sequenceIdTable);
     } finally {
       lock.unlock();
