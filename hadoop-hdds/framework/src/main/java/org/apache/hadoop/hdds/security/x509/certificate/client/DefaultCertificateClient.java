@@ -1256,15 +1256,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         storeCertificate(response.getX509CACertificate(),
             CAType.SUBORDINATE, certCodec, false, !renew);
 
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false, !renew);
-        }
+        getAndStoreAllRootCAs(certCodec, renew);
         // Return the default certificate ID
-        return CertificateCodec.getX509Certificate(pemEncodedCert)
+        return updateCertSerialId(CertificateCodec.getX509Certificate(pemEncodedCert)
             .getSerialNumber()
-            .toString();
+            .toString());
       } else {
         throw new CertificateException("Unable to retrieve " +
             "certificate chain.");
@@ -1277,6 +1273,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  private void getAndStoreAllRootCAs(CertificateCodec certCodec, boolean renew)
+      throws IOException {
+    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
+    for (String rootCAPem : rootCAPems) {
+      storeCertificate(rootCAPem, CAType.ROOT, certCodec,
+          false, !renew);
+    }
+  }
 
   public String signAndStoreCertificate(
       PKCS10CertificationRequest request) throws CertificateException {
@@ -1340,7 +1344,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       synchronized (DefaultCertificateClient.class) {
         X509Certificate currentCert = getCertificate();
         Duration timeLeft = timeBeforeExpiryGracePeriod(currentCert);
-        if (forceRenewal && !timeLeft.isZero()) {
+
+        if (!forceRenewal && !timeLeft.isZero()) {
           return;
         }
         String newCertId;
