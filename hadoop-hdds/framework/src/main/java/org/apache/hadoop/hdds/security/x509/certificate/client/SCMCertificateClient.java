@@ -231,4 +231,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       throw new RuntimeException(e);
     }
   }
+
+  @Override
+  protected void startRootCaRotationPoller() {
+    //SCM root CA rotation is handled separately from polling
+  }
 }
