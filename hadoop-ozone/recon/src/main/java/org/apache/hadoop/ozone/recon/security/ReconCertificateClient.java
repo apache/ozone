@@ -90,7 +90,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
 
   @Override
   public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath) throws CertificateException {
+      Path certificatePath, boolean renew) throws CertificateException {
     try {
       SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
       HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
@@ -108,17 +108,14 @@ public class ReconCertificateClient  extends CommonCertificateClient {
         String pemEncodedCert = response.getX509Certificate();
         CertificateCodec certCodec = new CertificateCodec(
             getSecurityConfig(), certificatePath);
-        storeCertificate(pemEncodedCert, CAType.NONE,
-            certCodec,
-            false);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec, false, !renew);
         storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE,
-            certCodec, false);
+            CAType.SUBORDINATE, certCodec, false, !renew);
 
         // Store Root CA certificate.
         if (response.hasX509RootCACertificate()) {
           storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false);
+              CAType.ROOT, certCodec, false, !renew);
         }
         return getX509Certificate(pemEncodedCert).getSerialNumber().toString();
       } else {
