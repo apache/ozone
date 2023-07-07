@@ -296,12 +296,12 @@ public interface MiniOzoneCluster {
   @SuppressWarnings("visibilitymodifier")
   abstract class Builder {
 
-    protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
-    protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
-    protected static final int ACTIVE_OMS_NOT_SET = -1;
-    protected static final int ACTIVE_SCMS_NOT_SET = -1;
-    protected static final int DEFAULT_PIPELINE_LIMIT = 3;
-    protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
+    public static final int DEFAULT_HB_INTERVAL_MS = 1000;
+    public static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
+    public static final int ACTIVE_OMS_NOT_SET = -1;
+    public static final int ACTIVE_SCMS_NOT_SET = -1;
+    public static final int DEFAULT_PIPELINE_LIMIT = 3;
+    public static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
     protected OzoneConfiguration conf;
     protected String path;
