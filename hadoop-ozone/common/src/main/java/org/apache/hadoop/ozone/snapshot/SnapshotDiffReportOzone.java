@@ -24,15 +24,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.hdfs.DFSUtilClient;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DiffReportEntryProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffReportProto;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -166,7 +163,7 @@ public class SnapshotDiffReportOzone
       return null;
     }
     DiffType type = fromProtobufDiffType(entry.getDiffType());
-    return type == null ? null : new DiffReportEntryOzone(type,
+    return type == null ? null : new DiffReportEntry(type,
         entry.getSourcePath().getBytes(StandardCharsets.UTF_8),
         entry.hasTargetPath() ?
             entry.getTargetPath().getBytes(StandardCharsets.UTF_8) : null);
@@ -194,7 +191,7 @@ public class SnapshotDiffReportOzone
 
   public static DiffReportEntry getDiffReportEntry(final DiffType type,
       final String sourcePath, final String targetPath) {
-    return new DiffReportEntryOzone(type,
+    return new DiffReportEntry(type,
         sourcePath.getBytes(StandardCharsets.UTF_8),
         targetPath != null ? targetPath.getBytes(StandardCharsets.UTF_8) :
             null);
@@ -207,46 +204,5 @@ public class SnapshotDiffReportOzone
    */
   public void aggregate(SnapshotDiffReportOzone diffReport) {
     this.getDiffList().addAll(diffReport.getDiffList());
-  }
-
-  /**
-   * DiffReportEntry for ozone.
-   */
-  public static class DiffReportEntryOzone extends DiffReportEntry {
-
-    public DiffReportEntryOzone(DiffType type, byte[] sourcePath) {
-      super(type, sourcePath);
-    }
-
-    public DiffReportEntryOzone(DiffType type, byte[][] sourcePathComponents) {
-      super(type, sourcePathComponents);
-    }
-
-    public DiffReportEntryOzone(DiffType type, byte[] sourcePath,
-                                byte[] targetPath) {
-      super(type, sourcePath, targetPath);
-    }
-
-    public DiffReportEntryOzone(DiffType type, byte[][] sourcePathComponents,
-                                byte[][] targetPathComponents) {
-      super(type, sourcePathComponents, targetPathComponents);
-    }
-
-    static String getPathString(byte[] path) {
-      String pathStr = DFSUtilClient.bytes2String(path);
-      return pathStr.isEmpty() ? "." : Paths.get(pathStr)
-          .toAbsolutePath().toString();
-    }
-
-    @Override
-    public String toString() {
-      String str = this.getType().getLabel() + "\t" +
-          getPathString(this.getSourcePath());
-      if (this.getType() == SnapshotDiffReport.DiffType.RENAME) {
-        str = str + " -> " + getPathString(this.getTargetPath());
-      }
-
-      return str;
-    }
   }
 }

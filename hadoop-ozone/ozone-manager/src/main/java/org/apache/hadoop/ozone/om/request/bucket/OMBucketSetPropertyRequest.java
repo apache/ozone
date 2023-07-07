@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -33,6 +35,8 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -270,7 +274,13 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   private void checkAclPermission(
       OzoneManager ozoneManager, String volumeName, String bucketName)
       throws IOException {
-    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
+    final boolean nativeAuthorizerEnabled;
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+        ozoneManager.getOmMetadataReader()) {
+      OmMetadataReader mdReader = (OmMetadataReader) rcMetadataReader.get();
+      nativeAuthorizerEnabled = mdReader.isNativeAuthorizerEnabled();
+    }
+    if (nativeAuthorizerEnabled) {
       UserGroupInformation ugi = createUGI();
       String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
           IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);

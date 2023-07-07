@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
@@ -36,6 +38,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -271,8 +275,13 @@ public abstract class OMClientRequest implements RequestAuditor {
         contextBuilder.setOwnerName(bucketOwner);
       }
 
-      ozoneManager.getOmMetadataReader().checkAcls(obj,
-          contextBuilder.build(), true);
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+          ozoneManager.getOmMetadataReader()) {
+        OmMetadataReader omMetadataReader =
+            (OmMetadataReader) rcMetadataReader.get();
+
+        omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
+      }
     }
   }
 
@@ -332,10 +341,13 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    OzoneAclUtils.checkAllAcls(ozoneManager.getOmMetadataReader(),
-            resType, storeType, aclType,
-            vol, bucket, key, volOwner, bucketOwner, createUGI(),
-            getRemoteAddress(), getHostName());
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+        ozoneManager.getOmMetadataReader()) {
+      OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
+          resType, storeType, aclType,
+          vol, bucket, key, volOwner, bucketOwner, createUGI(),
+          getRemoteAddress(), getHostName());
+    }
   }
 
   /**

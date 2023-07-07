@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMDBCheckpointServlet;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -187,6 +188,8 @@ public class TestSCMDbCheckpointServlet {
             }
           });
 
+      when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(
+          new DBCheckpointServlet.Lock());
       scmDbCheckpointServletMock.init();
       long initialCheckpointCount =
           scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();

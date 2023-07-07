@@ -151,6 +151,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -986,15 +987,32 @@ public class RpcClient implements ClientProtocol {
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff,
-                                           boolean cancel)
+                                           boolean forceFullDiff)
       throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff, cancel);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+  }
+
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
+        "volume can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
+        "bucket can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(fromSnapshot),
+        "fromSnapshot can't be null or empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(toSnapshot),
+        "toSnapshot can't be null or empty.");
+    return ozoneManagerClient.cancelSnapshotDiff(volumeName, bucketName,
+        fromSnapshot, toSnapshot);
   }
 
   @Override
@@ -1525,7 +1543,8 @@ public class RpcClient implements ClientProtocol {
         key.getDataSize(),
         key.getCreationTime(),
         key.getModificationTime(),
-        key.getReplicationConfig()))
+        key.getReplicationConfig(),
+        key.isFile()))
         .collect(Collectors.toList());
   }
 
@@ -1576,7 +1595,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations,
         keyInfo.getReplicationConfig(), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(),
-        () -> getInputStreamWithRetryFunction(keyInfo));
+        () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile());
   }
 
   @Override

@@ -2261,6 +2261,25 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.ca.rotation.ack.timeout</name>
+    <value>PT15M</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Max time that SCM leader will wait for the rotation preparation acks before it believes the rotation
+      is failed. Default is 15 minutes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
+    <value>PT2h</value>
+    <description>Interval to use for polling in certificate clients for a new
+      root ca certificate. Every time the specified time duration elapses,
+      the clients send a request to the SCMs to see if a new root ca
+      certificate was generated. Once there is a change, the system
+      automatically adds the new root ca to the clients'
+      trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.handler.count.key</name>
     <value>2</value>
     <tag>OZONE, HDDS, SECURITY</tag>
@@ -3991,7 +4010,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
-    <value>60m</value>
+    <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.

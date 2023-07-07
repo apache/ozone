@@ -42,6 +42,12 @@ public class DatanodeConfiguration {
       "hdds.datanode.container.delete.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
+  public static final String DISK_CHECK_FILE_SIZE_KEY =
+      "hdds.datanode.disk.check.file.size";
+  public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
+      "hdds.datanode.disk.check.io.test.count";
+  public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY =
+      "hdds.datanode.disk.check.io.failures.tolerated";
   public static final String FAILED_DATA_VOLUMES_TOLERATED_KEY =
       "hdds.datanode.failed.data.volumes.tolerated";
   public static final String FAILED_METADATA_VOLUMES_TOLERATED_KEY =
@@ -64,10 +70,16 @@ public class DatanodeConfiguration {
 
   static final int FAILED_VOLUMES_TOLERATED_DEFAULT = -1;
 
+  public static final int DISK_CHECK_IO_TEST_COUNT_DEFAULT = 3;
+
+  public static final int DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT = 1;
+
+  public static final int DISK_CHECK_FILE_SIZE_DEFAULT = 100;
+
   static final boolean WAIT_ON_ALL_FOLLOWERS_DEFAULT = false;
 
   static final long DISK_CHECK_MIN_GAP_DEFAULT =
-      Duration.ofMinutes(15).toMillis();
+      Duration.ofMinutes(10).toMillis();
 
   static final long DISK_CHECK_TIMEOUT_DEFAULT =
       Duration.ofMinutes(10).toMillis();
@@ -265,8 +277,44 @@ public class DatanodeConfiguration {
   )
   private int failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
 
+  @Config(key = "disk.check.io.test.count",
+      defaultValue = "3",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of IO tests required to determine if a disk " +
+          " has failed. Each disk check does one IO test. The volume will be " +
+          "failed if more than " +
+          "hdds.datanode.disk.check.io.failures.tolerated out of the last " +
+          "hdds.datanode.disk.check.io.test.count runs failed. Set to 0 " +
+          "to disable disk IO checks."
+  )
+  private int volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+
+  @Config(key = "disk.check.io.failures.tolerated",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "The number of IO tests out of the last hdds.datanode" +
+          ".disk.check.io.test.count test run that are allowed to fail before" +
+          " the volume is marked as failed."
+  )
+  private int volumeIOFailureTolerance =
+      DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+
+  @Config(key = "disk.check.file.size",
+      defaultValue = "100B",
+      type = ConfigType.SIZE,
+      tags = { DATANODE },
+      description = "The size of the temporary file that will be synced to " +
+          "the disk and " +
+          "read back to assess its health. The contents of the " +
+          "file will be stored in memory during the duration of the check."
+  )
+  private int volumeHealthCheckFileSize =
+      DISK_CHECK_FILE_SIZE_DEFAULT;
+
   @Config(key = "disk.check.min.gap",
-      defaultValue = "15m",
+      defaultValue = "10m",
       type = ConfigType.TIME,
       tags = { DATANODE },
       description = "The minimum gap between two successive checks of the same"
@@ -461,6 +509,48 @@ public class DatanodeConfiguration {
       failedDbVolumesTolerated = FAILED_VOLUMES_TOLERATED_DEFAULT;
     }
 
+    if (volumeIOTestCount == 0) {
+      LOG.info("{} set to {}. Disk IO health tests have been disabled.",
+          DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount);
+    } else {
+      if (volumeIOTestCount < 0) {
+        LOG.warn("{} must be greater than 0 but was set to {}." +
+                "Defaulting to {}",
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance < 0) {
+        LOG.warn("{} must be greater than or equal to 0 but was set to {}. " +
+                "Defaulting to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT);
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeIOFailureTolerance >= volumeIOTestCount) {
+        LOG.warn("{} was set to {} but cannot be greater or equals to {} " +
+                "set to {}. Defaulting {} to {} and {} to {}",
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY, volumeIOFailureTolerance,
+            DISK_CHECK_IO_TEST_COUNT_KEY, volumeIOTestCount,
+            DISK_CHECK_IO_FAILURES_TOLERATED_KEY,
+            DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT,
+            DISK_CHECK_IO_TEST_COUNT_KEY, DISK_CHECK_IO_TEST_COUNT_DEFAULT);
+        volumeIOTestCount = DISK_CHECK_IO_TEST_COUNT_DEFAULT;
+        volumeIOFailureTolerance = DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
+      }
+
+      if (volumeHealthCheckFileSize < 1) {
+        LOG.warn(DISK_CHECK_FILE_SIZE_KEY +
+                "must be at least 1 byte and was set to {}. Defaulting to {}",
+            volumeHealthCheckFileSize,
+            DISK_CHECK_FILE_SIZE_DEFAULT);
+        volumeHealthCheckFileSize =
+            DISK_CHECK_FILE_SIZE_DEFAULT;
+      }
+    }
+
     if (diskCheckMinGap < 0) {
       LOG.warn(DISK_CHECK_MIN_GAP_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -497,7 +587,6 @@ public class DatanodeConfiguration {
       rocksdbDeleteObsoleteFilesPeriod =
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
-
   }
 
   public void setContainerDeleteThreads(int containerDeleteThreads) {
@@ -539,6 +628,30 @@ public class DatanodeConfiguration {
 
   public void setFailedDbVolumesTolerated(int failedVolumesTolerated) {
     this.failedDbVolumesTolerated = failedVolumesTolerated;
+  }
+
+  public int getVolumeIOTestCount() {
+    return volumeIOTestCount;
+  }
+
+  public void setVolumeIOTestCount(int testCount) {
+    this.volumeIOTestCount = testCount;
+  }
+
+  public int getVolumeIOFailureTolerance() {
+    return volumeIOFailureTolerance;
+  }
+
+  public void setVolumeIOFailureTolerance(int failureTolerance) {
+    volumeIOFailureTolerance = failureTolerance;
+  }
+
+  public int getVolumeHealthCheckFileSize() {
+    return volumeHealthCheckFileSize;
+  }
+
+  public void getVolumeHealthCheckFileSize(int fileSizeBytes) {
+    this.volumeHealthCheckFileSize = fileSizeBytes;
   }
 
   public boolean getCheckEmptyContainerDir() {

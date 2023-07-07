@@ -49,6 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -57,6 +58,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -128,7 +130,6 @@ public class TestOMDbCheckpointServlet {
   private HttpServletRequest requestMock = null;
   private HttpServletResponse responseMock = null;
   private OMDBCheckpointServlet omDbCheckpointServletMock = null;
-  private BootstrapStateHandler.Lock lock;
   private File metaDir;
   private String snapshotDirName;
   private String snapshotDirName2;
@@ -137,7 +138,7 @@ public class TestOMDbCheckpointServlet {
   private String method;
   private File folder;
   private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
-
+  private FileOutputStream fileOutputStream;
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -153,7 +154,7 @@ public class TestOMDbCheckpointServlet {
     tempFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
-    FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
+    fileOutputStream = new FileOutputStream(tempFile);
 
     servletOutputStream = new ServletOutputStream() {
       @Override
@@ -193,7 +194,8 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock =
         mock(OMDBCheckpointServlet.class);
 
-    lock = new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
+    BootstrapStateHandler.Lock lock =
+        new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
 
     requestMock = mock(HttpServletRequest.class);
@@ -370,11 +372,31 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
+    // Create a "spy" dbstore keep track of the checkpoint.
+    OzoneManager om = cluster.getOzoneManager();
+    DBStore dbStore =  om.getMetadataManager().getStore();
+    DBStore spyDbStore = spy(dbStore);
+    AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
+    when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
+      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      // Don't delete the checkpoint, because we need to compare it
+      // with the snapshot data.
+      doNothing().when(checkpoint).cleanupCheckpoint();
+      realCheckpoint.set(checkpoint);
+      return checkpoint;
+    });
+
+    // Init the mock with the spyDbstore
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        any(), any(), eq(false), any(), any(), eq(false));
+    omDbCheckpointServletMock.initialize(
+        spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
+        false, om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
+
     // Get the tarball.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
-      omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>());
-    }
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    dbCheckpoint = realCheckpoint.get();
 
     // Untar the file into a temp folder to be examined.
     String testDirName = folder.getAbsolutePath();
@@ -805,7 +827,7 @@ public class TestOMDbCheckpointServlet {
     // Confirm that servlet takes the lock when none of the other
     //  handlers have it.
     Future<Boolean> servletTest = checkLock(spyServlet, executorService);
-    Assert.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
+    Assertions.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 

@@ -33,7 +33,7 @@ export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.5; do
+for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.6; do
   export HADOOP_VERSION
   export HADOOP_MAJOR_VERSION=${HADOOP_VERSION%%.*}
   # Check if $HADOOP_VERSION starts with the prefix "3.3."
@@ -55,7 +55,3 @@ for HADOOP_VERSION in 2.7.3 3.1.2 3.2.2 3.3.5; do
   save_container_logs nm rm
   stop_containers nm rm
 done
-
-stop_docker_env
-
-generate_report

@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;
@@ -137,6 +138,15 @@ enum Type {
   SetTimes = 120;
   RefetchSecretKey = 121;
   ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
+  SetSafeMode = 124;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
 }
 
 message OMRequest {
@@ -257,8 +267,9 @@ message OMRequest {
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
   optional SetTimesRequest                   SetTimesRequest               = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
-
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
 }
 
 message OMResponse {
@@ -371,8 +382,9 @@ message OMResponse {
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
   optional SetTimesResponse                   SetTimesResponse             = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
-
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
 }
 
 enum Status {
@@ -816,6 +828,7 @@ message SnapshotDiffJobProto {
   optional string toSnapshot = 7;
   optional bool forceFullDiff = 8;
   optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
 }
 
 message OzoneObj {
@@ -1740,7 +1753,13 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
-  optional bool cancel = 8;
+}
+
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
 }
 
 message ListSnapshotDiffJobRequest {
@@ -1830,19 +1849,14 @@ message SnapshotDiffResponse {
     CANCELLED = 6;
   }
 
-  enum JobCancelResultProto {
-    JOB_NOT_CANCELLED = 1;
-    NEW_JOB = 2;
-    JOB_DONE = 3;
-    INVALID_STATUS_TRANSITION = 4;
-    JOB_ALREADY_CANCELLED = 5;
-    CANCELLATION_SUCCESS = 6;
-  }
-
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
-  optional JobCancelResultProto jobCancelResult = 4;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
 }
 
 message ListSnapshotDiffJobResponse {
@@ -1946,6 +1960,14 @@ message SetTimesRequest {
 }
 
 message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
 }
 
 /**

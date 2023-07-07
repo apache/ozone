@@ -53,12 +53,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
-import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -109,12 +108,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Tests the Ratis snapshots feature in OM.
  */
 @Timeout(5000)
-@Flaky("HDDS-8876")
-@Disabled("HDDS-8880")
 public class TestOMRatisSnapshots {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -143,7 +137,7 @@ public class TestOMRatisSnapshots {
    * @throws IOException
    */
   @BeforeEach
-  public void init() throws Exception {
+  public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -153,9 +147,16 @@ public class TestOMRatisSnapshots {
         StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.
         OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
+    long snapshotThreshold = SNAPSHOT_THRESHOLD;
+    // TODO: refactor tests to run under a new class with different configs.
+    if (testInfo.getTestMethod().isPresent() &&
+        testInfo.getTestMethod().get().getName()
+            .equals("testInstallSnapshot")) {
+      snapshotThreshold = SNAPSHOT_THRESHOLD * 10;
+    }
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
+        snapshotThreshold);
     conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
         5, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
@@ -466,9 +467,15 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    assertNotNull(followerOMMetaMngr.getKeyTable(
-        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
-        volumeName, bucketName, newKeys.get(0))));
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
+            .get(followerOMMetaMngr.getOzoneKey(
+                volumeName, bucketName, newKeys.get(0))) != null;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10000);
 
     // Verify follower candidate directory get cleaned
     String[] filesInCandidate = followerOM.getOmSnapshotProvider().
@@ -572,6 +579,7 @@ public class TestOMRatisSnapshots {
 
   @Test
   @Timeout(300)
+  @Flaky("HDDS-8876")
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -671,6 +679,11 @@ public class TestOMRatisSnapshots {
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
+    // There is a chance we end up checking the DBCheckpointMetrics
+    // before the follower sends another request to the leader
+    // to generate a checkpoint.
+    // TODO: Add wait check here, to avoid flakiness.
+
     // Verify the metrics
     DBCheckpointMetrics dbMetrics = leaderOM.getMetrics().
         getDBCheckpointMetrics();
@@ -686,9 +699,15 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    assertNotNull(followerOMMetaMngr.getKeyTable(
-        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
-        volumeName, bucketName, newKeys.get(0))));
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
+            .get(followerOMMetaMngr.getOzoneKey(
+                volumeName, bucketName, newKeys.get(0))) != null;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10000);
 
     // Verify follower candidate directory get cleaned
     String[] filesInCandidate = followerOM.getOmSnapshotProvider().
@@ -697,7 +716,7 @@ public class TestOMRatisSnapshots {
     assertEquals(0, filesInCandidate.length);
   }
 
-  @Ignore("Enable this unit test after RATIS-1481 used")
+  @Test
   public void testInstallSnapshotWithClientWrite() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil

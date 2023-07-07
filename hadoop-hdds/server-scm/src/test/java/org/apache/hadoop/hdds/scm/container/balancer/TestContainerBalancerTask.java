@@ -690,7 +690,8 @@ public class TestContainerBalancerTask {
   @Test
   public void testMetrics()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      InvalidContainerBalancerConfigurationException, TimeoutException,
+      NodeNotFoundException {
     conf.set("hdds.datanode.du.refresh.period", "1ms");
     balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
@@ -699,6 +700,11 @@ public class TestContainerBalancerTask {
     // deliberately set max size per iteration to a low value, 6 GB
     balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    Mockito.when(moveManager.move(any(), any(), any()))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.COMPLETED));
 
     startBalancer(balancerConfiguration);
     stopBalancer();
@@ -708,7 +714,18 @@ public class TestContainerBalancerTask {
             balancerConfiguration.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
     Assertions.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
+    Assertions.assertTrue(metrics.getDataSizeMovedGB() > 0);
     Assertions.assertEquals(1, metrics.getNumIterations());
+    Assertions.assertTrue(
+        metrics.getNumContainerMovesScheduledInLatestIteration() > 0);
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesScheduledInLatestIteration());
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesCompleted() +
+            metrics.getNumContainerMovesFailed() +
+            metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(0, metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(1, metrics.getNumContainerMovesFailed());
   }
 
   /**
