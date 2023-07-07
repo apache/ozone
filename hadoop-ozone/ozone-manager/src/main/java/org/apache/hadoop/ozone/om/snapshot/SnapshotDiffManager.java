@@ -1266,8 +1266,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   }
 
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
-  private String resolveAbsolutePath(boolean isFSOBucket,
-          final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal)
+  private String resolveBucketRelativePath(boolean isFSOBucket,
+      final Optional<Map<Long, Path>> parentIdMap, byte[] keyVal)
       throws IOException {
     String key = codecRegistry.asObject(keyVal, String.class);
     if (isFSOBucket) {
@@ -1279,9 +1279,10 @@ public class SnapshotDiffManager implements AutoCloseable {
             parentId));
       }
       return parentIdMap.map(m -> m.get(parentId).resolve(splitKey[1]))
-          .get().toString();
+          .get().toString().substring(1);
     }
-    return Paths.get(OzoneConsts.OZONE_URI_DELIMITER).resolve(key).toString();
+    return Paths.get(OzoneConsts.OZONE_URI_DELIMITER).resolve(key).toString()
+        .substring(1);
   }
 
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
@@ -1366,28 +1367,28 @@ public class SnapshotDiffManager implements AutoCloseable {
             throw new IllegalStateException(
                 "Old and new key name both are null");
           } else if (oldKeyName == null) { // Key Created.
-            String key = resolveAbsolutePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(CREATE, key);
             createDiffs.add(codecRegistry.asRawData(entry));
           } else if (newKeyName == null) { // Key Deleted.
-            String key = resolveAbsolutePath(isFSOBucket, oldParentIdPathMap,
-                oldKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                oldParentIdPathMap, oldKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
           } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
-            String key = resolveAbsolutePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String key = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
           } else { // Key Renamed.
-            String oldKey = resolveAbsolutePath(isFSOBucket, oldParentIdPathMap,
-                oldKeyName);
-            String newKey = resolveAbsolutePath(isFSOBucket, newParentIdPathMap,
-                newKeyName);
+            String oldKey = resolveBucketRelativePath(isFSOBucket,
+                oldParentIdPathMap, oldKeyName);
+            String newKey = resolveBucketRelativePath(isFSOBucket,
+                newParentIdPathMap, newKeyName);
             renameDiffs.add(codecRegistry.asRawData(
                 SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
                     newKey)));

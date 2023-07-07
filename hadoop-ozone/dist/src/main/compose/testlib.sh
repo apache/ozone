@@ -262,6 +262,18 @@ execute_command_in_container(){
   docker-compose exec -T "$@"
 }
 
+## @description  Execute specific commands in docker container
+## @param        container name
+## @param        specific commands to execute
+execute_commands_in_container(){
+  local container=$1
+  shift 1
+  local command=$@
+
+  # shellcheck disable=SC2068
+  docker-compose exec -T $container /bin/bash -c "$command"
+}
+
 ## @description Stop a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
@@ -323,18 +335,19 @@ wait_for_port(){
 wait_for_execute_command(){
   local container=$1
   local timeout=$2
-  local command=$3
+  shift 2
+  local command=$@
 
   #Reset the timer
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     if docker-compose exec -T $container bash -c '$command'; then
-       echo "$command succeed"
-       return
+     if docker-compose exec -T $container /bin/bash -c "$command"; then
+        echo "$command succeed"
+        return
      fi
-     echo "$command hasn't succeed yet"
-     sleep 1
+        echo "$command hasn't succeed yet"
+        sleep 1
    done
    echo "Timed out waiting on $command to be successful"
    return 1

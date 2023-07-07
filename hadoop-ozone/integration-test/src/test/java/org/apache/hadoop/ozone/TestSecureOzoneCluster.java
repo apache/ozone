@@ -83,7 +83,6 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage;
@@ -115,6 +114,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
@@ -140,6 +140,7 @@ import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
@@ -253,6 +254,10 @@ public final class TestSecureOzoneCluster {
       conf.set(HDDS_X509_RENEW_GRACE_DURATION,
           Duration.ofMillis(certGraceTime).toString());
       conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
+      conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
+          Duration.ofMillis(certGraceTime - 1000).toString());
+      conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
+          Duration.ofMillis(certGraceTime - 1000).toString());
       conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
           delegationTokenMaxTime);
 
@@ -452,8 +457,7 @@ public final class TestSecureOzoneCluster {
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
     HASecurityUtils.initializeSecurity(scmStore, conf,
-        NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
-            OZONE_SCM_CLIENT_PORT_DEFAULT), true);
+        InetAddress.getLocalHost().getHostName(), true);
     scmStore.setPrimaryScmNodeId(scmId);
     // writes the version file properties
     scmStore.initialize();
@@ -1329,12 +1333,11 @@ public final class TestSecureOzoneCluster {
     X500Name x500Issuer = new JcaX509CertificateHolder(cert).getIssuer();
     RDN cn = x500Issuer.getRDNs(BCStyle.CN)[0];
     String hostName = InetAddress.getLocalHost().getHostName();
-    String scmUser = OzoneConsts.SCM_SUB_CA_PREFIX + hostName;
-    assertEquals(scmUser, cn.getFirst().getValue().toString());
 
     // Subject name should be om login user in real world but in this test
     // UGI has scm user context.
-    assertEquals(scmUser, cn.getFirst().getValue().toString());
+    assertTrue(cn.getFirst().getValue().toString().contains(SCM_SUB_CA));
+    assertTrue(cn.getFirst().getValue().toString().contains(hostName));
 
     LocalDate today = LocalDateTime.now().toLocalDate();
     Date invalidDate;
@@ -1349,7 +1352,8 @@ public final class TestSecureOzoneCluster {
     assertTrue(cert.getSubjectDN().toString().contains(scmId));
     assertTrue(cert.getSubjectDN().toString().contains(clusterId));
 
-    assertTrue(cert.getIssuerDN().toString().contains(scmUser));
+    assertTrue(cn.getFirst().getValue().toString().contains(SCM_SUB_CA));
+    assertTrue(cn.getFirst().getValue().toString().contains(hostName));
     assertTrue(cert.getIssuerDN().toString().contains(scmId));
     assertTrue(cert.getIssuerDN().toString().contains(clusterId));
 
