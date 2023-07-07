@@ -201,8 +201,7 @@ public class TestOMRatisSnapshots {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {10})
-  @SuppressWarnings("methodlength")
+  @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -306,124 +305,6 @@ public class TestOMRatisSnapshots {
      */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
-
-    // verify that the bootstrap Follower OM can become leader again
-    leaderOM.transferLeadership(followerNodeId);
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        followerOM.checkLeaderStatus();
-        return true;
-      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
-        return false;
-      }
-    }, 1000, 10000);
-    OzoneManager newLeaderOM = cluster.getOMLeader();
-
-    checkSnapshot(newLeaderOM, leaderOM, snapshotName, keys, snapshotInfo);
-    readKeys(newKeys);
-
-    // Prepare baseline data for compaction logs
-    String currentCompactionLogPath = newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getCurrentCompactionLogPath();
-    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
-    String compactionLogsPath = currentCompactionLogPath
-        .substring(0, lastIndex);
-    int numberOfLogFiles = 0;
-    long contentLength;
-    Path compactionLogPath = Paths.get(compactionLogsPath);
-    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
-    try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog);
-         DirectoryStream<Path> files =
-             Files.newDirectoryStream(compactionLogPath)) {
-      contentLength = bufferedReader.lines()
-          .mapToLong(String::length)
-          .reduce(0L, Long::sum);
-      for (Path ignored : files) {
-        numberOfLogFiles++;
-      }
-    }
-
-    // Check whether newly created snapshot gets processed by SFS
-    newKeys = writeKeys(1);
-    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
-        snapshotName + RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(newSnapshot);
-    File omMetadataDir =
-        OMStorage.getOmDbDir(newLeaderOM.getConfiguration());
-    String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    Path filePath =
-        Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
-    Assertions.assertTrue(Files.exists(filePath));
-    GenericTestUtils.waitFor(() -> {
-      List<String> processedSnapshotIds;
-      try {
-        processedSnapshotIds = Files.readAllLines(filePath);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-
-      return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
-          .toString());
-    }, 1000, 30000);
-
-    // Check whether newly created snapshot data can be reclaimed
-    client.getObjectStore()
-        .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
-    GenericTestUtils.waitFor(() -> {
-      Table<String, SnapshotInfo> snapshotInfoTable =
-          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
-      try {
-        return null == snapshotInfoTable.get(newSnapshot.getTableKey());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 10000);
-
-    // Check whether newly created keys data can be reclaimed
-    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
-        .getMetadataManager()
-        .getKeyTable(ozoneBucket.getBucketLayout());
-    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
-        OM_KEY_PREFIX + ozoneBucket.getName() +
-        OM_KEY_PREFIX + newKeys.get(0);
-    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
-    ozoneBucket.deleteKeys(newKeys);
-    GenericTestUtils.waitFor(() -> {
-      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
-          .getMetadataManager()
-          .getKeyTable(ozoneBucket.getBucketLayout());
-      try {
-        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 10000);
-
-    // Check whether compaction logs get appeneded to
-    // Force compaction
-    newLeaderOM.getMetadataManager()
-        .getStore()
-        .compactDB();
-    int newNumberOfLogFiles = 0;
-    long newContentLength;
-    try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog);
-         DirectoryStream<Path> files =
-             Files.newDirectoryStream(compactionLogPath)) {
-      newContentLength = bufferedReader.lines()
-          .mapToLong(String::length)
-          .reduce(0L, Long::sum);
-      for (Path ignored : files) {
-        newNumberOfLogFiles++;
-      }
-    }
-    Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
-        || contentLength != newContentLength);
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
@@ -1118,6 +999,230 @@ public class TestOMRatisSnapshots {
         "Failed to reload OM state and instantiate services.");
     String msg = "RPC server is stopped";
     assertLogCapture(logCapture, msg);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {10})
+  @SuppressWarnings("methodlength")
+  public void testSnapshotBackgroundServices(int numSnapshotsToCreate)
+      throws IOException, InterruptedException, TimeoutException {
+    // Get the leader OM
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
+        .getCurrentProxyOMNodeId();
+
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+
+    // Find the inactive OM
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    // Create some snapshots, each with new keys
+    int keyIncrement = 10;
+    String snapshotNamePrefix = "snapshot";
+    String snapshotName = "";
+    List<String> keys = new ArrayList<>();
+    SnapshotInfo snapshotInfo = null;
+    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate;
+         snapshotCount++) {
+      snapshotName = snapshotNamePrefix + snapshotCount;
+      keys = writeKeys(keyIncrement);
+      snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
+    }
+
+    // Get the latest db checkpoint from the leader OM.
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerNodeId);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 10s
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+          >= leaderOMSnapshotIndex - 1;
+    }, 100, 10000);
+
+    long followerOMLastAppliedIndex =
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+    assertTrue(
+        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+
+    // After the new checkpoint is installed, the follower OM
+    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
+    // could be great than snapshot index if there is any conf entry from ratis.
+    followerOMLastAppliedIndex = followerOM.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
+    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm() >= leaderOMSnapshotTermIndex);
+
+    // Verify checkpoint installation was happened.
+    String msg = "Reloaded OM state";
+    assertLogCapture(logCapture, msg);
+
+    // Verify that the follower OM's DB contains the transactions which were
+    // made while it was inactive.
+    OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
+    assertNotNull(followerOMMetaMngr.getVolumeTable().get(
+        followerOMMetaMngr.getVolumeKey(volumeName)));
+    assertNotNull(followerOMMetaMngr.getBucketTable().get(
+        followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
+    for (String key : keys) {
+      assertNotNull(followerOMMetaMngr.getKeyTable(
+              TEST_BUCKET_LAYOUT)
+          .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
+    }
+
+    // Verify RPC server is running
+    GenericTestUtils.waitFor(() -> {
+      return followerOM.isOmRpcServerRunning();
+    }, 100, 5000);
+
+    assertLogCapture(logCapture,
+        "Install Checkpoint is finished");
+
+    // Read & Write after snapshot installed.
+    List<String> newKeys = writeKeys(1);
+    readKeys(newKeys);
+    // TODO: Enable this part after RATIS-1481 used
+    /*
+    Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
+        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
+        volumeName, bucketName, newKeys.get(0))));
+     */
+
+    checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+
+    // verify that the bootstrap Follower OM can become leader again
+    leaderOM.transferLeadership(followerNodeId);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        followerOM.checkLeaderStatus();
+        return true;
+      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+        return false;
+      }
+    }, 1000, 10000);
+    OzoneManager newLeaderOM = cluster.getOMLeader();
+
+    checkSnapshot(newLeaderOM, leaderOM, snapshotName, keys, snapshotInfo);
+    readKeys(newKeys);
+
+    // Prepare baseline data for compaction logs
+    String currentCompactionLogPath = newLeaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getCurrentCompactionLogPath();
+    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
+    String compactionLogsPath = currentCompactionLogPath
+        .substring(0, lastIndex);
+    int numberOfLogFiles = 0;
+    long contentLength;
+    Path compactionLogPath = Paths.get(compactionLogsPath);
+    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
+    try (BufferedReader bufferedReader =
+             Files.newBufferedReader(currentCompactionLog);
+         DirectoryStream<Path> files =
+             Files.newDirectoryStream(compactionLogPath)) {
+      contentLength = bufferedReader.lines()
+          .mapToLong(String::length)
+          .reduce(0L, Long::sum);
+      for (Path ignored : files) {
+        numberOfLogFiles++;
+      }
+    }
+
+    // Check whether newly created snapshot gets processed by SFS
+    newKeys = writeKeys(1);
+    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
+        snapshotName + RandomStringUtils.randomNumeric(5));
+    Assertions.assertNotNull(newSnapshot);
+    File omMetadataDir =
+        OMStorage.getOmDbDir(newLeaderOM.getConfiguration());
+    String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
+    Path filePath =
+        Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
+    Assertions.assertTrue(Files.exists(filePath));
+    GenericTestUtils.waitFor(() -> {
+      List<String> processedSnapshotIds;
+      try {
+        processedSnapshotIds = Files.readAllLines(filePath);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+
+      return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
+          .toString());
+    }, 1000, 30000);
+
+    // Check whether newly created snapshot data can be reclaimed
+    client.getObjectStore()
+        .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
+    GenericTestUtils.waitFor(() -> {
+      Table<String, SnapshotInfo> snapshotInfoTable =
+          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
+      try {
+        return null == snapshotInfoTable.get(newSnapshot.getTableKey());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+
+    // Check whether newly created keys data can be reclaimed
+    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
+        .getMetadataManager()
+        .getKeyTable(ozoneBucket.getBucketLayout());
+    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
+        OM_KEY_PREFIX + ozoneBucket.getName() +
+        OM_KEY_PREFIX + newKeys.get(0);
+    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
+    ozoneBucket.deleteKeys(newKeys);
+    GenericTestUtils.waitFor(() -> {
+      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
+          .getMetadataManager()
+          .getKeyTable(ozoneBucket.getBucketLayout());
+      try {
+        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+
+    // Check whether compaction logs get appeneded to
+    // Force compaction
+    newLeaderOM.getMetadataManager()
+        .getStore()
+        .compactDB();
+    int newNumberOfLogFiles = 0;
+    long newContentLength;
+    try (BufferedReader bufferedReader =
+             Files.newBufferedReader(currentCompactionLog);
+         DirectoryStream<Path> files =
+             Files.newDirectoryStream(compactionLogPath)) {
+      newContentLength = bufferedReader.lines()
+          .mapToLong(String::length)
+          .reduce(0L, Long::sum);
+      for (Path ignored : files) {
+        newNumberOfLogFiles++;
+      }
+    }
+    Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
+        || contentLength != newContentLength);
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
