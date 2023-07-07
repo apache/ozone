@@ -173,7 +173,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected boolean shouldStartCertificateMonitor() {
+  protected boolean shouldStartCertificateMonitorService() {
     return false;
   }
 
@@ -230,10 +230,5 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  protected void startRootCaRotationPoller() {
-    //SCM root CA rotation is handled separately from polling
   }
 }

@@ -171,7 +171,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return;
     }
 
-    if (shouldStartCertificateMonitor()) {
+    if (shouldStartCertificateMonitorService()) {
+      startRootCaRotationPoller();
       if (certPath != null && executorService == null) {
         startCertificateMonitor();
       } else {
@@ -182,19 +183,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
       }
     } else {
-      getLogger().info("CertificateLifetimeMonitor is disabled for {}",
-          component);
+      getLogger().info("CertificateLifetimeMonitor and root ca rotation " +
+          "polling is disabled for {}", component);
     }
-    startRootCaRotationPoller();
   }
 
-  protected void startRootCaRotationPoller() {
+  private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
           rootCaCertificates, scmSecurityClient);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
+    } else {
+      getLogger().debug("Root CA certificate rotation poller is already " +
+          "started.");
     }
   }
 
@@ -1309,7 +1312,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return scmSecurityClient;
   }
 
-  protected boolean shouldStartCertificateMonitor() {
+  protected boolean shouldStartCertificateMonitorService() {
     return true;
   }
 
