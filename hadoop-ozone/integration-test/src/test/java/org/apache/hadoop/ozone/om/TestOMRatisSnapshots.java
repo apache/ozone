@@ -67,8 +67,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -321,6 +323,31 @@ public class TestOMRatisSnapshots {
     checkSnapshot(newLeaderOM, leaderOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
+    // Prepare baseline data for compaction logs
+    String currentCompactionLogPath = newLeaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getCurrentCompactionLogPath();
+    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
+    String compactionLogsPath = currentCompactionLogPath
+        .substring(0, lastIndex);
+    int numberOfLogFiles = 0;
+    long contentLength;
+    Path compactionLogPath = Paths.get(compactionLogsPath);
+    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
+    try (BufferedReader bufferedReader =
+             Files.newBufferedReader(currentCompactionLog);
+         DirectoryStream<Path> files =
+             Files.newDirectoryStream(compactionLogPath)) {
+      contentLength = bufferedReader.lines()
+          .mapToLong(String::length)
+          .reduce(0L, Long::sum);
+      for (Path ignored : files) {
+        numberOfLogFiles++;
+      }
+    }
+
     // Check whether newly created snapshot gets processed by SFS
     newKeys = writeKeys(1);
     SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
@@ -377,7 +404,26 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
 
-    // Check whether differ service works
+    // Check whether compaction logs get appeneded to
+    // Force compaction
+    newLeaderOM.getMetadataManager()
+        .getStore()
+        .compactDB();
+    int newNumberOfLogFiles = 0;
+    long newContentLength;
+    try (BufferedReader bufferedReader =
+             Files.newBufferedReader(currentCompactionLog);
+         DirectoryStream<Path> files =
+             Files.newDirectoryStream(compactionLogPath)) {
+      newContentLength = bufferedReader.lines()
+          .mapToLong(String::length)
+          .reduce(0L, Long::sum);
+      for (Path ignored : files) {
+        newNumberOfLogFiles++;
+      }
+    }
+    Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
+        || contentLength != newContentLength);
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,

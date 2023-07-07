@@ -1489,6 +1489,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
+  public String getCurrentCompactionLogPath() {
+    return currentCompactionLogPath;
+  }
+
+  @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
   }
