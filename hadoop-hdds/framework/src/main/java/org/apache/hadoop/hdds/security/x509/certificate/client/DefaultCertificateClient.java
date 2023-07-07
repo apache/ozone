@@ -171,19 +171,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return;
     }
 
-    if (shouldStartCertificateMonitorService()) {
+    if (shouldStartCertificateRenewerService()) {
       startRootCaRotationPoller();
       if (certPath != null && executorService == null) {
-        startCertificateMonitor();
+        startCertificateRenewerService();
       } else {
         if (executorService != null) {
-          getLogger().debug("CertificateLifetimeMonitor is already started.");
+          getLogger().debug("CertificateRenewerService is already started.");
         } else {
           getLogger().warn("Component certificate was not loaded.");
         }
       }
     } else {
-      getLogger().info("CertificateLifetimeMonitor and root ca rotation " +
+      getLogger().info("CertificateRenewerService and root ca rotation " +
           "polling is disabled for {}", component);
     }
   }
@@ -1312,7 +1312,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return scmSecurityClient;
   }
 
-  protected boolean shouldStartCertificateMonitorService() {
+  protected boolean shouldStartCertificateRenewerService() {
     return true;
   }
 
@@ -1326,7 +1326,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return CompletableFuture.runAsync(renewerService, executorService);
   }
 
-  public synchronized void startCertificateMonitor() {
+  public synchronized void startCertificateRenewerService() {
     Preconditions.checkNotNull(getCertificate(),
         "Component certificate should not be empty");
     // Schedule task to refresh certificate before it expires
@@ -1340,13 +1340,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-CertificateLifetimeMonitor")
+                  getComponentName() + "-CertificateRenewerService")
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
         new CertificateRenewerService(false),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
-    getLogger().info("CertificateLifetimeMonitor for {} is started with " +
+    getLogger().info("CertificateRenewerService for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
         timeBeforeGracePeriod, interval);
   }
