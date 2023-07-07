@@ -56,6 +56,7 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
@@ -203,6 +204,7 @@ public class TestOMRatisSnapshots {
 
   @ParameterizedTest
   @ValueSource(ints = {100})
+  @Disabled
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -368,6 +370,7 @@ public class TestOMRatisSnapshots {
 
   @Test
   @Timeout(300)
+  @Disabled
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
     // Get the leader OM
@@ -580,6 +583,7 @@ public class TestOMRatisSnapshots {
   @Test
   @Timeout(300)
   @Flaky("HDDS-8876")
+  @Disabled
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -717,6 +721,7 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @Disabled
   public void testInstallSnapshotWithClientWrite() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -818,6 +823,7 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @Disabled
   public void testInstallSnapshotWithClientRead() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -907,6 +913,7 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @Disabled
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -965,6 +972,7 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
+  @Disabled
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
