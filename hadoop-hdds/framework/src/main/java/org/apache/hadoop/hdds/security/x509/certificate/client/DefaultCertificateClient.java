@@ -1379,10 +1379,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
         String newCertId;
         try {
-          getLogger().info("Current certificate {} has entered the expiry" +
-                  " grace period {}. Starting renew key and certs.",
+          getLogger().info("Current certificate {} needs to be renewed " +
+                  "remaining grace period {}. Forced renewal due to root ca " +
+                  "rotation: {}.",
               currentCert.getSerialNumber().toString(),
-              timeLeft, securityConfig.getRenewalGracePeriod());
+              timeLeft, forceRenewal);
           newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
         } catch (CertificateException e) {
           if (e.errorCode() ==
