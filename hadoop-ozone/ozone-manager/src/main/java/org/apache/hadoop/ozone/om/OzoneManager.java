@@ -80,6 +80,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
+import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -3584,11 +3585,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
+    java.util.Optional<SstFilteringService> sstFilteringService =
+        java.util.Optional.ofNullable(keyManager.getSnapshotSstFilteringService());
     DBCheckpoint omDBCheckpoint;
+    sstFilteringService.ifPresent(BackgroundService::shutdown);
     try {
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
+      sstFilteringService.ifPresent(BackgroundService::start);
       LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
       return null;
     }
@@ -3599,6 +3604,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
+      sstFilteringService.ifPresent(BackgroundService::start);
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
     return termIndex;
