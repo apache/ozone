@@ -656,7 +656,7 @@ public class TestDefaultCertificateClient {
     Thread.enumerate(threads);
     Predicate<Thread> monitorFilterPredicate =
         t -> t != null
-            && t.getName().equals(compName + "-CertificateLifetimeMonitor");
+            && t.getName().equals(compName + "-CertificateRenewerService");
     long monitorThreadCount = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .count();
