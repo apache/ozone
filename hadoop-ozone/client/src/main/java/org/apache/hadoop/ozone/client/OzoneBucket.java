@@ -562,7 +562,7 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Returns Iterator to iterate over all keys after prevKey in the bucket.
-   * If simpleList is true, iterator will only contain immediate children.
+   * If shallow is true, iterator will only contain immediate children.
    *
    * @param keyPrefix Bucket prefix to match
    * @param prevKey Keys will be listed after this key name
@@ -1063,9 +1063,9 @@ public class OzoneBucket extends WithMetadata {
     private String keyPrefix = null;
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
+    private final boolean shallow;
     private boolean addedKeyPrefix;
     private String delimiterKeyPrefix;
-    private final boolean shallow;
 
     String getKeyPrefix() {
       return keyPrefix;
@@ -1081,10 +1081,6 @@ public class OzoneBucket extends WithMetadata {
 
     void setAddedKeyPrefix(boolean addedKeyPrefix) {
       this.addedKeyPrefix = addedKeyPrefix;
-    }
-
-    boolean isShallow() {
-      return shallow;
     }
 
     /**
@@ -1190,7 +1186,7 @@ public class OzoneBucket extends WithMetadata {
      * needs to be split into keyPrefix "a" and call listKeys method to get
      * the next one key as the startKey in listStatus.
      */
-    private List<OzoneKey> getNextShallowListOfKeys(String prevKey)
+    protected List<OzoneKey> getNextShallowListOfKeys(String prevKey)
         throws IOException {
       String startKey = prevKey;
       // handle for first round
@@ -1242,7 +1238,7 @@ public class OzoneBucket extends WithMetadata {
                 keyInfo.getBucketName(), keyName,
                 keyInfo.getDataSize(), keyInfo.getCreationTime(),
                 keyInfo.getModificationTime(),
-                keyInfo.getReplicationConfig());
+                keyInfo.getReplicationConfig(), keyInfo.isFile());
           })
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
@@ -1397,7 +1393,7 @@ public class OzoneBucket extends WithMetadata {
       // 1. Pop out top pair and get its immediate children
       List<OzoneKey> keysResultList = new ArrayList<>();
       if (stack.isEmpty()) {
-        // case: startKey is empty or shallow list case
+        // case: startKey is empty
         if (getChildrenKeys(getKeyPrefix(), prevKey, keysResultList)) {
           return keysResultList;
         }
@@ -1517,13 +1513,6 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.isFile());
 
         keysResultList.add(ozoneKey);
-
-        // If shallow is true, all immediate children will be added to
-        // keysResultList. Because only immediate children of keyPrefix
-        // are needed, the stack is always empty.
-        if (isShallow()) {
-          continue;
-        }
 
         if (status.isDirectory()) {
           // Adding in-progress keyPath back to the stack to make sure

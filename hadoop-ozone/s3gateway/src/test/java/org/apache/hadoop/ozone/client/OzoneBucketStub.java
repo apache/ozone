@@ -368,7 +368,7 @@ public class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig());
+              key.getReplicationConfig(), key.isFile());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {
