@@ -3578,7 +3578,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
    */
-  public TermIndex installSnapshotFromLeader(String leaderId) {
+  public synchronized TermIndex installSnapshotFromLeader(String leaderId) {
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
@@ -3586,9 +3586,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     java.util.Optional<SstFilteringService> sstFilteringService =
-        java.util.Optional.ofNullable(keyManager.getSnapshotSstFilteringService());
+        java.util.Optional.ofNullable(
+            keyManager.getSnapshotSstFilteringService());
     DBCheckpoint omDBCheckpoint;
     sstFilteringService.ifPresent(BackgroundService::shutdown);
+    this.getOmSnapshotManager().getSnapshotCache().invalidateAll();
     try {
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);

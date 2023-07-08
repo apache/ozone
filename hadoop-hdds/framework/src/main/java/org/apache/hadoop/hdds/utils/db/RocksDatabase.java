@@ -49,12 +49,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -947,6 +949,7 @@ public final class RocksDatabase implements Closeable {
       List<Pair<String, String>> prefixPairs,
       BooleanTriFunction<String, String, String, Boolean> filterFunction)
       throws RocksDBException {
+    List<File> filesToBeDeleted = new ArrayList<>();
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
       String sstFileColumnFamily =
           new String(liveFileMetaData.columnFamilyName(),
@@ -979,8 +982,16 @@ public final class RocksDatabase implements Closeable {
                   + " {} from db: {}", sstFileName,
               liveFileMetaData.columnFamilyName(), db.get().getName());
           db.get().deleteFile(sstFileName);
+          filesToBeDeleted.add(new File(liveFileMetaData.path(),
+              liveFileMetaData.fileName()));
         }
       }
+    }
+
+    Iterator<File> files = filesToBeDeleted.iterator();
+    while (files.hasNext()) {
+      RDBCheckpointUtils.waitForFileDelete(files.next(),
+          Duration.ofSeconds(60));
     }
   }
 
