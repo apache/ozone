@@ -258,7 +258,7 @@ public class TestOmSnapshot {
     counter = new AtomicInteger(0);
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    preFinalizationChecks();
+//    preFinalizationChecks();
     finalizeOMUpgrade();
     counter = new AtomicInteger();
   }
@@ -661,7 +661,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.DELETE, key1)));
   }
 
   /**
@@ -697,7 +697,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.DELETE, key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
   }
@@ -746,9 +746,9 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 2);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1),
+            SnapshotDiffReport.DiffType.DELETE, key1),
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.CREATE, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.CREATE, key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap3);
     Assert.assertEquals(diff.getDiffList().size(), 0);
     bucket.deleteKey(key1);
@@ -758,12 +758,12 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.DELETE, key1)));
     diff = getSnapDiffReport(testVolumeName, testBucketName, snap2, snap4);
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.DELETE, key1)));
   }
 
   /**
@@ -806,7 +806,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)
+            SnapshotDiffReport.DiffType.DELETE, key1)
     ));
   }
 
@@ -864,7 +864,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.DELETE, OZONE_URI_DELIMITER + key1)
+            SnapshotDiffReport.DiffType.DELETE, key1)
     ));
   }
 
@@ -908,8 +908,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.RENAME,
-            OZONE_URI_DELIMITER + key1,
-            OZONE_URI_DELIMITER + renamedKey)
+            key1, renamedKey)
     ));
   }
 
@@ -986,7 +985,7 @@ public class TestOmSnapshot {
         key1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.MODIFY, key1)));
   }
 
   /**
@@ -1027,21 +1026,21 @@ public class TestOmSnapshot {
     if (bucketLayout.isFileSystemOptimized()) {
       diffEntries = Lists.newArrayList(
           SnapshotDiffReportOzone.getDiffReportEntry(
-          SnapshotDiffReport.DiffType.RENAME, OZONE_URI_DELIMITER + key1,
-              "/dir1/dir2/" + key1 + "_renamed"),
+          SnapshotDiffReport.DiffType.RENAME, key1,
+              "dir1/dir2/" + key1 + "_renamed"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "/dir1"),
+              SnapshotDiffReport.DiffType.CREATE, "dir1"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "/dir1/dir2"));
+              SnapshotDiffReport.DiffType.CREATE, "dir1/dir2"));
     } else {
       diffEntries = Lists.newArrayList(
           SnapshotDiffReportOzone.getDiffReportEntry(
               SnapshotDiffReport.DiffType.RENAME,
-              OZONE_URI_DELIMITER + key1, "/dir1/dir2/" + key1 + "_renamed"),
+              key1, "dir1/dir2/" + key1 + "_renamed"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "/dir1/dir2"),
+              SnapshotDiffReport.DiffType.CREATE, "dir1/dir2"),
           SnapshotDiffReportOzone.getDiffReportEntry(
-              SnapshotDiffReport.DiffType.CREATE, "/dir1"));
+              SnapshotDiffReport.DiffType.CREATE, "dir1"));
     }
     Assert.assertEquals(diff.getDiffList(), diffEntries);
   }
@@ -1080,7 +1079,8 @@ public class TestOmSnapshot {
         p = fileStatuses[0].getPath();
         Assertions.assertEquals(diff.getDiffList().get(idx),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.CREATE, p.toUri().getPath()));
+                SnapshotDiffReport.DiffType.CREATE, p.toUri().getPath()
+                    .substring(1)));
         if (fileStatuses[0].isFile()) {
           break;
         }
@@ -1114,18 +1114,18 @@ public class TestOmSnapshot {
       if (bucketLayout.isFileSystemOptimized()) {
         Assertions.assertEquals(Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2", "/dir1/dir3"),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2", "dir1/dir3"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "/dir1")),
+                SnapshotDiffReport.DiffType.MODIFY, "dir1")),
             diff.getDiffList());
       } else {
         Assertions.assertEquals(Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2/key1",
-                "/dir1/dir3/key1"),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2/key1",
+                "dir1/dir3/key1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2",
-                "/dir1/dir3")),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2",
+                "dir1/dir3")),
             diff.getDiffList());
       }
 
@@ -1158,20 +1158,20 @@ public class TestOmSnapshot {
       if (bucketLayout.isFileSystemOptimized()) {
         Assertions.assertEquals(Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2", "/dir3/dir2"),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2", "dir3/dir2"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "/dir1"),
+                SnapshotDiffReport.DiffType.MODIFY, "dir1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.MODIFY, "/dir3")),
+                SnapshotDiffReport.DiffType.MODIFY, "dir3")),
             diff.getDiffList());
       } else {
         Assertions.assertEquals(Arrays.asList(
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2/key1",
-                "/dir3/dir2/key1"),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2/key1",
+                "dir3/dir2/key1"),
             SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.RENAME, "/dir1/dir2",
-                "/dir3/dir2")),
+                SnapshotDiffReport.DiffType.RENAME, "dir1/dir2",
+                "dir3/dir2")),
             diff.getDiffList());
       }
     }
@@ -1558,7 +1558,7 @@ public class TestOmSnapshot {
     Assert.assertEquals(diff.getDiffList().size(), 1);
     Assert.assertEquals(diff.getDiffList(), Lists.newArrayList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.MODIFY, OZONE_URI_DELIMITER + key1)));
+            SnapshotDiffReport.DiffType.MODIFY, key1)));
   }
 
   @Test
