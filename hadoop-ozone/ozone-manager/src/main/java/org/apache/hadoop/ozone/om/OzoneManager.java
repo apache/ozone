@@ -59,6 +59,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -288,6 +289,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
@@ -4467,6 +4469,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void setTimes(OmKeyArgs keyArgs, long mtime, long atime)
       throws IOException {
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    switch (action) {
+    case ENTER:
+      throw new OMException("Enter safe mode is unsupported",
+          INTERNAL_ERROR);
+    case FORCE_EXIT:
+      return getScmClient().getContainerClient().forceExitSafeMode();
+    case GET:
+      return getScmClient().getContainerClient().inSafeMode();
+    //case LEAVE:
+    // TODO: support LEAVE in the future.
+    default:
+      throw new OMException("Unsupported safe mode action " + action,
+          INTERNAL_ERROR);
+    }
   }
 
   /**

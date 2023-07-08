@@ -269,6 +269,7 @@ public final class OmUtils {
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
     case TransferLeadership:
+    case SetSafeMode:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -319,6 +320,7 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case UnknownCommand:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

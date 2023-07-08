@@ -296,7 +296,6 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
-    LOG.info("Added pipeline {}.", pipeline);
     recordMetricsForPipeline(pipeline);
   }
 
@@ -422,7 +421,6 @@ public class PipelineManagerImpl implements PipelineManager {
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
     acquireWriteLock();
     final Pipeline pipeline;
-    boolean opened = false;
     try {
       pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
@@ -431,14 +429,9 @@ public class PipelineManagerImpl implements PipelineManager {
       if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
         stateManager.updatePipelineState(pipelineIdProtobuf,
             HddsProtos.PipelineState.PIPELINE_OPEN);
-        opened = true;
       }
     } finally {
       releaseWriteLock();
-    }
-
-    if (opened) {
-      LOG.info("Pipeline {} moved to OPEN state", pipeline);
     }
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);

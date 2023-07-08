@@ -84,6 +84,3 @@ OZONE_KEEP_RESULTS=true start_docker_env
 # Sends commands to finalize OM and SCM.
 execute_robot_test "$SCM" upgrade/finalize.robot
 callback with_this_version_finalized
-
-stop_docker_env
-generate_report

@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -100,30 +102,31 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
-  private final CertificateServer rootCertificateServer;
+  private CertificateServer rootCertificateServer;
   private final CertificateServer scmCertificateServer;
-  private final List<X509Certificate> rootCACertificateList;
   private final RPC.Server rpcServer; // HADOOP RPC SERVER
   private final SCMUpdateServiceGrpcServer grpcUpdateServer; // gRPC SERVER
   private final InetSocketAddress rpcAddress;
   private final ProtocolMessageMetrics metrics;
   private final ProtocolMessageMetrics secretKeyMetrics;
   private final StorageContainerManager storageContainerManager;
+  private final CertificateClient scmCertificateClient;
 
   // SecretKey may not be enabled when neither block token nor container
   // token is enabled.
   private final SecretKeyManager secretKeyManager;
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
-      CertificateServer rootCertificateServer,
+      @Nullable CertificateServer rootCertificateServer,
       CertificateServer scmCertificateServer,
-      List<X509Certificate> rootCACertList, StorageContainerManager scm,
+      CertificateClient scmCertClient,
+      StorageContainerManager scm,
       @Nullable SecretKeyManager secretKeyManager)
       throws IOException {
     this.storageContainerManager = scm;
     this.rootCertificateServer = rootCertificateServer;
     this.scmCertificateServer = scmCertificateServer;
-    this.rootCACertificateList = rootCACertList;
+    this.scmCertificateClient = scmCertClient;
     this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
@@ -187,6 +190,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
+    if (storageContainerManager.getRootCARotationManager()
+        .isRotationInProgress()) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
+    }
     return getEncodedCertToString(certSignReq, NodeType.DATANODE);
   }
 
@@ -198,6 +207,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         nodeDetails.getNodeType(), nodeDetails.getHostName(),
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
+    if (storageContainerManager.getRootCARotationManager()
+        .isRotationInProgress()) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
+    }
     return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
   }
 
@@ -236,9 +251,12 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   @Override
   public synchronized List<String> getAllRootCaCertificates()
       throws IOException {
-    List<String> pemEncodedList =
-        new ArrayList<>(rootCACertificateList.size());
-    for (X509Certificate cert : rootCACertificateList) {
+    List<String> pemEncodedList = new ArrayList<>();
+    Set<X509Certificate> certList =
+        scmCertificateClient.getAllRootCaCerts().size() == 0 ?
+            scmCertificateClient.getAllCaCerts() :
+            scmCertificateClient.getAllRootCaCerts();
+    for (X509Certificate cert : certList) {
       pemEncodedList.add(getPEMEncodedString(cert));
     }
     return pemEncodedList;
@@ -257,20 +275,39 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
+    if (storageContainerManager.getRootCARotationManager()
+        .isRotationInProgress()) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
+    }
     return getEncodedCertToString(certSignReq, NodeType.OM);
   }
-
 
   /**
    * Get signed certificate for SCM Node.
    *
    * @param scmNodeDetails   - SCM Node Details.
-   * @param certSignReq - Certificate signing request.
-   * @return String         - SCM signed pem encoded certificate.
+   * @param certSignReq      - Certificate signing request.
+   * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
+    return getSCMCertificate(scmNodeDetails, certSignReq, false);
+  }
+
+  /**
+   * Get signed certificate for SCM Node.
+   *
+   * @param scmNodeDetails   - SCM Node Details.
+   * @param certSignReq      - Certificate signing request.
+   * @param isRenew          - if SCM is renewing certificate or not.
+   * @return String          - SCM signed pem encoded certificate.
+   */
+  @Override
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq, boolean isRenew) throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
     if (!storageContainerManager.getClusterId().equals(
@@ -278,6 +315,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       throw new IOException("SCM ClusterId mismatch. Peer SCM ClusterId " +
           scmNodeDetails.getClusterId() + ", primary SCM ClusterId "
           + storageContainerManager.getClusterId());
+    }
+
+    if (storageContainerManager.getRootCARotationManager()
+        .isRotationInProgress() && !isRenew) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
     }
 
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
@@ -293,8 +337,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @return String         - SCM signed pem encoded certificate.
    * @throws IOException
    */
-  private String getEncodedCertToString(String certSignReq, NodeType nodeType)
-      throws IOException {
+  private synchronized String getEncodedCertToString(String certSignReq,
+      NodeType nodeType) throws IOException {
     Future<CertPath> future;
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(certSignReq,
@@ -417,25 +461,18 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   @Override
   public synchronized String getRootCACertificate() throws IOException {
     LOGGER.debug("Getting Root CA certificate.");
-    X509Certificate lastExpiringRootCa = null;
-    if (storageContainerManager.getScmStorageConfig()
-        .checkPrimarySCMIdInitialized()) {
-      Date lastCertDate = new Date(0);
-      for (X509Certificate cert : rootCACertificateList) {
-        if (cert.getNotAfter().after(lastCertDate)) {
-          lastCertDate = cert.getNotAfter();
-          lastExpiringRootCa = cert;
-        }
+    if (rootCertificateServer != null) {
+      try {
+        return CertificateCodec.getPEMEncodedString(
+            rootCertificateServer.getCACertificate());
+      } catch (CertificateException e) {
+        LOGGER.error("Failed to get root CA certificate", e);
+        throw new IOException("Failed to get root CA certificate", e);
       }
     }
-    if (lastExpiringRootCa == null) {
-      return null;
-    }
-    return CertificateCodec.getPEMEncodedString(lastExpiringRootCa);
-  }
 
-  public synchronized void addNewRootCa(X509Certificate rootCaCertToAdd) {
-    rootCACertificateList.add(rootCaCertToAdd);
+    return CertificateCodec.getPEMEncodedString(
+        scmCertificateClient.getCACertificate());
   }
 
   @Override
@@ -510,13 +547,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     getRpcServer().join();
     LOGGER.info("Join gRPC server for SCMSecurityProtocolServer.");
     getGrpcUpdateServer().join();
-
   }
 
-  public CertificateServer getRootCertificateServer() {
+  public synchronized CertificateServer getRootCertificateServer() {
     return rootCertificateServer;
   }
 
+  public synchronized void setRootCertificateServer(
+      CertificateServer newServer) {
+    this.rootCertificateServer = newServer;
+  }
 
   public CertificateServer getScmCertificateServer() {
     return scmCertificateServer;
