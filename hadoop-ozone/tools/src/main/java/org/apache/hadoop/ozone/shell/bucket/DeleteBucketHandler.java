@@ -169,6 +169,7 @@ public class DeleteBucketHandler extends BucketHandler {
       FileSystem fs = FileSystem.get(clientConf);
       if (!fs.delete(path, true)) {
         out().println("Could not delete bucket.");
+        return;
       }
       out().printf("Bucket %s is deleted%n", bucket.getName());
     } catch (IOException e) {
