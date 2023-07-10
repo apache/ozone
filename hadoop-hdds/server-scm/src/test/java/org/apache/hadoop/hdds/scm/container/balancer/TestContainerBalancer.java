@@ -285,8 +285,7 @@ public class TestContainerBalancer {
       if (containerBalancer.isBalancerRunning()) {
         containerBalancer.stopBalancer();
       }
-    } catch (IOException | IllegalContainerBalancerStateException |
-             TimeoutException e) {
+    } catch (IOException | IllegalContainerBalancerStateException e) {
       LOG.warn("Failed to stop balancer", e);
     }
   }

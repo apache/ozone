@@ -57,7 +57,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -477,8 +476,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public boolean rotateSecretKeys(boolean force)
-      throws TimeoutException, IOException {
+  public boolean rotateSecretKeys(boolean force) throws IOException {
     return secretKeyClient.checkAndRotate(force);
   }
 

@@ -259,8 +259,7 @@ public final class TestBlockTokensCLI {
         createArgsForCommand(new String[]{"scm", "rotate", "--scm", hostPort}));
   }
 
-  public void testRotateKeySCMAdminCommandUtil(String[] args)
-      throws InterruptedException, TimeoutException {
+  public void testRotateKeySCMAdminCommandUtil(String[] args) {
     // Get the initial secret key.
     String initialKey =
         getScmSecretKeyManager().getCurrentSecretKey().toString();

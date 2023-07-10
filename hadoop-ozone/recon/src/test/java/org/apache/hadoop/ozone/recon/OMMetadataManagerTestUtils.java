@@ -79,7 +79,7 @@ public final class OMMetadataManagerTestUtils {
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration);
+        omConfiguration, null);
 
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
     OmVolumeArgs args =
@@ -113,7 +113,7 @@ public final class OMMetadataManagerTestUtils {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
-    return new OmMetadataManagerImpl(omConfiguration);
+    return new OmMetadataManagerImpl(omConfiguration, null);
   }
 
   /**
@@ -346,6 +346,7 @@ public final class OMMetadataManagerTestUtils {
           .setBucketName(bucketName)
           .setVolumeName(volName)
           .setKeyName(keyNames.get(i))
+          .setDataSize(100L)
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
           .build());
     }

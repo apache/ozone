@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The interface to call into underlying container layer.
@@ -368,9 +367,9 @@ public interface ScmClient extends Closeable {
    *
    * @param force boolean flag that forcefully rotates the key on demand
    * @return
-   * @throws TimeoutException
+   * @throws IOException
    */
-  boolean rotateSecretKeys(boolean force) throws TimeoutException, IOException;
+  boolean rotateSecretKeys(boolean force) throws IOException;
 
   /**
    * Transfer the raft leadership.

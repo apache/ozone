@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -50,10 +49,6 @@ public class RotateKeySubCommand extends ScmSubcommand {
       boolean status = false;
       try {
         status = client.rotateSecretKeys(force);
-      } catch (TimeoutException e) {
-        System.err.println(
-            "Secret key rotation failed due to a timeout: " + e.getMessage());
-        return;
       } catch (IOException e) {
         System.err.println("Secret key rotation failed: " + e.getMessage());
         return;

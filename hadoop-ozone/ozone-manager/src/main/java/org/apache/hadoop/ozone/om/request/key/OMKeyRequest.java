@@ -39,7 +39,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -57,6 +59,8 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -381,11 +385,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkKeyAclsInOpenKeyTable(OzoneManager ozoneManager,
       String volume, String bucket, String key,
       IAccessAuthorizer.ACLType aclType, long clientId) throws IOException {
+    final boolean nativeAuthorizerEnabled;
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+        ozoneManager.getOmMetadataReader()) {
+      OmMetadataReader mdReader = (OmMetadataReader) rcMetadataReader.get();
+      nativeAuthorizerEnabled = mdReader.isNativeAuthorizerEnabled();
+    }
+
     String keyNameForAclCheck = key;
     // Native authorizer requires client id as part of key name to check
     // write ACL on key. Add client id to key name if ozone native
     // authorizer is configured.
-    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
+    if (nativeAuthorizerEnabled) {
       keyNameForAclCheck = key + "/" + clientId;
     }
 

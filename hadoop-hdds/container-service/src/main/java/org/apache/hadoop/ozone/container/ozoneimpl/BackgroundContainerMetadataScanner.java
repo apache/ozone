@@ -57,7 +57,8 @@ public class BackgroundContainerMetadataScanner extends
 
   @VisibleForTesting
   @Override
-  public void scanContainer(Container<?> container) throws IOException {
+  public void scanContainer(Container<?> container)
+      throws IOException, InterruptedException {
     // There is one background container metadata scanner per datanode.
     // If this container's volume has failed, skip the container.
     // The iterator returned by getContainerIterator may have stale results.
@@ -70,9 +71,7 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    // Full data scan also does a metadata scan. If a full data scan was done
-    // recently, we can skip this metadata scan.
-    if (ContainerUtils.recentlyScanned(container, minScanGap, LOG)) {
+    if (!shouldScan(container)) {
       return;
     }
 
@@ -88,5 +87,12 @@ public class BackgroundContainerMetadataScanner extends
   @Override
   public ContainerMetadataScannerMetrics getMetrics() {
     return this.metrics;
+  }
+
+  private boolean shouldScan(Container<?> container) {
+    // Full data scan also does a metadata scan. If a full data scan was done
+    // recently, we can skip this metadata scan.
+    return container.shouldScanMetadata() &&
+        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 }

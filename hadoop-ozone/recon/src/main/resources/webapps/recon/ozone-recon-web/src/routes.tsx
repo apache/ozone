@@ -23,6 +23,8 @@ import {NotFound} from './views/notFound/notFound';
 import {IRoute} from './types/routes.types';
 import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
+import {Om} from './views/insights/om/om';
+
 import {DiskUsage} from './views/diskUsage/diskUsage';
 import {Heatmap} from './views/heatMap/heatmap';
 
@@ -42,6 +44,10 @@ export const routes: IRoute[] = [
   {
     path: '/Insights',
     component: Insights
+  },
+  {
+    path: '/Om',
+    component: Om
   },
   {
     path: '/MissingContainers',

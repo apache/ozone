@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -41,25 +40,31 @@ public final class PipelineChoosePolicyFactory {
       OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT =
       RandomPipelineChoosePolicy.class;
 
+  @VisibleForTesting
+  public static final Class<? extends PipelineChoosePolicy>
+      OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT =
+      RandomPipelineChoosePolicy.class;
+
   private PipelineChoosePolicyFactory() {
   }
 
   public static PipelineChoosePolicy getPolicy(
-      ConfigurationSource conf) throws SCMException {
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    Class<? extends PipelineChoosePolicy> policyClass = getClass(
-        scmConfig.getPipelineChoosePolicyName(), PipelineChoosePolicy.class);
-
+      ScmConfig scmConfig, boolean forEC) throws SCMException {
+    Class<? extends PipelineChoosePolicy> policyClass = null;
+    String policyName = forEC ? scmConfig.getECPipelineChoosePolicyName() :
+        scmConfig.getPipelineChoosePolicyName();
     try {
+      policyClass = getClass(policyName, PipelineChoosePolicy.class);
       return createPipelineChoosePolicyFromClass(policyClass);
     } catch (Exception e) {
-      if (policyClass != OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT) {
+      Class<? extends PipelineChoosePolicy> defaultPolicy = forEC ?
+          OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT :
+          OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT;
+      if (policyClass == null || policyClass != defaultPolicy) {
         LOG.error("Met an exception while create pipeline choose policy "
-            + "for the given class " + policyClass.getName()
-            + ". Fallback to the default pipeline choose policy "
-            + OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT, e);
-        return createPipelineChoosePolicyFromClass(
-            OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT);
+            + "for the given class {}. Fallback to the default pipeline "
+            + " choose policy {}", policyName, defaultPolicy, e);
+        return createPipelineChoosePolicyFromClass(defaultPolicy);
       }
       throw e;
     }
