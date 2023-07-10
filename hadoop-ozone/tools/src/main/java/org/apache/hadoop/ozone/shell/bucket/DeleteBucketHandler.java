@@ -90,13 +90,15 @@ public class DeleteBucketHandler extends BucketHandler {
         } else if (serviceIds.size() == 1) {
           // Only one OM service ID configured, we can use that
           omServiceId = serviceIds.iterator().next();
+        } else {
+          omServiceId = getConf().get(OZONE_OM_ADDRESS_KEY);
         }
       }
       if (!yes) {
         // Ask for user confirmation
         out().print("This command will delete bucket recursively." +
             "\nThere is no recovery option after using this command, " +
-            "and no trash for FSO buckets." +
+            "and deleted keys won't move to trash." +
             "\nEnter 'yes' to proceed': ");
         out().flush();
         Scanner scanner = new Scanner(new InputStreamReader(
@@ -157,13 +159,8 @@ public class DeleteBucketHandler extends BucketHandler {
    */
   private void deleteFSBucketRecursive(OzoneVolume vol, OzoneBucket bucket) {
     try {
-      String hostPrefix = OZONE_OFS_URI_SCHEME + "://";
-      if (!Strings.isNullOrEmpty(omServiceId)) {
-        hostPrefix += omServiceId + PATH_SEPARATOR_STR;
-      } else {
-        hostPrefix += getConf().get(OZONE_OM_ADDRESS_KEY) +
-            PATH_SEPARATOR_STR;
-      }
+      String hostPrefix = OZONE_OFS_URI_SCHEME + "://" +
+          omServiceId + PATH_SEPARATOR_STR;
       String ofsPrefix = hostPrefix + vol.getName() + PATH_SEPARATOR_STR +
           bucket.getName();
       final Path path = new Path(ofsPrefix);
