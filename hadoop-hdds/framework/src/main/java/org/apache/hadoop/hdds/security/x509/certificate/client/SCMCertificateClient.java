@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -173,13 +173,20 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected boolean shouldStartCertificateMonitor() {
+  protected boolean shouldStartCertificateRenewerService() {
     return false;
   }
 
   @Override
   public Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  protected SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) {
+    throw new UnsupportedOperationException("getCertSignResponse of " +
+        " SCMCertificateClient is not supported currently");
   }
 
   @Override
@@ -193,7 +200,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
               .setScmNodeId(scmId).build();
 
       // Get SCM sub CA cert.
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response =
+      SCMGetCertResponseProto response =
           getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
               getEncodedString(request), true);
 
