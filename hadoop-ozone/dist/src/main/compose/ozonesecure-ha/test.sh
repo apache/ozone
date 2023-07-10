@@ -66,7 +66,7 @@ execute_robot_test scm4.org scmha/primordial-scm.robot
 
 # add new datanode4
 docker-compose up -d datanode4
-wait_for_port datanode4 9856 60
+wait_for_port datanode4 9856 120
 wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
 
 # decommission primordial node scm1.org
