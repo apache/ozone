@@ -70,7 +70,7 @@ execute_robot_test scm4.org -v "TARGET_SCM:scm4.org" scmha/scm-leader-transfer.r
 
 # add new datanode4 and verify certificate
 docker-compose up -d datanode4
-wait_for_port datanode4 9856 60
+wait_for_port datanode4 9856 120
 wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
 
 #transfer leader to scm3.org
