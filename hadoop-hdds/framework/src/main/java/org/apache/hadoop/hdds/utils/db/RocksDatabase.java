@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -990,7 +991,7 @@ public final class RocksDatabase implements Closeable {
 
     Iterator<File> files = filesToBeDeleted.iterator();
     while (files.hasNext()) {
-      RDBCheckpointUtils.waitForFileDelete(files.next(),
+      RdbUtil.waitForFileDelete(files.next(),
           Duration.ofSeconds(60));
     }
   }

@@ -67,43 +67,4 @@ public final class RDBCheckpointUtils {
       return false;
     }
   }
-
-  /**
-   * Wait for file to be deleted.
-   * @param file File to be deleted.
-   * @param maxDuration poll max duration.
-   * @param interval poll interval.
-   * @param pollDelayDuration poll delay val.
-   * @return true if deleted.
-   */
-  public static boolean waitForFileDelete(File file, Duration maxDuration,
-      Duration interval, Duration pollDelayDuration) {
-    Instant start = Instant.now();
-    try {
-      with().atMost(maxDuration)
-          .pollDelay(pollDelayDuration)
-          .pollInterval(interval)
-          .await()
-          .until(() -> !file.exists());
-      LOG.info("Waited for {} milliseconds for file {} deletion.",
-          Duration.between(start, Instant.now()).toMillis(),
-          file.getAbsoluteFile());
-      return true;
-    } catch (ConditionTimeoutException exception) {
-      LOG.info("File: {} didn't get deleted in {} secs.",
-          file.getAbsolutePath(), maxDuration.getSeconds());
-      return false;
-    }
-  }
-
-  /**
-   * Wait for file to be deleted.
-   * @param file File to be deleted.
-   * @param maxDuration poll max duration.
-   * @return true if deleted.
-   */
-  public static boolean waitForFileDelete(File file, Duration maxDuration) {
-    return waitForFileDelete(file, maxDuration, POLL_INTERVAL_DURATION,
-        POLL_DELAY_DURATION);
-  }
 }

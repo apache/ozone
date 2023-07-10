@@ -20,23 +20,37 @@ package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.awaitility.Awaitility.with;
+
 /**
  * Temporary class to test snapshot diff functionality.
  * This should be removed later.
  */
 public final class RdbUtil {
+
+  static final Logger LOG =
+      LoggerFactory.getLogger(RdbUtil.class);
+  private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
+  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
 
   private RdbUtil() { }
 
@@ -59,4 +73,42 @@ public final class RdbUtil {
     }
   }
 
+  /**
+   * Wait for file to be deleted.
+   * @param file File to be deleted.
+   * @param maxDuration poll max duration.
+   * @param interval poll interval.
+   * @param pollDelayDuration poll delay val.
+   * @return true if deleted.
+   */
+  public static boolean waitForFileDelete(File file, Duration maxDuration,
+      Duration interval, Duration pollDelayDuration) {
+    Instant start = Instant.now();
+    try {
+      Awaitility.with().atMost(maxDuration)
+          .pollDelay(pollDelayDuration)
+          .pollInterval(interval)
+          .await()
+          .until(() -> !file.exists());
+      LOG.info("Waited for {} milliseconds for file {} deletion.",
+          Duration.between(start, Instant.now()).toMillis(),
+          file.getAbsoluteFile());
+      return true;
+    } catch (ConditionTimeoutException exception) {
+      LOG.info("File: {} didn't get deleted in {} secs.",
+          file.getAbsolutePath(), maxDuration.getSeconds());
+      return false;
+    }
+  }
+
+  /**
+   * Wait for file to be deleted.
+   * @param file File to be deleted.
+   * @param maxDuration poll max duration.
+   * @return true if deleted.
+   */
+  public static boolean waitForFileDelete(File file, Duration maxDuration) {
+    return waitForFileDelete(file, maxDuration, POLL_INTERVAL_DURATION,
+        POLL_DELAY_DURATION);
+  }
 }
