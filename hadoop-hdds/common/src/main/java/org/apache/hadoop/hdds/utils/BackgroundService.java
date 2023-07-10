@@ -88,7 +88,6 @@ public abstract class BackgroundService {
 
   // start service
   public void start() {
-    LOG.info("Starting up service {}", serviceName);
     exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
