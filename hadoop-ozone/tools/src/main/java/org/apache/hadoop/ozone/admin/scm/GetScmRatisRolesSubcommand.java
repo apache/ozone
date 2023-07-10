@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
+import static java.lang.System.err;
+
 /**
  * Handler of scm status command.
  */
@@ -67,11 +69,15 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     for (String role : ratisRoles) {
       Map<String, String> roleDetails = new HashMap<>();
       String[] roles = role.split(":");
-      roleDetails.put("address", roles[0].concat(roles[1]));
-      if(roles.length > 2) {
-        roleDetails.put("raftPeerRole", roles[2]);
-        roleDetails.put("ID", roles[3]);
-        roleDetails.put("InetAddress", roles[4]);
+      if (roles.length >= 2) {
+        roleDetails.put("address", roles[0].concat(roles[1]));
+        if (roles.length > 2) {
+          roleDetails.put("raftPeerRole", roles[2]);
+          roleDetails.put("ID", roles[3]);
+          roleDetails.put("InetAddress", roles[4]);
+        }
+      } else {
+        err.println("Invalid response received for ScmRatisRoles.");
       }
       allRoles.put(roles[0], roleDetails);
     }
