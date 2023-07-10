@@ -100,10 +100,11 @@ supported are:
 ## ACL Manipulation Using Ozone CLI
 
 The ACLs can also be manipulated by using the `ozone sh` commands.<br>
-Usage: `ozone sh <object> <action> path-to-object [-a <value>]` <br>
+Usage: `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
+`-a` is for the comma separated list of ACLs. It is required for all subcommands except `getacl`. <br>
 `<value>` is of the form `type:name:rights[scope]`.<br>
-_type_ can be user, group or world.<br>
-_name_ is the name of the user/group <br>
+_type_ can be user, group, world or anonymous.<br>
+_name_ is the name of the user/group. For world and anonymous type, name should either be left empty or be WORLD or ANONYMOUS respectively. <br>
 _rights_ can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
 _scope_ can be ACCESS or DEFAULT. If not specified, it is taken as ACCESS.<br>
 
@@ -112,12 +113,14 @@ When the object is a prefix, the path-to-object must contain the full path from 
 i.e., /volume/bucket/some/key/prefix/
 </div>
 
-The Following are the operation on ACLs that can be performed using the CLI.
+The Following are the operations or actions on ACLs that can be performed using the CLI.
 
 <h3>setacl</h3>
 
 ```shell
-$ ozone sh bucket setacl /vol1/bucket1 -a user:testuser2:a
+$ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
+ ACLs set successfully.
+$ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
  ACLs set successfully.
 ```
 
@@ -141,20 +144,20 @@ $ ozone sh bucket getacl /vol1/bucket2
 <h3>addacl</h3>
 
 ```shell
-$ ozone sh bucket addacl vol1/bucket2 -a user:testuser2:a
+$ ozone sh bucket addacl -a user:testuser2:a  /vol1/bucket2
 ACL user:testuser2:a[ACCESS] added successfully.
 
-$ ozone sh bucket addacl vol1/bucket2 -a user:testuser:rxy[DEFAULT]
+$ ozone sh bucket addacl -a user:testuser:rxy[DEFAULT] /vol1/bucket2
 ACL user:testuser:rxy[DEFAULT] added successfully.
 
-$ ozone sh prefix addacl vol1/buck3/dir1/ -a user:testuser2:a[DEFAULT]
+$ ozone sh prefix addacl -a user:testuser2:a[DEFAULT] /vol1/buck3/dir1/
 ACL user:testuser2:a[DEFAULT] added successfully.
 ```
 
 <h3>removeacl</h3>
 
 ```shell
-$ ozone sh bucket removeacl vol1/bucket2 -a user:testuser:r[DEFAULT]
+$ ozone sh bucket removeacl -a user:testuser:r[DEFAULT] /vol1/bucket2
 ACL user:testuser:r[DEFAULT] removed successfully.
 ```
 

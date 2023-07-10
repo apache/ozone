@@ -79,24 +79,27 @@ ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包�
 ## 使用 Ozone CLI 操作 ACL
 
 还可以使用 `ozone sh` 命令来操作 ACL。<br>
-用法 : `ozone sh <object> <action> path-to-object [-a <value>]` <br>
-`<value>` 的格式为 `type:name:rights[scope]`.<br>
-_type_ 可以是 user, group 或 world.<br>
-_name_ 是用户/组的名称 <br>
-_rights_ 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)<br>
-_scope_ 可以是 ACCESS 或 DEFAULT. 如果不指定，则视为 ACCESS.<br>
+用法 : `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
+`-a` 表示以逗号分隔的 ACL 列表。除了 `getacl` 之外的所有子命令都需要它。<br>
+`<value>` 的格式为 `type:name:rights[scope]`。<br>
+_type_ 可以是 user, group, world 或 anonymous。<br>
+_name_ 是用户/组的名称。如果 type 为 world 和 anonymous，则 name 应留空或分别为 WORLD 或 ANONYMOUS。 <br>
+_rights_ 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)。<br>
+_scope_ 可以是 ACCESS 或 DEFAULT. 如果不指定，则视为 ACCESS。<br>
 
 <div class="alert alert-warning" role="alert">
 当对象是前缀时，对象路径必须包含从卷到密钥的目录或前缀的完整路径。
 那是， /volume/bucket/some/key/prefix/
 </div>
 
-以下是可以使用 CLI 对 ACL 执行的操作。
+以下是可以使用 CLI 对 ACL 执行的操作或操作。
 
 <h3>setacl</h3>
 
 ```shell
-$ ozone sh bucket setacl /vol1/bucket1 -a user:testuser2:a
+$ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
+ ACLs set successfully.
+$ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
  ACLs set successfully.
 ```
 
@@ -120,20 +123,20 @@ $ ozone sh bucket getacl /vol1/bucket2
 <h3>addacl</h3>
 
 ```shell
-$ ozone sh bucket addacl vol1/bucket2 -a user:testuser2:a
+$ ozone sh bucket addacl -a user:testuser2:a /vol1/bucket2
 ACL user:testuser2:a[ACCESS] added successfully.
 
-$ ozone sh bucket addacl vol1/bucket2 -a user:testuser:rxy[DEFAULT]
+$ ozone sh bucket addacl -a user:testuser:rxy[DEFAULT] /vol1/bucket2
 ACL user:testuser:rxy[DEFAULT] added successfully.
 
-$ ozone sh prefix addacl vol1/buck3/dir1/ -a user:testuser2:a[DEFAULT]
+$ ozone sh prefix addacl -a user:testuser2:a[DEFAULT] /vol1/buck3/dir1/
 ACL user:testuser2:a[DEFAULT] added successfully.
 ```
 
 <h3>removeacl</h3>
 
 ```shell
-$ ozone sh bucket removeacl vol1/bucket2 -a user:testuser:r[DEFAULT]
+$ ozone sh bucket removeacl -a user:testuser:r[DEFAULT] /vol1/bucket2
 ACL user:testuser:r[DEFAULT] removed successfully.
 ```
 
