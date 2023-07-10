@@ -243,7 +243,7 @@ public final class RocksDatabase implements Closeable {
       }
     }
 
-    public long getLatestSequenceNumber() {
+    public long getLatestSequenceNumber() throws IOException {
       return RocksDatabase.this.getLatestSequenceNumber();
     }
 
@@ -829,7 +829,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public long getLatestSequenceNumber() {
+  public long getLatestSequenceNumber() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLatestSequenceNumber();

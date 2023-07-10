@@ -4039,7 +4039,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public DBUpdates getDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     long limitCount = Long.MAX_VALUE;
     if (dbUpdatesRequest.hasLimitCount()) {
       limitCount = dbUpdatesRequest.getLimitCount();

@@ -297,7 +297,11 @@ public class RocksDBStoreMetrics implements MetricsSource {
   }
 
   private void getLatestSequenceNumber(MetricsRecordBuilder rb) {
-    rb.addCounter(Interns.info(LAST_SEQUENCE_NUMBER, "RocksDBStat"),
-        rocksDB.getLatestSequenceNumber());
+    try {
+      rb.addCounter(Interns.info(LAST_SEQUENCE_NUMBER, "RocksDBStat"),
+          rocksDB.getLatestSequenceNumber());
+    } catch (IOException e) {
+      LOG.error("Failed to get latest sequence number", e);
+    }
   }
 }

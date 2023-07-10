@@ -347,13 +347,13 @@ public class RDBStore implements DBStore {
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
   }
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }

@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -376,7 +375,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private DBUpdatesResponse getOMDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
 
     DBUpdatesResponse.Builder builder = DBUpdatesResponse
         .newBuilder();
