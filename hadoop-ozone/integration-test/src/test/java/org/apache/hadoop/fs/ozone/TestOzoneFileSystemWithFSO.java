@@ -20,12 +20,14 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -48,7 +50,9 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -566,6 +570,29 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         return false;
       }
     }, 1000, 120000);
+  }
+
+  /**
+   * Verify recoverLease() and isFileClosed() APIs.
+   * @throws Exception
+   */
+  @Test
+  public void testLeaseRecoverable() throws Exception {
+    // Create a file
+    Path parent = new Path("/d1/d2/");
+    Path source = new Path(parent, "file1");
+
+    LeaseRecoverable fs = (LeaseRecoverable)getFs();
+    FSDataOutputStream stream = getFs().create(source);
+    // file not visible yet
+    assertThrows(OMException.class, () -> fs.isFileClosed(source));
+    stream.write(1);
+    stream.hsync();
+    // file is visible and open
+    assertFalse(fs.isFileClosed(source));
+    assertTrue(fs.recoverLease(source));
+    // file is closed after lease recovery
+    assertTrue(fs.isFileClosed(source));
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,

@@ -118,6 +118,8 @@ public final class SCMCertStore implements CertificateStore {
       scmMetadataStore.getValidCertsTable().putWithBatch(batchOperation,
           serialID, certificate);
       scmMetadataStore.getStore().commitBatchOperation(batchOperation);
+      LOG.info("Scm certificate {} for {} is stored", serialID,
+          certificate.getSubjectDN());
     } finally {
       lock.unlock();
     }

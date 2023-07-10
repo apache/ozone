@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -1543,18 +1544,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return adapter.getSnapshotDiffReport(snapshotDir, fromSnapshot, toSnapshot);
   }
 
-
-  /**
-   * Start the lease recovery of a file.
-   *
-   * @param f a file
-   * @return true if the file is already closed
-   * @throws IOException if an error occurs
-   */
-  public boolean recoverLease(final Path f) throws IOException {
-    return adapterImpl.recoverLease(f);
-  }
-
   @Override
   public void setTimes(Path f, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
@@ -1569,4 +1558,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     adapter.setTimes(key, mtime, atime);
   }
 
+  protected boolean setSafeModeUtil(SafeModeAction action,
+      boolean isChecked)
+      throws IOException {
+    if (action == SafeModeAction.GET) {
+      statistics.incrementReadOps(1);
+    } else {
+      statistics.incrementWriteOps(1);
+    }
+    LOG.trace("setSafeMode() action:{}", action);
+    return getAdapter().setSafeMode(action, isChecked);
+  }
 }

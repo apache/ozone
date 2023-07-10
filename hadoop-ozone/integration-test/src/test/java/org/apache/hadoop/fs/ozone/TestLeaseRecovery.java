@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -120,6 +121,7 @@ public class TestLeaseRecovery {
     ThreadLocalRandom.current().nextBytes(data);
     stream.write(data);
     stream.hsync();
+    assertFalse(fs.isFileClosed(file));
 
     int count = 0;
     while (count++ < 15 && !fs.recoverLease(file)) {
@@ -127,6 +129,7 @@ public class TestLeaseRecovery {
     }
     // The lease should have been recovered.
     assertTrue("File should be closed", fs.recoverLease(file));
+    assertTrue(fs.isFileClosed(file));
     // open it again, make sure the data is correct
     byte[] readData = new byte[1 << 20];
     try (FSDataInputStream fdis = fs.open(file)) {

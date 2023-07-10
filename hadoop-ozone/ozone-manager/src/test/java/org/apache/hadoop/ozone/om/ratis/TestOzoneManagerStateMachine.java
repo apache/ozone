@@ -74,7 +74,8 @@ public class TestOzoneManagerStateMachine {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.newFolder().getAbsolutePath().toString());
 
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf,
+        ozoneManager);
 
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 

@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -94,9 +93,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
           scheduler.schedule(() -> {
             try {
               secretKeyManager.checkAndInitialize();
-            } catch (TimeoutException e) {
+            } catch (Exception e) {
               throw new RuntimeException(
-                  "Timeout replicating initialized state.", e);
+                  "Error replicating initialized state.", e);
             }
           }, 0, TimeUnit.SECONDS);
         }
@@ -128,7 +127,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
     try {
       secretKeyManager.checkAndRotate();
-    } catch (TimeoutException e) {
+    } catch (Exception e) {
       LOG.error("Error occurred when updating SecretKeys.", e);
     }
   }

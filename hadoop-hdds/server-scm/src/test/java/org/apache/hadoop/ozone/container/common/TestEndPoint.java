@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -171,7 +170,10 @@ public class TestEndPoint {
    * that they have been deleted during tmp dir cleanup.
    */
   @Test
-  public void testTmpDirCleanup() throws Exception {
+  public void testDeletedContainersClearedOnStartup() throws Exception {
+    // TODO HDDS-8770. If cleanup of RocksDB is no longer required on tmp dir
+    //  cleanup, this test can be removed.
+
     OzoneConfiguration conf = SCMTestUtils.getConf();
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         true);
@@ -201,7 +203,7 @@ public class TestEndPoint {
       // Write some data before calling versionTask.call()
       // Create a container and move it under the tmp delete dir.
       KeyValueContainer container = ContainerTestUtils.
-          setUpTestContainerUnderTmpDir(hddsVolume, clusterId,
+          addContainerToDeletedDir(hddsVolume, clusterId,
               conf, OzoneConsts.SCHEMA_V3);
       File containerDBFile = container.getContainerDBFile();
 
@@ -237,8 +239,10 @@ public class TestEndPoint {
             newState);
 
         // assert that tmp dir is empty
-        Assertions.assertFalse(KeyValueContainerUtil.ContainerDeleteDirectory
-            .getDeleteLeftovers(hddsVolume).hasNext());
+        File[] leftoverContainers =
+            hddsVolume.getDeletedContainerDir().listFiles();
+        Assertions.assertNotNull(leftoverContainers);
+        Assertions.assertEquals(0, leftoverContainers.length);
         // All DB keys have been deleted, MetadataTable should be empty
         Assertions.assertEquals(0, metadataTable.getEstimatedKeyCount());
       }
