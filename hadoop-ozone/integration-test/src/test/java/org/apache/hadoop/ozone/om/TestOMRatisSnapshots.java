@@ -89,12 +89,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.LOG;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -153,7 +155,10 @@ public class TestOMRatisSnapshots {
       conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
           TimeUnit.SECONDS);
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
-          5, TimeUnit.MILLISECONDS);
+          1, TimeUnit.MILLISECONDS);
+      conf.setTimeDuration(
+          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+          5, TimeUnit.SECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
@@ -1103,6 +1108,21 @@ public class TestOMRatisSnapshots {
     checkSnapshot(newLeaderOM, newFollowerOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
+    // Prepare baseline data for SST pruning
+    String sstBackupDir = newLeaderOM.getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getSstBackupDir();
+    Assertions.assertNotNull(sstBackupDir);
+    int numberOfSstFiles = 0;
+    try (DirectoryStream<Path> files =
+             Files.newDirectoryStream(Paths.get(sstBackupDir))) {
+      for (Path ignored : files) {
+        numberOfSstFiles++;
+      }
+    }
+    LOG.info("###numberOfSstFiles={}", numberOfSstFiles);
+
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
         .getMetadataManager()
@@ -1131,7 +1151,7 @@ public class TestOMRatisSnapshots {
     // Check whether newly created snapshot gets processed by SFS
     newKeys = writeKeys(1);
     SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
-        snapshotName + RandomStringUtils.randomNumeric(5));
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
     Assertions.assertNotNull(newSnapshot);
     File omMetadataDir =
         OMStorage.getOmDbDir(newLeaderOM.getConfiguration());
@@ -1204,6 +1224,22 @@ public class TestOMRatisSnapshots {
     }
     Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
         || contentLength != newContentLength);
+
+    // Check whether sst files were pruned
+    int finalNumberOfSstFiles = numberOfSstFiles;
+    GenericTestUtils.waitFor(() -> {
+      int newNumberOfSstFiles = 0;
+      try (DirectoryStream<Path> files =
+               Files.newDirectoryStream(Paths.get(sstBackupDir))) {
+        for (Path ignored : files) {
+          newNumberOfSstFiles++;
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      LOG.info("###newNumberOfSstFiles={}", newNumberOfSstFiles);
+      return finalNumberOfSstFiles < newNumberOfSstFiles;
+    }, 1000, 10000);
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
