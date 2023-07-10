@@ -1180,8 +1180,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       File file =
           new File(sstBackupDir + "/" + sstFileNode + SST_FILE_EXTENSION);
       try {
-        LOG.info("###file={}, deleted={}",
-            file.toPath(), Files.deleteIfExists(file.toPath()));
+        Files.deleteIfExists(file.toPath());
       } catch (IOException exception) {
         LOG.warn("Failed to delete SST file: " + sstFileNode, exception);
       }
@@ -1530,10 +1529,5 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
-  }
-
-  @VisibleForTesting
-  public String getSstBackupDir() {
-    return sstBackupDir;
   }
 }
