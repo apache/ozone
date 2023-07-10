@@ -102,7 +102,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -234,8 +233,6 @@ public class TestContainerCommandsEC {
           try {
             scm.getPipelineManager().closePipeline(p, false);
           } catch (IOException e) {
-            throw new RuntimeException(e);
-          } catch (TimeoutException e) {
             throw new RuntimeException(e);
           }
         });
@@ -799,7 +796,7 @@ public class TestContainerCommandsEC {
   }
 
   private void closeContainer(long conID)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException, InvalidStateTransitionException {
     //Close the container first.
     scm.getContainerManager().getContainerStateManager().updateContainerState(
         HddsProtos.ContainerID.newBuilder().setId(conID).build(),

@@ -28,5 +28,44 @@
   "/heatmap/readaccess?startDate=*&path=*&entityType=bucket": "/bucketHeatmap",
   "/heatmap/readaccess?startDate=*&path=*&entityType=key": "/keyHeatmap",
   "/heatmap/readaccess?startDate=*&path=*&entityType=volume": "/heatmap",
-  "/features/disabledFeatures": "/disabledFeatures"
+  "/features/disabledFeatures": "/disabledFeatures",
+  "/keys/open?limit=0": "/keysOpenSummary",
+  "/keys/deletePending?limit=1": "/keysdeletePendingSummary",
+
+  "/containers/mismatch?limit=*&prevKey=11&missingIn=OM" : "/omMismatch1",
+  "/containers/mismatch?limit=*&prevKey=21&missingIn=OM" : "/omMismatch2",
+  "/containers/mismatch?limit=*&prevKey=31&missingIn=OM" : "/omMismatch3",
+  "/containers/mismatch?limit=*&prevKey=41&missingIn=OM" : "/omMismatch4",
+
+  "/containers/mismatch?limit=*&prevKey=*&missingIn=OM" : "/omMismatch",
+
+  "/containers/mismatch?limit=*&prevKey=11&missingIn=SCM" : "/scmMismatch1",
+  "/containers/mismatch?limit=*&prevKey=21&missingIn=SCM" : "/scmMismatch2",
+  "/containers/mismatch?limit=*&prevKey=31&missingIn=SCM" : "/scmMismatch3",
+  "/containers/mismatch?limit=*&prevKey=41&missingIn=SCM" : "/scmMismatch4",
+  "/containers/mismatch?limit=*&prevKey=51&missingIn=SCM" : "/scmMismatch5",
+
+  "/containers/mismatch?limit=*&prevKey=*&missingIn=SCM" : "/scmMismatch",
+
+  "/keys/open?includeFso=false&includeNonFso=true&limit=*&prevKey": "/nonFSO",
+  "/keys/open?includeFso=false&includeNonFso=true&limit=*&prevKey=/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/1105696238501917": "/nonFSO1",
+  "/keys/open?includeFso=false&includeNonFso=true&limit=*&prevKey=21": "/nonFSO2",
+  "/keys/open?includeFso=false&includeNonFso=true&limit=*&prevKey=31": "/nonFSO3",
+  
+  
+  "/keys/open?includeFso=true&includeNonFso=false&limit=*&prevKey": "/fso",
+  "/keys/open?includeFso=true&includeNonFso=false&limit=*&prevKey=/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713": "/fso1",
+  "/keys/open?includeFso=true&includeNonFso=false&limit=*&prevKey=/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191713": "/fso2",
+  "/keys/open?includeFso=true&includeNonFso=false&limit=*&prevKey=/-9223372036854775552/-9223372036854775040/-9223372036852420095/2431/110569623850191713": "/fso3",
+ 
+  "/keys/deletePending?limit=*&prevKey" : "/keydeletePending",
+  "/keys/deletePending?limit=*&prevKey=/volume/bucket1/rcmeevblsf/106/-9223372036843950335" : "/keydeletePending1",
+  "/keys/deletePending?limit=*&prevKey=/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191" : "/keydeletePending2",
+  "/keys/deletePending?limit=*&prevKey=31" : "/keydeletePending3",
+  
+  "/containers/mismatch/deleted?limit=*&prevKey": "/deleted",
+  "/containers/mismatch/deleted?limit=*&prevKey=11": "/deleted1",
+  "/containers/mismatch/deleted?limit=*&prevKey=21": "/deleted2",
+  "/containers/mismatch/deleted?limit=*&prevKey=31": "/deleted3",
+  "/containers/mismatch/deleted?limit=*&prevKey=41": "/deleted4"
 }

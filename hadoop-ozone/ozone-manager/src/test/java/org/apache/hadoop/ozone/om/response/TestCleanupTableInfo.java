@@ -283,7 +283,7 @@ public class TestCleanupTableInfo {
       Assert.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    return spy(new OmMetadataManagerImpl(conf));
+    return spy(new OmMetadataManagerImpl(conf, null));
   }
 
   private OMFileCreateRequest anOMFileCreateRequest() {

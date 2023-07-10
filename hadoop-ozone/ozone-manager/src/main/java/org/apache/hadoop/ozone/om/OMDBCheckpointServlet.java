@@ -78,8 +78,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
  * If Kerberos is not enabled, simply append the login username to
  * `ozone.administrator`, e.g. `scm`
  */
-public class OMDBCheckpointServlet extends DBCheckpointServlet
-    implements BootstrapStateHandler {
+public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
@@ -135,8 +134,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock();
-         TarArchiveOutputStream archiveOutputStream =
+    try (TarArchiveOutputStream archiveOutputStream =
              new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);

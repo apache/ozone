@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -eu -o pipefail
+
 export K8S_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 cd "$K8S_DIR"
@@ -22,11 +24,7 @@ cd "$K8S_DIR"
 # shellcheck source=/dev/null
 source "../testlib.sh"
 
-rm -rf result
-
-regenerate_resources
-
-start_k8s_env
+pre_run_setup
 
 export SCM=scm-0
 
@@ -41,11 +39,3 @@ wait_for_startup
 execute_robot_test ${SCM} -v PREFIX:pre smoketest/freon/validate.robot
 execute_robot_test ${SCM} -v PREFIX:post smoketest/freon/generate.robot
 execute_robot_test ${SCM} -v PREFIX:post smoketest/freon/validate.robot
-
-combine_reports
-
-get_logs
-
-stop_k8s_env
-
-revert_resources

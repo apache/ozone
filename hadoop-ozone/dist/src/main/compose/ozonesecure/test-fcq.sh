@@ -15,22 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:failing
+#suite:secure
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
+export SECURITY_ENABLED=true
+export COMPOSE_FILE=docker-compose.yaml:fcq.yaml
+
 start_docker_env
 
-execute_robot_test scm failing/test1.robot
-execute_robot_test scm failing/test2.robot
-
-stop_docker_env
-
-generate_report
+execute_robot_test s3g fcq/s3_om_fcq.robot

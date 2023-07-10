@@ -62,7 +62,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -184,7 +183,7 @@ public class PipelineManagerImpl implements PipelineManager {
             .setPeriodicalTask(() -> {
               try {
                 pipelineManager.scrubPipelines();
-              } catch (IOException | TimeoutException e) {
+              } catch (IOException e) {
                 LOG.error("Unexpected error during pipeline scrubbing", e);
               }
             }).build();
@@ -223,11 +222,10 @@ public class PipelineManagerImpl implements PipelineManager {
    * the pipline to be used by clients in the system.
    * @param pipeline
    * @throws IOException
-   * @throws TimeoutException
    */
   @Override
   public void addEcPipeline(Pipeline pipeline)
-      throws IOException, TimeoutException {
+      throws IOException {
     if (pipeline.getReplicationConfig().getReplicationType()
         != ReplicationType.EC) {
       throw new IllegalArgumentException(
@@ -239,7 +237,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
-      throws IOException, TimeoutException {
+      throws IOException {
     return createPipeline(replicationConfig, Collections.emptyList(),
         Collections.emptyList());
   }
@@ -247,7 +245,7 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException, TimeoutException {
+      throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
 
     acquireWriteLock();
@@ -285,20 +283,19 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   private void addPipelineToManager(Pipeline pipeline)
-      throws IOException, TimeoutException {
+      throws IOException {
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION);
     acquireWriteLock();
     try {
       stateManager.addPipeline(pipelineProto);
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       LOG.debug("Failed to add pipeline {}.", pipeline, ex);
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
       releaseWriteLock();
     }
-    LOG.info("Added pipeline {}.", pipeline);
     recordMetricsForPipeline(pipeline);
   }
 
@@ -420,11 +417,10 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void openPipeline(PipelineID pipelineId)
-      throws IOException, TimeoutException {
+      throws IOException {
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
     acquireWriteLock();
     final Pipeline pipeline;
-    boolean opened = false;
     try {
       pipeline = stateManager.getPipeline(pipelineId);
       if (pipeline.isClosed()) {
@@ -433,14 +429,9 @@ public class PipelineManagerImpl implements PipelineManager {
       if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
         stateManager.updatePipelineState(pipelineIdProtobuf,
             HddsProtos.PipelineState.PIPELINE_OPEN);
-        opened = true;
       }
     } finally {
       releaseWriteLock();
-    }
-
-    if (opened) {
-      LOG.info("Pipeline {} moved to OPEN state", pipeline);
     }
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);
@@ -453,7 +444,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(Pipeline pipeline)
-      throws IOException, TimeoutException {
+      throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
     acquireWriteLock();
@@ -475,7 +466,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * @throws IOException
    */
   private void closeContainersForPipeline(final PipelineID pipelineId)
-      throws IOException, TimeoutException {
+      throws IOException {
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     ContainerManager containerManager = scmContext.getScm()
         .getContainerManager();
@@ -502,7 +493,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException, TimeoutException {
+      throws IOException {
     PipelineID pipelineID = pipeline.getId();
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     // close containers.
@@ -547,7 +538,7 @@ public class PipelineManagerImpl implements PipelineManager {
         LOG.info("Closing the stale pipeline: {}", p.getId());
         closePipeline(p, false);
         LOG.info("Closed the stale pipeline: {}", p.getId());
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
         LOG.error("Closing the stale pipeline failed: {}", p, e);
       }
     });
@@ -571,7 +562,7 @@ public class PipelineManagerImpl implements PipelineManager {
    * Scrub pipelines.
    */
   @Override
-  public void scrubPipelines() throws IOException, TimeoutException {
+  public void scrubPipelines() throws IOException {
     Instant currentTime = clock.instant();
     long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
@@ -670,7 +661,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void activatePipeline(PipelineID pipelineID)
-      throws IOException, TimeoutException {
+      throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     acquireWriteLock();
     try {
@@ -689,7 +680,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
-      throws IOException, TimeoutException {
+      throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     acquireWriteLock();
     try {

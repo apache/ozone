@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,22 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:failing
+version: "3.4"
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
+x-FCQ-config:
+  &FCQ-config
+  environment:
+    - CORE-SITE.XML_ipc.9862.callqueue.impl=org.apache.hadoop.ipc.FairCallQueue
+    - CORE-SITE.XML_ipc.9862.identity-provider.impl=org.apache.hadoop.ozone.om.helpers.OzoneIdentityProvider
+    - OZONE-SITE.XML_ozone.om.transport.class=org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-start_docker_env
-
-execute_robot_test scm failing/test1.robot
-execute_robot_test scm failing/test2.robot
-
-stop_docker_env
-
-generate_report
+services:
+  om:
+    <<: *FCQ-config
+  s3g:
+    <<: *FCQ-config
