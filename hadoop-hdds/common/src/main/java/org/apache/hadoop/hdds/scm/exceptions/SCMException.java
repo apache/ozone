@@ -136,5 +136,6 @@ public class SCMException extends IOException {
     INVALID_PIPELINE_STATE,
     DUPLICATED_PIPELINE_ID,
     TIMEOUT,
+    CA_ROTATION_IN_PROGRESS
   }
 }

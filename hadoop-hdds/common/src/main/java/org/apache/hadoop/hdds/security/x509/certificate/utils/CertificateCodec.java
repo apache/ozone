@@ -296,7 +296,8 @@ public class CertificateCodec {
     try (FileOutputStream file = new FileOutputStream(certificateFile)) {
       file.write(pemEncodedCertificate.getBytes(DEFAULT_CHARSET));
     }
-
+    LOG.info("Save certificate to {}", certificateFile.getAbsolutePath());
+    LOG.info("Certificate {}", pemEncodedCertificate);
     Files.setPosixFilePermissions(certificateFile.toPath(), permissionSet);
   }
 

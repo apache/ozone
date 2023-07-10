@@ -194,9 +194,24 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
       String certSignReq) throws IOException {
-    return getSCMCertChain(scmNodeDetails, certSignReq).getX509Certificate();
+    return getSCMCertChain(scmNodeDetails, certSignReq, false)
+        .getX509Certificate();
   }
 
+  /**
+   * Get signed certificate for SCM node.
+   *
+   * @param scmNodeDetails  - SCM Node Details.
+   * @param certSignReq     - Certificate signing request.
+   * @param renew           - Whether SCM is trying to renew its certificate
+   * @return String         - pem encoded SCM signed
+   *                          certificate.
+   */
+  public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
+      String certSignReq, boolean renew) throws IOException {
+    return getSCMCertChain(scmNodeDetails, certSignReq, renew)
+        .getX509Certificate();
+  }
 
   /**
    * Get signed certificate for SCM node and root CA certificate.
@@ -207,12 +222,13 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * signed certificate and root CA certificate.
    */
   public SCMGetCertResponseProto getSCMCertChain(
-      ScmNodeDetailsProto scmNodeDetails, String certSignReq)
+      ScmNodeDetailsProto scmNodeDetails, String certSignReq, boolean isRenew)
       throws IOException {
     SCMGetSCMCertRequestProto request =
         SCMGetSCMCertRequestProto.newBuilder()
             .setCSR(certSignReq)
             .setScmDetails(scmNodeDetails)
+            .setRenew(isRenew)
             .build();
     return submitRequest(Type.GetSCMCertificate,
         builder -> builder.setGetSCMCertificateRequest(request))

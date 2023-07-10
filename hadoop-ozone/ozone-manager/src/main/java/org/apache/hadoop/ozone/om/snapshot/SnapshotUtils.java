@@ -70,7 +70,8 @@ public final class SnapshotUtils {
       throw e;
     }
     if (snapshotInfo == null) {
-      throw new OMException(KEY_NOT_FOUND);
+      throw new OMException("Snapshot '" + snapshotKey + "' is not found.",
+          KEY_NOT_FOUND);
     }
     return snapshotInfo;
   }

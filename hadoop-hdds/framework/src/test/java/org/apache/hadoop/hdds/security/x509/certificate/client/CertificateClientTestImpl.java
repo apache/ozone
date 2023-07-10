@@ -166,7 +166,7 @@ public class CertificateClientTestImpl implements CertificateClient {
           Duration.between(currentTime, gracePeriodStart);
 
       executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
+          new ThreadFactoryBuilder().setNameFormat("CertificateRenewerService")
               .setDaemon(true).build());
       this.executorService.schedule(new RenewCertTask(),
           delay.toMillis(), TimeUnit.MILLISECONDS);
