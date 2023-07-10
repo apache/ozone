@@ -105,11 +105,6 @@ public class OMDBInsightEndpoint {
    * @return the http json response wrapped in below format:
    *
    * {
-   *   "keysSummary": {
-   *     "totalUnreplicatedDataSize": 2147483648,
-   *     "totalReplicatedDataSize": 2147483648,
-   *     "totalOpenKeys": 8
-   *   },
    *   "lastKey": "/-4611686018427388160/-9223372036854775552/-922777620354",
    *   "replicatedTotal": 2147483648,
    *   "unreplicatedTotal": 2147483648,
