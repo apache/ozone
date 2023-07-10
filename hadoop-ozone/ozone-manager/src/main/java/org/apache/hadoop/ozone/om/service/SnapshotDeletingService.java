@@ -653,5 +653,4 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   public void setSuccessRunCount(long num) {
     successRunCount.getAndSet(num);
   }
-
 }

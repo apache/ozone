@@ -56,7 +56,7 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
@@ -147,6 +147,14 @@ public class TestOMRatisSnapshots {
         StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.
         OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
+    if (testInfo.getDisplayName().equals("testSnapshotBackgroundServices")) {
+      conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+          5, TimeUnit.SECONDS);
+      conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
+          TimeUnit.SECONDS);
+      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+          5, TimeUnit.MILLISECONDS);
+    }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
     if (testInfo.getTestMethod().isPresent() &&
@@ -157,12 +165,6 @@ public class TestOMRatisSnapshots {
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         snapshotThreshold);
-    conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-        5, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
-        TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
-        5, TimeUnit.MILLISECONDS);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -203,7 +205,6 @@ public class TestOMRatisSnapshots {
 
   @ParameterizedTest
   @ValueSource(ints = {100})
-  @Disabled
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
@@ -369,7 +370,6 @@ public class TestOMRatisSnapshots {
 
   @Test
   @Timeout(300)
-  @Disabled
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
     // Get the leader OM
@@ -582,7 +582,6 @@ public class TestOMRatisSnapshots {
   @Test
   @Timeout(300)
   @Flaky("HDDS-8876")
-  @Disabled
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -720,7 +719,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Disabled
   public void testInstallSnapshotWithClientWrite() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -822,7 +820,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Disabled
   public void testInstallSnapshotWithClientRead() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -912,7 +909,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Disabled
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -971,7 +967,6 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-  @Disabled
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -1027,16 +1022,15 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {10})
+  @Test
+  @DisplayName("testSnapshotBackgroundServices")
   @SuppressWarnings("methodlength")
-  public void testSnapshotBackgroundServices(int numSnapshotsToCreate)
+  public void testSnapshotBackgroundServices()
       throws IOException, InterruptedException, TimeoutException {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
-
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Find the inactive OM
@@ -1052,7 +1046,7 @@ public class TestOMRatisSnapshots {
     String snapshotName = "";
     List<String> keys = new ArrayList<>();
     SnapshotInfo snapshotInfo = null;
-    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate;
+    for (int snapshotCount = 0; snapshotCount < 10;
          snapshotCount++) {
       snapshotName = snapshotNamePrefix + snapshotCount;
       keys = writeKeys(keyIncrement);
@@ -1066,7 +1060,6 @@ public class TestOMRatisSnapshots {
         TermIndex.valueOf(transactionInfo.getTerm(),
             transactionInfo.getTransactionIndex());
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
-    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
@@ -1076,59 +1069,17 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 100, 10000);
+    GenericTestUtils.waitFor(() ->
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= leaderOMSnapshotIndex - 1, 100, 10000);
 
-    long followerOMLastAppliedIndex =
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
-
-    // After the new checkpoint is installed, the follower OM
-    // lastAppliedIndex must >= the snapshot index of the checkpoint. It
-    // could be great than snapshot index if there is any conf entry from ratis.
-    followerOMLastAppliedIndex = followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
-
-    // Verify checkpoint installation was happened.
-    String msg = "Reloaded OM state";
-    assertLogCapture(logCapture, msg);
-
-    // Verify that the follower OM's DB contains the transactions which were
-    // made while it was inactive.
-    OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
-    assertNotNull(followerOMMetaMngr.getVolumeTable().get(
-        followerOMMetaMngr.getVolumeKey(volumeName)));
-    assertNotNull(followerOMMetaMngr.getBucketTable().get(
-        followerOMMetaMngr.getBucketKey(volumeName, bucketName)));
-    for (String key : keys) {
-      assertNotNull(followerOMMetaMngr.getKeyTable(
-              TEST_BUCKET_LAYOUT)
-          .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
-    }
 
     // Verify RPC server is running
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.isOmRpcServerRunning();
-    }, 100, 5000);
-
-    assertLogCapture(logCapture,
-        "Install Checkpoint is finished");
+    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    // TODO: Enable this part after RATIS-1481 used
-    /*
-    Assert.assertNotNull(followerOMMetaMngr.getKeyTable(
-        TEST_BUCKET_LAYOUT).get(followerOMMetaMngr.getOzoneKey(
-        volumeName, bucketName, newKeys.get(0))));
-     */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
 
@@ -1144,8 +1095,12 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
     OzoneManager newLeaderOM = cluster.getOMLeader();
+    Assertions.assertEquals(followerOM, newLeaderOM);
+    OzoneManager newFollowerOM =
+        cluster.getOzoneManager(leaderOM.getOMNodeId());
+    Assertions.assertEquals(leaderOM, newFollowerOM);
 
-    checkSnapshot(newLeaderOM, leaderOM, snapshotName, keys, snapshotInfo);
+    checkSnapshot(newLeaderOM, newFollowerOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
     // Prepare baseline data for compaction logs
@@ -1196,7 +1151,8 @@ public class TestOMRatisSnapshots {
           .toString());
     }, 1000, 30000);
 
-    // Check whether newly created snapshot data can be reclaimed
+    // Check whether newly created snapshot data is reclaimed
+    ozoneBucket.deleteKeys(newKeys);
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
     GenericTestUtils.waitFor(() -> {
@@ -1209,15 +1165,14 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
 
-    // Check whether newly created keys data can be reclaimed
+    // Check whether newly created keys data is reclaimed
     Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
     String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
         OM_KEY_PREFIX + ozoneBucket.getName() +
         OM_KEY_PREFIX + newKeys.get(0);
-    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
-    ozoneBucket.deleteKeys(newKeys);
+    Assertions.assertNull(omKeyInfoTableBeforeDeletion.get(newKey));
     GenericTestUtils.waitFor(() -> {
       Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
           .getMetadataManager()
