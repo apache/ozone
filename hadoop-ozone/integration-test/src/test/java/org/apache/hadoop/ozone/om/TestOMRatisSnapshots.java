@@ -666,11 +666,23 @@ public class TestOMRatisSnapshots {
     // TODO: Add wait check here, to avoid flakiness.
 
     // Verify the metrics
-    DBCheckpointMetrics dbMetrics = leaderOM.getMetrics().
-        getDBCheckpointMetrics();
-    assertEquals(0, dbMetrics.getLastCheckpointStreamingNumSSTExcluded());
-    assertTrue(dbMetrics.getNumIncrementalCheckpoints() >= 1);
-    assertTrue(dbMetrics.getNumCheckpoints() >= 3);
+    GenericTestUtils.waitFor(() -> {
+      DBCheckpointMetrics dbMetrics =
+          leaderOM.getMetrics().getDBCheckpointMetrics();
+      return dbMetrics.getLastCheckpointStreamingNumSSTExcluded() == 0;
+    }, 100, 10000);
+
+    GenericTestUtils.waitFor(() -> {
+      DBCheckpointMetrics dbMetrics =
+          leaderOM.getMetrics().getDBCheckpointMetrics();
+      return dbMetrics.getNumIncrementalCheckpoints() >= 1;
+    }, 100, 10000);
+
+    GenericTestUtils.waitFor(() -> {
+      DBCheckpointMetrics dbMetrics =
+          leaderOM.getMetrics().getDBCheckpointMetrics();
+      return dbMetrics.getNumCheckpoints() >= 3;
+    }, 100, 10000);
 
     // Verify RPC server is running
     GenericTestUtils.waitFor(() -> {
