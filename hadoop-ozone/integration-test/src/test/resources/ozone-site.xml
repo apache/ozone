@@ -51,4 +51,9 @@
     <value>1s</value>
   </property>
 
+  <property>
+    <name>dfs.container.ratis.datastream.enabled</name>
+    <value>true</value>
+  </property>
+
 </configuration>

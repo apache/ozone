@@ -1172,9 +1172,4 @@ public class ObjectEndpoint extends EndpointBase {
   public boolean isDatastreamEnabled() {
     return datastreamEnabled;
   }
-
-  @VisibleForTesting
-  public void setDatastreamEnabled(boolean datastreamEnabled) {
-    this.datastreamEnabled = datastreamEnabled;
-  }
 }

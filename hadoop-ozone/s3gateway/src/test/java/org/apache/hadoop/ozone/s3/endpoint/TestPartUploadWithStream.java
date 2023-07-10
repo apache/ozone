@@ -69,7 +69,6 @@ public class TestPartUploadWithStream {
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
     REST.setOzoneConfiguration(conf);
-    REST.setDatastreamEnabled(true);
     REST.init();
   }
 
@@ -128,7 +127,6 @@ public class TestPartUploadWithStream {
     assertNotEquals(eTag, response.getHeaderString("ETag"));
 
   }
-
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {

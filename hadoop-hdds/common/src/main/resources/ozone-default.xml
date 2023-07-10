@@ -54,7 +54,7 @@
 
   <property>
     <name>dfs.container.ratis.datastream.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>It specifies whether to enable data stream of container.</description>
   </property>
