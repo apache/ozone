@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -80,7 +81,7 @@ public class TestServiceInfoProvider {
     @BeforeEach
     public void setup() throws Exception {
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
-      provider = new ServiceInfoProvider(conf, om, null);
+      provider = new ServiceInfoProvider(new SecurityConfig(conf), om, null);
     }
 
     @Test
@@ -116,7 +117,8 @@ public class TestServiceInfoProvider {
       pem2 = getPEMEncodedString(cert2);
       when(certClient.getAllRootCaCerts())
           .thenReturn(new HashSet<>(Arrays.asList(cert1, cert2)));
-      provider = new ServiceInfoProvider(conf, om, certClient);
+      provider =
+          new ServiceInfoProvider(new SecurityConfig(conf), om, certClient);
     }
 
     @Test

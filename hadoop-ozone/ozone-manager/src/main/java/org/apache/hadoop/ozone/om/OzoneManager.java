@@ -640,7 +640,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           HddsServerUtil.getSecretKeyClientForOm(conf);
       secretKeyClient = new DefaultSecretKeySignerClient(secretKeyProtocol);
     }
-    serviceInfo = new ServiceInfoProvider(configuration, this, certClient,
+    serviceInfo = new ServiceInfoProvider(secConfig, this, certClient,
         testSecureOmFlag);
 
     if (secConfig.isBlockTokenEnabled()) {
@@ -1115,7 +1115,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       certClient.close();
     }
     certClient = newClient;
-    serviceInfo = new ServiceInfoProvider(configuration, this, certClient);
+    serviceInfo = new ServiceInfoProvider(secConfig, this, certClient);
   }
 
   /**

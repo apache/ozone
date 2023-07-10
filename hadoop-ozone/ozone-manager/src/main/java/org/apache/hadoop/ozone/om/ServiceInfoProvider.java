@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -30,7 +29,7 @@ import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -40,6 +39,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -54,11 +54,11 @@ public final class ServiceInfoProvider {
   private final OzoneManagerProtocol om;
   private final CertificateClient certClient;
 
-  private String caCertPem;
-  private List<String> caCertPemList;
+  private String caCertPEM;
+  private List<String> caCertPEMList;
 
   public ServiceInfoProvider(
-      OzoneConfiguration config,
+      SecurityConfig config,
       OzoneManagerProtocol om,
       CertificateClient certClient
   ) throws IOException {
@@ -66,23 +66,22 @@ public final class ServiceInfoProvider {
   }
 
   public ServiceInfoProvider(
-      OzoneConfiguration config,
+      SecurityConfig config,
       OzoneManagerProtocol om,
       CertificateClient certClient,
       boolean skipInitializationForTesting
   ) throws IOException {
     this.om = om;
-    if (new SecurityConfig(config).isSecurityEnabled()
-        && !skipInitializationForTesting) {
+    if (config.isSecurityEnabled() && !skipInitializationForTesting) {
       this.certClient = certClient;
       Set<X509Certificate> certs = getCACertificates();
-      caCertPem = toPEMEncodedString(newestOf(certs));
-      caCertPemList = toPEMEncodedStrings(certs);
+      caCertPEM = toPEMEncodedString(newestOf(certs));
+      caCertPEMList = toPEMEncodedStrings(certs);
       this.certClient.registerRootCARotationListener(onRootCAChange());
     } else {
       this.certClient = null;
-      caCertPem = null;
-      caCertPemList = emptyList();
+      caCertPEM = null;
+      caCertPEMList = emptyList();
     }
   }
 
@@ -91,12 +90,13 @@ public final class ServiceInfoProvider {
     return certs -> {
       CompletableFuture<Void> returnedFuture = new CompletableFuture<>();
       try {
-        caCertPem = toPEMEncodedString(newestOf(certs));
-        caCertPemList = toPEMEncodedStrings(certs);
+        synchronized (this) {
+          caCertPEM = toPEMEncodedString(newestOf(certs));
+          caCertPEMList = toPEMEncodedStrings(certs);
+        }
         returnedFuture.complete(null);
       } catch (Exception e) {
-        LOG.info("Unable to refresh cached PEM formatted CA " +
-            "certificates.", e);
+        LOG.error("Unable to refresh cached PEM formatted CA certificates.", e);
         returnedFuture.completeExceptionally(e);
       }
       return returnedFuture;
@@ -104,18 +104,24 @@ public final class ServiceInfoProvider {
   }
 
   public ServiceInfoEx provide() throws IOException {
-    return new ServiceInfoEx(om.getServiceList(), caCertPem, caCertPemList);
+    String returnedCaCertPEM;
+    List<String> returnedCaCertPEMList;
+    synchronized (this) {
+      returnedCaCertPEM = caCertPEM;
+      returnedCaCertPEMList = new ArrayList<>(caCertPEMList);
+    }
+    return new ServiceInfoEx(
+        om.getServiceList(), returnedCaCertPEM, returnedCaCertPEMList);
   }
 
   private Set<X509Certificate> getCACertificates() {
-    return !certClient.getAllRootCaCerts().isEmpty()
-        ? certClient.getAllRootCaCerts()
-        : certClient.getAllCaCerts();
+    Set<X509Certificate> rootCerts = certClient.getAllRootCaCerts();
+    return !rootCerts.isEmpty() ? rootCerts : certClient.getAllCaCerts();
   }
 
   private X509Certificate newestOf(Collection<X509Certificate> certs) {
     return certs.stream()
-        .max((c1, c2) -> expiry(c1).compareTo(expiry(c2)))
+        .max(comparing(X509Certificate::getNotAfter))
         .orElse(null);
   }
 
@@ -128,6 +134,7 @@ public final class ServiceInfoProvider {
     try {
       return toPEMEncodedString(cert);
     } catch (SCMSecurityException e) {
+      LOG.error("Can not translate certificate {} to PEM format", cert, e);
       return null;
     }
   }
@@ -137,9 +144,5 @@ public final class ServiceInfoProvider {
         .map(this::toPEMEncodedStringUnsafe)
         .filter(Objects::nonNull)
         .collect(Collectors.toList());
-  }
-
-  private Instant expiry(X509Certificate cert) {
-    return cert.getNotAfter().toInstant();
   }
 }
