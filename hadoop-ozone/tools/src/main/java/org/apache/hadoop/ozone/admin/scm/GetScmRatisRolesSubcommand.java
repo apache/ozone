@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.admin.scm;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 /**
@@ -38,11 +42,37 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
   @CommandLine.ParentCommand
   private ScmAdmin parent;
 
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   @Override
   protected void execute(ScmClient scmClient) throws IOException {
-    List<String> roles = scmClient.getScmRatisRoles();
-    for (String role: roles) {
-      System.out.println(role);
+    List<String> ratisRoles = scmClient.getScmRatisRoles();
+    if (json) {
+      Map<String, Map<String, String>> scmRoles = parseScmRoles(ratisRoles);
+      System.out.print(
+      JsonUtils.toJsonStringWithDefaultPrettyPrinter(scmRoles));
+    } else {
+      for (String role: ratisRoles) {
+        System.out.println(role);
+      }
     }
+  }
+
+  protected Map<String, Map<String, String>> parseScmRoles(
+      List<String> ratisRoles) {
+    Map<String, Map<String, String>> allRoles = new HashMap<>();
+    for (String role : ratisRoles) {
+      Map<String, String> roleDetails = new HashMap<>();
+      String[] roles = role.split(":");
+      roleDetails.put("address",roles[1]);
+      roleDetails.put("raftPeerRole",roles[2]);
+      roleDetails.put("ID",roles[3]);
+      roleDetails.put("InetAddress",roles[4]);
+      allRoles.put(roles[0],roleDetails);
+    }
+    return allRoles;
   }
 }
