@@ -40,9 +40,12 @@ import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
 
@@ -217,5 +220,27 @@ public class TestObjectGet {
         .when(headers).getHeaderString("Content-Disposition");
     doReturn(CONTENT_ENCODING1)
         .when(headers).getHeaderString("Content-Encoding");
+  }
+
+  @Test
+  public void testGetWhenKeyIsDirectoryAndDoesNotEndWithASlash()
+      throws IOException {
+    // GIVEN
+    final String bucketName = "b1";
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    rest.setOzoneConfiguration(config);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(bucketName);
+    bucket.createDirectory(keyPath);
+
+    // WHEN
+    final OS3Exception ex =
+        Assertions.assertThrows(OS3Exception.class,
+            () -> rest.get(bucketName, keyPath, null, 0, null));
+
+    // THEN
+    Assertions.assertEquals(NO_SUCH_KEY.getCode(), ex.getCode());
+    bucket.deleteKey(keyPath);
   }
 }

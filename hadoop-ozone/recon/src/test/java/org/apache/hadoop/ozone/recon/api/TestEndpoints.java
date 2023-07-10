@@ -642,7 +642,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
-    Assertions.assertEquals(3, clusterStateResponse.getKeysPendingDeletion());
+    // Since a single RepeatedOmKeyInfo can contain multiple deleted keys with
+    // the same name, the total count of pending deletion keys is determined by
+    // summing the count of the keyInfoList. Each keyInfoList comprises
+    // OmKeyInfo objects that represent the deleted keys.
+    Assertions.assertEquals(6, clusterStateResponse.getKeysPendingDeletion());
     Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 

@@ -52,11 +52,6 @@ execute_robot_test s3g admincli
 
 execute_robot_test s3g omha/om-leader-transfer.robot
 
-# verify root CA rotation monitor task
-wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-MonitorTask-Active'"
-execute_robot_test s3g scmha/scm-leader-transfer.robot
-wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | awk -F' ' '{print $1}' | xargs -I {} jstack {} | grep 'RootCARotationManager-MonitorTask-Inactive'"
-
 execute_robot_test s3g httpfs
 
 export SCM=scm2.org
@@ -80,7 +75,3 @@ docker-compose stop scm4.org
 execute_robot_test scm3.org kinit.robot
 wait_for_execute_command scm3.org 60 "ozone admin scm decommission --nodeid=${SCMID} | grep Decommissioned"
 execute_robot_test scm3.org scmha/scm-decommission.robot
-
-stop_docker_env
-
-generate_report

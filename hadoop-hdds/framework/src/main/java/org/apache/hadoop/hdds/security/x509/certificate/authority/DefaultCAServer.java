@@ -24,8 +24,8 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
@@ -60,7 +60,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -133,6 +132,7 @@ public class DefaultCAServer implements CertificateServer {
   private CertificateStore store;
   private Lock lock;
   private static boolean testSecureFlag;
+  private BigInteger rootCertificateId;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -142,15 +142,23 @@ public class DefaultCAServer implements CertificateServer {
    * @param certificateStore - A store used to persist Certificates.
    */
   public DefaultCAServer(String subject, String clusterID, String scmID,
-                         CertificateStore certificateStore,
+      CertificateStore certificateStore, BigInteger rootCertId,
       PKIProfile pkiProfile, String componentName) {
     this.subject = subject;
     this.clusterID = clusterID;
     this.scmID = scmID;
     this.store = certificateStore;
+    this.rootCertificateId = rootCertId;
     this.profile = pkiProfile;
     this.componentName = componentName;
     lock = new ReentrantLock();
+  }
+
+  public DefaultCAServer(String subject, String clusterID, String scmID,
+      CertificateStore certificateStore, PKIProfile pkiProfile,
+      String componentName) {
+    this(subject, clusterID, scmID, certificateStore, BigInteger.ONE,
+        pkiProfile, componentName);
   }
 
   @Override
@@ -269,8 +277,7 @@ public class DefaultCAServer implements CertificateServer {
       default:
         return null; // cannot happen, keeping checkstyle happy.
       }
-    } catch (CertificateException | IOException | OperatorCreationException |
-             TimeoutException e) {
+    } catch (CertificateException | IOException | OperatorCreationException e) {
       LOG.error("Unable to issue a certificate.", e);
       xCertHolders.completeExceptionally(
           new SCMSecurityException(e, UNABLE_TO_ISSUE_CERTIFICATE));
@@ -281,7 +288,7 @@ public class DefaultCAServer implements CertificateServer {
   private X509CertificateHolder signAndStoreCertificate(LocalDateTime beginDate,
       LocalDateTime endDate, PKCS10CertificationRequest csr, NodeType role)
       throws IOException,
-      OperatorCreationException, CertificateException, TimeoutException {
+      OperatorCreationException, CertificateException {
 
     lock.lock();
     X509CertificateHolder xcert;
@@ -328,7 +335,7 @@ public class DefaultCAServer implements CertificateServer {
           store.revokeCertificates(certificates,
               getCACertificate(), reason, revocationTime, crlApprover)
       );
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       LOG.error("Revoking the certificate failed.", ex.getCause());
       revoked.completeExceptionally(new SCMSecurityException(ex));
     }
@@ -570,8 +577,8 @@ public class DefaultCAServer implements CertificateServer {
         .setClusterID(this.clusterID)
         .setBeginDate(beginDate)
         .setEndDate(endDate)
-        .makeCA()
-        .setConfiguration(securityConfig.getConfiguration())
+        .makeCA(rootCertificateId)
+        .setConfiguration(securityConfig)
         .setKey(key);
 
     builder.addInetAddresses();

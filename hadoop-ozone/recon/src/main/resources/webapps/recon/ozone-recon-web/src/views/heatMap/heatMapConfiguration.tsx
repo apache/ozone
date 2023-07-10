@@ -82,8 +82,8 @@ export default class HeatMapConfiguration extends Component {
           tileStrokeWidth: 1,
           colorDomain: [0.000, 0.050, 0.100, 0.150, 0.200, 0.250, 0.300, 0.350, 0.400, 0.450, 0.500, 0.550, 0.600, 0.650, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000],
           colorRange: [...colorRange1],
-          groupFill: 'black',
-          nodePadding: 1, //Disatnce between two nodes
+          nodePadding: 1.5, //Distance between two nodes
+          nodeGap: '10',
           labelShadow: { enabled: false }, //labels shadow
           highlightStyle: {
             text: {
@@ -96,9 +96,12 @@ export default class HeatMapConfiguration extends Component {
           listeners: {
               nodeClick: (event) => {
               var data = event.datum;
-              if (data.path) {
-                this.props.onClick(data.path);
-              }
+              // Leaf level box should not call API
+              if (!data.color)
+                if (data.path) {
+                  console.log("Path", data.path);
+                  this.props.onClick(data.path);
+                }
               },
             },
         }],
@@ -109,7 +112,7 @@ export default class HeatMapConfiguration extends Component {
   };
 
     
-  tooltipContent = (params:any) => {
+  tooltipContent = (params: any) => {
     let tooltipContent = `<span>
       Size:
       ${byteToSize(params.datum.size, 1)}
@@ -118,11 +121,17 @@ export default class HeatMapConfiguration extends Component {
         tooltipContent += `<br/>
         Access count:
       ${params.datum.accessCount }
+    `;
+      }
+    else{
+        tooltipContent += `<br/>
+        Max Access Count:
+      ${params.datum.maxAccessCount}
     `;}
     if (params.datum.label !== "") {
         tooltipContent += `<br/>
           File Name:
-          ${params.datum.label ? params.datum.label.split("/").slice(-1) : "no"}
+          ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
         `;
       }
     tooltipContent += '</span>';

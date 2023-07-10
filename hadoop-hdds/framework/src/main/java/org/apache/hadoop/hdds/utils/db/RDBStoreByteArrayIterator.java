@@ -25,17 +25,12 @@ import java.util.Arrays;
 /**
  * RocksDB store iterator using the byte[] API.
  */
-public class RDBStoreByteArrayIterator
-    extends RDBStoreAbstractIterator<byte[]> {
-  public RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table) {
-    this(iterator, table, null);
-  }
-
-  public RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
+  RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
       RDBTable table, byte[] prefix) {
     super(iterator, table,
         prefix == null ? null : Arrays.copyOf(prefix, prefix.length));
+    seekToFirst();
   }
 
   @Override

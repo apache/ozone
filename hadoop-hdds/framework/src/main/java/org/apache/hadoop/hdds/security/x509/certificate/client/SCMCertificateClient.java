@@ -18,7 +18,12 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -29,11 +34,14 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.cert.X509Certificate;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 /**
  * SCM Certificate Client which is used for generating public/private Key pair,
@@ -48,15 +56,35 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   public static final String COMPONENT_NAME =
       Paths.get(OzoneConsts.SCM_CA_CERT_STORAGE_DIR,
           OzoneConsts.SCM_SUB_CA_PATH).toString();
+  private String scmId;
+  private String cId;
+  private String scmHostname;
+  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
 
   public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME, null, null);
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String scmId, String clusterId, String scmCertId, String hostname) {
+    super(securityConfig, scmClient, LOG, scmCertId,
+        COMPONENT_NAME, null, null);
+    this.scmId = scmId;
+    this.cId = clusterId;
+    this.scmHostname = hostname;
   }
 
-  public SCMCertificateClient(SecurityConfig securityConfig,
-      String certSerialId, String component) {
-    super(securityConfig, LOG, certSerialId, component, null, null);
+  public SCMCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String certSerialId) {
+    super(securityConfig, scmClient, LOG, certSerialId,
+        COMPONENT_NAME, null, null);
+  }
+
+  public SCMCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String certSerialId,
+      String component) {
+    super(securityConfig, scmClient, LOG, certSerialId, component, null, null);
   }
 
   @Override
@@ -127,7 +155,16 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
+    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
+        + scmHostname;
+
+    LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
+            "subject:{}", scmHostname, scmId, cId, subject);
+
     return super.getCSRBuilder()
+        .setSubject(subject)
+        .setScmID(scmId)
+        .setClusterID(cId)
         .setDigitalEncryption(true)
         .setDigitalSignature(true)
         // Set CA to true, as this will be used to sign certs for OM/DN.
@@ -135,6 +172,10 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
   }
 
+  @Override
+  protected boolean shouldStartCertificateRenewerService() {
+    return false;
+  }
 
   @Override
   public Logger getLogger() {
@@ -142,9 +183,52 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request,
-      Path certPath) throws CertificateException {
-    throw new UnsupportedOperationException("signAndStoreCertificate of " +
+  protected SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) {
+    throw new UnsupportedOperationException("getCertSignResponse of " +
         " SCMCertificateClient is not supported currently");
+  }
+
+  @Override
+  public String signAndStoreCertificate(PKCS10CertificationRequest request,
+      Path certPath, boolean renew) throws CertificateException {
+    try {
+      HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
+          HddsProtos.ScmNodeDetailsProto.newBuilder()
+              .setClusterId(cId)
+              .setHostName(scmHostname)
+              .setScmNodeId(scmId).build();
+
+      // Get SCM sub CA cert.
+      SCMGetCertResponseProto response =
+          getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
+              getEncodedString(request), true);
+
+      CertificateCodec certCodec = new CertificateCodec(
+          getSecurityConfig(), certPath);
+      String pemEncodedCert = response.getX509Certificate();
+
+      // Store SCM sub CA and root CA certificate.
+      if (response.hasX509CACertificate()) {
+        String pemEncodedRootCert = response.getX509CACertificate();
+        storeCertificate(pemEncodedRootCert,
+            CAType.SUBORDINATE, certCodec, false, !renew);
+        storeCertificate(pemEncodedCert, CAType.NONE, certCodec,
+            false, !renew);
+        //note: this does exactly the same as store certificate
+        certCodec.writeCertificate(certCodec.getLocation().toAbsolutePath(),
+            getSecurityConfig().getCertificateFileName(), pemEncodedCert);
+
+        X509Certificate certificate =
+            CertificateCodec.getX509Certificate(pemEncodedCert);
+        // return new scm cert serial ID.
+        return certificate.getSerialNumber().toString();
+      } else {
+        throw new RuntimeException("Unable to retrieve SCM certificate chain");
+      }
+    } catch (Throwable e) {
+      LOG.error("Error while fetching/storing SCM signed certificate.", e);
+      throw new RuntimeException(e);
+    }
   }
 }

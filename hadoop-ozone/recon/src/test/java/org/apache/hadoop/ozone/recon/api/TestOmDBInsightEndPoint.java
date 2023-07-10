@@ -221,18 +221,25 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     statsDao.insert(newRecord);
     newRecord = new GlobalStats("openKeyTableReplicatedDataSize", 30L, now);
     statsDao.insert(newRecord);
+    newRecord = new GlobalStats("deletedTableReplicatedDataSize", 30L, now);
+    statsDao.insert(newRecord);
     newRecord = new GlobalStats("openFileTableUnReplicatedDataSize", 10L, now);
     statsDao.insert(newRecord);
     newRecord = new GlobalStats("openKeyTableUnReplicatedDataSize", 10L, now);
     statsDao.insert(newRecord);
+    newRecord = new GlobalStats("deletedTableUnReplicatedDataSize", 10L, now);
+    statsDao.insert(newRecord);
+
 
     // Insert records for table counts
     newRecord = new GlobalStats("openKeyTableTableCount", 3L, now);
     statsDao.insert(newRecord);
     newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
     statsDao.insert(newRecord);
+    newRecord = new GlobalStats("deletedTableTableCount", 3L, now);
+    statsDao.insert(newRecord);
 
-    // Call the API to get the response
+    // Call the API of Open keys to get the response
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
@@ -242,6 +249,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(60L, summary.get("totalReplicatedDataSize"));
     Assertions.assertEquals(20L, summary.get("totalUnreplicatedDataSize"));
     Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
+
+    // Call the API of Deleted keys to get the response
+    Response deletedKeyInfoResp =
+        omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
+    keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    summary = keyInsightInfoResp.getKeysSummary();
+    Assertions.assertEquals(30L, summary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(10L, summary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(3L, summary.get("totalDeletedKeys"));
   }
 
   @Test
