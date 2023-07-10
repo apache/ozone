@@ -397,6 +397,7 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  @SuppressWarnings("parameternumber")
   public static void writeDeletedDirToOm(OMMetadataManager omMetadataManager,
                                          String bucketName,
                                          String volumeName,

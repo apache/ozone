@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -154,6 +155,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * If the iterator is null, returns (0, 0, 0).
    *
    * @param iterator The iterator over the table to be iterated.
+   * @param tableName The name of the table being iterated.
    * @return A Triple with three Long values representing the count,
    *         unreplicated size and replicated size.
    * @throws IOException If an I/O error occurs during the iterator traversal.
@@ -212,13 +214,20 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   public long fetchSizeForDeletedDirectory(String path)
       throws IOException {
-    if (path == null || path.isEmpty()) {
+    if (Strings.isNullOrEmpty(path)) {
+      LOG.error("Invalid path: Path is null or empty");
       return 0L;
     }
+
     String[] parts = path.split("/");
-    String directoryObjectId = parts.length >= 6 ? parts[5] : "";
+    if (parts.length < 6) {
+      LOG.error("Invalid path format: {}", path);
+      return 0L;
+    }
     /* DB key in DeletedDirectoryTable =>
                       "volumeId/bucketId/parentId/dirName/dirObjectId" */
+    String directoryObjectId = parts[5];
+
     try {
       long convertedValue = Long.parseLong(directoryObjectId);
       NSSummary nsSummary = nsSummaryTable.get(convertedValue);
@@ -342,6 +351,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
+  @SuppressWarnings("parameternumber")
   private void handleSizeRelatedTablePutEvent(
       OMDBUpdateEvent<String, Object> event, String countKey,
       String unReplicatedSizeKey, String replicatedSizeKey, String tableName,
@@ -405,6 +415,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
+  @SuppressWarnings("parameternumber")
   private void handleSizeRelatedTableDeleteEvent(
       OMDBUpdateEvent<String, Object> event, String countKey,
       String unReplicatedSizeKey, String replicatedSizeKey, String tableName,
