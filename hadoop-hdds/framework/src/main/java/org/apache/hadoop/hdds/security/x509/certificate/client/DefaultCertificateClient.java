@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -127,6 +128,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private Runnable shutdownCallback;
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
   private final Set<CertificateNotification> notificationReceivers;
+  private RootCaRotationPoller rootCaRotationPoller;
 
   protected DefaultCertificateClient(
       SecurityConfig securityConfig,
@@ -169,19 +171,33 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return;
     }
 
-    if (shouldStartCertificateMonitor()) {
+    if (shouldStartCertificateRenewerService()) {
+      startRootCaRotationPoller();
       if (certPath != null && executorService == null) {
-        startCertificateMonitor();
+        startCertificateRenewerService();
       } else {
         if (executorService != null) {
-          getLogger().debug("CertificateLifetimeMonitor is already started.");
+          getLogger().debug("CertificateRenewerService is already started.");
         } else {
           getLogger().warn("Component certificate was not loaded.");
         }
       }
     } else {
-      getLogger().info("CertificateLifetimeMonitor is disabled for {}",
-          component);
+      getLogger().info("CertificateRenewerService and root ca rotation " +
+          "polling is disabled for {}", component);
+    }
+  }
+
+  private void startRootCaRotationPoller() {
+    if (rootCaRotationPoller == null) {
+      rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
+          rootCaCertificates, scmSecurityClient);
+      rootCaRotationPoller.addRootCARotationProcessor(
+          this::getRootCaRotationListener);
+      rootCaRotationPoller.run();
+    } else {
+      getLogger().debug("Root CA certificate rotation poller is already " +
+          "started.");
     }
   }
 
@@ -985,6 +1001,10 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       executorService = null;
     }
 
+    if (rootCaRotationPoller != null) {
+      rootCaRotationPoller.close();
+    }
+
     if (serverKeyStoresFactory != null) {
       serverKeyStoresFactory.destroy();
     }
@@ -1292,11 +1312,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     return scmSecurityClient;
   }
 
-  protected boolean shouldStartCertificateMonitor() {
+  protected boolean shouldStartCertificateRenewerService() {
     return true;
   }
 
-  public synchronized void startCertificateMonitor() {
+  public synchronized CompletableFuture<Void> getRootCaRotationListener(
+      List<X509Certificate> rootCAs) {
+    if (rootCaCertificates.containsAll(rootCAs)) {
+      return CompletableFuture.completedFuture(null);
+    }
+    CertificateRenewerService renewerService =
+        new CertificateRenewerService(true);
+    return CompletableFuture.runAsync(renewerService, executorService);
+  }
+
+  public synchronized void startCertificateRenewerService() {
     Preconditions.checkNotNull(getCertificate(),
         "Component certificate should not be empty");
     // Schedule task to refresh certificate before it expires
@@ -1310,13 +1340,13 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     if (executorService == null) {
       executorService = Executors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-CertificateLifetimeMonitor")
+                  getComponentName() + "-CertificateRenewerService")
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
         new CertificateRenewerService(false),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
-    getLogger().info("CertificateLifetimeMonitor for {} is started with " +
+    getLogger().info("CertificateRenewerService for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
         timeBeforeGracePeriod, interval);
   }
@@ -1349,10 +1379,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
         String newCertId;
         try {
-          getLogger().info("Current certificate {} has entered the expiry" +
-                  " grace period {}. Starting renew key and certs.",
+          getLogger().info("Current certificate {} needs to be renewed " +
+                  "remaining grace period {}. Forced renewal due to root ca " +
+                  "rotation: {}.",
               currentCert.getSerialNumber().toString(),
-              timeLeft, securityConfig.getRenewalGracePeriod());
+              timeLeft, forceRenewal);
           newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
         } catch (CertificateException e) {
           if (e.errorCode() ==

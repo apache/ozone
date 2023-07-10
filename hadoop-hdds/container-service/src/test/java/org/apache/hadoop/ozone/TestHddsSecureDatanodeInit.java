@@ -327,7 +327,7 @@ public class TestHddsSecureDatanodeInit {
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    client.startCertificateMonitor();
+    client.startCertificateRenewerService();
 
     // check after renew, client will have the new cert ID
     GenericTestUtils.waitFor(() -> {
@@ -402,7 +402,7 @@ public class TestHddsSecureDatanodeInit {
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    client.startCertificateMonitor();
+    client.startCertificateRenewerService();
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);
