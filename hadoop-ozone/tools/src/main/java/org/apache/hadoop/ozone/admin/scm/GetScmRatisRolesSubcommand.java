@@ -53,7 +53,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     if (json) {
       Map<String, Map<String, String>> scmRoles = parseScmRoles(ratisRoles);
       System.out.print(
-      JsonUtils.toJsonStringWithDefaultPrettyPrinter(scmRoles));
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(scmRoles));
     } else {
       for (String role: ratisRoles) {
         System.out.println(role);
@@ -67,11 +67,13 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     for (String role : ratisRoles) {
       Map<String, String> roleDetails = new HashMap<>();
       String[] roles = role.split(":");
-      roleDetails.put("address",roles[1]);
-      roleDetails.put("raftPeerRole",roles[2]);
-      roleDetails.put("ID",roles[3]);
-      roleDetails.put("InetAddress",roles[4]);
-      allRoles.put(roles[0],roleDetails);
+      roleDetails.put("address", roles[0].concat(roles[1]));
+      if(roles.length > 2) {
+        roleDetails.put("raftPeerRole", roles[2]);
+        roleDetails.put("ID", roles[3]);
+        roleDetails.put("InetAddress", roles[4]);
+      }
+      allRoles.put(roles[0], roleDetails);
     }
     return allRoles;
   }

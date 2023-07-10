@@ -29,5 +29,4 @@ Run scm roles
 
 List scm roles as JSON
     ${output} =         Execute          ozone admin scm roles --json
-                        Should contain   ${output}    "raftPeerRole" :
-                        Should contain   ${output}    "ID" :
+                        Should contain   ${output}    "address" :
