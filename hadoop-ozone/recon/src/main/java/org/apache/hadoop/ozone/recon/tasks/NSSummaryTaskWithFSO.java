@@ -85,10 +85,14 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       try {
         if (updateOnFileTable) {
           // key update on fileTable
-          OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
-                  (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
-          OmKeyInfo updatedKeyInfo = keyTableUpdateEvent.getValue();
-          OmKeyInfo oldKeyInfo = keyTableUpdateEvent.getOldValue();
+          OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+          Object value = keyTableUpdateEvent.getValue();
+          Object oldValue = keyTableUpdateEvent.getOldValue();
+          // Check if values are instance of OmKeyInfo
+          if (!isOmKeyInfo(value)) {
+            continue;
+          }
+          OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
 
           switch (action) {
           case PUT:
@@ -100,7 +104,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
             break;
 
           case UPDATE:
-            if (oldKeyInfo != null) {
+            if (oldValue != null && isOmKeyInfo(oldValue)) {
+              OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
               // delete first, then put
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
             } else {
@@ -164,6 +169,22 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
     LOG.info("Completed a process run of NSSummaryTaskWithFSO");
     return true;
+  }
+
+  /**
+   * Checks if the object passed is an instance of `OmKeyInfo`.
+   *
+   * @param obj The object to check.
+   * @return True if the object is an instance of `OmKeyInfo`, false otherwise.
+   */
+  private boolean isOmKeyInfo(Object obj) {
+    if (obj instanceof OmKeyInfo) {
+      return true;
+    } else {
+      LOG.warn("Unexpected value type {} for key. Skipping processing.",
+          obj.getClass().getName());
+      return false;
+    }
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {

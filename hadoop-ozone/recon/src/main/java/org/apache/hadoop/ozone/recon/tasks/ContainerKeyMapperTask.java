@@ -216,6 +216,10 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
+      if(!isOmKeyInfo(omdbUpdateEvent.getValue())){
+        continue;
+      }
+
       OmKeyInfo updatedKeyValue = omdbUpdateEvent.getValue();
       try {
         switch (omdbUpdateEvent.getAction()) {
@@ -230,7 +234,8 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           break;
 
         case UPDATE:
-          if (omdbUpdateEvent.getOldValue() != null) {
+          if (omdbUpdateEvent.getOldValue() != null && isOmKeyInfo(
+              omdbUpdateEvent.getOldValue())) {
             handleDeleteOMKeyEvent(
                 omdbUpdateEvent.getOldValue().getKeyName(), containerKeyMap,
                 containerKeyCountMap, deletedKeyCountList);
@@ -261,6 +266,22 @@ public class ContainerKeyMapperTask implements ReconOmTask {
     LOG.info("{} successfully processed {} OM DB update event(s).",
         getTaskName(), eventCount);
     return new ImmutablePair<>(getTaskName(), true);
+  }
+
+  /**
+   * Checks if the object passed is an instance of `OmKeyInfo`.
+   *
+   * @param obj The object to check.
+   * @return True if the object is an instance of `OmKeyInfo`, false otherwise.
+   */
+  private boolean isOmKeyInfo(Object obj) {
+    if (obj instanceof OmKeyInfo) {
+      return true;
+    } else {
+      LOG.warn("Unexpected value type {} for key. Skipping processing.",
+          obj.getClass().getName());
+      return false;
+    }
   }
 
   private void writeToTheDB(Map<ContainerKeyPrefix, Integer> containerKeyMap,
