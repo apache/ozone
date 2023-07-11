@@ -216,7 +216,7 @@ public class ContainerKeyMapperTask implements ReconOmTask {
         continue;
       }
       String updatedKey = omdbUpdateEvent.getKey();
-      if(!isOmKeyInfo(omdbUpdateEvent.getValue())){
+      if (!isOmKeyInfo(omdbUpdateEvent.getValue())) {
         continue;
       }
 
