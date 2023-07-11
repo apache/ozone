@@ -128,6 +128,11 @@ public class SecretKeyManager implements SecretKeyClient {
       state.updateKeys(updatedKeys);
       return true;
     }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "The latest key was created at: " + currentKey.getCreationTime() +
+              " which does not pass the rotation duration");
+    }
     return false;
   }
 
