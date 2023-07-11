@@ -16,6 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.ExitManager;
@@ -63,6 +66,8 @@ import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,8 +75,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -82,6 +89,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -201,6 +209,13 @@ public class TestOMRatisSnapshots {
     }
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
+    List<Set<String>> sstSetList = new ArrayList<>();
+    FaultInjector faultInjector =
+        new SnapshotMaxSizeInjector(leaderOM,
+            followerOM.getOmSnapshotProvider().getSnapshotDir(),
+            sstSetList);
+    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
+
     // Create some snapshots, each with new keys
     int keyIncrement = 10;
     String snapshotNamePrefix = "snapshot";
@@ -287,6 +302,17 @@ public class TestOMRatisSnapshots {
      */
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+    int sstFileCount = 0;
+    Set<String> sstFileUnion = new HashSet<>();
+    for (Set<String> sstFiles : sstSetList) {
+      sstFileCount += sstFiles.size();
+      sstFileUnion.addAll(sstFiles);
+    }
+    // Confirm that there were multiple tarballs.
+    assertTrue(sstSetList.size() > 1);
+    // Confirm that there was no overlap of sst files
+    // between the individual tarballs.
+    assertEquals(sstFileUnion.size(), sstFileCount);
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
@@ -1125,6 +1151,110 @@ public class TestOMRatisSnapshots {
         assertTrue(Fail.fail("resume interrupted"));
       }
       wait.countDown();
+    }
+
+    @Override
+    public void reset() throws IOException {
+      init();
+    }
+  }
+
+  // Interrupts the tarball download process to test creation of
+  // multiple tarballs as needed when the tarball size exceeds the
+  // max.
+  private static class SnapshotMaxSizeInjector extends FaultInjector {
+    private final OzoneManager om;
+    private int count;
+    private final File snapshotDir;
+    private final List<Set<String>> sstSetList;
+    private final Path tempDir;
+    SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
+                            List<Set<String>> sstSetList) throws IOException {
+      this.om = om;
+      this.snapshotDir = snapshotDir;
+      this.sstSetList = sstSetList;
+      this.tempDir = Files.createTempDirectory("tmpDirPrefix");
+      init();
+    }
+
+    @Override
+    public void init() {
+    }
+
+    @Override
+    // Pause each time a tarball is received, to process it.
+    public void pause() throws IOException {
+      count++;
+      File tarball = getTarball(snapshotDir);
+      // First time through, get total size of sst files and reduce
+      // max size config.  That way next time through, we get multiple
+      // tarballs.
+      if (count == 1) {
+        long sstSize = getSizeOfSstFiles(tarball);
+        om.getConfiguration().setLong(
+            OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
+        // Now empty the tarball to restart the download
+        // process from the beginning.
+        createEmptyTarball(tarball);
+      } else {
+        // Each time we get a new tarball add a set of
+        // its sst file to the list, (i.e. one per tarball.)
+        sstSetList.add(getSstFilenames(tarball));
+      }
+    }
+
+    // Get Size of sstfiles in tarball.
+    private long getSizeOfSstFiles(File tarball) throws IOException {
+      FileUtil.unTar(tarball, tempDir.toFile());
+      List<Path> sstPaths = Files.walk(tempDir).filter(
+          path -> path.toString().endsWith(".sst")).
+          collect(Collectors.toList());
+      long sstSize = 0;
+      for (Path sstPath : sstPaths) {
+        sstSize += Files.size(sstPath);
+      }
+      return sstSize;
+    }
+
+    private void createEmptyTarball(File dummyTarFile)
+        throws IOException {
+      FileOutputStream fileOutputStream = new FileOutputStream(dummyTarFile);
+      TarArchiveOutputStream archiveOutputStream =
+          new TarArchiveOutputStream(fileOutputStream);
+      archiveOutputStream.close();
+    }
+
+    // Return a list of sst files in tarball.
+    private Set<String> getSstFilenames(File tarball)
+        throws IOException {
+      Set<String> sstFilenames = new HashSet<>();
+      try (TarArchiveInputStream tarInput =
+           new TarArchiveInputStream(new FileInputStream(tarball))) {
+        TarArchiveEntry entry;
+        while ((entry = tarInput.getNextTarEntry()) != null) {
+          String name = entry.getName();
+          if (name.toLowerCase().endsWith(".sst")) {
+            sstFilenames.add(entry.getName());
+          }
+        }
+      }
+      return sstFilenames;
+    }
+
+    // Find the tarball in the dir.
+    private File getTarball(File dir) {
+      File[] fileList = dir.listFiles();
+      assertNotNull(fileList);
+      for (File f : fileList) {
+        if (f.getName().toLowerCase().endsWith(".tar")) {
+          return f;
+        }
+      }
+      return null;
+    }
+
+    @Override
+    public void resume() throws IOException {
     }
 
     @Override

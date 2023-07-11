@@ -109,6 +109,9 @@ public final class HddsServerUtil {
   private HddsServerUtil() {
   }
 
+  public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
+      "OZONE_RATIS_SNAPSHOT_COMPLETE";
+
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
 
@@ -590,6 +593,7 @@ public final class HddsServerUtil {
           }
         }
       }
+      includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
   }
 
@@ -603,6 +607,20 @@ public final class HddsServerUtil {
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
+  }
+
+  // Mark tarball completed.
+  public static void includeRatisSnapshotCompleteFlag(
+      ArchiveOutputStream archiveOutput) throws IOException {
+    File file = File.createTempFile(
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, "");
+    String entryName = OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
+    includeFile(file, entryName, archiveOutput);
+  }
+
+  static boolean ratisSnapshotComplete(Path dir) {
+    return new File(dir.toString(),
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
   }
 
   // optimize ugi lookup for RPC operations to avoid a trip through
