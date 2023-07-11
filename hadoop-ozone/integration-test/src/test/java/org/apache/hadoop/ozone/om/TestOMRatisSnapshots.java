@@ -1137,7 +1137,7 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  // Interupts the tarball download process to test creation of
+  // Interrupts the tarball download process to test creation of
   // multiple tarballs as needed when the tarball size exceeds the
   // max.
   private static class SnapshotMaxSizeInjector extends FaultInjector {

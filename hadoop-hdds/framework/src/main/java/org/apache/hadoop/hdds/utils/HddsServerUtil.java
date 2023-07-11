@@ -110,7 +110,7 @@ public final class HddsServerUtil {
   }
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
-      "OzoneRatisSnapshotCompleteFlag";
+      "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);

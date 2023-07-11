@@ -124,9 +124,10 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
       RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
           candidateDir, true);
+      LOG.info("Successfully untar the downloaded snapshot {} at {}.",
+          targetFile, checkpoint.getCheckpointLocation());
       if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
-        LOG.info("Successfully untar the downloaded snapshot {} at {}.",
-            targetFile, checkpoint.getCheckpointLocation());
+        LOG.info("Ratis snapshot transfer is complete.");
         return checkpoint;
       }
     }
