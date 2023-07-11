@@ -122,7 +122,8 @@ public class SecretKeyManager implements SecretKeyClient {
           .collect(toList());
       updatedKeys.add(newCurrentKey);
 
-      LOG.info("SecretKey rotation is happening, new key generated {}",
+      LOG.info((force ? "Forced " : "") +
+              "SecretKey rotation is happening, new key generated {}",
           newCurrentKey);
       state.updateKeys(updatedKeys);
       return true;

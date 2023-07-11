@@ -103,7 +103,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
             .setSecretKeysListResponseProto(getAllSecretKeys())
             .build();
 
-      case GetCheckAndRotate:
+      case CheckAndRotate:
         return scmSecurityResponse
             .setCheckAndRotateResponseProto(
                 checkAndRotate(request.getCheckAndRotateRequest().getForce()))

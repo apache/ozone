@@ -137,7 +137,7 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
             .setForce(force)
             .build();
     boolean checkAndRotateStatus =
-        submitRequest(Type.GetCheckAndRotate, builder ->
+        submitRequest(Type.CheckAndRotate, builder ->
             builder.setCheckAndRotateRequest(request))
             .getCheckAndRotateResponseProto().getStatus();
 
