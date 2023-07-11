@@ -38,8 +38,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoo
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;

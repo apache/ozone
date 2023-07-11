@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -494,7 +494,8 @@ public class TestBlockDeletingService {
         });
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
-    BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
+    BlockDeletingService
+        svc = new BlockDeletingService(ozoneContainer,
         1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf);
 
     // On the first run, the container with incorrect metadata should consume
@@ -826,7 +827,8 @@ public class TestBlockDeletingService {
     long timeout  = 1;
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
-    BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
+    BlockDeletingService
+        svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.NANOSECONDS,
         10, conf);
     svc.start();
