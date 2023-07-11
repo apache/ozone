@@ -79,6 +79,7 @@ allows the user to overwrite an existing ozone key.
 7. **Write_ACL** – Allows a user to write the ACL on a specific object.
 
 Where an _scope_ can be:
+
 1. **ACCESS** – Access ACL is applied only to the specific object and not inheritable. It controls the access to the object itself.
 2. **DEFAULT** - Default ACL is applied to the specific object and will be inherited by object's descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
 
@@ -101,15 +102,18 @@ supported are:
 The ACLs can also be manipulated by using the `ozone sh` commands.<br>
 Usage: `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
 `-a` is for the comma separated list of ACLs. It is required for all subcommands except `getacl`. <br>
-`<value>` is of the form `type:name:rights[scope]`.<br>
-_type_ can be user, group, world or anonymous.<br>
-_name_ is the name of the user/group. For world and anonymous type, name should either be left empty or be WORLD or ANONYMOUS respectively. <br>
-_rights_ can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
-_scope_ can be ACCESS or DEFAULT. If not specified, default is ACCESS.<br>
+`<value>` is of the form **`type:name:rights[scope]`**.<br>
+**_type_** can be user, group, world or anonymous.<br>
+**_name_** is the name of the user/group. For world and anonymous type, name should either be left empty or be WORLD or ANONYMOUS respectively. <br>
+**_rights_** can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
+**_scope_** can be **ACCESS** or **DEFAULT**. If not specified, default is **ACCESS**.<br>
 
 <div class="alert alert-warning" role="alert">
-When the object is a prefix, the path-to-object must contain the full path from volume till the directory or prefix of the key.
-i.e., /volume/bucket/some/key/prefix/
+When the object is a prefix, the path-to-object must contain the full path from volume till the directory or prefix of the key. i.e.,
+<br>
+   /volume/bucket/some/key/prefix/
+<br>   
+   Note: the tail "/" is required. 
 </div>
 
 The Following are the operations or actions on ACLs that can be performed using the CLI.
