@@ -41,6 +41,65 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
  * Interface for Container Operations.
  */
 public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
+  /**
+   * Encapsulates the result of a container scan.
+   */
+  class ScanResult {
+    /**
+     * Represents the reason a container scan failed and a container should
+     * be marked unhealthy.
+     */
+    public enum FailureType {
+      MISSING_CONTAINER_DIR,
+      MISSING_METADATA_DIR,
+      MISSING_CONTAINER_FILE,
+      MISSING_CHUNKS_DIR,
+      MISSING_CHUNK_FILE,
+      CORRUPT_CONTAINER_FILE,
+      CORRUPT_CHUNK,
+      INCONSISTENT_CHUNK_LENGTH,
+      INACCESSIBLE_DB,
+      WRITE_FAILURE
+    }
+
+    private final boolean healthy;
+    private final File unhealthyFile;
+    private final FailureType failureType;
+    private final Throwable exception;
+
+    private ScanResult(boolean healthy, FailureType failureType,
+        File unhealthyFile, Throwable exception) {
+      this.healthy = healthy;
+      this.unhealthyFile = unhealthyFile;
+      this.failureType = failureType;
+      this.exception = exception;
+    }
+
+    public static ScanResult healthy() {
+      return new ScanResult(true, null, null, null);
+    }
+
+    public static ScanResult unhealthy(FailureType type, File failingFile,
+        Throwable exception) {
+      return new ScanResult(false, type, failingFile, exception);
+    }
+
+    public boolean isHealthy() {
+      return healthy;
+    }
+
+    public File getUnhealthyFile() {
+      return unhealthyFile;
+    }
+
+    public FailureType getFailureType() {
+      return failureType;
+    }
+
+    public Throwable getException() {
+      return exception;
+    }
+  }
 
   /**
    * Creates a container.
@@ -174,7 +233,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    * @return true if the integrity checks pass
    * Scan the container metadata to detect corruption.
    */
-  boolean scanMetaData() throws InterruptedException;
+  ScanResult scanMetaData() throws InterruptedException;
 
   /**
    * Return if the container data should be checksum verified to detect
@@ -195,6 +254,6 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    *         false otherwise
    * @throws InterruptedException if the scan is interrupted.
    */
-  boolean scanData(DataTransferThrottler throttler, Canceler canceler)
+  ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
 }

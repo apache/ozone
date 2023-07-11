@@ -33,8 +33,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,9 +55,6 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  * ManagedSstFileReader tests.
  */
 class TestManagedSstFileReader {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestManagedSstFileReader.class);
 
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
@@ -158,6 +153,5 @@ class TestManagedSstFileReader {
     } finally {
       executorService.shutdown();
     }
-
   }
 }

@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -116,6 +117,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -381,12 +383,14 @@ public class KeyValueHandler extends Handler {
     }
 
     if (created) {
+      ContainerLogger.logOpen(newContainerData);
       try {
         sendICR(newContainer);
       } catch (StorageContainerException ex) {
         return ContainerUtils.logAndReturnError(LOG, ex, request);
       }
     }
+
     return getSuccessResponse(request);
   }
 
@@ -1033,6 +1037,7 @@ public class KeyValueHandler extends Handler {
     HddsVolume targetVolume = originalContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
+    ContainerLogger.logImported(containerData);
     sendICR(container);
     return container;
 
@@ -1045,6 +1050,7 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
+    ContainerLogger.logExported(container.getContainerData());
   }
 
   @Override
@@ -1059,8 +1065,10 @@ public class KeyValueHandler extends Handler {
         if (state == RECOVERING) {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
+          ContainerLogger.logRecovered(container.getContainerData());
         }
         container.markContainerForClose();
+        ContainerLogger.logClosing(container.getContainerData());
         sendICR(container);
       }
     } finally {
@@ -1069,7 +1077,7 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void markContainerUnhealthy(Container container)
+  public void markContainerUnhealthy(Container container, ScanResult reason)
       throws StorageContainerException {
     container.writeLock();
     try {
@@ -1095,6 +1103,10 @@ public class KeyValueHandler extends Handler {
         LOG.warn("Unexpected error while marking container {} unhealthy",
             containerID, ex);
       } finally {
+        // Even if the container file is corrupted/missing and the unhealthy
+        // update fails, the unhealthy state is kept in memory and sent to
+        // SCM. Write a corresponding entry to the container log as well.
+        ContainerLogger.logUnhealthy(container.getContainerData(), reason);
         sendICR(container);
       }
     } finally {
@@ -1103,7 +1115,7 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public void quasiCloseContainer(Container container)
+  public void quasiCloseContainer(Container container, String reason)
       throws IOException {
     container.writeLock();
     try {
@@ -1122,6 +1134,7 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.quasiClose();
+      ContainerLogger.logQuasiClosed(container.getContainerData(), reason);
       sendICR(container);
     } finally {
       container.writeUnlock();
@@ -1154,6 +1167,7 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
+      ContainerLogger.logClosed(container.getContainerData());
       sendICR(container);
     } finally {
       container.writeUnlock();
@@ -1377,6 +1391,7 @@ public class KeyValueHandler extends Handler {
     // Avoid holding write locks for disk operations
     container.delete();
     container.getContainerData().setState(State.DELETED);
+    ContainerLogger.logDeleted(container.getContainerData(), force);
     sendICR(container);
   }
 

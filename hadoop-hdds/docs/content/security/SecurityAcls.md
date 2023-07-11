@@ -36,7 +36,7 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ozo
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 
-The general format of an ACL is _object_:_who_:_rights_.
+The general format of an ACL is _object_:_who_:_rights_:_scope_.
 
 Where an _object_ can be:
 
@@ -78,16 +78,94 @@ allows the user to overwrite an existing ozone key.
 6. **Read_ACL** – Allows a user to read the ACL on a specific object.
 7. **Write_ACL** – Allows a user to write the ACL on a specific object.
 
-<h3>Ozone Native ACL APIs</h3>
+Where an _scope_ can be:
+
+1. **ACCESS** – Access ACL is applied only to the specific object and not inheritable. It controls the access to the object itself.
+2. **DEFAULT** - Default ACL is applied to the specific object and will be inherited by object's descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
+
+## Ozone Native ACL APIs
 
 The ACLs can be manipulated by a set of APIs supported by Ozone. The APIs
 supported are:
 
 1. **SetAcl** – This API will take user principal, the name, type
-of the ozone object and a list of ACLs.
+   of the ozone object and a list of ACLs.
 2. **GetAcl** – This API will take the name and type of the ozone object
-and will return a list of ACLs.
+   and will return a list of ACLs.
 3. **AddAcl** - This API will take the name, type of the ozone object, the
-ACL, and add it to existing ACL entries of the ozone object.
+   ACL, and add it to existing ACL entries of the ozone object.
 4. **RemoveAcl** - This API will take the name, type of the
-ozone object and the ACL that has to be removed.
+   ozone object and the ACL that has to be removed.
+
+## ACL Manipulation Using Ozone CLI
+
+The ACLs can also be manipulated by using the `ozone sh` commands.<br>
+Usage: `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
+`-a` is for the comma separated list of ACLs. It is required for all subcommands except `getacl`. <br>
+`<value>` is of the form **`type:name:rights[scope]`**.<br>
+**_type_** can be user, group, world or anonymous.<br>
+**_name_** is the name of the user/group. For world and anonymous type, name should either be left empty or be WORLD or ANONYMOUS respectively. <br>
+**_rights_** can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
+**_scope_** can be **ACCESS** or **DEFAULT**. If not specified, default is **ACCESS**.<br>
+
+<div class="alert alert-warning" role="alert">
+When the object is a prefix, the path-to-object must contain the full path from volume till the directory or prefix of the key. i.e.,
+<br>
+   /volume/bucket/some/key/prefix/
+<br>   
+   Note: the tail "/" is required. 
+</div>
+
+<br>
+Following are the supported ACL actions.
+
+<h3>setacl</h3>
+
+```shell
+$ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
+ ACLs set successfully.
+$ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
+ ACLs set successfully.
+$ ozone sh bucket setacl -a=anonymous::lr /vol1/bucket3
+ ACLs set successfully.
+$ ozone sh bucket setacl -a world::a /vol1/bucket4
+ ACLs set successfully.
+```
+
+<h3>getacl</h3>
+
+```shell
+$ ozone sh bucket getacl /vol1/bucket2 
+[ {
+  "type" : "USER",
+  "name" : "om/om@EXAMPLE.COM",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+}, {
+  "type" : "GROUP",
+  "name" : "om",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+} ]
+```
+
+<h3>addacl</h3>
+
+```shell
+$ ozone sh bucket addacl -a user:testuser2:a  /vol1/bucket2
+ACL user:testuser2:a[ACCESS] added successfully.
+
+$ ozone sh bucket addacl -a user:testuser:rxy[DEFAULT] /vol1/bucket2
+ACL user:testuser:rxy[DEFAULT] added successfully.
+
+$ ozone sh prefix addacl -a user:testuser2:a[DEFAULT] /vol1/buck3/dir1/
+ACL user:testuser2:a[DEFAULT] added successfully.
+```
+
+<h3>removeacl</h3>
+
+```shell
+$ ozone sh bucket removeacl -a user:testuser:r[DEFAULT] /vol1/bucket2
+ACL user:testuser:r[DEFAULT] removed successfully.
+```
+

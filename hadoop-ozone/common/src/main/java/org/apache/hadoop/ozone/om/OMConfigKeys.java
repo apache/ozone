@@ -489,6 +489,11 @@ public final class OMConfigKeys {
 
   public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS =
+      "ozone.om.snapshot.diff.disable.native.libs";
+
+  public static final boolean
+      OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT = false;
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
       = "ozone.om.snapshot.diff.db.dir";
 
