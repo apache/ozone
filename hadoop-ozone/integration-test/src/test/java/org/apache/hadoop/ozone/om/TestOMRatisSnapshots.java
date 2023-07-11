@@ -67,7 +67,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.BufferedReader;
@@ -133,9 +132,6 @@ public class TestOMRatisSnapshots {
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
 
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
@@ -1267,7 +1263,7 @@ public class TestOMRatisSnapshots {
     do {
       response = client.getObjectStore()
           .snapshotDiff(
-              volume, bucket, fromSnapshot, toSnapshot, null, 0, false);
+              volume, bucket, fromSnapshot, toSnapshot, null, 0, false, false);
       Thread.sleep(response.getWaitTimeInMs());
     } while (response.getJobStatus() != DONE);
 
