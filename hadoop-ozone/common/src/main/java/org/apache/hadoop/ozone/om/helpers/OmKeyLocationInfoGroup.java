@@ -179,7 +179,7 @@ public class OmKeyLocationInfoGroup {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("version:").append(version).append(" ");
-    sb.append("isMultipartKey:").append(isMultipartKey);
+    sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for (OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
