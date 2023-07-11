@@ -172,7 +172,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
 
     if (shouldStartCertificateRenewerService()) {
-      startRootCaRotationPoller();
+      if (securityConfig.isAutoCARotationEnabled()) {
+        startRootCaRotationPoller();
+      }
       if (certPath != null && executorService == null) {
         startCertificateRenewerService();
       } else {
