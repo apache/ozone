@@ -116,7 +116,8 @@ When the object is a prefix, the path-to-object must contain the full path from 
    Note: the tail "/" is required. 
 </div>
 
-The Following are the operations or actions on ACLs that can be performed using the CLI.
+<br>
+Following are the supported ACL actions.
 
 <h3>setacl</h3>
 
@@ -124,6 +125,10 @@ The Following are the operations or actions on ACLs that can be performed using 
 $ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
  ACLs set successfully.
 $ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
+ ACLs set successfully.
+$ ozone sh bucket setacl -a=anonymous::lr /vol1/bucket3
+ ACLs set successfully.
+$ ozone sh bucket setacl -a world::a /vol1/bucket4
  ACLs set successfully.
 ```
 
