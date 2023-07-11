@@ -36,10 +36,14 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.http.HttpStatus;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Test head object.
@@ -100,5 +104,89 @@ public class TestObjectHead {
       Assert.assertTrue(ex.getErrorMessage().contains("object does not exist"));
       Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
     }
+  }
+
+  @Test
+  public void testHeadWhenKeyIsAFileAndKeyPathDoesNotEndWithASlash()
+      throws IOException, OS3Exception {
+    // GIVEN
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    String keyContent = "content";
+    OzoneOutputStream out = bucket.createKey(keyPath,
+        keyContent.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(keyContent.getBytes(UTF_8));
+    out.close();
+
+    // WHEN
+    final Response response = keyEndpoint.head(bucketName, keyPath);
+
+    // THEN
+    Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testHeadWhenKeyIsDirectoryAndKeyPathDoesNotEndWithASlash()
+      throws IOException, OS3Exception {
+    // GIVEN
+    final String keyPath = "keyDir";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    bucket.createDirectory(keyPath);
+
+    // WHEN
+    final Response response = keyEndpoint.head(bucketName, keyPath);
+
+    // THEN
+    Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
+    bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testHeadWhenKeyIsDirectoryAndKeyPathEndsWithASlash()
+      throws IOException, OS3Exception {
+    // GIVEN
+    final String keyPath = "keyDir/";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    bucket.createDirectory(keyPath);
+
+    // WHEN
+    final Response response = keyEndpoint.head(bucketName, keyPath);
+
+    // THEN
+    Assertions.assertEquals(HttpStatus.SC_OK, response.getStatus());
+    bucket.deleteKey(keyPath);
+  }
+
+  @Test
+  public void testHeadWhenKeyIsAFileAndKeyPathEndsWithASlash()
+      throws IOException, OS3Exception {
+    // GIVEN
+    final String keyPath = "keyFile";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    keyEndpoint.setOzoneConfiguration(config);
+    String keyContent = "content";
+    OzoneOutputStream out = bucket.createKey(keyPath,
+        keyContent.getBytes(UTF_8).length,
+        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+            ReplicationFactor.ONE), new HashMap<>());
+    out.write(keyContent.getBytes(UTF_8));
+    out.close();
+
+    // WHEN
+    final Response response = keyEndpoint.head(bucketName, keyPath + "/");
+
+    // THEN
+    Assertions.assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
+    bucket.deleteKey(keyPath);
   }
 }

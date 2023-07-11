@@ -15,22 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:failing
+set -eu -o pipefail
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
+export K8S_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
+cd "$K8S_DIR"
 
 # shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
+source "../testlib.sh"
 
-start_docker_env
+pre_run_setup
 
-execute_robot_test scm failing/test1.robot
-execute_robot_test scm failing/test2.robot
-
-stop_docker_env
-
-generate_report
+execute_robot_test scm-0 smoketest/basic/basic.robot

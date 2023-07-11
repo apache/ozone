@@ -480,8 +480,11 @@ public final class OzoneConsts {
   public static final String SCM_ROOT_CA_COMPONENT_NAME =
       Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString();
 
-  public static final String SCM_SUB_CA_PREFIX = "scm-sub@";
-  public static final String SCM_ROOT_CA_PREFIX = "scm@";
+  // %s to distinguish different certificates
+  public static final String SCM_SUB_CA = "scm-sub";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "-%s@";
+  public static final String SCM_ROOT_CA = "scm";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "-%s@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
