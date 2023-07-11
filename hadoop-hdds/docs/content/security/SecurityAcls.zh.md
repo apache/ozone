@@ -34,7 +34,7 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ozo
 
 Ozone 的 ACL 是 Posix ACL 和 S3 ACL 的超集。
 
-ACL 的通用格式为 _对象_:_角色_:_权限_.
+ACL 的通用格式为 _对象_:_角色_:_权限_:_范围_.
 
 _对象_ 可选的值包括：
 
@@ -64,8 +64,11 @@ _权限_ 可选的值包括：:
 6. **读 ACL** – 允许用户读取某个对象的 ACL。
 7. **写 ACL** – 允许用户修改某个对象的 ACL。
 
-根据其范围，ACL 有 2 种类型 - 访问和默认。<br>
-访问 ACL 仅限于特定对象，不能继承。它们控制对对象本身的访问。后代仅继承默认 ACL。不能在键上设置默认 ACL（因为键下不能有对象）。
+_范围_ 可选的值包括：:
+
+1. **ACCESS** – 这类 ACL 仅作用于对象本身，不能被继承。它控制对对象本身的访问。
+2. **DEFAULT** - 这类 ACL 不仅作用于对象本身，还会被对象的后代继承。不能在叶子对象上设置该类 ACL（因为叶子对象下不能再有其他对象）。
+
 
 ## Ozone 原生 ACL API
 
@@ -81,18 +84,20 @@ ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包�
 还可以使用 `ozone sh` 命令来操作 ACL。<br>
 用法 : `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
 `-a` 表示以逗号分隔的 ACL 列表。除了 `getacl` 之外的所有子命令都需要它。<br>
-`<value>` 的格式为 `type:name:rights[scope]`。<br>
-_type_ 可以是 user, group, world 或 anonymous。<br>
-_name_ 是用户/组的名称。如果 type 为 world 和 anonymous，则 name 应留空或分别为 WORLD 或 ANONYMOUS。 <br>
-_rights_ 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)。<br>
-_scope_ 可以是 ACCESS 或 DEFAULT. 如果不指定，则视为 ACCESS。<br>
+`<value>` 的格式为 **`type:name:rights[scope]`**。<br>
+**_type_** 可以是 user, group, world 或 anonymous。<br>
+**_name_** 是用户/组的名称。如果 type 为 world 和 anonymous，则 name 应留空或分别为 WORLD 或 ANONYMOUS。 <br>
+**_rights_** 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)。<br>
+**_scope_** 可以是 **ACCESS** 或 **DEFAULT**. 如果不指定，默认 **ACCESS**。<br>
 
 <div class="alert alert-warning" role="alert">
-当对象是前缀时，对象路径必须包含从卷到密钥的目录或前缀的完整路径。
-那是， /volume/bucket/some/key/prefix/
+当对象是前缀时，对象路径必须包含从卷到密钥的目录或前缀的完整路径，例如，<br>
+   /volume/bucket/some/key/prefix/ <br>
+   注意：结尾的“/”是需要的。
 </div>
 
-以下是可以使用 CLI 对 ACL 执行的操作或操作。
+<br>
+以下是 CLI 支持的 ACL 具体操作。
 
 <h3>setacl</h3>
 
