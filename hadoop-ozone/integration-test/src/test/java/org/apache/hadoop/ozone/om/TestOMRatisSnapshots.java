@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -49,6 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -99,6 +102,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1083,6 +1087,7 @@ public class TestOMRatisSnapshots {
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
+    String diffKey = newKeys.get(0);
     readKeys(newKeys);
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
@@ -1122,7 +1127,6 @@ public class TestOMRatisSnapshots {
         numberOfSstFiles++;
       }
     }
-    LOG.info("###numberOfSstFiles={}", numberOfSstFiles);
 
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
@@ -1240,8 +1244,34 @@ public class TestOMRatisSnapshots {
         newNumberOfSstFiles++;
       }
     }
-    LOG.info("###newNumberOfSstFiles={}", newNumberOfSstFiles);
     Assertions.assertTrue(numberOfSstFiles > newNumberOfSstFiles);
+
+    // Snap diff
+    String previouslyNonDeletedSnapshotName = snapshotName;
+    String lastSnapshotName = createOzoneSnapshot(newLeaderOM,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
+    SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
+        previouslyNonDeletedSnapshotName, lastSnapshotName);
+    Assertions.assertEquals(Collections.singletonList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
+        diff.getDiffList());
+  }
+
+  private SnapshotDiffReportOzone getSnapDiffReport(String volume,
+      String bucket,
+      String fromSnapshot,
+      String toSnapshot)
+      throws InterruptedException, IOException {
+    SnapshotDiffResponse response;
+    do {
+      response = client.getObjectStore()
+          .snapshotDiff(
+              volume, bucket, fromSnapshot, toSnapshot, null, 0, false);
+      Thread.sleep(response.getWaitTimeInMs());
+    } while (response.getJobStatus() != DONE);
+
+    return response.getSnapshotDiffReport();
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
