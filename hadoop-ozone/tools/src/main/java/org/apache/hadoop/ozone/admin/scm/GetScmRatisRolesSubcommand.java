@@ -64,7 +64,7 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     }
   }
 
-  protected Map<String, Map<String, String>> parseScmRoles(
+  private Map<String, Map<String, String>> parseScmRoles(
       List<String> ratisRoles) {
     Map<String, Map<String, String>> allRoles = new HashMap<>();
     for (String role : ratisRoles) {
@@ -78,9 +78,9 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
       // This will just print the hostname with ratis port as the address
       roleDetails.put("address", roles[0].concat(":").concat(roles[1]));
       if (roles.length == 5) {
-          roleDetails.put("raftPeerRole", roles[2]);
-          roleDetails.put("ID", roles[3]);
-          roleDetails.put("InetAddress", roles[4]);
+        roleDetails.put("raftPeerRole", roles[2]);
+        roleDetails.put("ID", roles[3]);
+        roleDetails.put("InetAddress", roles[4]);
       }
       allRoles.put(roles[0], roleDetails);
     }
