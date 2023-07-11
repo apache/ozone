@@ -186,13 +186,21 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       throw e;
     }
 
+    // Backwards compatibility with older Ozone clients that don't have this
+    // field. Defaults to false.
+    boolean forceCreationWhenVolumeExists =
+        request.hasForceCreationWhenVolumeExists()
+            && request.getForceCreationWhenVolumeExists();
+
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
                 .setTenantId(tenantId)
                 .setVolumeName(volumeName)
                 .setUserRoleName(userRoleName)
-                .setAdminRoleName(adminRoleName))
+                .setAdminRoleName(adminRoleName)
+                .setForceCreationWhenVolumeExists(
+                    forceCreationWhenVolumeExists))
         .setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder()
                 .setVolumeInfo(updatedVolumeInfo));
@@ -227,6 +235,8 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String tenantId = request.getTenantId();
     final String userRoleName = request.getUserRoleName();
     final String adminRoleName = request.getAdminRoleName();
+    final boolean forceCreationWhenVolumeExists =
+        request.getForceCreationWhenVolumeExists();
 
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
@@ -252,7 +262,13 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       // Check volume existence
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume: '{}' already exists", volumeName);
-        throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
+        if (forceCreationWhenVolumeExists) {
+          LOG.warn("But forceCreationWhenVolumeExists is set to true. Resuming "
+              + "tenant creation despite volume '{}' existence", volumeName);
+        } else {
+          // forceCreationWhenVolumeExists is false, throw
+          throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
+        }
       }
 
       // Create volume

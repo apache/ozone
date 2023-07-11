@@ -1074,7 +1074,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final CreateTenantRequest.Builder requestBuilder =
         CreateTenantRequest.newBuilder()
             .setTenantId(omTenantArgs.getTenantId())
-            .setVolumeName(omTenantArgs.getVolumeName());
+            .setVolumeName(omTenantArgs.getVolumeName())
+            .setForceCreationWhenVolumeExists(
+                omTenantArgs.getForceCreationWhenVolumeExists());
             // Can add more args (like policy names) later if needed
     final OMRequest omRequest = createOMRequest(Type.CreateTenant)
         .setCreateTenantRequest(requestBuilder)
