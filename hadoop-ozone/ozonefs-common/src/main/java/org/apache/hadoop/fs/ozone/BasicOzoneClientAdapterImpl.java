@@ -668,12 +668,20 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
-    boolean takeTemporarySnapshot = false;
+    boolean takeTemporaryToSnapshot = false;
+    boolean takeTemporaryFromSnapshot = false;
     if (toSnapshot.isEmpty()) {
       // empty toSnapshot implies diff b/w the fromSnapshot &
       // current state.
-      takeTemporarySnapshot = true;
+      takeTemporaryToSnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
+          "temp" + SnapshotInfo.generateName(Time.now()));
+    }
+    if (fromSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the current state
+      // & the toSnapshot
+      takeTemporaryFromSnapshot = true;
+      fromSnapshot = createSnapshot(snapshotDir.toString(),
           "temp" + SnapshotInfo.generateName(Time.now()));
     }
     try {
@@ -694,11 +702,16 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       return aggregated;
     } finally {
       // delete the temp snapshot
-      if (takeTemporarySnapshot) {
+      if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
-        ozoneClient.getObjectStore()
-            .deleteSnapshot(snapPath.getVolumeName(), snapPath.getBucketName(),
-                toSnapshot);
+        if (takeTemporaryToSnapshot) {
+          ozoneClient.getObjectStore().deleteSnapshot(snapPath.getVolumeName(),
+              snapPath.getBucketName(), toSnapshot);
+        }
+        if (takeTemporaryFromSnapshot) {
+          ozoneClient.getObjectStore().deleteSnapshot(snapPath.getVolumeName(),
+              snapPath.getBucketName(), fromSnapshot);
+        }
       }
     }
   }
