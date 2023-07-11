@@ -64,6 +64,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.BufferedReader;
@@ -88,6 +89,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -128,6 +130,9 @@ public class TestOMRatisSnapshots {
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TestOMRatisSnapshots.class);
+
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
    * inactive OM. So at the start of the cluster, there will be 2 active and 1
@@ -151,6 +156,8 @@ public class TestOMRatisSnapshots {
           5, TimeUnit.SECONDS);
       conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
           TimeUnit.SECONDS);
+      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
+          1, TimeUnit.MILLISECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
@@ -1115,6 +1122,7 @@ public class TestOMRatisSnapshots {
         numberOfSstFiles++;
       }
     }
+    LOG.info("###numberOfSstFiles={}", numberOfSstFiles);
 
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
@@ -1224,7 +1232,7 @@ public class TestOMRatisSnapshots {
         .getMetadataManager()
         .getStore()
         .getRocksDBCheckpointDiffer()
-        .pruneSstFiles();
+        .pruneOlderSnapshotsWithCompactionHistory();
     int newNumberOfSstFiles = 0;
     try (DirectoryStream<Path> files =
              Files.newDirectoryStream(sstBackupDirPath)) {
@@ -1232,6 +1240,7 @@ public class TestOMRatisSnapshots {
         newNumberOfSstFiles++;
       }
     }
+    LOG.info("###newNumberOfSstFiles={}", newNumberOfSstFiles);
     Assertions.assertTrue(numberOfSstFiles > newNumberOfSstFiles);
   }
 
