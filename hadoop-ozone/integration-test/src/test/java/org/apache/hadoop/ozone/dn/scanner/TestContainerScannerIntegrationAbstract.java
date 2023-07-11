@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -71,6 +72,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * This class tests the data scanner functionality.
@@ -230,7 +232,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       Assert.assertFalse(chunksDir.exists());
-    }),
+    }, ScanResult.FailureType.MISSING_CHUNKS_DIR),
 
     MISSING_METADATA_DIR(container -> {
       File metadataDir =
@@ -243,13 +245,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       Assert.assertFalse(metadataDir.exists());
-    }),
+    }, ScanResult.FailureType.MISSING_METADATA_DIR),
 
     MISSING_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       Assert.assertTrue(containerFile.delete());
       Assert.assertFalse(containerFile.exists());
-    }),
+    }, ScanResult.FailureType.MISSING_CONTAINER_FILE),
 
     MISSING_CONTAINER_DIR(container -> {
       File containerDir =
@@ -261,7 +263,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         throw new UncheckedIOException(ex);
       }
       Assert.assertFalse(containerDir.exists());
-    }),
+    }, ScanResult.FailureType.MISSING_CONTAINER_DIR),
 
     MISSING_BLOCK(container -> {
       File chunksDir = new File(
@@ -275,17 +277,17 @@ public abstract class TestContainerScannerIntegrationAbstract {
           throw new UncheckedIOException(ex);
         }
       }
-    }),
+    }, ScanResult.FailureType.MISSING_CHUNK_FILE),
 
     CORRUPT_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       corruptFile(containerFile);
-    }),
+    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
 
     TRUNCATED_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
       truncateFile(containerFile);
-    }),
+    }, ScanResult.FailureType.CORRUPT_CONTAINER_FILE),
 
     CORRUPT_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -295,7 +297,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       Assert.assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
-    }),
+    }, ScanResult.FailureType.CORRUPT_CHUNK),
 
     TRUNCATED_BLOCK(container -> {
       File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -305,17 +307,29 @@ public abstract class TestContainerScannerIntegrationAbstract {
           .findFirst();
       Assert.assertTrue(blockFile.isPresent());
       truncateFile(blockFile.get());
-    });
+    }, ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
     private final Consumer<Container<?>> corruption;
+    private final ScanResult.FailureType expectedResult;
     private static final Random RANDOM = new Random();
 
-    ContainerCorruptions(Consumer<Container<?>> corruption) {
+    ContainerCorruptions(Consumer<Container<?>> corruption,
+                         ScanResult.FailureType expectedResult) {
       this.corruption = corruption;
+      this.expectedResult = expectedResult;
+
     }
 
     public void applyTo(Container<?> container) {
       corruption.accept(container);
+    }
+
+    /**
+     * Check that the correct corruption type was written to the container log.
+     */
+    public void assertLogged(LogCapturer logCapturer) {
+      Assert.assertTrue(logCapturer.getOutput()
+          .contains(expectedResult.toString()));
     }
 
     /**

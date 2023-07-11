@@ -173,7 +173,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   }
 
   @Override
-  protected boolean shouldStartCertificateMonitor() {
+  protected boolean shouldStartCertificateRenewerService() {
     return false;
   }
 

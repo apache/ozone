@@ -72,38 +72,14 @@ find_tests(){
 
 ## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
-  # version-dependent
-  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
+  local cmd="ozone admin safemode wait -t 240"
+  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+    wait_for_port kdc 88 60
+    cmd="kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $cmd"
+  fi
 
-  #Reset the timer
-  SECONDS=0
-
-  #Don't give it up until 240 seconds
-  while [[ $SECONDS -lt 240 ]]; do
-
-     #This line checks the safemode status in scm
-     local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
-     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
-     else
-         status=$(docker-compose exec -T ${SCM} bash -c "$command")
-     fi
-
-     echo "SECONDS: $SECONDS"
-
-     echo $status
-     if [[ "$status" ]]; then
-       if [[ ${status} == "SCM is out of safe mode." ]]; then
-         #Safemode exits. Let's return from the function.
-         echo "Safe mode is off"
-         return
-       fi
-     fi
-
-     sleep 2
-   done
-   echo "WARNING! Safemode is still on. Please check the docker-compose files"
-   return 1
+  wait_for_port ${SCM} 9860 120
+  execute_commands_in_container ${SCM} "$cmd"
 }
 
 ## @description wait until OM leader is elected (or 120 seconds)

@@ -21,14 +21,17 @@ package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
@@ -42,6 +45,7 @@ public class TestBackgroundContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
   private final ContainerCorruptions corruption;
+  private final LogCapturer logCapturer;
 
   @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
@@ -69,6 +73,8 @@ public class TestBackgroundContainerDataScannerIntegration
   public TestBackgroundContainerDataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
+    logCapturer = LogCapturer.captureLogs(
+            LoggerFactory.getLogger(ContainerLogger.LOG_NAME));
   }
 
   /**
@@ -91,5 +97,6 @@ public class TestBackgroundContainerDataScannerIntegration
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);
+    corruption.assertLogged(logCapturer);
   }
 }

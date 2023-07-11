@@ -2022,6 +2022,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
+    <value>100000000</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Max size of SST files in OM Ratis Snapshot tarball.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.snapshot.provider.socket.timeout</name>
     <value>5000s</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
@@ -3958,6 +3966,15 @@
     <tag>OZONE, OM</tag>
     <description>
       Flag to always perform full snapshot diff (can be slow) without using the optimised compaction DAG.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
     </description>
   </property>
 

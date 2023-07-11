@@ -829,6 +829,7 @@ message SnapshotDiffJobProto {
   optional bool forceFullDiff = 8;
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
+  optional bool disableNativeDiff = 11;
 }
 
 message OzoneObj {
@@ -1753,6 +1754,7 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
+  optional bool disableNativeDiff = 8;
 }
 
 message CancelSnapshotDiffRequest {
