@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -133,9 +132,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
+      long clientID = multipartCommitUploadPartRequest.getClientID();
+
       // check acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.WRITE, clientID);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -148,8 +149,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-
-      long clientID = multipartCommitUploadPartRequest.getClientID();
 
       openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
               clientID);
