@@ -385,8 +385,8 @@ copy_results() {
   fi
 
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml
-    rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
+    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
+      && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
   mkdir -p "${target_dir}"
