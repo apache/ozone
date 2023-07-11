@@ -36,7 +36,7 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ozo
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 
-The general format of an ACL is _object_:_who_:_rights_.
+The general format of an ACL is _object_:_who_:_rights_:_scope_.
 
 Where an _object_ can be:
 
@@ -78,10 +78,9 @@ allows the user to overwrite an existing ozone key.
 6. **Read_ACL** – Allows a user to read the ACL on a specific object.
 7. **Write_ACL** – Allows a user to write the ACL on a specific object.
 
-There are 2 types of ACLs based on their scope - **ACCESS** and **DEFAULT**.<br>
-Access ACLs are limited only to the specific object and not inherited. They control the access to the object itself.
-Only Default ACLs are inherited by the descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
-
+Where an _scope_ can be:
+1. **ACCESS** – Access ACL is applied only to the specific object and not inheritable. It controls the access to the object itself.
+2. **DEFAULT** - Default ACL is applied to the specific object and will be inherited by object's descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
 
 ## Ozone Native ACL APIs
 
@@ -106,7 +105,7 @@ Usage: `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
 _type_ can be user, group, world or anonymous.<br>
 _name_ is the name of the user/group. For world and anonymous type, name should either be left empty or be WORLD or ANONYMOUS respectively. <br>
 _rights_ can be (read=r, write=w, delete=d, list=l, all=a, none=n, create=c, read_acl=x, write_acl=y)<br>
-_scope_ can be ACCESS or DEFAULT. If not specified, it is taken as ACCESS.<br>
+_scope_ can be ACCESS or DEFAULT. If not specified, default is ACCESS.<br>
 
 <div class="alert alert-warning" role="alert">
 When the object is a prefix, the path-to-object must contain the full path from volume till the directory or prefix of the key.
