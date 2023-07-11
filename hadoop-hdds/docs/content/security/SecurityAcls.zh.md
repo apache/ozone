@@ -106,6 +106,10 @@ $ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
  ACLs set successfully.
 $ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
  ACLs set successfully.
+$ ozone sh bucket setacl -a=anonymous::lr /vol1/bucket3
+ ACLs set successfully.
+$ ozone sh bucket setacl -a world::a /vol1/bucket4
+ ACLs set successfully.
 ```
 
 <h3>getacl</h3>
