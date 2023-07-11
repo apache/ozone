@@ -41,6 +41,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+
 /**
  * Control plane for container management in datanode.
  */
@@ -107,13 +109,14 @@ public class ContainerController {
    * Marks the container as UNHEALTHY.
    *
    * @param containerId Id of the container to update
+   * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public void markContainerUnhealthy(final long containerId)
+  public void markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
     Container container = containerSet.getContainer(containerId);
     if (container != null) {
-      getHandler(container).markContainerUnhealthy(container);
+      getHandler(container).markContainerUnhealthy(container, reason);
     } else {
       LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
           containerId);
@@ -135,11 +138,14 @@ public class ContainerController {
    * Quasi closes a container given its id.
    *
    * @param containerId Id of the container to quasi close
+   * @param reason The reason the container was quasi closed, for logging
+   *               purposes.
    * @throws IOException in case of exception
    */
-  public void quasiCloseContainer(final long containerId) throws IOException {
+  public void quasiCloseContainer(final long containerId, String reason)
+      throws IOException {
     final Container container = containerSet.getContainer(containerId);
-    getHandler(container).quasiCloseContainer(container);
+    getHandler(container).quasiCloseContainer(container, reason);
   }
 
   /**
