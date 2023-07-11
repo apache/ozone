@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.awaitility.Awaitility.with;
 
 /**
  * Temporary class to test snapshot diff functionality.
