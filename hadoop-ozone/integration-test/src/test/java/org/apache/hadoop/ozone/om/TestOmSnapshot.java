@@ -1797,7 +1797,8 @@ public class TestOmSnapshot {
   }
 
   @NotNull
-  private static List<LiveFileMetaData> getKeyTableSstFiles() {
+  private static List<LiveFileMetaData> getKeyTableSstFiles()
+      throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
       return rdbStore.getDb().getSstFileList().stream().filter(
           x -> new String(x.columnFamilyName(), UTF_8).equals(
