@@ -826,7 +826,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
-        this, LOG, AUDIT, metrics);
+        this, LOG, AUDIT, metrics, true);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
     rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
