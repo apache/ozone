@@ -675,14 +675,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       // current state.
       takeTemporaryToSnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          "temp" + "-to-" + SnapshotInfo.generateName(Time.now()));
     }
     if (fromSnapshot.isEmpty()) {
-      // empty toSnapshot implies diff b/w the current state
+      // empty fromSnapshot implies diff b/w the current state
       // & the toSnapshot
       takeTemporaryFromSnapshot = true;
       fromSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          "temp" + "-from-" + SnapshotInfo.generateName(Time.now()));
     }
     try {
       SnapshotDiffReportOzone aggregated;
@@ -705,11 +705,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
         if (takeTemporaryToSnapshot) {
-          ozoneClient.getObjectStore().deleteSnapshot(snapPath.getVolumeName(),
+          objectStore.deleteSnapshot(snapPath.getVolumeName(),
               snapPath.getBucketName(), toSnapshot);
         }
         if (takeTemporaryFromSnapshot) {
-          ozoneClient.getObjectStore().deleteSnapshot(snapPath.getVolumeName(),
+          objectStore.deleteSnapshot(snapPath.getVolumeName(),
               snapPath.getBucketName(), fromSnapshot);
         }
       }

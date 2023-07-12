@@ -1323,14 +1323,14 @@ public class BasicRootedOzoneClientAdapterImpl
       // current state.
       takeTemporaryToSnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          "temp" + "-to-" + SnapshotInfo.generateName(Time.now()));
     }
     if (fromSnapshot.isEmpty()) {
-      // empty toSnapshot implies diff b/w the current state
+      // empty fromSnapshot implies diff b/w the current state
       // & the toSnapshot
       takeTemporaryFromSnapshot = true;
       fromSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          "temp" + "-from-" + SnapshotInfo.generateName(Time.now()));
     }
     OFSPath ofsPath = new OFSPath(snapshotDir, config);
     String volume = ofsPath.getVolumeName();
@@ -1356,14 +1356,12 @@ public class BasicRootedOzoneClientAdapterImpl
     } finally {
       // delete the temp snapshot
       if (takeTemporaryToSnapshot) {
-        ozoneClient.getObjectStore()
-            .deleteSnapshot(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-                toSnapshot);
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), toSnapshot);
       }
       if (takeTemporaryFromSnapshot) {
-        ozoneClient.getObjectStore()
-            .deleteSnapshot(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-                fromSnapshot);
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), fromSnapshot);
       }
     }
   }
