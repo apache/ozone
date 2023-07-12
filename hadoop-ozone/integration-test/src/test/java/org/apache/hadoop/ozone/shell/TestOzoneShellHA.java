@@ -1361,8 +1361,7 @@ public class TestOzoneShellHA {
     // Delete bucket1 recursively
     args =
         new String[] {"bucket", "delete", volume1 +
-              OZONE_URI_DELIMITER + bucket1, "-r", "--yes",
-            "-id", omServiceId};
+              OZONE_URI_DELIMITER + bucket1, "-r", "--yes"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1380,8 +1379,7 @@ public class TestOzoneShellHA {
     // Delete bucket2(obs) recursively.
     args =
         new String[] {"bucket", "delete", volume1 +
-              OZONE_URI_DELIMITER + bucket2, "-r", "--yes",
-            "-id", omServiceId};
+              OZONE_URI_DELIMITER + bucket2, "-r", "--yes"};
     execute(ozoneShell, args);
     out.reset();
 
@@ -1392,8 +1390,7 @@ public class TestOzoneShellHA {
     // Delete bucket3(legacy) recursively.
     args =
         new String[] {"bucket", "delete", volume1 +
-              OZONE_URI_DELIMITER + bucket3, "-r", "--yes",
-            "-id", omServiceId};
+              OZONE_URI_DELIMITER + bucket3, "-r", "--yes"};
     execute(ozoneShell, args);
     out.reset();
 

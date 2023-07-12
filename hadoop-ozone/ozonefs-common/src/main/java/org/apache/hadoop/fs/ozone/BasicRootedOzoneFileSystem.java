@@ -766,14 +766,22 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
     OzoneVolume volume =
         adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
-    try {
-      volume.deleteBucket(ofsPath.getBucketName());
-    } catch (OMException ex) {
-      // bucket is not empty
-      if (ex.getResult() == BUCKET_NOT_EMPTY) {
-        throw new PathIsNotEmptyDirectoryException(f.toString());
-      } else {
-        throw ex;
+    int retryCount = 3;
+    int count = 0;
+    while (count < retryCount) {
+      try {
+        count++;
+        volume.deleteBucket(ofsPath.getBucketName());
+        break;
+      } catch (OMException ex) {
+        // bucket is not empty
+        if (ex.getResult() == BUCKET_NOT_EMPTY) {
+          if (count == retryCount) {
+            throw new PathIsNotEmptyDirectoryException(f.toString());
+          }
+        } else {
+          throw ex;
+        }
       }
     }
   }
