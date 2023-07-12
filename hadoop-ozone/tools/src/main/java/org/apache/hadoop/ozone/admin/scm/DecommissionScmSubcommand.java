@@ -49,10 +49,13 @@ public class DecommissionScmSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     DecommissionScmResponseProto response = scmClient.decommissionScm(nodeId);
     if (!response.getSuccess()) {
-      System.out.println("Error decommissioning Scm " + nodeId);
+      String errorMsg = "Error decommissioning Scm " + nodeId;
       if (response.hasErrorMsg()) {
-        System.out.println(response.getErrorMsg());
+        errorMsg = errorMsg + ", " + response.getErrorMsg();
       }
+      System.err.println(errorMsg);
+      // Throwing exception to create non-zero exit code in case of failure.
+      throw new IOException(errorMsg);
     } else {
       System.out.println("Decommissioned Scm " + nodeId);
     }
