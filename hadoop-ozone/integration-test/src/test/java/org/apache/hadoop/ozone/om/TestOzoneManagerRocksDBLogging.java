@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -44,8 +45,8 @@ public class TestOzoneManagerRocksDBLogging {
   @Rule
   public Timeout timeout = Timeout.seconds(100);
 
-  private static GenericTestUtils.LogCapturer logCapturer =
-      GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
+  private static LogCapturer logCapturer =
+      LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
 
   @Before
   public void init() throws Exception {

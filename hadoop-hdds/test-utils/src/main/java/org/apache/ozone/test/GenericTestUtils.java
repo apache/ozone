@@ -34,13 +34,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.Appender;
-import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
@@ -307,51 +303,6 @@ public abstract class GenericTestUtils {
       }
     }
     return dir.delete();
-  }
-
-  /**
-   * Class to capture logs for doing assertions.
-   */
-  public static final class LogCapturer {
-    private StringWriter sw = new StringWriter();
-    private WriterAppender appender;
-    private Logger logger;
-
-    public static LogCapturer captureLogs(org.slf4j.Logger logger) {
-      return new LogCapturer(toLog4j(logger), getDefaultLayout());
-    }
-
-    public static LogCapturer captureLogs(org.slf4j.Logger logger,
-        Layout layout) {
-      return new LogCapturer(toLog4j(logger), layout);
-    }
-
-    private static Layout getDefaultLayout() {
-      Appender defaultAppender = Logger.getRootLogger().getAppender("stdout");
-      if (defaultAppender == null) {
-        defaultAppender = Logger.getRootLogger().getAppender("console");
-      }
-      return (defaultAppender == null) ? new PatternLayout() :
-          defaultAppender.getLayout();
-    }
-
-    private LogCapturer(Logger logger, Layout layout) {
-      this.logger = logger;
-      this.appender = new WriterAppender(layout, sw);
-      logger.addAppender(this.appender);
-    }
-
-    public String getOutput() {
-      return sw.toString();
-    }
-
-    public void stopCapturing() {
-      logger.removeAppender(appender);
-    }
-
-    public void clearOutput() {
-      sw.getBuffer().setLength(0);
-    }
   }
 
   @Deprecated

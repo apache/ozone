@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -62,7 +62,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
 
   @Test
   public void testCommandStatusReport() {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+    LogCapturer logCapturer = LogCapturer
         .captureLogs(LOG);
 
     CommandStatusReportFromDatanode report = this.getStatusReport(Collections

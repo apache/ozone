@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -330,7 +331,7 @@ public class TestHddsDispatcher {
               .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
               .build();
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+      LogCapturer logCapturer = LogCapturer
           .captureLogs(HddsDispatcher.LOG);
       // send write chunk request without sending create container
       response = hddsDispatcher.dispatch(writeChunkRequest, dispatcherContext);
@@ -370,7 +371,7 @@ public class TestHddsDispatcher {
       Mockito.doReturn(builder.build()).when(mockDispatcher)
           .createContainer(writeChunkRequest);
 
-      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+      LogCapturer logCapturer = LogCapturer
           .captureLogs(HddsDispatcher.LOG);
       // send write chunk request without sending create container
       mockDispatcher.dispatch(writeChunkRequest, null);

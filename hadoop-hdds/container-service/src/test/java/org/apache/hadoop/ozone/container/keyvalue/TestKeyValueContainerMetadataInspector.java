@@ -34,8 +34,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-import org.apache.log4j.PatternLayout;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -497,9 +496,8 @@ public class TestKeyValueContainerMetadataInspector
       KeyValueContainerData containerData) throws Exception {
     // Use an empty layout so the captured log has no prefix and can be
     // parsed as json.
-    GenericTestUtils.LogCapturer capturer =
-        GenericTestUtils.LogCapturer.captureLogs(
-            KeyValueContainerMetadataInspector.REPORT_LOG, new PatternLayout());
+    LogCapturer capturer =
+        LogCapturer.captureLogs(KeyValueContainerMetadataInspector.REPORT_LOG);
     KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
     capturer.stopCapturing();
     String output = capturer.getOutput();

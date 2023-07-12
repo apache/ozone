@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -257,7 +258,7 @@ public class TestScmSafeMode {
     });
     cluster.stop();
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+    LogCapturer logCapturer = LogCapturer
         .captureLogs(SCMSafeModeManager.getLogger());
     logCapturer.clearOutput();
 

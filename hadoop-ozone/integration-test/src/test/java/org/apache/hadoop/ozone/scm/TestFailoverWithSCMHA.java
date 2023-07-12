@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -125,7 +126,7 @@ public class TestFailoverWithSCMHA {
             failoverProxyProvider);
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+    LogCapturer logCapture = LogCapturer
         .captureLogs(SCMBlockLocationFailoverProxyProvider.LOG);
     ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
@@ -138,7 +139,7 @@ public class TestFailoverWithSCMHA {
         new SCMContainerLocationFailoverProxyProvider(conf, null);
     GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.LOG,
         Level.DEBUG);
-    logCapture = GenericTestUtils.LogCapturer
+    logCapture = LogCapturer
         .captureLogs(SCMContainerLocationFailoverProxyProvider.LOG);
     proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     StorageContainerLocationProtocol scmContainerClient =
@@ -184,7 +185,7 @@ public class TestFailoverWithSCMHA {
             failoverProxyProvider);
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+    LogCapturer logCapture = LogCapturer
         .captureLogs(SCMBlockLocationFailoverProxyProvider.LOG);
     ScmBlockLocationProtocol scmBlockLocationProtocol = TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
@@ -213,7 +214,7 @@ public class TestFailoverWithSCMHA {
         new SCMContainerLocationFailoverProxyProvider(conf, null);
     GenericTestUtils.setLogLevel(SCMContainerLocationFailoverProxyProvider.LOG,
         Level.DEBUG);
-    logCapture = GenericTestUtils.LogCapturer
+    logCapture = LogCapturer
         .captureLogs(SCMContainerLocationFailoverProxyProvider.LOG);
     proxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     StorageContainerLocationProtocol scmContainerClient =

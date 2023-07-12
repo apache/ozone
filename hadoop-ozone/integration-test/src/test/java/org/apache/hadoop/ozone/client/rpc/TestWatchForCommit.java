@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -293,8 +293,8 @@ public class TestWatchForCommit {
 
   @Test
   public void test2WayCommitForTimeoutException() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(XceiverClientRatis.LOG);
     try (XceiverClientManager clientManager = new XceiverClientManager(conf)) {
 
       ContainerWithPipeline container1 = storageContainerLocationClient

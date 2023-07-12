@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.LogCapturer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -286,8 +287,8 @@ public class TestHealthyPipelineSafeModeRule {
       Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
 
 
-      GenericTestUtils.LogCapturer logCapturer =
-          GenericTestUtils.LogCapturer.captureLogs(LoggerFactory.getLogger(
+      LogCapturer logCapturer =
+          LogCapturer.captureLogs(LoggerFactory.getLogger(
               SCMSafeModeManager.class));
 
       // fire event with pipeline create status with ratis type and factor 1

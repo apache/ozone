@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
@@ -188,8 +189,8 @@ public class TestSCMInstallSnapshotWithHA {
         lastTermIndex.getIndex() + 100);
 
     GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.INFO);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    LogCapturer logCapture =
+        LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
 
     // Install the old checkpoint on the follower . This should fail as the
     // follower is already ahead of that transactionLogIndex and the
@@ -264,8 +265,8 @@ public class TestSCMInstallSnapshotWithHA {
     SCMHAManagerImpl scmhaManager =
         (SCMHAManagerImpl) (followerSCM.getScmHAManager());
     GenericTestUtils.setLogLevel(SCMHAManagerImpl.getLogger(), Level.ERROR);
-    GenericTestUtils.LogCapturer logCapture =
-        GenericTestUtils.LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
+    LogCapturer logCapture =
+        LogCapturer.captureLogs(SCMHAManagerImpl.getLogger());
     scmhaManager.setExitManagerForTesting(new DummyExitManager());
 
     followerSM.pause();

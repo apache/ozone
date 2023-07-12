@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.security.ssl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.BeforeClass;
 import org.junit.Test;
 

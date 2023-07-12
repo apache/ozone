@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -70,7 +70,7 @@ public class TestOmAcls {
   private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient client;
-  private static GenericTestUtils.LogCapturer logCapturer;
+  private static LogCapturer logCapturer;
 
   static {
     AuditLogTestUtils.enableAuditLog();
@@ -99,7 +99,7 @@ public class TestOmAcls {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
+        LogCapturer.captureLogs(OzoneManager.getLogger());
   }
 
   @AfterClass

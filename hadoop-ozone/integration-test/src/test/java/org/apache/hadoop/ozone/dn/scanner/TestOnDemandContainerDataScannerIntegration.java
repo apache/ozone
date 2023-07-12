@@ -25,12 +25,12 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 
@@ -44,7 +44,7 @@ public class TestOnDemandContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
   private final ContainerCorruptions corruption;
-  private final GenericTestUtils.LogCapturer logCapturer;
+  private final LogCapturer logCapturer;
 
   /**
    The on-demand container scanner is triggered by errors on the block read
@@ -89,8 +89,7 @@ public class TestOnDemandContainerDataScannerIntegration
   public TestOnDemandContainerDataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
-    logCapturer = GenericTestUtils.LogCapturer.captureLogs(
-        LoggerFactory.getLogger(ContainerLogger.LOG_NAME));
+    logCapturer = LogCapturer.log4j2(ContainerLogger.LOG_NAME);
   }
 
   /**

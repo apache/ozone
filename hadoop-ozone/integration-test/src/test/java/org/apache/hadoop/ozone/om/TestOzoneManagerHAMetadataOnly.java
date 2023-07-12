@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.log4j.Logger;
+import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -439,7 +440,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     String volumeName = UUID.randomUUID().toString();
 
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+    LogCapturer logCapturer = LogCapturer
         .captureLogs(OMVolumeCreateRequest.getLogger());
     OMRequest omRequest =
         OMRequest.newBuilder().setCreateVolumeRequest(

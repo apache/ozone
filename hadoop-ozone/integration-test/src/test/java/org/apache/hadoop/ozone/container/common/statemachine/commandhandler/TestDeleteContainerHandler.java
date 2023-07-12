@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -242,8 +243,8 @@ public class TestDeleteContainerHandler {
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(
             LoggerFactory.getLogger(KeyValueHandler.class));
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
@@ -445,8 +446,8 @@ public class TestDeleteContainerHandler {
 
 
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(
             LoggerFactory.getLogger(KeyValueHandler.class));
     GenericTestUtils.waitFor(() ->
             logCapturer.getOutput().
@@ -654,8 +655,8 @@ public class TestDeleteContainerHandler {
     // Deleting a non-empty container should fail on DN when the force flag
     // is false.
     // Check the log for the error message when deleting non-empty containers
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(
             LoggerFactory.getLogger(DeleteContainerCommandHandler.class));
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains("Non" +
             "-force deletion of non-empty container is not allowed"), 500,

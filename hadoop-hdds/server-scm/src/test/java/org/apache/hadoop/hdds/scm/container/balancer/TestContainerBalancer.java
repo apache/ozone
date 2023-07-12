@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -254,8 +255,8 @@ public class TestContainerBalancer {
     containerBalancer.notifyStatusChanged();
     Assertions.assertFalse(containerBalancer.isBalancerRunning());
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(ContainerBalancerTask.LOG);
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(ContainerBalancerTask.LOG);
     String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
         " seconds before starting balancing.";
     /*

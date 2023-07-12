@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LogCapturer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -70,7 +70,7 @@ public class TestReconScmSnapshot {
   }
 
   public static void testSnapshot(MiniOzoneCluster cluster) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+    LogCapturer logCapturer = LogCapturer
         .captureLogs(LoggerFactory.getLogger(
         ReconStorageContainerManagerFacade.class));
 

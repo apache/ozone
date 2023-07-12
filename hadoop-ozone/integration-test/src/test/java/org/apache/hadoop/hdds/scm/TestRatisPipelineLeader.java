@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+
+import org.apache.ozone.test.LogCapturer;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -99,8 +101,8 @@ public class TestRatisPipelineLeader {
     final Logger log = LoggerFactory.getLogger(
         "org.apache.ratis.grpc.server.GrpcClientProtocolService");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(log);
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(log);
     try (XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
       xceiverClientRatis.connect();
