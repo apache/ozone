@@ -282,22 +282,22 @@ public class TestRocksDBCheckpointDiffer {
         // Snapshot 0
         + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Additional "compaction" to trigger and test early exit condition
-        + "C 1 000001,000002:000062\n"
+        + "C 1291 000001,000002:000062\n"
         // Snapshot 1
         + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Regular compaction
-        + "C 2 000068,000062:000069\n"
+        + "C 4023 000068,000062:000069\n"
         // Trivial move
-        + "C 3 000071,000064,000060,000052:000071,000064,000060,000052\n"
-        + "C 4 000073,000066:000074\n"
-        + "C 5 000082,000076,000069:000083\n"
-        + "C 6 000087,000080,000074:000088\n"
+        + "C 5647 000071,000064,000060,000052:000071,000064,000060,000052\n"
+        + "C 7658 000073,000066:000074\n"
+        + "C 7872 000082,000076,000069:000083\n"
+        + "C 9001 000087,000080,000074:000088\n"
         // Deletion?
-        + "C 7 000093,000090,000083:\n"
+        + "C 12755 000093,000090,000083:\n"
         // Snapshot 2
         + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd " + createdTime + "\n"
-        + "C 8 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
-        + "C 9 000105,000095,000088:000107\n"
+        + "C 16192 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
+        + "C 16762 000105,000095,000088:000107\n"
         // Snapshot 3
         + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea " + createdTime + "\n";
 
@@ -921,38 +921,38 @@ public class TestRocksDBCheckpointDiffer {
 
     String compactionLogFile0 = "S 1000 snapshotId0 " +
         (currentTimeMillis - MINUTES.toMillis(30)) + " \n";
-    String compactionLogFile1 = "C 1 000015,000013,000011,000009:000018," +
+    String compactionLogFile1 = "C 1000 000015,000013,000011,000009:000018," +
         "000016,000017\n"
         + "S 2000 snapshotId1 " +
         (currentTimeMillis - MINUTES.toMillis(24)) + " \n";
 
-    String compactionLogFile2 = "C 2 000018,000016,000017,000026,000024," +
+    String compactionLogFile2 = "C 1000 000018,000016,000017,000026,000024," +
         "000022,000020:000027,000030,000028,000031,000029\n"
         + "S 3000 snapshotId2 " +
         (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
 
-    String compactionLogFile3 = "C 3 000027,000030,000028,000031,000029," +
+    String compactionLogFile3 = "C 1000 000027,000030,000028,000031,000029," +
         "000039,000037,000035,000033:000040,000044,000042,000043,000046," +
         "000041,000045\n"
         + "S 3000 snapshotId3 " +
         (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
 
-    String compactionLogFile4 = "C 4 000040,000044,000042,000043,000046," +
+    String compactionLogFile4 = "C 1000 000040,000044,000042,000043,000046," +
         "000041,000045,000054,000052,000050,000048:000059,000055,000056," +
         "000060,000057,000058\n"
         + "S 3000 snapshotId4 " +
         (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
 
-    String compactionLogFileWithoutSnapshot1 = "C 1 000015,000013,000011," +
+    String compactionLogFileWithoutSnapshot1 = "C 1000 000015,000013,000011," +
         "000009:000018,000016,000017\n" +
-        "C 2 000018,000016,000017,000026,000024,000022,000020:000027,000030," +
+        "C 2000 000018,000016,000017,000026,000024,000022,000020:000027,000030," +
         "000028,000031,000029\n";
 
-    String compactionLogFileWithoutSnapshot2 = "C 3 000027,000030,000028," +
+    String compactionLogFileWithoutSnapshot2 = "C 3000 000027,000030,000028," +
         "000031,000029,000039,000037,000035,000033:000040,000044,000042," +
         "000043,000046,000041,000045\n";
 
-    String compactionLogFileWithoutSnapshot3 = "C 4 000040,000044,000042," +
+    String compactionLogFileWithoutSnapshot3 = "C 4000 000040,000044,000042," +
         "000043,000046,000041,000045,000054,000052,000050,000048:000059," +
         "000055,000056,000060,000057,000058\n";
 
