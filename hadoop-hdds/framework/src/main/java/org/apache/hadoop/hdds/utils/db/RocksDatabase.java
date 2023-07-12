@@ -243,7 +243,7 @@ public final class RocksDatabase implements Closeable {
       }
     }
 
-    public long getLatestSequenceNumber() {
+    public long getLatestSequenceNumber() throws IOException {
       return RocksDatabase.this.getLatestSequenceNumber();
     }
 
@@ -508,9 +508,9 @@ public final class RocksDatabase implements Closeable {
 
   /**
    * @param cfName columnFamily on which flush will run.
-   * @throws IOException
    */
   public void flush(String cfName) throws IOException {
+    assertClose();
     ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
       options.setWaitForFlush(true);
@@ -555,6 +555,7 @@ public final class RocksDatabase implements Closeable {
 
   public void compactRangeDefault(final ManagedCompactRangeOptions options)
       throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       db.get().compactRange(null, null, null, options);
@@ -567,13 +568,15 @@ public final class RocksDatabase implements Closeable {
   }
 
   public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    assertClose();
     compactRangeDefault(options);
     for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
       compactRange(columnFamily, null, null, options);
     }
   }
 
-  public int getLiveFilesMetaDataSize() {
+  public int getLiveFilesMetaDataSize() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLiveFilesMetaData().size();
@@ -584,9 +587,9 @@ public final class RocksDatabase implements Closeable {
 
   /**
    * @param cfName columnFamily on which compaction will run.
-   * @throws IOException
    */
   public void compactRange(String cfName) throws IOException {
+    assertClose();
     ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try {
       if (handle != null) {
@@ -604,6 +607,7 @@ public final class RocksDatabase implements Closeable {
 
   private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
       throws IOException {
+    assertClose();
     for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
       try {
         String table = new String(cf.getName(), StandardCharsets.UTF_8);
@@ -621,6 +625,7 @@ public final class RocksDatabase implements Closeable {
   public void compactRange(ColumnFamily family, final byte[] begin,
       final byte[] end, final ManagedCompactRangeOptions options)
       throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       db.get().compactRange(family.getHandle(), begin, end, options);
@@ -632,7 +637,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public List<LiveFileMetaData> getLiveFilesMetaData() {
+  public List<LiveFileMetaData> getLiveFilesMetaData() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLiveFilesMetaData();
@@ -823,7 +829,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public long getLatestSequenceNumber() {
+  public long getLatestSequenceNumber() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLatestSequenceNumber();
@@ -924,7 +931,8 @@ public final class RocksDatabase implements Closeable {
   }
 
   @VisibleForTesting
-  public List<LiveFileMetaData> getSstFileList() {
+  public List<LiveFileMetaData> getSstFileList() throws IOException {
+    assertClose();
     return db.get().getLiveFilesMetaData();
   }
 
@@ -932,7 +940,7 @@ public final class RocksDatabase implements Closeable {
    * return the max compaction level of sst files in the db.
    * @return level
    */
-  private int getLastLevel() {
+  private int getLastLevel() throws IOException {
     return getSstFileList().stream()
         .max(Comparator.comparing(LiveFileMetaData::level)).get().level();
   }
@@ -941,12 +949,12 @@ public final class RocksDatabase implements Closeable {
    * Deletes sst files which do not correspond to prefix
    * for given table.
    * @param prefixPairs, a list of pair (TableName,prefixUsed).
-   * @throws RocksDBException
    */
   public void deleteFilesNotMatchingPrefix(
       List<Pair<String, String>> prefixPairs,
       BooleanTriFunction<String, String, String, Boolean> filterFunction)
-      throws RocksDBException {
+      throws IOException, RocksDBException {
+    assertClose();
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
       String sstFileColumnFamily =
           new String(liveFileMetaData.columnFamilyName(),

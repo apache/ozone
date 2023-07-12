@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -13,22 +14,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-source:
-  - path: ../../definitions
-import:
-  - path: ozone
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: ozone/scm-ha
-    - type: ozone/persistence
-  - path: ozone/freon
-    destination: freon
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: kustomize
-transformations:
-  - type: Namespace
-  - type: kustomize
 
+set -eu -o pipefail
+
+export K8S_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+cd "$K8S_DIR"
+
+# shellcheck source=/dev/null
+source "../testlib.sh"
+
+pre_run_setup
+
+execute_robot_test scm-0 smoketest/basic/basic.robot
