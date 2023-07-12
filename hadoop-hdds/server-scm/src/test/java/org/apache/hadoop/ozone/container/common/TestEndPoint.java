@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -168,9 +169,6 @@ public class TestEndPoint {
    */
   @Test
   public void testDeletedContainersClearedOnStartup() throws Exception {
-    // TODO HDDS-8770. If cleanup of RocksDB is no longer required on tmp dir
-    //  cleanup, this test can be removed.
-
     OzoneConfiguration conf = SCMTestUtils.getConf();
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
         true);
@@ -187,6 +185,9 @@ public class TestEndPoint {
       // in order to delete during datanode startup or shutdown
       KeyValueContainerUtil.moveToDeletedContainerDir(
           kvContainer.getContainerData(), hddsVolume);
+      Path containerTmpPath = KeyValueContainerUtil.getTmpDirectoryPath(
+          kvContainer.getContainerData(), hddsVolume);
+      Assertions.assertTrue(containerTmpPath.toFile().exists());
 
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
 

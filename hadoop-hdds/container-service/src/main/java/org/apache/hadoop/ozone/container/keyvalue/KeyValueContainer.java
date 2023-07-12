@@ -306,7 +306,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void delete() throws StorageContainerException {
     long containerId = containerData.getContainerID();
     try {
-      KeyValueContainerUtil.removeContainer(containerData, config);
+      // Delete the Container from tmp directory.
+      File tmpDirectoryPath = KeyValueContainerUtil.getTmpDirectoryPath(
+          containerData, containerData.getVolume()).toFile();
+      FileUtils.deleteDirectory(tmpDirectoryPath);
     } catch (StorageContainerException ex) {
       // Disk needs replacement.
       throw ex;
@@ -366,7 +369,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public void markContainerForDelete() throws StorageContainerException {
+  public void markContainerForDelete() {
     writeLock();
     ContainerDataProto.State prevState = containerData.getState();
     try {

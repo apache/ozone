@@ -239,7 +239,6 @@ public class HddsVolume extends StorageVolume {
       // populate the container metadata based on the values in RocksDB.
       // The container is in the tmp directory,
       // so it won't be loaded in the container set
-      // but there will be orphaned entries in the volume's RocksDB.
       // --------------------------------------------
       try {
         if (containerDir.isDirectory()) {

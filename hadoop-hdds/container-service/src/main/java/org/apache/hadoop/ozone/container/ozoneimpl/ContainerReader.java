@@ -214,8 +214,7 @@ public class ContainerReader implements Runnable {
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
           if (shouldDeleteRecovering) {
-            KeyValueContainerUtil.removeContainerDB(
-                kvContainer.getContainerData(), hddsVolume.getConf());
+            cleanupContainer(hddsVolume, kvContainer);
             kvContainer.delete();
             LOG.info("Delete recovering container {}.",
                 kvContainer.getContainerData().getContainerID());
@@ -223,7 +222,7 @@ public class ContainerReader implements Runnable {
           return;
         }
         if (kvContainer.getContainerState() == DELETED) {
-          cleanupDeletedContainer(hddsVolume, kvContainer);
+          cleanupContainer(hddsVolume, kvContainer);
           return;
         }
         containerSet.addContainer(kvContainer);
@@ -241,18 +240,19 @@ public class ContainerReader implements Runnable {
     }
   }
 
-  private void cleanupDeletedContainer(
+  private void cleanupContainer(
       HddsVolume volume, KeyValueContainer kvContainer) {
     try {
-      LOG.info("Cleanup container {} with DELETED state.",
+      LOG.info("Cleanup container {}.",
           kvContainer.getContainerData().getContainerID());
-      KeyValueContainerUtil.removeContainerDB(kvContainer.getContainerData(),
+      // container information from db is removed for V3
+      // and container moved to tmp folder
+      // then container content removed from tmp folder
+      KeyValueContainerUtil.removeContainer(kvContainer.getContainerData(),
           volume.getConf());
-      KeyValueContainerUtil.moveToDeletedContainerDir(
-          kvContainer.getContainerData(), volume);
       kvContainer.delete();
     } catch (IOException ex) {
-      LOG.warn("Failed to remove container {} in DELETED state.",
+      LOG.warn("Failed to remove container {}.",
           kvContainer.getContainerData().getContainerID(), ex);
     }
   }
