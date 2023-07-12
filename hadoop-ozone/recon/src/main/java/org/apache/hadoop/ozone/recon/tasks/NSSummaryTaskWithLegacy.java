@@ -90,11 +90,13 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
         OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
         Object value = keyTableUpdateEvent.getValue();
         Object oldValue = keyTableUpdateEvent.getOldValue();
-        // Check if values are instance of OmKeyInfo
-        if (!isOmKeyInfo(value)) {
+        if (!(value instanceof OmKeyInfo)) {
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+              value.getClass().getName(), updatedKey);
           continue;
         }
         OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
 
         // KeyTable entries belong to both Legacy and OBS buckets.
         // Check bucket layout and if it's OBS
@@ -126,8 +128,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
             break;
 
           case UPDATE:
-            if (oldValue != null && isOmKeyInfo(oldValue)) {
-              OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+            if (oldKeyInfo != null) {
               // delete first, then put
               setKeyParentID(oldKeyInfo);
               handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
@@ -152,8 +153,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
           OmDirectoryInfo oldDirectoryInfo = null;
 
-          if (oldValue != null && isOmKeyInfo(oldValue)) {
-            OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+          if (oldKeyInfo != null) {
             oldDirectoryInfo =
                 new OmDirectoryInfo.Builder()
                     .setName(oldKeyInfo.getKeyName())
@@ -204,22 +204,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
 
     LOG.info("Completed a process run of NSSummaryTaskWithLegacy");
     return true;
-  }
-
-  /**
-   * Checks if the object passed is an instance of `OmKeyInfo`.
-   *
-   * @param obj The object to check.
-   * @return True if the object is an instance of `OmKeyInfo`, false otherwise.
-   */
-  private boolean isOmKeyInfo(Object obj) {
-    if (obj instanceof OmKeyInfo) {
-      return true;
-    } else {
-      LOG.warn("Unexpected value type {} for key. Skipping processing.",
-          obj.getClass().getName());
-      return false;
-    }
   }
 
   public boolean reprocessWithLegacy(OMMetadataManager omMetadataManager) {

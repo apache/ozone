@@ -158,62 +158,48 @@ public class FileSizeCountTask implements ReconOmTask {
       String updatedKey = omdbUpdateEvent.getKey();
       Object value = omdbUpdateEvent.getValue();
       Object oldValue = omdbUpdateEvent.getOldValue();
-      // Check if values are instance of OmKeyInfo
-      if (!isOmKeyInfo(value)) {
-        continue;
-      }
-      OmKeyInfo omKeyInfo = (OmKeyInfo) value;
 
-      try {
-        switch (omdbUpdateEvent.getAction()) {
-        case PUT:
-          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-          break;
+      if (value instanceof OmKeyInfo) {
+        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
 
-        case DELETE:
-          handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
-          break;
-
-        case UPDATE:
-          if (oldValue != null && isOmKeyInfo(oldValue)) {
-            OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
-            handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+        try {
+          switch (omdbUpdateEvent.getAction()) {
+          case PUT:
             handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-          } else {
-            LOG.warn("Update event does not have the old keyInfo for {}.",
-                updatedKey);
-          }
-          break;
+            break;
 
-        default:
-          LOG.trace("Skipping DB update event : {}",
-              omdbUpdateEvent.getAction());
+          case DELETE:
+            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+            break;
+
+          case UPDATE:
+            if (omKeyInfoOld != null) {
+              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.",
+                  updatedKey);
+            }
+            break;
+
+          default:
+            LOG.trace("Skipping DB update event : {}",
+                omdbUpdateEvent.getAction());
+          }
+        } catch (Exception e) {
+          LOG.error("Unexpected exception while processing key {}.",
+              updatedKey, e);
+          return new ImmutablePair<>(getTaskName(), false);
         }
-      } catch (Exception e) {
-        LOG.error("Unexpected exception while processing key {}.",
-            updatedKey, e);
-        return new ImmutablePair<>(getTaskName(), false);
+      } else {
+        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+            value.getClass().getName(), updatedKey);
       }
     }
     writeCountsToDB(false, fileSizeCountMap);
     LOG.info("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
-  }
-
-  /**
-   * Checks if the object passed is an instance of `OmKeyInfo`.
-   *
-   * @param obj The object to check.
-   * @return True if the object is an instance of `OmKeyInfo`, false otherwise.
-   */
-  private boolean isOmKeyInfo(Object obj) {
-    if (obj instanceof OmKeyInfo) {
-      return true;
-    } else {
-      LOG.warn("Unexpected value type {} for key. Skipping processing.",
-          obj.getClass().getName());
-      return false;
-    }
   }
 
   /**
