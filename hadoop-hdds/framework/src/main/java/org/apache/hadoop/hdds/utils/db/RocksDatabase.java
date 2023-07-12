@@ -958,7 +958,6 @@ public final class RocksDatabase implements Closeable {
       BooleanTriFunction<String, String, String, Boolean> filterFunction)
       throws IOException, RocksDBException {
     assertClose();
-    List<File> filesToBeDeleted = new ArrayList<>();
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
       String sstFileColumnFamily =
           new String(liveFileMetaData.columnFamilyName(),
@@ -991,16 +990,8 @@ public final class RocksDatabase implements Closeable {
                   + " {} from db: {}", sstFileName,
               liveFileMetaData.columnFamilyName(), db.get().getName());
           db.get().deleteFile(sstFileName);
-          filesToBeDeleted.add(new File(liveFileMetaData.path(),
-              liveFileMetaData.fileName()));
         }
       }
-    }
-
-    Iterator<File> files = filesToBeDeleted.iterator();
-    while (files.hasNext()) {
-      RdbUtil.waitForFileDelete(files.next(),
-          Duration.ofSeconds(60));
     }
   }
 
