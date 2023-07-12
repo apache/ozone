@@ -289,6 +289,7 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID));
 
+    KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
     container.delete();
     containerSet.removeContainer(testContainerID);
     Assert.assertFalse(containerSet.getContainerMapCopy()
@@ -478,9 +479,11 @@ public class TestContainerPersistence {
         .collect(Collectors.toSet());
     Assert.assertEquals(2, deleteDirFiles.size());
 
-    File container1Dir = new File(container1Data.getContainerPath());
+    File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container1Data, hddsVolume).toFile();
     Assert.assertTrue(deleteDirFiles.contains(container1Dir));
-    File container2Dir = new File(container2Data.getContainerPath());
+    File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container2Data, hddsVolume).toFile();
     Assert.assertTrue(deleteDirFiles.contains(container2Dir));
 
     // Delete container1 from the disk. Container2 should remain in the
