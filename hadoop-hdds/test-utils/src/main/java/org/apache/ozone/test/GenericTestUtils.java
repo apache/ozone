@@ -329,14 +329,14 @@ public abstract class GenericTestUtils {
       return Log4j2Capturer.getInstance();
     }
 
+    public String getOutput() {
+      return writer().toString();
+    }
+
     public abstract void stopCapturing();
 
     protected StringWriter writer() {
       return sw;
-    }
-
-    public String getOutput() {
-      return writer().toString();
     }
 
     public void clearOutput() {
