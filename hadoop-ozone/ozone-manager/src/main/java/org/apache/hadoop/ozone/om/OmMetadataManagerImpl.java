@@ -1018,10 +1018,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // we iterate through the table.
           // Check in table whether it is deleted or still present.
           if (table.getIfExist(kv.getKey()) == null) {
-            kv = keyIter.next();
             if (!keyIter.hasNext()) {
               break;
             }
+            kv = keyIter.next();
             continue;
           }
           // Still in table and no entry in cache
