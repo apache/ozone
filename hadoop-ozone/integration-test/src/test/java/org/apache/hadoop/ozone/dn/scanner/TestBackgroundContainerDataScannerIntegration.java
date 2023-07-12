@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,7 +72,7 @@ public class TestBackgroundContainerDataScannerIntegration
   public TestBackgroundContainerDataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
-    logCapturer = LogCapturer.log4j2(ContainerLogger.LOG_NAME);
+    logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
   }
 
   /**

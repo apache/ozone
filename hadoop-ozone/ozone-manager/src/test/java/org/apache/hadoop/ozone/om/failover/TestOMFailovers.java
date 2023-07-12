@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.event.Level;
@@ -58,7 +57,7 @@ public class TestOMFailovers {
     testException = new AccessControlException();
 
     GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
-    LogCapturer logCapturer = LogCapturer
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(OMFailoverProxyProviderBase.LOG);
 
     MockFailoverProxyProvider failoverProxyProvider =

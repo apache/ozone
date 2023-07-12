@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
 
@@ -76,8 +77,6 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createEndpoint;
-
-import org.apache.ozone.test.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -262,7 +261,7 @@ public class TestEndPoint {
     conf.setFromObject(new ReplicationConfig().setPort(0));
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
-      LogCapturer logCapturer = LogCapturer
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(VersionEndpointTask.LOG);
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(

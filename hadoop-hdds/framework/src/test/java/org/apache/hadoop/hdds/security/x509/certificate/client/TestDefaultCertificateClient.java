@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.ozone.test.LogCapturer;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -383,7 +382,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testInitCertAndKeypairValidationFailures() throws Exception {
-    LogCapturer dnClientLog = LogCapturer
+    GenericTestUtils.LogCapturer dnClientLog = GenericTestUtils.LogCapturer
         .captureLogs(dnCertClient.getLogger());
     KeyPair keyPair = keyGenerator.generateKey();
     KeyPair keyPair1 = keyGenerator.generateKey();

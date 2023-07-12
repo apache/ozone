@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -687,7 +686,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testAddContainerWithClosedPipelineScmStart() throws Exception {
-    LogCapturer logCapturer = LogCapturer.
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.
             captureLogs(LoggerFactory.getLogger(PipelineStateMap.class));
     SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
@@ -733,7 +732,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineCloseFlow() throws IOException, TimeoutException {
-    LogCapturer logCapturer = LogCapturer
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
             .captureLogs(LoggerFactory.getLogger(PipelineManagerImpl.class));
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline pipeline = pipelineManager.createPipeline(

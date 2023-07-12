@@ -60,7 +60,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.Assert;
@@ -81,7 +80,7 @@ public class TestHddsSecureDatanodeInit {
   private static String[] args = new String[]{};
   private static PrivateKey privateKey;
   private static PublicKey publicKey;
-  private static LogCapturer dnLogs;
+  private static GenericTestUtils.LogCapturer dnLogs;
   private static SecurityConfig securityConfig;
   private static KeyCodec keyCodec;
   private static CertificateCodec certCodec;
@@ -119,7 +118,7 @@ public class TestHddsSecureDatanodeInit {
         return mock(SCMSecurityProtocolClientSideTranslatorPB.class);
       }
     };
-    dnLogs = LogCapturer.captureLogs(getLogger());
+    dnLogs = GenericTestUtils.LogCapturer.captureLogs(getLogger());
     callQuietly(() -> {
       service.start(conf);
       return null;

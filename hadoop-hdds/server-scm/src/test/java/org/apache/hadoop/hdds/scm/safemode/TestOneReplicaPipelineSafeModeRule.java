@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -133,8 +132,8 @@ public class TestOneReplicaPipelineSafeModeRule {
     int pipelineCountOne = 0;
     setup(nodes, pipelineFactorThreeCount, pipelineCountOne);
 
-    LogCapturer logCapturer =
-        LogCapturer.captureLogs(
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
@@ -168,8 +167,8 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     setup(nodes, pipelineCountThree, pipelineCountOne);
 
-    LogCapturer logCapturer =
-        LogCapturer.captureLogs(
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines =

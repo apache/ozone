@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.After;
 import org.junit.Assert;
@@ -314,7 +313,7 @@ public class TestReplicationSupervisor {
 
     replicatorRef.set(replicator);
 
-    LogCapturer logCapturer = LogCapturer
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(DownloadAndImportReplicator.LOG);
 
     supervisor.addTask(createTask(1L));

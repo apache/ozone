@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
 
-import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -439,8 +438,8 @@ public class TestKeyValueHandler {
 
       // Case 3:  Delete Container on a failed volume
       hddsVolume.failVolume();
-      LogCapturer kvHandlerLogs =
-          LogCapturer.captureLogs(KeyValueHandler.getLogger());
+      GenericTestUtils.LogCapturer kvHandlerLogs =
+          GenericTestUtils.LogCapturer.captureLogs(KeyValueHandler.getLogger());
       kvHandler.deleteContainer(containerSet.getContainer(container2ID), true);
       String expectedLog =
           "Delete container issued on containerID 2 which is " +

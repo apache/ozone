@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -271,7 +270,7 @@ public class TestOzoneContainerWithTLS {
       }
 
       // Download newly created container will fail because of cert expired
-      LogCapturer logCapture = LogCapturer
+      GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
           .captureLogs(SimpleContainerDownloader.LOG);
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);

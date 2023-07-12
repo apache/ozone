@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateCli
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -199,8 +198,8 @@ public class TestRootCARotationManager {
 
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
-    LogCapturer logs =
-        LogCapturer.captureLogs(RootCARotationManager.LOG);
+    GenericTestUtils.LogCapturer logs =
+        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
     GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
@@ -232,8 +231,8 @@ public class TestRootCARotationManager {
 
     rootCARotationManager = new RootCARotationManager(scm);
     rootCARotationManager.setRootCARotationHandler(handler);
-    LogCapturer logs =
-        LogCapturer.captureLogs(RootCARotationManager.LOG);
+    GenericTestUtils.LogCapturer logs =
+        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
     GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();

@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -429,7 +428,7 @@ public class TestOmSnapshotManager {
   @Test
   public void testCreateSnapshotIdempotent() throws Exception {
     // set up db tables
-    LogCapturer logCapturer = LogCapturer
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(OmSnapshotManager.LOG);
     Table<String, OmVolumeArgs> volumeTable = mock(Table.class);
     Table<String, OmBucketInfo> bucketTable = mock(Table.class);

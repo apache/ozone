@@ -66,7 +66,6 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -131,7 +130,7 @@ public class TestLegacyReplicationManager {
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
   private ContainerManager containerManager;
-  private LogCapturer scmLogs;
+  private GenericTestUtils.LogCapturer scmLogs;
   private SCMServiceManager serviceManager;
   private TestClock clock;
   private File testDir;
@@ -152,7 +151,7 @@ public class TestLegacyReplicationManager {
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
-    scmLogs = LogCapturer.
+    scmLogs = GenericTestUtils.LogCapturer.
         captureLogs(LegacyReplicationManager.LOG);
     containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();

@@ -34,6 +34,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -305,6 +306,43 @@ public abstract class GenericTestUtils {
     return dir.delete();
   }
 
+  /**
+   * Class to capture logs for doing assertions.
+   */
+  public abstract static class LogCapturer {
+    private final StringWriter sw = new StringWriter();
+
+    public static LogCapturer captureLogs(Logger logger) {
+      return new Log4j1Capturer(logger);
+    }
+
+    public static LogCapturer captureLogs(Logger logger, Layout layout) {
+      return new Log4j1Capturer(logger, layout);
+    }
+
+    public static LogCapturer captureLogs(org.slf4j.Logger logger) {
+      return new Log4j1Capturer(toLog4j(logger));
+    }
+
+    // TODO: let Log4j2Capturer capture only specific logger's logs
+    public static LogCapturer log4j2(String ignoredLoggerName) {
+      return Log4j2Capturer.getInstance();
+    }
+
+    public abstract void stopCapturing();
+
+    protected StringWriter writer() {
+      return sw;
+    }
+
+    public String getOutput() {
+      return writer().toString();
+    }
+
+    public void clearOutput() {
+      writer().getBuffer().setLength(0);
+    }
+  }
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());

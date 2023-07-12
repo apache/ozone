@@ -20,7 +20,7 @@ package org.apache.ozone.test;
 /**
  * Capture Log4j1 logs.
  */
-class Log4j1Capturer extends LogCapturer {
+class Log4j1Capturer extends GenericTestUtils.LogCapturer {
   private final org.apache.log4j.Appender appender;
   private final org.apache.log4j.Logger logger;
 
@@ -43,7 +43,7 @@ class Log4j1Capturer extends LogCapturer {
     this(logger, getDefaultLayout());
   }
 
-  private Log4j1Capturer(org.apache.log4j.Logger logger,
+  Log4j1Capturer(org.apache.log4j.Logger logger,
       org.apache.log4j.Layout layout) {
     this.logger = logger;
     this.appender = new org.apache.log4j.WriterAppender(layout, writer());

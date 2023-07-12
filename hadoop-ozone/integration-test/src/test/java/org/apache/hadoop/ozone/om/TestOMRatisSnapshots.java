@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
@@ -242,8 +241,8 @@ public class TestOMRatisSnapshots {
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
-    LogCapturer logCapture =
-        LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
@@ -755,8 +754,8 @@ public class TestOMRatisSnapshots {
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
-    LogCapturer logCapture =
-        LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
 
     // Continuously create new keys
     ExecutorService executor = Executors.newFixedThreadPool(1);
@@ -856,8 +855,8 @@ public class TestOMRatisSnapshots {
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
-    LogCapturer logCapture =
-        LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
 
     // Continuously read keys
     ExecutorService executor = Executors.newFixedThreadPool(1);
@@ -930,8 +929,8 @@ public class TestOMRatisSnapshots {
     }
     cluster.startInactiveOM(followerNodeId);
     GenericTestUtils.setLogLevel(OzoneManager.LOG, Level.INFO);
-    LogCapturer logCapture =
-        LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
 
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
     OzoneManagerRatisServer followerRatisServer = followerOM.getOmRatisServer();
@@ -1014,8 +1013,8 @@ public class TestOMRatisSnapshots {
     }
 
     GenericTestUtils.setLogLevel(OzoneManager.LOG, Level.INFO);
-    LogCapturer logCapture =
-        LogCapturer.captureLogs(OzoneManager.LOG);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
     followerOM.setExitManagerForTesting(new DummyExitManager());
     // Install corrupted checkpoint
     followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
@@ -1091,7 +1090,7 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  private void assertLogCapture(LogCapturer logCapture,
+  private void assertLogCapture(GenericTestUtils.LogCapturer logCapture,
                               String msg)
       throws InterruptedException, TimeoutException {
     GenericTestUtils.waitFor(() -> {

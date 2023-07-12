@@ -29,7 +29,7 @@ import java.io.Writer;
 /**
  * Capture Log4j2 logs.
  */
-final class Log4j2Capturer extends LogCapturer {
+final class Log4j2Capturer extends GenericTestUtils.LogCapturer {
   private static final String APPENDER_NAME = "capture";
 
   private static final Log4j2Capturer INSTANCE = new Log4j2Capturer();

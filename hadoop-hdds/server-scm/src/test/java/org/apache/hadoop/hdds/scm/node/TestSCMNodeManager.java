@@ -79,7 +79,6 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
-import org.apache.ozone.test.LogCapturer;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -896,7 +895,7 @@ public class TestSCMNodeManager {
     // than SCM should not be found in the cluster.
     DatanodeDetails node1 =
         HddsTestUtils.createRandomDatanodeAndRegister(nodeManager);
-    LogCapturer logCapturer = LogCapturer
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(SCMNodeManager.LOG);
     int scmMlv =
         nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();

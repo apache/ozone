@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
-import org.apache.ozone.test.LogCapturer;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -185,8 +185,10 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
 
-    LogCapturer logs = LogCapturer.captureLogs(
-        LoggerFactory.getLogger(OMVolumeSetQuotaRequest.class));
+    GenericTestUtils.LogCapturer logs =
+            GenericTestUtils.LogCapturer.captureLogs(
+                    LoggerFactory.getLogger(OMVolumeSetQuotaRequest.class)
+            );
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1,
