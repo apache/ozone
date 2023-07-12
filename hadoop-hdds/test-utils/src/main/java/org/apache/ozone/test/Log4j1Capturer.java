@@ -17,36 +17,39 @@
  */
 package org.apache.ozone.test;
 
+import org.apache.log4j.Appender;
+import org.apache.log4j.Layout;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
+import org.apache.log4j.WriterAppender;
+
 /**
  * Capture Log4j1 logs.
  */
 class Log4j1Capturer extends GenericTestUtils.LogCapturer {
-  private final org.apache.log4j.Appender appender;
-  private final org.apache.log4j.Logger logger;
+  private final Appender appender;
+  private final Logger logger;
 
-  private static org.apache.log4j.Layout getDefaultLayout() {
-    org.apache.log4j.Logger rootLogger =
-        org.apache.log4j.Logger.getRootLogger();
+  private static Layout getDefaultLayout() {
+    Logger rootLogger = Logger.getRootLogger();
 
-    org.apache.log4j.Appender defaultAppender =
-        rootLogger.getAppender("stdout");
+    Appender defaultAppender = rootLogger.getAppender("stdout");
     if (defaultAppender == null) {
       defaultAppender = rootLogger.getAppender("console");
     }
 
-    return (defaultAppender == null)
-        ? new org.apache.log4j.PatternLayout()
+    return defaultAppender == null
+        ? new PatternLayout()
         : defaultAppender.getLayout();
   }
 
-  Log4j1Capturer(org.apache.log4j.Logger logger) {
+  Log4j1Capturer(Logger logger) {
     this(logger, getDefaultLayout());
   }
 
-  Log4j1Capturer(org.apache.log4j.Logger logger,
-      org.apache.log4j.Layout layout) {
+  Log4j1Capturer(Logger logger, Layout layout) {
     this.logger = logger;
-    this.appender = new org.apache.log4j.WriterAppender(layout, writer());
+    this.appender = new WriterAppender(layout, writer());
     logger.addAppender(appender);
   }
 
