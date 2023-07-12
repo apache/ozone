@@ -193,7 +193,7 @@ public class TestS3InitiateMultipartUploadRequest
         .get(bucketKey).getAcls();
     Assert.assertEquals(acls, bucketAcls);
 
-    // create file inherit bucket DEFAULT acls
+    // create file with acls inherited from parent DEFAULT acls
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
         bucketName, keyName);
 
@@ -234,7 +234,8 @@ public class TestS3InitiateMultipartUploadRequest
         .findAny().orElse(null);
 
     // Should inherit parent DEFAULT Acls
-    Assert.assertEquals("Failed to inherit parent DEFAULT acls!,",
+    // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
+    Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
         parentDefaultAcl.stream()
             .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls);

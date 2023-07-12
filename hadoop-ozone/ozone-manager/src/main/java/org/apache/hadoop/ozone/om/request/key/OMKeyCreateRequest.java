@@ -240,12 +240,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             bucketInfo.getBucketName(), bucketInfo.getBucketLayout());
       }
 
-      OMFileRequest.OMPathInfo pathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName));
+      OMFileRequest.OMPathInfo pathInfo = null;
 
       if (bucketInfo.getBucketLayout()
           .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+        pathInfo = OMFileRequest.verifyFilesInPath(omMetadataManager,
+            volumeName, bucketName, keyName, Paths.get(keyName));
         OMFileRequest.OMDirectoryResult omDirectoryResult =
             pathInfo.getDirectoryResult();
 

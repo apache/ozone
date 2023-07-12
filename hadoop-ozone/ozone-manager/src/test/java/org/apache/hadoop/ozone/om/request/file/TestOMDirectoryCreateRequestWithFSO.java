@@ -670,7 +670,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
     acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
 
-    // create bucket with DEFAULT acls
+    // Create bucket with DEFAULT acls
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -687,7 +687,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     final long bucketId = omMetadataManager.getBucketId(volumeName,
         bucketName);
 
-    // Create sub dirs
+    // Create dir with acls inherited from parent DEFAULT acls
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
         keyName);
     OMDirectoryCreateRequestWithFSO omDirCreateReqFSO =
@@ -717,7 +717,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
     List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
         .collect(Collectors.toList());
+    System.out.println("expectedInheritAcls: " + expectedInheritAcls);
 
+    // dir should inherit parent DEFAULT acls and self has DEFAULT scope
+    // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
       String dbKey = "";
@@ -727,8 +730,10 @@ public class TestOMDirectoryCreateRequestWithFSO {
       OmDirectoryInfo omDirInfo =
           omMetadataManager.getDirectoryTable().get(dbKey);
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
+      System.out.println(
+          "  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
 
-      Assert.assertEquals("Failed to inherit parent DEAFULT acls!,",
+      Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
           expectedInheritAcls, omDirAcls);
 
       parentID = omDirInfo.getObjectID();

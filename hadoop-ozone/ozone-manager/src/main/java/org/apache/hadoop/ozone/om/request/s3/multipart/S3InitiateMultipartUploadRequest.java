@@ -154,10 +154,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      OMFileRequest.OMPathInfo pathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName));
-
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
       // ever finally commit the key, we see that key in ozone. Suppose if we
@@ -183,6 +179,13 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // initiate MPU.
       final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
           .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+
+      OMFileRequest.OMPathInfo pathInfo = null;
+      if (bucketInfo != null && bucketInfo.getBucketLayout()
+          .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
+        pathInfo = OMFileRequest.verifyFilesInPath(omMetadataManager,
+            volumeName, bucketName, keyName, Paths.get(keyName));
+      }
       final ReplicationConfig replicationConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),

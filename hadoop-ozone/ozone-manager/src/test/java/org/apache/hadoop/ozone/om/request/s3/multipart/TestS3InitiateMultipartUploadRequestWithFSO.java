@@ -159,7 +159,8 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     dirs.add("a");
     dirs.add("b");
     dirs.add("c");
-    String keyName = prefix + UUID.randomUUID();
+    String fileName = UUID.randomUUID().toString();
+    String keyName = prefix + fileName;
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
@@ -179,7 +180,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         .get(bucketKey).getAcls();
     Assert.assertEquals(acls, bucketAcls);
 
-    // create file inherit bucket DEFAULT acls
+    // create dir with acls inherited from parent DEFAULT acls
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
         bucketName);
@@ -194,14 +195,24 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
+    // create file with acls inherited from parent DEFAULT acls
+    long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
+    String multipartOpenFileKey = omMetadataManager.getMultipartKey(volumeId,
+        bucketId, parentID, fileName,
+        modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getMultipartUploadID());
+    OmKeyInfo omKeyInfo = omMetadataManager
+        .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
+        .get(multipartOpenFileKey);
+
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    verifyKeyInheritAcls(dirs, volumeId, bucketId, bucketAcls);
+    verifyKeyInheritAcls(dirs, omKeyInfo, volumeId, bucketId, bucketAcls);
 
   }
 
-  private void verifyKeyInheritAcls(List<String> dirs,
+  private void verifyKeyInheritAcls(List<String> dirs, OmKeyInfo fileInfo,
       long volumeId, long bucketId, List<OzoneAcl> bucketAcls)
       throws IOException {
     // bucketID is the parent
@@ -209,7 +220,10 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     List<OzoneAcl> expectedInheritAcls = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
         .collect(Collectors.toList());
+    System.out.println("expectedInheritAcls: " + expectedInheritAcls);
 
+    // dir should inherit parent DEFAULT acls and self has DEFAULT scope
+    // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
     for (int indx = 0; indx < dirs.size(); indx++) {
       String dirName = dirs.get(indx);
       String dbKey = "";
@@ -220,11 +234,26 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
           omMetadataManager.getDirectoryTable().get(dbKey);
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
-      Assert.assertEquals("Failed to inherit parent DEFAULT acls!,",
+      System.out.println("  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
+      Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
           expectedInheritAcls, omDirAcls);
 
       parentID = omDirInfo.getObjectID();
       expectedInheritAcls = omDirAcls;
+
+      // file should inherit parent DEFAULT acls and self has ACCESS scope
+      // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
+      if (indx == dirs.size() - 1) {
+        // verify file acls
+        Assert.assertEquals(fileInfo.getParentObjectID(),
+            omDirInfo.getObjectID());
+        List<OzoneAcl> fileAcls = fileInfo.getAcls();
+        System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
+        Assert.assertEquals("Failed to inherit parent DEFAULT acls!",
+            expectedInheritAcls.stream()
+                .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+                .collect(Collectors.toList()), fileAcls);
+      }
     }
   }
 
