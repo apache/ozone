@@ -53,7 +53,6 @@ public class DecommissionScmSubcommand extends ScmSubcommand {
       if (response.hasErrorMsg()) {
         errorMsg = errorMsg + ", " + response.getErrorMsg();
       }
-      System.err.println(errorMsg);
       // Throwing exception to create non-zero exit code in case of failure.
       throw new IOException(errorMsg);
     } else {
