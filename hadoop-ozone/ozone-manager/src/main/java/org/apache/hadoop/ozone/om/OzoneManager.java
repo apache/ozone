@@ -3585,17 +3585,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    java.util.Optional<SstFilteringService> sstFilteringService =
-        java.util.Optional.ofNullable(
-            keyManager.getSnapshotSstFilteringService());
     DBCheckpoint omDBCheckpoint;
-    sstFilteringService.ifPresent(BackgroundService::shutdown);
-    this.getOmSnapshotManager().getSnapshotCache().invalidateAll();
     try {
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
-      sstFilteringService.ifPresent(BackgroundService::start);
       LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
       return null;
     }
@@ -3606,7 +3600,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
-      sstFilteringService.ifPresent(BackgroundService::start);
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
     return termIndex;
@@ -3640,7 +3633,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       keyManager.stop();
       stopSecretManager();
       stopTrashEmptier();
-
+      omSnapshotManager.getSnapshotCache().invalidateAll();
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
       // pending transactions in the buffer, they are discarded.
