@@ -1017,23 +1017,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // There is chance cache value flushed when
           // we iterate through the table.
           // Check in table whether it is deleted or still present.
-          if (table.getIfExist(kv.getKey()) == null) {
-            if (!keyIter.hasNext()) {
-              break;
-            }
-            kv = keyIter.next();
-            continue;
+          if (table.getIfExist(kv.getKey()) != null) {
+            // Still in table and no entry in cache
+            return true;
           }
-          // Still in table and no entry in cache
+        } else if (cacheValue.getCacheValue() != null) {
+          // Case 2a:
+          // We found a cache entry and cache value is not null.
           return true;
         }
-
-        // Case 2a:
-        // We found a cache entry and cache value is not null.
-        if (cacheValue.getCacheValue() != null) {
-          return true;
-        }
-
         // Case 2b:
         // Cache entry is present but cache value is null, hence this key is
         // marked for deletion.
