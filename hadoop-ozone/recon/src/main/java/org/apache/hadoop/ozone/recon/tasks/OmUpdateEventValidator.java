@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,7 @@ import java.io.IOException;
  */
 public class OmUpdateEventValidator {
 
-  private static final Logger LOG =
+  private static Logger log =
       LoggerFactory.getLogger(OmUpdateEventValidator.class);
   private OMDBDefinition omdbDefinition;
 
@@ -54,21 +55,27 @@ public class OmUpdateEventValidator {
                               Object keyType,
                               OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
-    Object expectedValueType = omdbDefinition.getColumnFamily(tableName)
-        .getValueType();
+
+    String expectedValueTypeString =
+        omdbDefinition.getColumnFamily(tableName).getValueType().getName();
+    String actualValueTypeString = actualValueType.getClass().getName();
+
     // Check if both objects are of the same type
-    if (expectedValueType.getClass().equals(actualValueType.getClass())) {
+    if (expectedValueTypeString.equals(actualValueTypeString)) {
       // Both objects are of the same type
       return true;
     } else {
       // Objects are not of the same type
       logError(keyType.toString(), tableName, action.toString(),
-          expectedValueType.getClass().getName(),
-          actualValueType.getClass().getName());
+          expectedValueTypeString,
+          actualValueTypeString);
       return false;
     }
   }
 
+  /**
+   * Logs an error message indicating a validation failure.
+   */
   private void logError(String keyType, String tableName, String action,
                         String expectedValueType, String actualValueType) {
     String errorMessage = String.format(
@@ -76,6 +83,12 @@ public class OmUpdateEventValidator {
             "Expected value type: %s, Actual value type: %s",
         keyType, tableName, action, expectedValueType, actualValueType);
     // Log the error message as an ERROR level log
-    LOG.error(errorMessage);
+    log.warn(errorMessage);
   }
+
+  @VisibleForTesting
+  public static void setLogger(Logger logger) {
+    OmUpdateEventValidator.log = logger;
+  }
+
 }
