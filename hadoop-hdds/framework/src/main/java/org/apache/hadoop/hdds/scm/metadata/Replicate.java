@@ -40,6 +40,11 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Replicate {
-  public enum InvocationType {DIRECT, CLIENT}
+  /**
+   * For DIRECT, the call will be directly submitted to Ratis Server.
+   * <br>
+   * For CLIENT, the call will be submitted to Ratis Server via Ratis Client.
+   */
+  enum InvocationType { DIRECT, CLIENT }
   InvocationType invocationType() default InvocationType.DIRECT;
 }

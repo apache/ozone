@@ -105,10 +105,10 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     }
     try {
       switch (method.getAnnotation(Replicate.class).invocationType()) {
-        case CLIENT:
+      case CLIENT:
         return invokeRatisClient(method, args);
-        case DIRECT:
-        default:
+      case DIRECT:
+      default:
         return invokeRatisServer(method, args);
       }
     } catch (Exception e) {
