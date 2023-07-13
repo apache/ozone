@@ -51,11 +51,13 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
       = new HashMap<>();
   private OMDBDefinition omdbDefinition;
+  private OmUpdateEventValidator omUpdateEventValidator;
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
     omdbDefinition = new OMDBDefinition();
+    omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
   }
 
   @Override
@@ -127,16 +129,34 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
 
       if (action == PUT) {
         final Object value = cf.getValueCodec().fromPersistedFormat(valueBytes);
+
+        // If the updated value is not valid for this event, we skip it.
+        if (!omUpdateEventValidator.isValidEvent(tableName, value, key,
+            action)) {
+          return;
+        }
+
         builder.setValue(value);
         // If a PUT operation happens on an existing Key, it is tagged
         // as an "UPDATE" event.
         if (oldValue != null) {
+
+          // If the oldValue is not valid for this event, we skip it.
+          if (!omUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+              action)) {
+            return;
+          }
+
           builder.setOldValue(oldValue);
           if (latestEvent == null || latestEvent.getAction() != DELETE) {
             builder.setAction(UPDATE);
           }
         }
       } else if (action.equals(DELETE)) {
+        if (oldValue != null && !omUpdateEventValidator.isValidEvent(tableName,
+            oldValue, key, action)) {
+          return;
+        }
         // When you delete a Key, we add the old value to the event so that
         // a downstream task can use it.
         builder.setValue(oldValue);
