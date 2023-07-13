@@ -147,9 +147,16 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
 
+    // Backwards compatibility with older Ozone clients that don't have this
+    // field. Defaults to false.
+    boolean forceCreationWhenVolumeExists =
+        request.hasForceCreationWhenVolumeExists()
+            && request.getForceCreationWhenVolumeExists();
+
     // Check volume existence
-    if (ozoneManager.getMetadataManager().getVolumeTable()
-        .isExist(dbVolumeKey)) {
+    if (!forceCreationWhenVolumeExists &&
+        ozoneManager.getMetadataManager().getVolumeTable().isExist(
+            dbVolumeKey)) {
       LOG.debug("volume: '{}' already exists", volumeName);
       throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
     }
@@ -186,12 +193,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       throw e;
     }
 
-    // Backwards compatibility with older Ozone clients that don't have this
-    // field. Defaults to false.
-    boolean forceCreationWhenVolumeExists =
-        request.hasForceCreationWhenVolumeExists()
-            && request.getForceCreationWhenVolumeExists();
-
     final OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
         .setCreateTenantRequest(
             CreateTenantRequest.newBuilder()
@@ -224,7 +225,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    OmVolumeArgs omVolumeArgs;
+    OmVolumeArgs omVolumeArgs = null;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     final String owner = getOmRequest().getUserInfo().getUserName();
@@ -259,46 +260,51 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName);
 
+      boolean skipVolumeCreation = false;
       // Check volume existence
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume: '{}' already exists", volumeName);
         if (forceCreationWhenVolumeExists) {
-          LOG.warn("But forceCreationWhenVolumeExists is set to true. Resuming "
+          LOG.warn("forceCreationWhenVolumeExists = true. Resuming "
               + "tenant creation despite volume '{}' existence", volumeName);
+          skipVolumeCreation = true;
         } else {
           // forceCreationWhenVolumeExists is false, throw
           throw new OMException("Volume already exists", VOLUME_ALREADY_EXISTS);
         }
       }
 
-      // Create volume
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      PersistedUserVolumeInfo volumeList = null;
+      if (!skipVolumeCreation) {
+        // Create volume
+        acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(
+            USER_LOCK, owner);
 
-      // TODO: dedup OMVolumeCreateRequest
-      omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-      omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
-      omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
-      omVolumeArgs.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omVolumeArgs.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
-      // Set volume reference count to 1
-      omVolumeArgs.incRefCount();
-      Preconditions.checkState(omVolumeArgs.getRefCount() == 1,
-          "refCount should have been set to 1");
-      // Audit
-      auditMap = omVolumeArgs.toAuditMap();
+        // TODO: dedup OMVolumeCreateRequest
+        omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
+        omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
+        omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
+        omVolumeArgs.setObjectID(
+            ozoneManager.getObjectIdFromTxId(transactionLogIndex));
+        omVolumeArgs.setUpdateID(transactionLogIndex,
+            ozoneManager.isRatisEnabled());
+        // Set volume reference count to 1
+        omVolumeArgs.incRefCount();
+        Preconditions.checkState(omVolumeArgs.getRefCount() == 1,
+            "refCount should have been set to 1");
+        // Audit
+        auditMap = omVolumeArgs.toAuditMap();
 
-      PersistedUserVolumeInfo volumeList;
-      final String dbUserKey = omMetadataManager.getUserKey(owner);
-      volumeList = omMetadataManager.getUserTable().get(dbUserKey);
-      volumeList = addVolumeToOwnerList(volumeList, volumeName, owner,
-          ozoneManager.getMaxUserVolumeCount(), transactionLogIndex);
-      createVolume(omMetadataManager, omVolumeArgs, volumeList, dbVolumeKey,
-          dbUserKey, transactionLogIndex);
-      LOG.debug("volume: '{}' successfully created", dbVolumeKey);
-
+        final String dbUserKey = omMetadataManager.getUserKey(owner);
+        volumeList = omMetadataManager.getUserTable().get(dbUserKey);
+        volumeList = addVolumeToOwnerList(volumeList, volumeName, owner,
+            ozoneManager.getMaxUserVolumeCount(), transactionLogIndex);
+        createVolume(omMetadataManager, omVolumeArgs, volumeList, dbVolumeKey,
+            dbUserKey, transactionLogIndex);
+        LOG.debug("volume: '{}' successfully created", dbVolumeKey);
+      } else {
+        LOG.info("Skipped volume '{}' creation", volumeName);
+      }
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {

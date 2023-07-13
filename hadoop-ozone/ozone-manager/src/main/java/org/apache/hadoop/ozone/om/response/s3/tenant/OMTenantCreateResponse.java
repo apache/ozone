@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
@@ -43,13 +43,13 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 })
 public class OMTenantCreateResponse extends OMClientResponse {
 
-  private OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo;
+  private PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
   private OmDBTenantState omTenantState;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo,
+      OmVolumeArgs omVolumeArgs,
+      PersistedUserVolumeInfo userVolumeInfo,
       @Nonnull OmDBTenantState omTenantState
   ) {
     super(omResponse);
@@ -75,16 +75,19 @@ public class OMTenantCreateResponse extends OMClientResponse {
     omMetadataManager.getTenantStateTable().putWithBatch(
         batchOperation, tenantId, omTenantState);
 
-    // From OMVolumeCreateResponse
-    String dbVolumeKey =
-        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
-    String dbUserKey =
-        omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
+    // omVolumeArgs and userVolumeInfo can be null when skipped volume creation
+    if (omVolumeArgs != null && userVolumeInfo != null) {
+      // From OMVolumeCreateResponse
+      String dbVolumeKey =
+          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
+      String dbUserKey =
+          omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
 
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-        dbVolumeKey, omVolumeArgs);
-    omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-        userVolumeInfo);
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+          dbVolumeKey, omVolumeArgs);
+      omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+          userVolumeInfo);
+    }
   }
 
   @VisibleForTesting
