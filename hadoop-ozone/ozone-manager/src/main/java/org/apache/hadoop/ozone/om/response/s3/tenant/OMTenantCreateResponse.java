@@ -48,7 +48,7 @@ public class OMTenantCreateResponse extends OMClientResponse {
   private OmDBTenantState omTenantState;
 
   public OMTenantCreateResponse(@Nonnull OMResponse omResponse,
-      OmVolumeArgs omVolumeArgs,
+      @Nonnull OmVolumeArgs omVolumeArgs,
       PersistedUserVolumeInfo userVolumeInfo,
       @Nonnull OmDBTenantState omTenantState
   ) {
@@ -75,16 +75,16 @@ public class OMTenantCreateResponse extends OMClientResponse {
     omMetadataManager.getTenantStateTable().putWithBatch(
         batchOperation, tenantId, omTenantState);
 
-    // omVolumeArgs and userVolumeInfo can be null when skipped volume creation
-    if (omVolumeArgs != null && userVolumeInfo != null) {
-      // From OMVolumeCreateResponse
-      String dbVolumeKey =
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
+    // From OMVolumeCreateResponse
+    String dbVolumeKey =
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        dbVolumeKey, omVolumeArgs);
+
+    // userVolumeInfo can be null when skipped volume creation
+    if (userVolumeInfo != null) {
       String dbUserKey =
           omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
-
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          dbVolumeKey, omVolumeArgs);
       omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
           userVolumeInfo);
     }

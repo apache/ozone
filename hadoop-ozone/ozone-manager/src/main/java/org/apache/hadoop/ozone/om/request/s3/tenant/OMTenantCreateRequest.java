@@ -274,13 +274,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         }
       }
 
+      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(
+          USER_LOCK, owner);
+
       PersistedUserVolumeInfo volumeList = null;
       if (!skipVolumeCreation) {
-        // Create volume
-        acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(
-            USER_LOCK, owner);
-
-        // TODO: dedup OMVolumeCreateRequest
+        // Create volume. TODO: dedup OMVolumeCreateRequest
         omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
         omVolumeArgs.setQuotaInBytes(OzoneConsts.QUOTA_RESET);
         omVolumeArgs.setQuotaInNamespace(OzoneConsts.QUOTA_RESET);
@@ -288,12 +287,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             ozoneManager.getObjectIdFromTxId(transactionLogIndex));
         omVolumeArgs.setUpdateID(transactionLogIndex,
             ozoneManager.isRatisEnabled());
-        // Set volume reference count to 1
+
         omVolumeArgs.incRefCount();
-        Preconditions.checkState(omVolumeArgs.getRefCount() == 1,
+        // Remove this check when vol ref count is also used by other features
+        Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");
-        // Audit
-        auditMap = omVolumeArgs.toAuditMap();
 
         final String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
@@ -303,8 +301,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             dbUserKey, transactionLogIndex);
         LOG.debug("volume: '{}' successfully created", dbVolumeKey);
       } else {
-        LOG.info("Skipped volume '{}' creation", volumeName);
+        LOG.info("Skipped volume '{}' creation. "
+            + "Will only increment volume refCount", volumeName);
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+
+        omVolumeArgs.incRefCount();
+        // Remove this check when vol ref count is also used by other features
+        Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
+            "refCount should have been set to 1");
+
+        omMetadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            CacheValue.get(transactionLogIndex, omVolumeArgs));
       }
+
+      // Audit
+      auditMap = omVolumeArgs.toAuditMap();
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {

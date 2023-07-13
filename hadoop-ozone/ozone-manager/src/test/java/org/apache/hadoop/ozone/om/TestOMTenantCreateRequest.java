@@ -135,7 +135,7 @@ public class TestOMTenantCreateRequest {
 
   @Test
   public void testValidateAndUpdateCacheWhenVolumeExists() throws Exception {
-    // Check that forceCreationWhenVolumeExists flag is effective
+    // Check that forceCreationWhenVolumeExists flag behaves as expected
 
     final String tenantId = UUID.randomUUID().toString();
     final String ownerName = "username";
@@ -144,7 +144,7 @@ public class TestOMTenantCreateRequest {
     //  the volume already exists.
     OMRequestTestUtils.addVolumeToDB(tenantId, ownerName, omMetadataManager);
 
-    // forceCreationWhenVolumeExists = false
+    // First with forceCreationWhenVolumeExists = false
     OMRequest originalRequest =
         OMRequestTestUtils.createTenantRequest(tenantId, false);
     OMTenantCreateRequest omTenantCreateRequest1 =
@@ -155,7 +155,7 @@ public class TestOMTenantCreateRequest {
     LambdaTestUtils.intercept(OMException.class, "VOLUME_ALREADY_EXISTS",
         () -> omTenantCreateRequest1.preExecute(ozoneManager));
 
-    // forceCreationWhenVolumeExists = true
+    // Now with forceCreationWhenVolumeExists = true
     originalRequest =
         OMRequestTestUtils.createTenantRequest(tenantId, true);
     OMTenantCreateRequest omTenantCreateRequest2 =
@@ -168,19 +168,19 @@ public class TestOMTenantCreateRequest {
 
     // Craft a request that sets forceCreationWhenVolumeExists to false to test
     //  validateAndUpdateCache.
-    CreateTenantRequest transformedRequest =
+    CreateTenantRequest reqPostPreExecute =
         omTenantCreateRequest2.getOmRequest().getCreateTenantRequest();
-    OMRequest modRequest =
+    OMRequest modReqPostPreExecute =
         omTenantCreateRequest2.getOmRequest().toBuilder()
             .setCreateTenantRequest(
                 CreateTenantRequest.newBuilder()
                     .setTenantId(tenantId)
-                    .setVolumeName(transformedRequest.getVolumeName())
-                    .setUserRoleName(transformedRequest.getUserRoleName())
-                    .setAdminRoleName(transformedRequest.getAdminRoleName())
+                    .setVolumeName(reqPostPreExecute.getVolumeName())
+                    .setUserRoleName(reqPostPreExecute.getUserRoleName())
+                    .setAdminRoleName(reqPostPreExecute.getAdminRoleName())
                     .setForceCreationWhenVolumeExists(false)).build();
     OMTenantCreateRequest modTenantCreateRequest =
-        new OMTenantCreateRequest(modRequest);
+        new OMTenantCreateRequest(modReqPostPreExecute);
     // OMResponse should have status VOLUME_ALREADY_EXISTS in this crafted case
     OMClientResponse modOMClientResponse =
         modTenantCreateRequest.validateAndUpdateCache(ozoneManager, 2L,
