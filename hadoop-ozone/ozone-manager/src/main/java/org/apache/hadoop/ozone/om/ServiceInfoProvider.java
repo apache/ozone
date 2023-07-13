@@ -68,11 +68,9 @@ final class ServiceInfoProvider {
    * @param config the current security configuration
    * @param om the OzoneManagerProtocol provides the service list
    * @param certClient the CertificateClient provides certificate information
-   *
-   * @throws IOException in case certificate operations fail
    */
   ServiceInfoProvider(SecurityConfig config, OzoneManagerProtocol om,
-      CertificateClient certClient) throws IOException {
+      CertificateClient certClient) {
     this(config, om, certClient, false);
   }
 
@@ -94,12 +92,9 @@ final class ServiceInfoProvider {
    * @param certClient the CertificateClient provides certificate information
    * @param skipInitializationForTesting if we are testing OM in secure env this
    *                                     might need to be true
-   *
-   * @throws IOException in case certificate operations fail
    */
   ServiceInfoProvider(SecurityConfig config, OzoneManagerProtocol om,
-      CertificateClient certClient, boolean skipInitializationForTesting)
-      throws IOException {
+      CertificateClient certClient, boolean skipInitializationForTesting) {
     this.om = om;
     if (config.isSecurityEnabled() && !skipInitializationForTesting) {
       this.certClient = certClient;
@@ -154,14 +149,9 @@ final class ServiceInfoProvider {
         .orElse(null);
   }
 
-  private String toPEMEncodedString(X509Certificate cert)
-      throws SCMSecurityException {
-    return cert == null ? null : CertificateCodec.getPEMEncodedString(cert);
-  }
-
-  private String toPEMEncodedStringUnsafe(X509Certificate cert) {
+  private String toPEMEncodedString(X509Certificate cert) {
     try {
-      return toPEMEncodedString(cert);
+      return cert == null ? null : CertificateCodec.getPEMEncodedString(cert);
     } catch (SCMSecurityException e) {
       throw new RuntimeException(e);
     }
@@ -169,8 +159,7 @@ final class ServiceInfoProvider {
 
   private List<String> toPEMEncodedStrings(Collection<X509Certificate> certs) {
     return certs.stream()
-        .map(this::toPEMEncodedStringUnsafe)
-        .filter(Objects::nonNull)
+        .map(this::toPEMEncodedString)
         .collect(Collectors.toList());
   }
 }
