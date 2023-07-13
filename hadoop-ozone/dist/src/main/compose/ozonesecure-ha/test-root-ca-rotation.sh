@@ -66,9 +66,11 @@ wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm | grep sc
 # wait for next root CA rotation
 wait_for_execute_command scm4.org 240 "ozone admin cert info 4"
 
+wait_for_execute_command om 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
+execute_robot_test scm4.org -v PREFIX:"rootca2" certrotation/root-ca-rotation-client-checks.robot
+
 #transfer leader to scm4.org
 execute_robot_test scm4.org -v "TARGET_SCM:scm4.org" scmha/scm-leader-transfer.robot
-execute_robot_test scm4.org -v PREFIX:"rootca" certrotation/root-ca-rotation-client-checks.robot
 
 # add new datanode4 and verify certificate
 docker-compose up -d datanode4

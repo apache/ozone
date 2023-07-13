@@ -71,11 +71,8 @@ final class ServiceInfoProvider {
    *
    * @throws IOException in case certificate operations fail
    */
-  ServiceInfoProvider(
-      SecurityConfig config,
-      OzoneManagerProtocol om,
-      CertificateClient certClient
-  ) throws IOException {
+  ServiceInfoProvider(SecurityConfig config, OzoneManagerProtocol om,
+      CertificateClient certClient) throws IOException {
     this(config, om, certClient, false);
   }
 
@@ -100,12 +97,9 @@ final class ServiceInfoProvider {
    *
    * @throws IOException in case certificate operations fail
    */
-  ServiceInfoProvider(
-      SecurityConfig config,
-      OzoneManagerProtocol om,
-      CertificateClient certClient,
-      boolean skipInitializationForTesting
-  ) throws IOException {
+  ServiceInfoProvider(SecurityConfig config, OzoneManagerProtocol om,
+      CertificateClient certClient, boolean skipInitializationForTesting)
+      throws IOException {
     this.om = om;
     if (config.isSecurityEnabled() && !skipInitializationForTesting) {
       this.certClient = certClient;
@@ -169,8 +163,7 @@ final class ServiceInfoProvider {
     try {
       return toPEMEncodedString(cert);
     } catch (SCMSecurityException e) {
-      LOG.error("Can not translate certificate {} to PEM format", cert, e);
-      return null;
+      throw new RuntimeException(e);
     }
   }
 

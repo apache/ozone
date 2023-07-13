@@ -86,9 +86,8 @@ public final class CertificateTestUtils {
    *
    * @throws Exception in case any error occurs during the certificate creation
    */
-  public static X509Certificate createSelfSignedCert(
-      KeyPair keys, String commonName
-  ) throws Exception {
+  public static X509Certificate createSelfSignedCert(KeyPair keys,
+      String commonName) throws Exception {
     return createSelfSignedCert(keys, commonName, Duration.ofDays(1));
   }
 
@@ -106,9 +105,8 @@ public final class CertificateTestUtils {
    *
    * @throws Exception in case any error occurs during the certificate creation
    */
-  public static X509Certificate createSelfSignedCert(
-      KeyPair keys, String commonName, Duration expiresIn
-  ) throws Exception {
+  public static X509Certificate createSelfSignedCert(KeyPair keys,
+      String commonName, Duration expiresIn) throws Exception {
     final Instant now = Instant.now();
     final Date notBefore = Date.from(now);
     final Date notAfter = Date.from(now.plus(expiresIn));
