@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -98,7 +98,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
-    SecretKeyProtocol {
+    SecretKeyProtocolScm {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
@@ -245,6 +245,18 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       throw new SCMSecretKeyException(
           "Secret key initialization is not finished yet.",
           SECRET_KEY_NOT_INITIALIZED);
+    }
+  }
+
+  @Override
+  public boolean checkAndRotate(boolean force) throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    try {
+      return secretKeyManager.checkAndRotate(force);
+    } catch (SCMException ex) {
+      LOGGER.error("Error rotating secret keys", ex);
+      throw new SCMSecretKeyException(ex.getMessage(),
+          SCMSecretKeyException.ErrorCode.INTERNAL_ERROR);
     }
   }
 
