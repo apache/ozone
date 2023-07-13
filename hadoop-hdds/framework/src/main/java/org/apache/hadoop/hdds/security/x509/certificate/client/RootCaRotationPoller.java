@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
   private final Duration pollingInterval;
   private Set<X509Certificate> knownRootCerts;
   private final SCMSecurityProtocolClientSideTranslatorPB scmSecureClient;
+  private final AtomicBoolean certificateRenewalError;
 
   public RootCaRotationPoller(SecurityConfig securityConfig,
       Set<X509Certificate> initiallyKnownRootCaCerts,
@@ -67,6 +69,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
             .setDaemon(true).build());
     pollingInterval = securityConfig.getRootCaCertificatePollingInterval();
     rootCARotationProcessors = new ArrayList<>();
+    certificateRenewalError = new AtomicBoolean(false);
   }
 
   private void pollRootCas() {
@@ -93,8 +96,9 @@ public class RootCaRotationPoller implements Runnable, Closeable {
               .toArray(CompletableFuture[]::new));
 
       allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
-        if (throwable == null) {
+        if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
+          certificateRenewalError.set(false);
         }
       });
     } catch (IOException e) {
@@ -132,6 +136,10 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
       Thread.currentThread().interrupt();
     }
+  }
+
+  public void setCertificateRenewalError() {
+    certificateRenewalError.set(true);
   }
 
   private String getPrintableCertIds(Collection<X509Certificate> certs) {
