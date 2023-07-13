@@ -191,7 +191,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
-          rootCaCertificates, scmSecurityClient);
+          new HashSet<>(rootCaCertificates), scmSecurityClient);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
