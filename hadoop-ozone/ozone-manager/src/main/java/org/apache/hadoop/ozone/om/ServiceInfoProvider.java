@@ -43,11 +43,12 @@ import static java.util.Comparator.comparing;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
- * A helper class to handle the construction of
- * {@link org.apache.hadoop.ozone.om.helpers.ServiceInfoEx} objects,
- * and refresh of the things that are necessary for constructing it.
+ * A helper class for Ozone Manager, to take on the responsibility of caching
+ * the actual CA certificates in PEM format, and handle the update of these
+ * cached values, so that OM can provide this information to clients that needs
+ * to trust the DataNode certificates in a secure environment.
  */
-public final class ServiceInfoProvider {
+final class ServiceInfoProvider {
 
   private static final Logger LOG = getLogger(ServiceInfoProvider.class);
 
@@ -57,6 +58,19 @@ public final class ServiceInfoProvider {
   private String caCertPEM;
   private List<String> caCertPEMList;
 
+  /**
+   * Initializes the provider.
+   * The OzoneManagerProtocol implementation is used to provide the service
+   * list part of the ServiceInfoEx object this class provides for OM, while
+   * the SecurityConfig and the CertificateClient is used to provide security
+   * and trust related information within the same object.
+   *
+   * @param config the current security configuration
+   * @param om the OzoneManagerProtocol provides the service list
+   * @param certClient the CertificateClient provides certificate information
+   *
+   * @throws IOException in case certificate operations fail
+   */
   public ServiceInfoProvider(
       SecurityConfig config,
       OzoneManagerProtocol om,
@@ -65,6 +79,27 @@ public final class ServiceInfoProvider {
     this(config, om, certClient, false);
   }
 
+  /**
+   * Initializes the provider.
+   * The OzoneManagerProtocol implementation is used to provide the service
+   * list part of the ServiceInfoEx object this class provides for OM, while
+   * the SecurityConfig and the CertificateClient is used to provide security
+   * and trust related information within the same object.
+   *
+   * In some cases OM is initializing this class before a properly set up
+   * CertificateClient is given to the OM for tests. In this case the
+   * initialization code would fail, so this is handled in OM when a new
+   * CertificateClient is set the provider is re-created, but for this to work,
+   * the initial initialization is disabled when we are in a test process.
+   *
+   * @param config the current security configuration
+   * @param om the OzoneManagerProtocol provides the service list
+   * @param certClient the CertificateClient provides certificate information
+   * @param skipInitializationForTesting if we are testing OM in secure env this
+   *                                     might need to be true
+   *
+   * @throws IOException in case certificate operations fail
+   */
   public ServiceInfoProvider(
       SecurityConfig config,
       OzoneManagerProtocol om,

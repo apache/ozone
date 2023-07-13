@@ -58,23 +58,60 @@ public final class CertificateTestUtils {
 
   private static final String HASH_ALGO = "SHA256WithRSA";
 
+  /**
+   * Generates a keypair using the HDDSKeyGenerator with the given config.
+   *
+   * @param conf the config applies to keys
+   *
+   * @return a newly generated keypair
+   *
+   * @throws NoSuchProviderException on wrong security provider in the config
+   * @throws NoSuchAlgorithmException on wrong encryption algo in the config
+   */
   public static KeyPair aKeyPair(ConfigurationSource conf)
       throws NoSuchProviderException, NoSuchAlgorithmException {
     return new HDDSKeyGenerator(new SecurityConfig(conf)).generateKey();
   }
 
+  /**
+   * Creates a self-signed certificate and returns it as an X509Certificate.
+   * The given keys and common name are being used in the certificate.
+   * The certificate will have its serial id generated based on the hashcode
+   * of the public key, and will expire after 1 day.
+   *
+   * @param keys the keypair to use for the certificate
+   * @param commonName the common name used in the certificate
+   *
+   * @return the X509Certificate representing a self-signed certificate
+   *
+   * @throws Exception in case any error occurs during the certificate creation
+   */
   public static X509Certificate createSelfSignedCert(
       KeyPair keys, String commonName
   ) throws Exception {
     return createSelfSignedCert(keys, commonName, Duration.ofDays(1));
   }
 
+  /**
+   * Creates a self-signed certificate and returns it as an X509Certificate.
+   * The given keys and common name are being used in the certificate.
+   * The certificate will have its serial id generated based on the hashcode
+   * of the public key, and will expire after the specified duration.
+   *
+   * @param keys the keypair to use for the certificate
+   * @param commonName the common name used in the certificate
+   * @param expiresIn the lifespan of the certificate
+   *
+   * @return the X509Certificate representing a self-signed certificate
+   *
+   * @throws Exception in case any error occurs during the certificate creation
+   */
   public static X509Certificate createSelfSignedCert(
-      KeyPair keys, String commonName, Duration exiresIn
+      KeyPair keys, String commonName, Duration expiresIn
   ) throws Exception {
     final Instant now = Instant.now();
     final Date notBefore = Date.from(now);
-    final Date notAfter = Date.from(now.plus(exiresIn));
+    final Date notAfter = Date.from(now.plus(expiresIn));
     final ContentSigner contentSigner =
         new JcaContentSignerBuilder(HASH_ALGO).build(keys.getPrivate());
     final X500Name x500Name = new X500Name("CN=" + commonName);
