@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -108,7 +109,7 @@ public class SCMDeleteBlocksCommandStatusManager {
     }
 
     public Set<Long> getDeletedBlocksTxIds() {
-      return deletedBlocksTxIds;
+      return Collections.unmodifiableSet(deletedBlocksTxIds);
     }
 
     public UUID getDnId() {
@@ -156,11 +157,11 @@ public class SCMDeleteBlocksCommandStatusManager {
         new HashMap<>(scmCmdStatusRecord.size());
 
     for (UUID dnId : dnIds) {
-      if (scmCmdStatusRecord.get(dnId) == null) {
+      Map<Long, CmdStatusData> record = scmCmdStatusRecord.get(dnId);
+      if (record == null) {
         continue;
       }
       Map<Long, CmdStatus> dnStatusMap = new HashMap<>();
-      Map<Long, CmdStatusData> record = scmCmdStatusRecord.get(dnId);
       for (CmdStatusData statusData : record.values()) {
         CmdStatus status = statusData.getStatus();
         for (Long deletedBlocksTxId : statusData.getDeletedBlocksTxIds()) {
@@ -175,6 +176,11 @@ public class SCMDeleteBlocksCommandStatusManager {
 
   public void onSent(UUID dnId, long scmCmdId) {
     updateStatus(dnId, scmCmdId, SENT);
+  }
+
+  public void onDatanodeDead(UUID dnId) {
+    LOG.info("Clean SCMCommand record for DN: {}", dnId);
+    scmCmdStatusRecord.remove(dnId);
   }
 
   public void updateStatusByDNCommandStatus(UUID dnId, long scmCmdId,
@@ -222,10 +228,11 @@ public class SCMDeleteBlocksCommandStatusManager {
 
   private Set<Long> getScmCommandIds(UUID dnId, CmdStatus status) {
     Set<Long> scmCmdIds = new HashSet<>();
-    if (scmCmdStatusRecord.get(dnId) == null) {
+    Map<Long, CmdStatusData> record = scmCmdStatusRecord.get(dnId);
+    if (record == null) {
       return scmCmdIds;
     }
-    for (CmdStatusData statusData : scmCmdStatusRecord.get(dnId).values()) {
+    for (CmdStatusData statusData : record.values()) {
       if (statusData.getStatus().equals(status)) {
         scmCmdIds.add(statusData.getScmCmdId());
       }
@@ -234,11 +241,11 @@ public class SCMDeleteBlocksCommandStatusManager {
   }
 
   private Instant getUpdateTime(UUID dnId, long scmCmdId) {
-    if (scmCmdStatusRecord.get(dnId) == null ||
-        scmCmdStatusRecord.get(dnId).get(scmCmdId) == null) {
+    Map<Long, CmdStatusData> record = scmCmdStatusRecord.get(dnId);
+    if (record == null || record.get(scmCmdId) == null) {
       return null;
     }
-    return scmCmdStatusRecord.get(dnId).get(scmCmdId).getUpdateTime();
+    return record.get(scmCmdId).getUpdateTime();
   }
 
   private void updateStatus(UUID dnId, long scmCmdId, CmdStatus newStatus) {
@@ -335,19 +342,19 @@ public class SCMDeleteBlocksCommandStatusManager {
   }
 
   private CmdStatusData removeScmCommand(UUID dnId, long scmCmdId) {
-    if (scmCmdStatusRecord.get(dnId) == null ||
-        scmCmdStatusRecord.get(dnId).get(scmCmdId) == null) {
+    Map<Long, CmdStatusData> record = scmCmdStatusRecord.get(dnId);
+    if (record == null || record.get(scmCmdId) == null) {
       return null;
     }
 
-    CmdStatus status = scmCmdStatusRecord.get(dnId).get(scmCmdId).getStatus();
+    CmdStatus status = record.get(scmCmdId).getStatus();
     if (!finialStatuses.contains(status)) {
       LOG.error("Cannot Remove ScmCommand {} Non-final Status {} for DN: {}." +
           " final Status {}", scmCmdId, status, dnId, finialStatuses);
       return null;
     }
 
-    CmdStatusData statusData = scmCmdStatusRecord.get(dnId).remove(scmCmdId);
+    CmdStatusData statusData = record.remove(scmCmdId);
     LOG.debug("Remove ScmCommand {} for DN: {} ", statusData, dnId);
     return statusData;
   }
