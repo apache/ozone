@@ -16,15 +16,16 @@
 # limitations under the License.
 
 retry() {
-   n=0
-   until [ $n -ge 100 ]
+   local -i n=0
+   local -i attempts=${RETRY_ATTEMPTS:-100}
+   until [ $n -ge $attempts ]
    do
       "$@" && break
       n=$[$n+1]
       echo "$n '$@' is failed..."
       sleep ${RETRY_SLEEP:-3}
    done
-   if [ $n -eq 100 ]; then
+   if [ $n -eq $attempts ]; then
       return 255
    fi
 }
@@ -47,15 +48,13 @@ wait_for_startup(){
 }
 
 all_pods_are_running() {
-   RUNNING_COUNT=$(kubectl get pod --field-selector status.phase=Running | wc -l)
-   ALL_COUNT=$(kubectl get pod | wc -l)
-   RUNNING_COUNT=$((RUNNING_COUNT - 1))
-   ALL_COUNT=$((ALL_COUNT - 1))
-   if [ "$RUNNING_COUNT" -lt "3" ]; then
-      echo "$RUNNING_COUNT pods are running. Waiting for more."
+   local -i running=$(kubectl get pod --field-selector status.phase=Running | grep -v 'STATUS' | wc -l)
+   local -i all=$(kubectl get pod | grep -v 'STATUS' | wc -l)
+   if [ "$running" -lt "3" ]; then
+      echo "$running pods are running. Waiting for more."
       return 1
-   elif [ "$RUNNING_COUNT" -ne "$ALL_COUNT" ]; then
-      echo "$RUNNING_COUNT pods are running out from the $ALL_COUNT"
+   elif [ "$running" -ne "$all" ]; then
+      echo "$running / $all pods are running"
       return 2
    else
       STARTED=true
@@ -63,7 +62,15 @@ all_pods_are_running() {
    fi
 }
 
-start_k8s_env() {
+pre_run_setup() {
+  rm -fr logs result
+  regenerate_resources
+  reset_k8s_env
+  start_k8s_env
+  wait_for_startup
+}
+
+reset_k8s_env() {
    print_phase "Deleting existing k8s resources"
    #reset environment
    kubectl delete statefulset --all
@@ -74,13 +81,25 @@ start_k8s_env() {
    kubectl delete pod --all
    kubectl delete pvc --all
    kubectl delete pv --all
+}
 
+start_k8s_env() {
    print_phase "Applying k8s resources from $(basename $(pwd))"
    kubectl apply -k .
-   wait_for_startup
+   trap post_run EXIT HUP INT TERM
+}
+
+post_run() {
+  set +e
+  combine_reports
+  get_logs
+  stop_k8s_env
+  revert_resources
+  set -e
 }
 
 get_logs() {
+  print_phase "Collecting container logs"
   mkdir -p logs
   for pod in $(kubectl get pods -o custom-columns=NAME:.metadata.name | tail -n +2); do
     for initContainer in $(kubectl get pod -o jsonpath='{.spec.initContainers[*].name}' "${pod}"); do
@@ -91,7 +110,8 @@ get_logs() {
 }
 
 stop_k8s_env() {
-   if [ ! "$KEEP_RUNNING" ]; then
+   if [ "${KEEP_RUNNING:-false}" != "true" ]; then
+     print_phase "Deleting k8s resources"
      kubectl delete -k .
    fi
 }
@@ -145,8 +165,10 @@ execute_robot_test() {
 }
 
 combine_reports() {
-  rm result/output.xml || true
-  rebot -d result --nostatusrc -o output.xml -N $(basename "$(pwd)") result/*.xml
+  if [[ -d result ]]; then
+    rm -f result/output.xml
+    rebot -d result --nostatusrc -o output.xml -N $(basename "$(pwd)") result/*.xml
+  fi
 }
 
 print_phase() {

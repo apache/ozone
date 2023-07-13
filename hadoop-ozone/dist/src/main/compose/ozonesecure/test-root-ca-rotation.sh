@@ -40,6 +40,7 @@ wait_for_execute_command scm 30 "jps | grep StorageContainerManagerStarter |  se
 
 # wait and verify root CA is rotated
 wait_for_execute_command scm 180 "ozone admin cert info 2"
+wait_for_execute_command datanode 30 "find /data/metadata/dn/certs/ROOTCA-2.crt"
 
 # verify om operations and data operations
 execute_commands_in_container scm "ozone sh volume create /r-v1 && ozone sh bucket create /r-v1/r-b1"

@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
@@ -86,6 +87,8 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicLong snapshotFilteredCount;
 
+  private AtomicBoolean running;
+
   private BooleanTriFunction<String, String, String, Boolean> filterFunction =
       (first, last, prefix) -> {
         String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
@@ -103,10 +106,17 @@ public class SstFilteringService extends BackgroundService
         .getLong(SNAPSHOT_SST_DELETING_LIMIT_PER_TASK,
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
+    running = new AtomicBoolean(false);
   }
 
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
+
+  @Override
+  public void start() {
+    running.set(true);
+    super.start();
+  }
 
   private class SstFilteringTask implements BackgroundTask {
 
@@ -131,7 +141,7 @@ public class SstFilteringService extends BackgroundService
 
         long snapshotLimit = snapshotLimitPerTask;
 
-        while (iterator.hasNext() && snapshotLimit > 0) {
+        while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
           Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
@@ -237,5 +247,11 @@ public class SstFilteringService extends BackgroundService
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  @Override
+  public void shutdown() {
+    running.set(false);
+    super.shutdown();
   }
 }

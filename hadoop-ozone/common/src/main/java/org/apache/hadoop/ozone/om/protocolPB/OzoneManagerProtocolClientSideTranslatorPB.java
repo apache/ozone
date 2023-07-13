@@ -1074,7 +1074,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final CreateTenantRequest.Builder requestBuilder =
         CreateTenantRequest.newBuilder()
             .setTenantId(omTenantArgs.getTenantId())
-            .setVolumeName(omTenantArgs.getVolumeName());
+            .setVolumeName(omTenantArgs.getVolumeName())
+            .setForceCreationWhenVolumeExists(
+                omTenantArgs.getForceCreationWhenVolumeExists());
             // Can add more args (like policy names) later if needed
     final OMRequest omRequest = createOMRequest(Type.CreateTenant)
         .setCreateTenantRequest(requestBuilder)
@@ -1232,7 +1234,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff)
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
@@ -1242,7 +1245,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setPageSize(pageSize)
-            .setForceFullDiff(forceFullDiff);
+            .setForceFullDiff(forceFullDiff)
+            .setDisableNativeDiff(disableNativeDiff);
 
     if (!StringUtils.isBlank(token)) {
       requestBuilder.setToken(token);

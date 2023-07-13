@@ -720,13 +720,15 @@ public interface OzoneManagerProtocol
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   default SnapshotDiffResponse snapshotDiff(String volumeName,
                                             String bucketName,
                                             String fromSnapshot,
                                             String toSnapshot,
                                             String token,
                                             int pageSize,
-                                            boolean forceFullDiff)
+                                            boolean forceFullDiff,
+                                            boolean disableNativeDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
