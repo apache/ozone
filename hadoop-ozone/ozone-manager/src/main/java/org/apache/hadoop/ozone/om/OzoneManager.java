@@ -3577,7 +3577,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
    */
-  public TermIndex installSnapshotFromLeader(String leaderId) {
+  public synchronized TermIndex installSnapshotFromLeader(String leaderId) {
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
@@ -3632,7 +3632,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       keyManager.stop();
       stopSecretManager();
       stopTrashEmptier();
-
+      omSnapshotManager.getSnapshotCache().invalidateAll();
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
       // pending transactions in the buffer, they are discarded.
