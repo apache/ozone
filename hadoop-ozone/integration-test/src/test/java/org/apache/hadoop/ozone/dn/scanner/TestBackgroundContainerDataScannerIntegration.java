@@ -31,7 +31,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
@@ -73,8 +72,7 @@ public class TestBackgroundContainerDataScannerIntegration
   public TestBackgroundContainerDataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
-    logCapturer = LogCapturer.captureLogs(
-            LoggerFactory.getLogger(ContainerLogger.LOG_NAME));
+    logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
   }
 
   /**
