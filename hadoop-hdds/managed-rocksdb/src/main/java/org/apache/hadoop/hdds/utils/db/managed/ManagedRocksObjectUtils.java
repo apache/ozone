@@ -113,6 +113,4 @@ public final class ManagedRocksObjectUtils {
     waitForFileDelete(file, maxDuration, POLL_INTERVAL_DURATION,
         POLL_DELAY_DURATION);
   }
-
-
 }
