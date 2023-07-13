@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -88,10 +89,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -158,6 +161,9 @@ public class TestOMRatisSnapshots {
           TimeUnit.SECONDS);
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
           1, TimeUnit.MILLISECONDS);
+      conf.setTimeDuration(
+          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+          20, TimeUnit.SECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
@@ -1172,8 +1178,46 @@ public class TestOMRatisSnapshots {
           .toString());
     }, 1000, 30000);
 
-    // Check whether newly created snapshot data is reclaimed
+    // Check whether newly created keys data is reclaimed
+    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
+        OM_KEY_PREFIX + ozoneBucket.getName() +
+        OM_KEY_PREFIX + newKeys.get(0);
+    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
+        .getMetadataManager()
+        .getKeyTable(ozoneBucket.getBucketLayout());
+    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
+
+    Table<String, RepeatedOmKeyInfo> deletedTableBeforeDeletion = newLeaderOM
+        .getMetadataManager()
+        .getDeletedTable();
+    Assertions.assertNull(deletedTableBeforeDeletion.get(newKey));
+
     ozoneBucket.deleteKeys(newKeys);
+
+    // TODO: See why this is not working
+//    GenericTestUtils.waitFor(() -> {
+//      Table<String, RepeatedOmKeyInfo> deletedTableAfterDeletion = newLeaderOM
+//          .getMetadataManager()
+//          .getDeletedTable();
+//      try {
+//        return Objects.nonNull(deletedTableAfterDeletion.get(newKey));
+//      } catch (IOException e) {
+//        throw new RuntimeException(e);
+//      }
+//    }, 100, 10000);
+
+    GenericTestUtils.waitFor(() -> {
+      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
+          .getMetadataManager()
+          .getKeyTable(ozoneBucket.getBucketLayout());
+      try {
+        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+
+    // Check whether newly created snapshot data is reclaimed
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
     GenericTestUtils.waitFor(() -> {
@@ -1181,25 +1225,6 @@ public class TestOMRatisSnapshots {
           newLeaderOM.getMetadataManager().getSnapshotInfoTable();
       try {
         return null == snapshotInfoTable.get(newSnapshot.getTableKey());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 10000);
-
-    // Check whether newly created keys data is reclaimed
-    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
-        .getMetadataManager()
-        .getKeyTable(ozoneBucket.getBucketLayout());
-    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
-        OM_KEY_PREFIX + ozoneBucket.getName() +
-        OM_KEY_PREFIX + newKeys.get(0);
-    Assertions.assertNull(omKeyInfoTableBeforeDeletion.get(newKey));
-    GenericTestUtils.waitFor(() -> {
-      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
-          .getMetadataManager()
-          .getKeyTable(ozoneBucket.getBucketLayout());
-      try {
-        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -1227,20 +1252,36 @@ public class TestOMRatisSnapshots {
         || contentLength != newContentLength);
 
     // Check whether sst files were pruned
-    // Force pruning
-    newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .pruneOlderSnapshotsWithCompactionHistory();
-    int newNumberOfSstFiles = 0;
-    try (DirectoryStream<Path> files =
-             Files.newDirectoryStream(sstBackupDirPath)) {
-      for (Path ignored : files) {
-        newNumberOfSstFiles++;
+    final int finalNumberOfSstFiles = numberOfSstFiles;
+    try {
+      GenericTestUtils.waitFor(() -> {
+        int newNumberOfSstFiles = 0;
+        try (DirectoryStream<Path> files =
+                 Files.newDirectoryStream(sstBackupDirPath)) {
+          for (Path ignored : files) {
+            newNumberOfSstFiles++;
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+        return finalNumberOfSstFiles > newNumberOfSstFiles;
+      }, 1000, 10000);
+    } catch (TimeoutException e) {
+      // Force pruning to not introduce flaky test
+      int newNumberOfSstFiles = 0;
+      newLeaderOM
+          .getMetadataManager()
+          .getStore()
+          .getRocksDBCheckpointDiffer()
+          .pruneOlderSnapshotsWithCompactionHistory();
+      try (DirectoryStream<Path> files =
+               Files.newDirectoryStream(sstBackupDirPath)) {
+        for (Path ignored : files) {
+          newNumberOfSstFiles++;
+        }
       }
+      Assertions.assertTrue(numberOfSstFiles > newNumberOfSstFiles);
     }
-    Assertions.assertTrue(numberOfSstFiles > newNumberOfSstFiles);
 
     // Snap diff
     String previouslyNonDeletedSnapshotName = snapshotName;
@@ -1258,16 +1299,22 @@ public class TestOMRatisSnapshots {
       String bucket,
       String fromSnapshot,
       String toSnapshot)
-      throws InterruptedException, IOException {
-    SnapshotDiffResponse response;
-    do {
-      response = client.getObjectStore()
-          .snapshotDiff(
-              volume, bucket, fromSnapshot, toSnapshot, null, 0, false, false);
-      Thread.sleep(response.getWaitTimeInMs());
-    } while (response.getJobStatus() != DONE);
+      throws InterruptedException, TimeoutException {
+    AtomicReference<SnapshotDiffResponse> response = new AtomicReference<>();
 
-    return response.getSnapshotDiffReport();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        response.set(client.getObjectStore()
+            .snapshotDiff(
+                volume, bucket, fromSnapshot, toSnapshot, null, 0, false,
+                false));
+        return response.get().getJobStatus() == DONE;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+
+    return response.get().getSnapshotDiffReport();
   }
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
