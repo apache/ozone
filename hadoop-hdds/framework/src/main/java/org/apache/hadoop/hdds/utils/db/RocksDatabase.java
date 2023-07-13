@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -50,14 +49,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -985,11 +982,7 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent =
             filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
         if (!isKeyWithPrefixPresent) {
-          String sstFileName = liveFileMetaData.fileName();
-          LOG.info("Deleting sst file {} corresponding to column family"
-                  + " {} from db: {}", sstFileName,
-              liveFileMetaData.columnFamilyName(), db.get().getName());
-          db.get().deleteFile(sstFileName);
+          db.deleteFile(liveFileMetaData);
         }
       }
     }

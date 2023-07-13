@@ -18,12 +18,19 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.db.managed.util.ManagedObjectUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -32,6 +39,8 @@ import java.util.List;
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;
   public static final int NOT_FOUND = RocksDB.NOT_FOUND;
+
+  static final Logger LOG = LoggerFactory.getLogger(ManagedRocksDB.class);
 
   ManagedRocksDB(RocksDB original) {
     super(original);
@@ -77,5 +86,16 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     return new ManagedRocksDB(
         RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
     );
+  }
+
+  public void deleteFile(LiveFileMetaData fileToBeDeleted)
+      throws RocksDBException, IOException {
+    String sstFileName = fileToBeDeleted.fileName();
+    LOG.info("Deleting sst file {} corresponding to column family"
+            + " {} from db: {}", sstFileName,
+        fileToBeDeleted.columnFamilyName(), this.get().getName());
+    this.get().deleteFile(sstFileName);
+    ManagedObjectUtil.waitForFileDelete(new File(fileToBeDeleted.path(),
+            fileToBeDeleted.fileName()), Duration.ofSeconds(60));
   }
 }
