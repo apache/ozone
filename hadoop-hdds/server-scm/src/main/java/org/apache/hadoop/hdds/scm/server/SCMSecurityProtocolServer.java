@@ -190,8 +190,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -207,8 +208,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         nodeDetails.getNodeType(), nodeDetails.getHostName(),
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -287,8 +289,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -329,8 +332,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           + storageContainerManager.getClusterId());
     }
 
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress() && !isRenew) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress() && !isRenew) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
