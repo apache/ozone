@@ -2270,9 +2270,9 @@
   </property>
   <property>
     <name>hdds.x509.ca.rotation.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, HDDS, SECURITY</tag>
-    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is enabled.
+    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is disabled.
     </description>
   </property>
   <property>
