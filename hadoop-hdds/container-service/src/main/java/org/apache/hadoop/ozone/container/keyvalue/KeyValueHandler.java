@@ -1348,10 +1348,18 @@ public class KeyValueHandler extends Handler {
             (KeyValueContainerData) container.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
-        // Rename container location
+        // Steps to delete
+        // 1. container marked deleted
+        // 2. container is removed from container set
+        // 3. container db handler and content removed from db
+        // 4. container moved to tmp folder
+        // 5. container content deleted from tmp folder
         try {
-          KeyValueContainerUtil.moveToDeletedContainerDir(keyValueContainerData,
-              hddsVolume);
+          container.markContainerForDelete();
+          long containerId = container.getContainerData().getContainerID();
+          containerSet.removeContainer(containerId);
+          ContainerLogger.logDeleted(container.getContainerData(), force);
+          KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeletedContainerDir());
@@ -1361,18 +1369,7 @@ public class KeyValueHandler extends Handler {
           triggerVolumeScanAndThrowException(container, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
-
-        if (LOG.isDebugEnabled()) {
-          String containerPath = keyValueContainerData
-              .getContainerPath();
-          File containerDir = new File(containerPath);
-
-          LOG.debug("Container {} has been successfully moved under {}",
-              containerDir.getName(), hddsVolume.getDeletedContainerDir());
-        }
       }
-      long containerId = container.getContainerData().getContainerID();
-      containerSet.removeContainer(containerId);
     } catch (StorageContainerException e) {
       throw e;
     } catch (IOException e) {
@@ -1390,8 +1387,6 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
-    container.getContainerData().setState(State.DELETED);
-    ContainerLogger.logDeleted(container.getContainerData(), force);
     sendICR(container);
   }
 
