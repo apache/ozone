@@ -885,14 +885,21 @@ public class RpcClient implements ClientProtocol {
     final String volumeName = tenantArgs.getVolumeName();
     verifyVolumeName(volumeName);
 
+    final boolean forceCreationWhenVolumeExists =
+        tenantArgs.getForceCreationWhenVolumeExists();
+
     OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
     builder.setTenantId(tenantId);
     builder.setVolumeName(volumeName);
-    // TODO: Add more fields
-    // TODO: Include OmVolumeArgs in (Om)TenantArgs as well for volume creation?
+    builder.setForceCreationWhenVolumeExists(
+        tenantArgs.getForceCreationWhenVolumeExists());
 
-    LOG.info("Creating Tenant: '{}', with new volume: '{}'",
-        tenantId, volumeName);
+    // TODO: Add more fields. e.g. include OmVolumeArgs in (Om)TenantArgs
+    //  as well for customized volume creation.
+
+    LOG.info("Creating Tenant: '{}', with volume: '{}', "
+            + "forceCreationWhenVolumeExists: {}",
+        tenantId, volumeName, forceCreationWhenVolumeExists);
 
     ozoneManagerClient.createTenant(builder.build());
   }

@@ -971,12 +971,14 @@ public final class OMRequestTestUtils {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
-  public static OMRequest createTenantRequest(String tenantId) {
+  public static OMRequest createTenantRequest(String tenantId,
+      boolean forceCreationWhenVolumeExists) {
 
     final CreateTenantRequest.Builder requestBuilder =
         CreateTenantRequest.newBuilder()
             .setTenantId(tenantId)
-            .setVolumeName(tenantId);
+            .setVolumeName(tenantId)
+            .setForceCreationWhenVolumeExists(forceCreationWhenVolumeExists);
 
     return OMRequest.newBuilder()
         .setCreateTenantRequest(requestBuilder)
