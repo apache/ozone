@@ -99,6 +99,13 @@ public class RootCaRotationPoller implements Runnable, Closeable {
         if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
           certificateRenewalError.set(false);
+        } else {
+          LOG.info("Certificate consumption was unsuccesfull. " +
+              (certificateRenewalError.get() ?
+                  "There was a caught exception when trying to sign the " +
+                      "certificate" :
+                  "There was an unexpected error during cert rotation" +
+                      throwable));
         }
       });
     } catch (IOException e) {

@@ -51,6 +51,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE
 public class TestRootCaRotationPoller {
 
   private SecurityConfig secConf;
+  private GenericTestUtils.LogCapturer logCapturer;
 
   @Mock
   private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
@@ -61,6 +62,8 @@ public class TestRootCaRotationPoller {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL, "PT1s");
     secConf = new SecurityConfig(conf);
+    logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+        org.slf4j.LoggerFactory.getLogger(RootCaRotationPoller.class));
   }
 
   @Test
@@ -114,6 +117,39 @@ public class TestRootCaRotationPoller {
           return null;
         }));
     GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
+  }
+
+  @Test
+  public void testPollerRetriesAfterFailure() throws Exception {
+    X509Certificate knownCert = generateX509Cert(
+        LocalDateTime.now(), Duration.ofSeconds(50));
+    X509Certificate newRootCa = generateX509Cert(
+        LocalDateTime.now(), Duration.ofSeconds(50));
+    HashSet<X509Certificate> knownCerts = new HashSet<>();
+    knownCerts.add(knownCert);
+    List<String> certsFromScm = new ArrayList<>();
+    certsFromScm.add(CertificateCodec.getPEMEncodedString(knownCert));
+    certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
+    RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
+        knownCerts, scmSecurityClient);
+    poller.run();
+    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
+        .thenReturn(certsFromScm);
+    AtomicBoolean atomicBoolean = new AtomicBoolean();
+    atomicBoolean.set(false);
+    //Set that the first certificate renewal encountered an error
+    poller.setCertificateRenewalError();
+    poller.addRootCARotationProcessor(
+        certificates -> CompletableFuture.supplyAsync(() -> {
+          atomicBoolean.set(true);
+          Assertions.assertEquals(certificates.size(), 2);
+          return null;
+        }));
+    //Assert for the poller success even if there was an error at first
+    GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
+    //And that we see the error in the logs
+    Assertions.assertTrue(logCapturer.getOutput().contains(
+        "There was an error when trying to sign the certificate"));
   }
 
   private X509Certificate generateX509Cert(
