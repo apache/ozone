@@ -59,7 +59,7 @@ public interface CertificateStore {
    * @param role - OM/DN/SCM.
    * @throws IOException - on Failure.
    */
-  @Replicate
+  @Replicate(invocationType = Replicate.InvocationType.CLIENT)
   void storeValidCertificate(BigInteger serialID,
       X509Certificate certificate, NodeType role)
       throws IOException;

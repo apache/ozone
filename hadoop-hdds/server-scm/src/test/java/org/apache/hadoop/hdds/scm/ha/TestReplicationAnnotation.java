@@ -134,26 +134,5 @@ public class TestReplicationAnnotation {
       Assertions.assertNotNull(e.getMessage());
       Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
     }
-
-    scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CERT_STORE, null, scmRatisServer);
-
-    CertificateStore certificateStore =
-        (CertificateStore) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{CertificateStore.class},
-            scmhaInvocationHandler);
-
-    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    try {
-      certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
-          KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
-          "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
-      Assertions.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException e) {
-      Assertions.assertNotNull(e.getMessage());
-      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
-    }
-
   }
 }
