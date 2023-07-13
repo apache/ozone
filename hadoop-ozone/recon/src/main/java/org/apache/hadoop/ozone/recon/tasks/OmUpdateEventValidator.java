@@ -53,8 +53,7 @@ public class OmUpdateEventValidator {
   public boolean isValidEvent(String tableName,
                               Object actualValueType,
                               Object keyType,
-                              OMDBUpdateEvent.OMDBUpdateAction action)
-      throws IOException {
+                              OMDBUpdateEvent.OMDBUpdateAction action) {
 
     String expectedValueTypeString =
         omdbDefinition.getColumnFamily(tableName).getValueType().getName();
@@ -64,13 +63,12 @@ public class OmUpdateEventValidator {
     if (expectedValueTypeString.equals(actualValueTypeString)) {
       // Both objects are of the same type
       return true;
-    } else {
-      // Objects are not of the same type
-      logWarn(keyType.toString(), tableName, action.toString(),
-          expectedValueTypeString,
-          actualValueTypeString);
-      return false;
     }
+    // Objects are not of the same type
+    logWarn(keyType.toString(), tableName, action.toString(),
+        expectedValueTypeString,
+        actualValueTypeString);
+    return false;
   }
 
   /**
