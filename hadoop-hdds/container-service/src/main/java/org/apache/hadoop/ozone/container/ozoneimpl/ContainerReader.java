@@ -243,7 +243,7 @@ public class ContainerReader implements Runnable {
   private void cleanupContainer(
       HddsVolume volume, KeyValueContainer kvContainer) {
     try {
-      LOG.info("Cleanup container {}.",
+      LOG.info("Finishing delete of container {}.",
           kvContainer.getContainerData().getContainerID());
       // container information from db is removed for V3
       // and container moved to tmp folder
@@ -252,7 +252,7 @@ public class ContainerReader implements Runnable {
           volume.getConf());
       kvContainer.delete();
     } catch (IOException ex) {
-      LOG.warn("Failed to remove container {}.",
+      LOG.warn("Failed to remove deleted container {}.",
           kvContainer.getContainerData().getContainerID(), ex);
     }
   }
