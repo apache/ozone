@@ -71,7 +71,7 @@ final class ServiceInfoProvider {
    *
    * @throws IOException in case certificate operations fail
    */
-  public ServiceInfoProvider(
+  ServiceInfoProvider(
       SecurityConfig config,
       OzoneManagerProtocol om,
       CertificateClient certClient
@@ -100,7 +100,7 @@ final class ServiceInfoProvider {
    *
    * @throws IOException in case certificate operations fail
    */
-  public ServiceInfoProvider(
+  ServiceInfoProvider(
       SecurityConfig config,
       OzoneManagerProtocol om,
       CertificateClient certClient,
