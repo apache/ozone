@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-
 /**
  * Temporary class to test snapshot diff functionality.
  * This should be removed later.

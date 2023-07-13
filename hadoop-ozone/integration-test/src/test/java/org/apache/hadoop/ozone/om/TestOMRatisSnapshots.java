@@ -686,11 +686,6 @@ public class TestOMRatisSnapshots {
           .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName, key)));
     }
 
-    // There is a chance we end up checking the DBCheckpointMetrics
-    // before the follower sends another request to the leader
-    // to generate a checkpoint.
-    // TODO: Add wait check here, to avoid flakiness.
-
     // Verify the metrics
     GenericTestUtils.waitFor(() -> {
       DBCheckpointMetrics dbMetrics =

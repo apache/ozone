@@ -982,6 +982,9 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent =
             filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
         if (!isKeyWithPrefixPresent) {
+          LOG.info("Deleting sst file {} corresponding to column family"
+                  + " {} from db: {}", liveFileMetaData.fileName(),
+              liveFileMetaData.columnFamilyName(), db.get().getName());
           db.deleteFile(liveFileMetaData);
         }
       }

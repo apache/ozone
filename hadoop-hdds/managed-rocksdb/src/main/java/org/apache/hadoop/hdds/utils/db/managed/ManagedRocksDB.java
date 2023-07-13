@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.db.managed.util.ManagedObjectUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -88,14 +87,20 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
+  /**
+   * Delete liveMetaDataFile from rocks db.
+   * @param fileToBeDeleted File to be deleted.
+   * @throws RocksDBException In the underlying db throws an exception.
+   * @throws IOException In the case file is not deleted.
+   */
+
   public void deleteFile(LiveFileMetaData fileToBeDeleted)
       throws RocksDBException, IOException {
     String sstFileName = fileToBeDeleted.fileName();
-    LOG.info("Deleting sst file {} corresponding to column family"
-            + " {} from db: {}", sstFileName,
-        fileToBeDeleted.columnFamilyName(), this.get().getName());
     this.get().deleteFile(sstFileName);
-    ManagedObjectUtil.waitForFileDelete(new File(fileToBeDeleted.path(),
-            fileToBeDeleted.fileName()), Duration.ofSeconds(60));
+    File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
+    LOG.info("Deleting file {} from db: {}", file.getAbsolutePath(),
+        this.get().getName());
+    ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 }
