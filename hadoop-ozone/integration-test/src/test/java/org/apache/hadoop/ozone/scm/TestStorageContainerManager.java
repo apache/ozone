@@ -129,6 +129,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
@@ -731,8 +732,9 @@ public class TestStorageContainerManager {
       // first sleep 10s
       Thread.sleep(10000);
       // verify datanode heartbeats are well processed
-      long heartbeatCheckerIntervalMs =
-          MiniOzoneCluster.Builder.DEFAULT_HB_INTERVAL_MS;
+      long heartbeatCheckerIntervalMs = cluster.getConf()
+          .getTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000,
+              TimeUnit.MILLISECONDS);
       long start = Time.monotonicNow();
       Thread.sleep(heartbeatCheckerIntervalMs * 2);
 
