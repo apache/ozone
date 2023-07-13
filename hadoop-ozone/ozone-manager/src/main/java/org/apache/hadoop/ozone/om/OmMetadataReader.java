@@ -109,7 +109,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
           OZONE_ACL_AUTHORIZER_CLASS, OzoneAccessAuthorizer.class,
           IAccessAuthorizer.class);
       if (bNeedAccessAuthInitialization ||
-          clazz.getSimpleName().equals("OzoneNativeAuthorizer")) {
+          clazz.getSimpleName().equals(
+              OzoneNativeAuthorizer.class.getSimpleName())) {
         // In case of NativeAuthorizer always re-initialize
         accessAuthorizer = getACLAuthorizerInstance(configuration, clazz);
         if (accessAuthorizer instanceof OzoneNativeAuthorizer) {
