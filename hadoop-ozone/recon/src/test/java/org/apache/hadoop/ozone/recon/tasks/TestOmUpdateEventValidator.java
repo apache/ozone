@@ -40,7 +40,7 @@ import java.util.List;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.junit.Assert.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
@@ -96,7 +96,7 @@ public class TestOmUpdateEventValidator {
         mock(SnapshotInfo.class), "key1", PUT));
 
     // Verify that no log message is printed
-    verify(logger, Mockito.never()).error(Mockito.anyString());
+    verify(logger, Mockito.never()).warn(Mockito.anyString());
   }
 
   @Test
@@ -138,7 +138,7 @@ public class TestOmUpdateEventValidator {
     // Assert that the captured log messages are not empty
     List<String> logMessages = captor.getAllValues();
     for (String logMessage : logMessages) {
-      assertFalse("Error message is empty", logMessage.isEmpty());
+      assertFalse("Warning message is empty", logMessage.isEmpty());
     }
   }
 

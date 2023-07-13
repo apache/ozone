@@ -66,7 +66,7 @@ public class OmUpdateEventValidator {
       return true;
     } else {
       // Objects are not of the same type
-      logError(keyType.toString(), tableName, action.toString(),
+      logWarn(keyType.toString(), tableName, action.toString(),
           expectedValueTypeString,
           actualValueTypeString);
       return false;
@@ -74,16 +74,16 @@ public class OmUpdateEventValidator {
   }
 
   /**
-   * Logs an error message indicating a validation failure.
+   * Logs an warning message indicating a validation failure.
    */
-  private void logError(String keyType, String tableName, String action,
+  private void logWarn(String keyType, String tableName, String action,
                         String expectedValueType, String actualValueType) {
-    String errorMessage = String.format(
+    String warnMessage = String.format(
         "Validation failed for keyType: %s, tableName: %s, action: %s, " +
             "Expected value type: %s, Actual value type: %s",
         keyType, tableName, action, expectedValueType, actualValueType);
-    // Log the error message as an ERROR level log
-    log.warn(errorMessage);
+    // Log the warning message as an WARN level log
+    log.warn(warnMessage);
   }
 
   @VisibleForTesting
