@@ -45,6 +45,7 @@ wait_for_execute_command scm1.org 240 "ozone admin cert info 2"
 # transfer leader to scm2.org
 execute_robot_test scm1.org scmha/scm-leader-transfer.robot
 wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | sed 's/StorageContainerManagerStarter//' | xargs | xargs -I {} jstack {} | grep 'RootCARotationManager-Inactive'"
+execute_robot_test scm1.org -v PREFIX:"rootca" certrotation/root-ca-rotation-client-checks.robot
 
 # verify om operations
 execute_commands_in_container scm1.org "ozone sh volume create /r-v1 && ozone sh bucket create /r-v1/r-b1"
@@ -67,6 +68,7 @@ wait_for_execute_command scm4.org 240 "ozone admin cert info 4"
 
 #transfer leader to scm4.org
 execute_robot_test scm4.org -v "TARGET_SCM:scm4.org" scmha/scm-leader-transfer.robot
+execute_robot_test scm4.org -v PREFIX:"rootca" certrotation/root-ca-rotation-client-checks.robot
 
 # add new datanode4 and verify certificate
 docker-compose up -d datanode4
