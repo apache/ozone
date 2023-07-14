@@ -71,6 +71,9 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream {
               .getCommitUploadPartInfo();
         }
       }
+    } else if (byteBufferStreamOutput instanceof KeyDataStreamOutput) {
+      return ((KeyDataStreamOutput)
+          byteBufferStreamOutput).getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
