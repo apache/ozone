@@ -266,12 +266,12 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
-  optional SetTimesRequest                  SetTimesRequest               = 120;
+  optional SetTimesRequest                  SetTimesRequest                = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
-  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest     = 123;
+  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
-  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest          = 125;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
 }
 
 message OMResponse {
