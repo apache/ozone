@@ -89,11 +89,13 @@ public class RootCARotationManager implements SCMService {
   private final Duration renewalGracePeriod;
   private final Date timeOfDay;
   private final Duration ackTimeout;
+  private final Duration rootCertPollInterval;
   private final SCMCertificateClient scmCertClient;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   private final AtomicBoolean isProcessing = new AtomicBoolean(false);
   private final AtomicReference<Long> processStartTime =
       new AtomicReference<>();
+  private final AtomicBoolean isPostProcessing = new AtomicBoolean(false);
   private final String threadName = this.getClass().getSimpleName();
   private final String newCAComponent = SCM_ROOT_CA_COMPONENT_NAME +
       HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
@@ -105,6 +107,7 @@ public class RootCARotationManager implements SCMService {
   private ScheduledFuture waitAckTask;
   private ScheduledFuture waitAckTimeoutTask;
   private final RootCARotationMetrics metrics;
+  private ScheduledFuture clearPostProcessingTask;
 
   /**
    * Constructs RootCARotationManager with the specified arguments.
@@ -141,6 +144,7 @@ public class RootCARotationManager implements SCMService {
     renewalGracePeriod = secConf.getRenewalGracePeriod();
     timeOfDay = Date.from(LocalDateTime.parse(secConf.getCaRotationTimeOfDay())
         .atZone(ZoneId.systemDefault()).toInstant());
+    rootCertPollInterval = secConf.getRootCaCertificatePollingInterval();
 
     executorService = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadName)
@@ -178,8 +182,12 @@ public class RootCARotationManager implements SCMService {
         if (waitAckTimeoutTask != null) {
           waitAckTask.cancel(true);
         }
+        if (clearPostProcessingTask != null) {
+          clearPostProcessingTask.cancel(true);
+        }
         isProcessing.set(false);
         processStartTime.set(null);
+        isPostProcessing.set(false);
       }
       return;
     }
@@ -232,6 +240,10 @@ public class RootCARotationManager implements SCMService {
 
   public boolean isRotationInProgress() {
     return isProcessing.get();
+  }
+
+  public boolean isPostRotationInProgress() {
+    return isPostProcessing.get();
   }
 
   /**
@@ -665,6 +677,15 @@ public class RootCARotationManager implements SCMService {
             String msg = "Root certificate " + rootCACertId +
                 " rotation is finished successfully after " + timeTaken + " ns";
             cleanupAndStop(msg);
+
+            // set the isPostProcessing to true, which will block the CSR
+            // signing in this period.
+            isPostProcessing.set(true);
+            LOG.info("isPostProcessing is true");
+            clearPostProcessingTask = executorService.schedule(() -> {
+              isPostProcessing.set(false);
+              LOG.info("isPostProcessing is false");
+            }, rootCertPollInterval.toMillis(), TimeUnit.MILLISECONDS);
           } catch (Throwable e) {
             LOG.error("Execution error", e);
             handler.resetRotationPrepareAcks();

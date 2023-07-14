@@ -131,14 +131,14 @@ public class SCMClientProtocolServer implements
   private final RPC.Server clientRpcServer;
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
+  private final OzoneConfiguration config;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
 
-  public SCMClientProtocolServer(
-      OzoneConfiguration conf,
+  public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm,
-      ReconfigurationHandler reconfigurationHandler
-  ) throws IOException {
+      ReconfigurationHandler reconfigurationHandler) throws IOException {
     this.scm = scm;
+    this.config = conf;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -803,11 +803,20 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
 
-    if (scm.getRootCARotationManager() != null &&
-        scm.getRootCARotationManager().isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
-          " Please try the operation later again."),
-          ResultCodes.CA_ROTATION_IN_PROGRESS);
+    if (scm.getRootCARotationManager() != null) {
+      if (scm.getRootCARotationManager().isRotationInProgress()) {
+        throw new SCMException("Root CA and Sub CA rotation is in-progress." +
+            " Please try the operation later again.",
+            ResultCodes.CA_ROTATION_IN_PROGRESS);
+      }
+      if (scm.getRootCARotationManager().isPostRotationInProgress()) {
+        SecurityConfig securityConfig = new SecurityConfig(config);
+        throw new SCMException("This action is prohibited for " +
+            securityConfig.getRootCaCertificatePollingInterval() +
+            " due to root CA and sub CA rotation have just finished. " +
+            "Please try the operation later again.",
+            ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
+      }
     }
 
     boolean auditSuccess = true;
