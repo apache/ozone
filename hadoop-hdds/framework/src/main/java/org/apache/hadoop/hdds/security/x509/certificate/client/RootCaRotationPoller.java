@@ -89,7 +89,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
           getPrintableCertIds(knownRootCerts) + ". Root CA Cert ids from " +
           "SCM not known by the client: " +
           getPrintableCertIds(scmCertsWithoutKnownCerts));
-
+      certificateRenewalError.set(false);
       CompletableFuture<Void> allRootCAProcessorFutures =
           CompletableFuture.allOf(rootCARotationProcessors.stream()
               .map(c -> c.apply(rootCAsFromSCM))
@@ -98,7 +98,6 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
         if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
-          certificateRenewalError.set(false);
         } else {
           LOG.info("Certificate consumption was unsuccesfull. " +
               (certificateRenewalError.get() ?

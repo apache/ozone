@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 
@@ -138,9 +139,12 @@ public class TestRootCaRotationPoller {
     AtomicBoolean atomicBoolean = new AtomicBoolean();
     atomicBoolean.set(false);
     //Set that the first certificate renewal encountered an error
-    poller.setCertificateRenewalError();
+    AtomicInteger runNumber = new AtomicInteger(1);
     poller.addRootCARotationProcessor(
         certificates -> CompletableFuture.supplyAsync(() -> {
+          if (runNumber.getAndIncrement() < 2) {
+            poller.setCertificateRenewalError();
+          }
           atomicBoolean.set(true);
           Assertions.assertEquals(certificates.size(), 2);
           return null;
