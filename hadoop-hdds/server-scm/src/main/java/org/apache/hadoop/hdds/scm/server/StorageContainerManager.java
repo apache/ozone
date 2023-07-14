@@ -910,7 +910,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager();
     }
-    rootCARotationManager = new RootCARotationManager(this);
+    if (securityConfig.isAutoCARotationEnabled()) {
+      rootCARotationManager = new RootCARotationManager(this);
+    }
   }
 
   /**

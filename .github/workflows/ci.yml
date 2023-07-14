@@ -327,11 +327,13 @@ jobs:
       matrix:
         profile:
           - client
+          - contract
           - filesystem
           - hdds
           - om
           - ozone
           - scm
+          - shell
           - flaky
       fail-fast: false
     steps:

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 
 /**
@@ -110,21 +111,26 @@ public abstract class RDBSnapshotProvider implements Closeable {
         "reloading state from the snapshot.", leaderNodeID);
     checkLeaderConsistency(leaderNodeID);
 
-    String snapshotFileName = getSnapshotFileName(leaderNodeID);
-    File targetFile = new File(snapshotDir, snapshotFileName);
-    downloadSnapshot(leaderNodeID, targetFile);
-    LOG.info("Successfully download the latest snapshot {} from leader OM: {}",
-        targetFile, leaderNodeID);
+    while (true) {
+      String snapshotFileName = getSnapshotFileName(leaderNodeID);
+      File targetFile = new File(snapshotDir, snapshotFileName);
+      downloadSnapshot(leaderNodeID, targetFile);
+      LOG.info(
+          "Successfully download the latest snapshot {} from leader OM: {}",
+          targetFile, leaderNodeID);
 
-    numDownloaded.incrementAndGet();
-    injectPause();
+      numDownloaded.incrementAndGet();
+      injectPause();
 
-    RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
-        candidateDir, true);
-    LOG.info("Successfully untar the downloaded snapshot {} at {}.", targetFile,
-        checkpoint.getCheckpointLocation());
-
-    return checkpoint;
+      RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
+          candidateDir, true);
+      LOG.info("Successfully untar the downloaded snapshot {} at {}.",
+          targetFile, checkpoint.getCheckpointLocation());
+      if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
+        LOG.info("Ratis snapshot transfer is complete.");
+        return checkpoint;
+      }
+    }
   }
 
   /**

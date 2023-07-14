@@ -102,14 +102,21 @@ public class WritableECContainerProvider
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
-          LOG.warn("Unable to allocate a container for {} with {} existing "
-              + "containers", repConfig, openPipelineCount, e);
+          LOG.warn("Unable to allocate a container with {} existing ones; "
+              + "requested size={}, replication={}, owner={}, {}",
+              openPipelineCount, size, repConfig, owner, excludeList, e);
         }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("Pipeline count {} reached limit {}, checking existing ones; "
+            + "requested size={}, replication={}, owner={}, {}",
+            openPipelineCount, maximumPipelines, size, repConfig, owner,
+            excludeList);
       }
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
+    final int pipelineCount = existingPipelines.size();
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
@@ -156,13 +163,13 @@ public class WritableECContainerProvider
         if (openPipelineCount < maximumPipelines) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-        throw new IOException("Unable to allocate a pipeline for "
-            + repConfig + " after trying all existing pipelines as the max "
-            + "limit has been reached and no pipelines where closed");
+        throw new IOException("Pipeline limit (" + maximumPipelines
+            + ") reached (" + openPipelineCount + "), none closed");
       }
     } catch (IOException e) {
-      LOG.error("Unable to allocate a container for {} after trying all "
-          + "existing containers", repConfig, e);
+      LOG.warn("Unable to allocate a container after trying {} existing ones; "
+          + "requested size={}, replication={}, owner={}, {}",
+          pipelineCount, size, repConfig, owner, excludeList, e);
       throw e;
     }
   }
