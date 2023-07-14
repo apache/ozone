@@ -25,6 +25,7 @@ x-root-cert-rotation-config:
     - OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT45S
     - OZONE-SITE.XML_hdds.x509.ca.rotation.check.interval=PT1S
     - OZONE-SITE.XML_hdds.x509.ca.rotation.ack.timeout=PT20S
+    - OZONE-SITE.XML_hdds.x509.rootca.certificate.polling.interval=PT10s
     - OZONE-SITE.XML_hdds.block.token.expiry.time=15s
     - OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=15s
     - OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=15s

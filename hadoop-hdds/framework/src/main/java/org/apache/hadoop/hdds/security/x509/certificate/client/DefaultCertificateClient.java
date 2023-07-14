@@ -58,6 +58,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -200,6 +201,14 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     } else {
       getLogger().debug("Root CA certificate rotation poller is already " +
           "started.");
+    }
+  }
+
+  @Override
+  public void registerRootCARotationListener(
+      Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
+    if (securityConfig.isAutoCARotationEnabled()) {
+      rootCaRotationPoller.addRootCARotationProcessor(listener);
     }
   }
 

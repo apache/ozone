@@ -923,6 +923,9 @@ public final class TestSecureOzoneCluster {
     omStorage.forceInitialize();
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     certCodec.writeCertificate(certHolder);
+    String caCertFileName = CAType.ROOT.getFileNamePrefix()
+        + certHolder.getSerialNumber().toString() + ".crt";
+    certCodec.writeCertificate(certHolder, caCertFileName);
 
     // first renewed cert
     X509CertificateHolder newCertHolder =
