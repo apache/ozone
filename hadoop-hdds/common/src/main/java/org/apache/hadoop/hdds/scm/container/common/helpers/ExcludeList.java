@@ -145,7 +145,7 @@ public class ExcludeList {
   @Override
   public String toString() {
     return "ExcludeList {" +
-        "datanodes = " + getDatanodes() +
+        "datanodes = " + datanodes.keySet() +
         ", containerIds = " + containerIds +
         ", pipelineIds = " + pipelineIds +
         '}';
