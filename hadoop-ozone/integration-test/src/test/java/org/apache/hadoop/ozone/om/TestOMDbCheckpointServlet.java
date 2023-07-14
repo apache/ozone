@@ -71,6 +71,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -703,7 +704,9 @@ public class TestOMDbCheckpointServlet {
         if (file.toFile().isDirectory()) {
           getFiles(file, truncateLength, fileSet);
         }
-        if (!file.getFileName().toString().startsWith("fabricated")) {
+        String filename = file.getFileName().toString();
+        if (!filename.startsWith("fabricated") &&
+            !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME)) {
           fileSet.add(truncateFileName(truncateLength, file));
         }
       }

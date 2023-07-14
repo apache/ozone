@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -41,8 +42,11 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -142,7 +146,7 @@ public abstract class TestContainerScannersAbstract {
       Container<?> container, VerificationMode invocationTimes)
       throws Exception {
     Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
-        container.getContainerData().getContainerID());
+        eq(container.getContainerData().getContainerID()), any());
   }
 
   /**
@@ -183,20 +187,24 @@ public abstract class TestContainerScannersAbstract {
   private ContainerController mockContainerController() {
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
-        true, true, true, CONTAINER_SEQ_ID, vol);
+        true, ScanResult.healthy(), ScanResult.healthy(),
+        CONTAINER_SEQ_ID, vol);
 
     // Open container (only metadata can be scanned)
     ContainerTestUtils.setupMockContainer(openContainer,
-        false, true, false, CONTAINER_SEQ_ID, vol);
+        false, ScanResult.healthy(), ScanResult.healthy(),
+        CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt data)
     ContainerTestUtils.setupMockContainer(corruptData,
-        true, true, false, CONTAINER_SEQ_ID, vol);
+        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt metadata). To simulate container still
     // being open while metadata is corrupted, shouldScanData will return false.
     ContainerTestUtils.setupMockContainer(openCorruptMetadata,
-        false, false, false, CONTAINER_SEQ_ID, vol);
+        false, getUnhealthyScanResult(), ScanResult.healthy(),
+        CONTAINER_SEQ_ID, vol);
 
     containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata));
     ContainerController mock = mock(ContainerController.class);

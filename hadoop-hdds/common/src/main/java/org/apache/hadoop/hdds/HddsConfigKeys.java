@@ -226,6 +226,9 @@ public final class HddsConfigKeys {
       "hdds.x509.rootca.certificate.polling.interval";
   public static final String
       HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL_DEFAULT = "PT2h";
+  public static final String HDDS_X509_CA_ROTATION_ENABLED =
+      "hdds.x509.ca.rotation.enabled";
+  public static final boolean HDDS_X509_CA_ROTATION_ENABLED_DEFAULT = false;
 
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";

@@ -101,11 +101,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </plugin>
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
+        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
             <phase>generate-sources</phase>
             <configuration>
-              <tasks>
+              <target>
                 <replace token="com.google.protobuf"
                          value="org.apache.ratis.thirdparty.com.google.protobuf"
                          dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
@@ -118,7 +119,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                          value="org.apache.ratis.thirdparty.com.google.common"
                          dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto">
                 </replace>
-              </tasks>
+              </target>
             </configuration>
             <goals>
               <goal>run</goal>
