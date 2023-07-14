@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -69,9 +70,13 @@ public class TestS3InitiateMultipartUploadRequest
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assert.assertNotNull(omMetadataManager
+    OmKeyInfo openMPUKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-        .get(multipartKey));
+        .get(multipartKey);
+    Assert.assertNotNull(openMPUKeyInfo);
+    Assert.assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
+    Assert.assertTrue(openMPUKeyInfo.getLatestVersionLocations()
+        .isMultipartKey());
     Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
 
