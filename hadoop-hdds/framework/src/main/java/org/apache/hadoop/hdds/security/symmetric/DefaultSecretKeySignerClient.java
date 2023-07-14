@@ -49,7 +49,6 @@ import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeySignerClient.class);
-  public static final int SECRET_KEY_PREFETCH_MAX_RETRIES = 10;
 
   private final SecretKeyProtocol secretKeyProtocol;
   private final AtomicReference<ManagedSecretKey> cache =
@@ -83,20 +82,28 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   }
 
   private ManagedSecretKey loadInitialSecretKey() throws IOException {
+    // Load initial active secret key from SCM, retries with exponential
+    // backoff when SCM has not initialized secret keys yet.
+
+    // Exponential backoff policy, 10 retries/1s will give maximum wait time
+    // around 10 min (2^9 = 512s).
+    int maxRetries = 10;
+    int baseWaitTime = 1;
     final RetryPolicy expBackoff =
-        exponentialBackoffRetry(SECRET_KEY_PREFETCH_MAX_RETRIES,
-            1, TimeUnit.SECONDS);
-    RetryPolicy retryPolicy = (e, i, i1, b) -> {
-      if (e instanceof SCMSecretKeyException) {
-        ErrorCode errorCode = ((SCMSecretKeyException) e).getErrorCode();
-        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED)
-          return expBackoff.shouldRetry(e, i, i1, b);
+        exponentialBackoffRetry(maxRetries, baseWaitTime, TimeUnit.SECONDS);
+
+    RetryPolicy retryPolicy = (ex, retries, failovers, isIdempotent) -> {
+      if (ex instanceof SCMSecretKeyException) {
+        ErrorCode errorCode = ((SCMSecretKeyException) ex).getErrorCode();
+        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED) {
+          return expBackoff.shouldRetry(ex, retries, failovers, isIdempotent);
+        }
       }
       return FAIL;
     };
 
-    RetriableTask<ManagedSecretKey> task = new RetriableTask<>(
-        retryPolicy, "getCurrentSecretKey", secretKeyProtocol::getCurrentSecretKey);
+    RetriableTask<ManagedSecretKey> task = new RetriableTask<>(retryPolicy,
+        "getCurrentSecretKey", secretKeyProtocol::getCurrentSecretKey);
     try {
       return task.call();
     } catch (IOException e) {
