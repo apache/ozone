@@ -20,6 +20,10 @@ package org.apache.hadoop.hdds.security.symmetric;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode;
+import org.apache.hadoop.hdds.utils.RetriableTask;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +38,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.hadoop.io.retry.RetryPolicies.exponentialBackoffRetry;
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 
 /**
  * Default implementation of {@link SecretKeySignerClient} that fetches
@@ -43,6 +49,7 @@ import static java.util.Objects.requireNonNull;
 public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSecretKeySignerClient.class);
+  public static final int SECRET_KEY_PREFETCH_MAX_RETRIES = 10;
 
   private final SecretKeyProtocol secretKeyProtocol;
   private final AtomicReference<ManagedSecretKey> cache =
@@ -68,11 +75,36 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
 
   @Override
   public void start(ConfigurationSource conf) throws IOException {
-    final ManagedSecretKey initialKey =
-        secretKeyProtocol.getCurrentSecretKey();
+    final ManagedSecretKey initialKey = loadInitialSecretKey();
+
     LOG.info("Initial secret key fetched from SCM: {}.", initialKey);
     cache.set(initialKey);
     scheduleSecretKeyPoller(conf, initialKey.getCreationTime());
+  }
+
+  private ManagedSecretKey loadInitialSecretKey() throws IOException {
+    final RetryPolicy expBackoff =
+        exponentialBackoffRetry(SECRET_KEY_PREFETCH_MAX_RETRIES,
+            1, TimeUnit.SECONDS);
+    RetryPolicy retryPolicy = (e, i, i1, b) -> {
+      if (e instanceof SCMSecretKeyException) {
+        ErrorCode errorCode = ((SCMSecretKeyException) e).getErrorCode();
+        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED)
+          return expBackoff.shouldRetry(e, i, i1, b);
+      }
+      return FAIL;
+    };
+
+    RetriableTask<ManagedSecretKey> task = new RetriableTask<>(
+        retryPolicy, "getCurrentSecretKey", secretKeyProtocol::getCurrentSecretKey);
+    try {
+      return task.call();
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Unexpected exception getting current secret key", e);
+    }
   }
 
   @Override
