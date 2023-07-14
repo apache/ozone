@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -179,6 +180,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
+  private final AtomicInteger tarballRequestCount;
 
   /**
    * This is a package private constructor and should not be used other than
@@ -240,6 +242,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } else {
       this.executor = null;
     }
+    this.tarballRequestCount = new AtomicInteger(0);
   }
 
   private String createCompactionLogDir(String metadataDirName,
@@ -481,7 +484,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       @Override
       public void onCompactionBegin(RocksDB db,
                                     CompactionJobInfo compactionJobInfo) {
-
         if (compactionJobInfo.inputFiles().size() == 0) {
           LOG.error("Compaction input files list is empty");
           return;
@@ -588,6 +590,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             return;
           }
 
+          waitForTarballCreation();
+
           // Write input and output file names to compaction log
           appendToCurrentCompactionLog(content);
 
@@ -599,6 +603,22 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         }
       }
     };
+  }
+
+  /**
+   * Check if there is any in_progress tarball creation request and wait till
+   * all tarball creation finish, and it gets notified.
+   */
+  private void waitForTarballCreation() {
+    while (tarballRequestCount.get() != 0) {
+      try {
+        wait(Integer.MAX_VALUE);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOG.error("Compaction log thread {} is interrupted.",
+            Thread.currentThread().getName());
+      }
+    }
   }
 
   /**
@@ -1493,6 +1513,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public void incrementTarballRequestCount() {
+    tarballRequestCount.incrementAndGet();
+  }
+
+  public void decrementTarballRequestCount() {
+    tarballRequestCount.decrementAndGet();
   }
 
   @VisibleForTesting
