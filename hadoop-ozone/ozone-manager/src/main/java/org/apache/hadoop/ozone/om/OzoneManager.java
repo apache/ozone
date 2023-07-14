@@ -871,10 +871,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private IAccessAuthorizer createAccessAuthorizer() {
-    return null;
-  }
-
   /**
    * Return scmClient.
    */
