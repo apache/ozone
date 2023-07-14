@@ -1084,6 +1084,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           n.getFileName(), n.getCumulativeKeysReverseTraversal());
     }
   }
+
   @VisibleForTesting
   MutableGraph<CompactionNode> getForwardCompactionDAG() {
     return forwardCompactionDAG;

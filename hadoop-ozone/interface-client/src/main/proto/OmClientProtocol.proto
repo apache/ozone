@@ -380,14 +380,14 @@ message OMResponse {
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
-  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse        = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
-  optional SetTimesResponse                  SetTimesResponse             = 120;
+  optional SetTimesResponse                  SetTimesResponse              = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
-  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse   = 123;
+  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
-  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse           = 125;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
 }
 
 enum Status {

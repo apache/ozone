@@ -33,6 +33,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -600,8 +601,8 @@ public class ObjectStore {
    * @return path of the image file.
    * @throws IOException
    */
-  public String printCompactionLogDag(String fileName, String graphType)
-      throws IOException {
+  public String printCompactionLogDag(String fileName,
+                                      String graphType) throws IOException {
     return proxy.printCompactionLogDag(fileName, graphType);
   }
 

@@ -16,11 +16,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell.snapshot;
+package org.apache.hadoop.ozone.debug;
 
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -29,16 +32,19 @@ import java.io.IOException;
  * Handler to generate image for current compaction DAG in the OM.
  * ozone sh snapshot print-log-dag.
  */
-@CommandLine.Command(name = "print-log-dag",
+@CommandLine.Command(
+    name = "print-log-dag",
     aliases = "pld",
     description = "List snapshots for the buckets.")
-public class PrintCompactionLogDagHandler extends Handler {
+@MetaInfServices(SubcommandWithParent.class)
+public class CompactionLogDagPrinter extends Handler
+    implements SubcommandWithParent {
 
-  @CommandLine.Option(names = {"-f", "--fileName"},
+  @CommandLine.Option(names = {"-f", "--file-name"},
       description = "Name of the image file. (optional)")
   private String fileName;
 
-  @CommandLine.Option(names = {"-gt", "--graphType"},
+  @CommandLine.Option(names = {"-t", "--graph-type"},
       description = "Type of node name to use in the graph image.\n" +
           "Accepted values are: \n" +
           "  file_name: to use file name as node name in DAG,\n" +
@@ -50,10 +56,15 @@ public class PrintCompactionLogDagHandler extends Handler {
   private String graphType;
 
   @Override
+  public Class<?> getParentType() {
+    return OzoneDebug.class;
+  }
+
+  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
+      throws IOException, OzoneClientException {
     String imagePath = client.getObjectStore()
         .printCompactionLogDag(fileName, graphType);
-    err().printf("DAG image is created on path: ", imagePath);
+    System.out.println("DAG image is created on path: " + imagePath);
   }
 }

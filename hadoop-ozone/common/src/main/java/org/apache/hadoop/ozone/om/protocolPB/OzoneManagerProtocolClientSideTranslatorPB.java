@@ -1196,13 +1196,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public String printCompactionLogDag(String fileName, String graphType)
       throws IOException {
-    final PrintCompactionLogDagRequest request = PrintCompactionLogDagRequest
-        .newBuilder()
-        .setFileName(fileName)
-        .setGraphType(graphType)
-        .build();
+    final PrintCompactionLogDagRequest.Builder request = PrintCompactionLogDagRequest
+        .newBuilder();
+
+    if (fileName != null) {
+      request.setFileName(fileName);
+    }
+    if (graphType != null) {
+      request.setGraphType(graphType);
+    }
+
     final OMRequest omRequest = createOMRequest(Type.PrintCompactionLogDag)
-        .setPrintCompactionLogDagRequest(request)
+        .setPrintCompactionLogDagRequest(request.build())
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);

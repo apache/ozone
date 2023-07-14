@@ -23,6 +23,7 @@ import com.google.common.graph.MutableGraph;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.util.mxCellRenderer;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.jgrapht.Graph;
 import org.jgrapht.ext.JGraphXAdapter;
@@ -67,6 +68,10 @@ public class PrintableGraph {
   }
 
   public void generateImage(String fileName) throws IOException {
+    if (CollectionUtils.isEmpty(graph.vertexSet())) {
+      throw new IOException("Graph is empty.");
+    }
+
     JGraphXAdapter<String, Edge> jGraphXAdapter = new JGraphXAdapter<>(graph);
     mxIGraphLayout mxIGraphLayout =
         new mxHierarchicalLayout(jGraphXAdapter);
