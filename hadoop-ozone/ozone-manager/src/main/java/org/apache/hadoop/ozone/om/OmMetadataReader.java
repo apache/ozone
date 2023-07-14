@@ -48,7 +48,6 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
@@ -58,7 +57,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
@@ -79,7 +77,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   private final OzoneManager ozoneManager;
   private final boolean isAclEnabled;
   private final IAccessAuthorizer accessAuthorizer;
-  private final boolean isNativeAuthorizerEnabled;
   private final OmMetadataReaderMetrics metrics;
   private final Logger log;
   private final AuditLogger audit;
@@ -91,50 +88,19 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                           Logger log,
                           AuditLogger audit,
                           OmMetadataReaderMetrics omMetadataReaderMetrics,
-                          boolean bNeedAccessAuthInitialization) {
+                          IAccessAuthorizer accessAuthorizer) {
     this.keyManager = keyManager;
     this.bucketManager = ozoneManager.getBucketManager();
     this.volumeManager = ozoneManager.getVolumeManager();
     this.prefixManager = prefixManager;
-    OzoneConfiguration configuration = ozoneManager.getConfiguration();
     this.ozoneManager = ozoneManager;
     this.isAclEnabled = ozoneManager.getAclsEnabled();
     this.log = log;
     this.audit = audit;
-    boolean allowListAllVolumes = ozoneManager.getAllowListAllVolumes();
     this.metrics = omMetadataReaderMetrics;
     this.perfMetrics = ozoneManager.getPerfMetrics();
-    if (isAclEnabled) {
-      Class<? extends IAccessAuthorizer> clazz = configuration.getClass(
-          OZONE_ACL_AUTHORIZER_CLASS, OzoneAccessAuthorizer.class,
-          IAccessAuthorizer.class);
-      if (bNeedAccessAuthInitialization ||
-          clazz.getSimpleName().equals(
-              OzoneNativeAuthorizer.class.getSimpleName())) {
-        // In case of NativeAuthorizer always re-initialize
-        accessAuthorizer = getACLAuthorizerInstance(configuration, clazz);
-        if (accessAuthorizer instanceof OzoneNativeAuthorizer) {
-          OzoneNativeAuthorizer authorizer =
-              (OzoneNativeAuthorizer) accessAuthorizer;
-          isNativeAuthorizerEnabled = true;
-          authorizer.setVolumeManager(volumeManager);
-          authorizer.setBucketManager(bucketManager);
-          authorizer.setKeyManager(keyManager);
-          authorizer.setPrefixManager(prefixManager);
-          authorizer.setAdminCheck(ozoneManager::isAdmin);
-          authorizer.setReadOnlyAdminCheck(ozoneManager::isReadOnlyAdmin);
-          authorizer.setAllowListAllVolumes(allowListAllVolumes);
-        } else {
-          isNativeAuthorizerEnabled = false;
-        }
-      } else {
-        accessAuthorizer = ozoneManager.getAccessAuthorizer();
-        isNativeAuthorizerEnabled = false;
-      }
-    } else {
-      accessAuthorizer = null;
-      isNativeAuthorizerEnabled = false;
-    }
+    this.accessAuthorizer = accessAuthorizer != null ? accessAuthorizer
+        : OzoneAccessAuthorizer.get();
   }
 
   /**
@@ -581,11 +547,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
    * @return if native authorizer is enabled.
    */
   public boolean isNativeAuthorizerEnabled() {
-    return isNativeAuthorizerEnabled;
-  }
-
-  public IAccessAuthorizer getAccessAuthorizer() {
-    return accessAuthorizer;
+    return accessAuthorizer.isNative();
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {
