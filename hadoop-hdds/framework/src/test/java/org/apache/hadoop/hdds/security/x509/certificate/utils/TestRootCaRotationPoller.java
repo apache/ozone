@@ -149,7 +149,7 @@ public class TestRootCaRotationPoller {
     GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
     //And that we see the error in the logs
     Assertions.assertTrue(logCapturer.getOutput().contains(
-        "There was an error when trying to sign the certificate"));
+        "There was a caught exception when trying to sign the certificate"));
   }
 
   private X509Certificate generateX509Cert(
