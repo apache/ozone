@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.protocol;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 

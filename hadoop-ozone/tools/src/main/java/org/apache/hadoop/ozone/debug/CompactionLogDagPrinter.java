@@ -35,7 +35,7 @@ import java.io.IOException;
 @CommandLine.Command(
     name = "print-log-dag",
     aliases = "pld",
-    description = "List snapshots for the buckets.")
+    description = "Create an image of the current compaction log DAG in OM.")
 @MetaInfServices(SubcommandWithParent.class)
 public class CompactionLogDagPrinter extends Handler
     implements SubcommandWithParent {
@@ -44,6 +44,7 @@ public class CompactionLogDagPrinter extends Handler
       description = "Name of the image file. (optional)")
   private String fileName;
 
+  // TODO: Change graphType to enum.
   @CommandLine.Option(names = {"-t", "--graph-type"},
       description = "Type of node name to use in the graph image.\n" +
           "Accepted values are: \n" +

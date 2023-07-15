@@ -256,6 +256,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -4649,10 +4650,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                       String graphType)
       throws IOException {
 
-    // TODO: Add file prefix to it.
     if (StringUtils.isBlank(fileName)) {
-      fileName = "DAG_" + System.currentTimeMillis();
+      fileName = "dag-" + System.currentTimeMillis();
     }
+
+    // Append the tmp file prefix and image file suffix.
+    fileName = "/tmp" + OZONE_URI_DELIMITER + fileName + ".png";
 
     PrintableGraph.GraphType type;
 
