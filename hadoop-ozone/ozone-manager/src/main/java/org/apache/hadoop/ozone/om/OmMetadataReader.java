@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -39,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
@@ -493,17 +491,6 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     } else {
       return true;
     }
-  }
-
-  /**
-   * Returns an instance of {@link IAccessAuthorizer}.
-   * Looks up the configuration to see if there is custom class specified.
-   * Constructs the instance by passing the configuration directly to the
-   * constructor to achieve thread safety using final fields.
-   */
-  private IAccessAuthorizer getACLAuthorizerInstance(
-      OzoneConfiguration conf, Class<? extends IAccessAuthorizer> clazz) {
-    return ReflectionUtils.newInstance(clazz, conf);
   }
 
   static String getClientAddress() {
