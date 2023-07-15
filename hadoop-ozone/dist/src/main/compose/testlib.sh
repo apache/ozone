@@ -268,15 +268,10 @@ create_containers() {
 }
 
 save_container_logs() {
-  local output_name="${OUTPUT_NAME:-}"
-  if [[ -z "${output_name}" ]]; then
-    output_name="$COMPOSE_ENV_NAME"
-  fi
-  if [[ -z "${output_name}" ]]; then
-    output_name="$(basename $(pwd))"
-  fi
-
-  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-${output_name}.log"
+  local c
+  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | grep $(basename $(pwd))); do
+    docker logs "${c}" &> "$RESULT_DIR/docker-${c}.log"
+  done
 }
 
 
