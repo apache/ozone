@@ -81,7 +81,10 @@ allows the user to overwrite an existing ozone key.
 Where an _scope_ can be:
 
 1. **ACCESS** – Access ACL is applied only to the specific object and not inheritable. It controls the access to the object itself.
-2. **DEFAULT** - Default ACL is applied to the specific object and will be inherited by object's descendants. Default ACLs cannot be set on keys (as there can be no objects under a key).
+2. **DEFAULT** - Default ACL is applied to the specific object and will be inherited by object's descendants. Default ACLs cannot be set on keys (as there can be no objects under a key). <br>
+_Note_: ACLs inherited from parent's Default ACLs will follow the following rules based on different bucket layout:
+    - **Legacy with EnableFileSystem or FSO**: inherit the immediate parent's DEFAULT ACLs. If none, inherit the bucket DEFAULT ACLs. 
+    - **Legacy with DisableFileSystem or OBS**: inherit the bucket DEFAULT ACLs.
 
 ## Ozone Native ACL APIs
 
