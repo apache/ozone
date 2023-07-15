@@ -162,6 +162,8 @@ share/ozone/lib/kerby-asn1.jar
 share/ozone/lib/kerby-pkix.jar
 share/ozone/lib/kerby-util.jar
 share/ozone/lib/kotlin-stdlib-common.jar
+share/ozone/lib/kotlin-stdlib-jdk7.jar
+share/ozone/lib/kotlin-stdlib-jdk8.jar
 share/ozone/lib/kotlin-stdlib.jar
 share/ozone/lib/libthrift.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
@@ -191,6 +193,7 @@ share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
+share/ozone/lib/okio-jvm.jar
 share/ozone/lib/okio.jar
 share/ozone/lib/opentracing-api.jar
 share/ozone/lib/opentracing-noop.jar
