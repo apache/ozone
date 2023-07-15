@@ -297,6 +297,10 @@ public class OzoneAddress {
     return bucketName;
   }
 
+  public String getOmHost() {
+    return ozoneURI.getHost();
+  }
+
   public String getSnapshotNameWithIndicator() {
     return snapshotNameWithIndicator;
   }

@@ -30,8 +30,6 @@ import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.SafeMode;
-import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
@@ -2484,10 +2482,10 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
         diff.getDiffList().get(1).getType());
     Assert.assertArrayEquals(
-        "/key1".getBytes(StandardCharsets.UTF_8),
+        "key1".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(0).getSourcePath());
     Assert.assertArrayEquals(
-        "/key2".getBytes(StandardCharsets.UTF_8),
+        "key2".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(1).getSourcePath());
 
     // test whether snapdiff returns aggregated response as
@@ -2508,9 +2506,14 @@ public class TestRootedOzoneFileSystem {
     Path file =
         new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
     ContractTestUtils.touch(fs, file);
-    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, ".");
+    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, "");
     Assert.assertEquals(1, diff.getDiffList().size());
 
+    diff = ofs.getSnapshotDiffReport(bucketPath1, "", toSnap);
+    Assert.assertEquals(1, diff.getDiffList().size());
+
+    diff = ofs.getSnapshotDiffReport(bucketPath1, "", "");
+    Assert.assertEquals(0, diff.getDiffList().size());
 
     // try snapDiff between non-bucket paths
     String errorMsg = "Path is not a bucket";
@@ -2548,18 +2551,4 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
 
-  @Test
-  public void testSafeMode() throws Exception {
-    SafeMode safeModeFS = (SafeMode) fs;
-    // safe mode is off
-    assertFalse(safeModeFS.setSafeMode(SafeModeAction.GET));
-    // shutdown datanodes and restart SCM
-    cluster.shutdownHddsDatanodes();
-    cluster.restartStorageContainerManager(false);
-    // SCM should be in safe mode
-    assertTrue(safeModeFS.setSafeMode(SafeModeAction.GET));
-    // force exit safe mode and verify that it's out of safe mode.
-    safeModeFS.setSafeMode(SafeModeAction.FORCE_EXIT);
-    assertFalse(safeModeFS.setSafeMode(SafeModeAction.GET));
-  }
 }

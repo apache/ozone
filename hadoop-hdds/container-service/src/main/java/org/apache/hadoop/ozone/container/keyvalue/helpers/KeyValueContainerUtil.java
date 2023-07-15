@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 
 /**
@@ -130,25 +129,30 @@ public final class KeyValueContainerUtil {
   }
 
   /**
-   * remove Container if it is empty.
-   * <p>
-   * There are three things we need to delete.
-   * <p>
-   * 1. Container file and metadata file. 2. The Level DB file 3. The path that
-   * we created on the data location.
+   * remove Container 1. remove db, 2. move to tmp directory.
+   *
+   * @param containerData - Data of the container to remove.
+   * @throws IOException
+   */
+  public static void removeContainer(
+      KeyValueContainerData containerData, ConfigurationSource conf)
+      throws IOException {
+    Preconditions.checkNotNull(containerData);
+    KeyValueContainerUtil.removeContainerDB(containerData, conf);
+    KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
+        containerData.getVolume());
+  }
+
+  /**
+   * remove Container db, the Level DB file.
    *
    * @param containerData - Data of the container to remove.
    * @param conf - configuration of the cluster.
    * @throws IOException
    */
-  public static void removeContainer(KeyValueContainerData containerData,
-                                     ConfigurationSource conf)
+  public static void removeContainerDB(
+      KeyValueContainerData containerData, ConfigurationSource conf)
       throws IOException {
-    Preconditions.checkNotNull(containerData);
-    File containerMetaDataPath = new File(containerData
-        .getMetadataPath());
-    File chunksPath = new File(containerData.getChunksPath());
-
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // DB failure is catastrophic, the disk needs to be replaced.
       // In case of an exception, LOG the message and rethrow the exception.
@@ -163,15 +167,6 @@ public final class KeyValueContainerUtil {
       // Close the DB connection and remove the DB handler from cache
       BlockUtils.removeDB(containerData, conf);
     }
-
-    // Delete the Container MetaData path.
-    FileUtils.deleteDirectory(containerMetaDataPath);
-
-    //Delete the Container Chunks Path.
-    FileUtils.deleteDirectory(chunksPath);
-
-    //Delete Container directory
-    FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
   }
 
   /**
@@ -472,15 +467,18 @@ public final class KeyValueContainerUtil {
    * on the default container path on the disk.
    *
    * Delete operation for Schema < V3
-   * 1. Container directory renamed to tmp directory.
-   * 2. Container is removed from in memory container set.
-   * 3. Container is deleted from tmp directory.
+   * 1. Container is marked DELETED
+   * 2. Container is removed from memory container set
+   * 3. Container DB handler from cache is removed and closed
+   * 4. Container directory renamed to tmp directory.
+   * 5. Container is deleted from tmp directory.
    *
    * Delete operation for Schema V3
-   * 1. Container directory renamed to tmp directory.
-   * 2. Container is removed from in memory container set.
-   * 3. Container's entries are removed from RocksDB.
-   * 4. Container is deleted from tmp directory.
+   * 1. Container is marked DELETED
+   * 2. Container is removed from memory container set
+   * 3. Container from DB is removed
+   * 4. Container directory renamed to tmp directory.
+   * 5. Container is deleted from tmp directory.
    *
    * @param keyValueContainerData
    * @return true if renaming was successful
@@ -490,10 +488,8 @@ public final class KeyValueContainerUtil {
       HddsVolume hddsVolume) throws IOException {
     String containerPath = keyValueContainerData.getContainerPath();
     File container = new File(containerPath);
-    String containerDirName = container.getName();
-
-    Path destinationDirPath = hddsVolume.getDeletedContainerDir().toPath()
-        .resolve(Paths.get(containerDirName));
+    Path destinationDirPath = getTmpDirectoryPath(keyValueContainerData,
+        hddsVolume);
     File destinationDirFile = destinationDirPath.toFile();
 
     // If a container by the same name was moved to the delete directory but
@@ -504,14 +500,18 @@ public final class KeyValueContainerUtil {
     }
 
     Files.move(container.toPath(), destinationDirPath);
+    LOG.debug("Container {} has been successfully moved under {}",
+        container.getName(), hddsVolume.getDeletedContainerDir());
+  }
 
-    // Updating in memory values of the container's location
-    // which is used by KeyValueContainerUtil#removeContainer().
-    // In case of a datanode restart these values won't persist but
-    // tmp delete directory will be wiped, so this won't be an issue.
-    keyValueContainerData.setMetadataPath(destinationDirPath +
-        OZONE_URI_DELIMITER + OzoneConsts.CONTAINER_META_PATH);
-    keyValueContainerData.setChunksPath(destinationDirPath +
-        OZONE_URI_DELIMITER + OzoneConsts.STORAGE_DIR_CHUNKS);
+  public static Path getTmpDirectoryPath(
+      KeyValueContainerData keyValueContainerData,
+      HddsVolume hddsVolume) {
+    String containerPath = keyValueContainerData.getContainerPath();
+    File container = new File(containerPath);
+    String containerDirName = container.getName();
+    Path destinationDirPath = hddsVolume.getDeletedContainerDir().toPath()
+        .resolve(Paths.get(containerDirName));
+    return destinationDirPath;
   }
 }

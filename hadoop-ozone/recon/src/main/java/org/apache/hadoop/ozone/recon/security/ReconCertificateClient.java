@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.recon.security;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -34,11 +32,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
@@ -89,44 +85,19 @@ public class ReconCertificateClient  extends CommonCertificateClient {
   }
 
   @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest csr,
-      Path certificatePath, boolean renew) throws CertificateException {
-    try {
-      SCMSecurityProtocolProtos.SCMGetCertResponseProto response;
-      HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
-          HddsProtos.NodeDetailsProto.newBuilder()
-              .setHostName(InetAddress.getLocalHost().getHostName())
-              .setClusterId(clusterID)
-              .setUuid(reconID)
-              .setNodeType(HddsProtos.NodeType.RECON);
-      // TODO: For SCM CA we should fetch certificate from multiple SCMs.
-      response = getScmSecureClient().getCertificateChain(
-          reconDetailsProtoBuilder.build(), getEncodedString(csr));
-
-      // Persist certificates.
-      if (response.hasX509CACertificate()) {
-        String pemEncodedCert = response.getX509Certificate();
-        CertificateCodec certCodec = new CertificateCodec(
-            getSecurityConfig(), certificatePath);
-        storeCertificate(pemEncodedCert, CAType.NONE, certCodec, false, !renew);
-        storeCertificate(response.getX509CACertificate(),
-            CAType.SUBORDINATE, certCodec, false, !renew);
-
-        // Store Root CA certificate.
-        if (response.hasX509RootCACertificate()) {
-          storeCertificate(response.getX509RootCACertificate(),
-              CAType.ROOT, certCodec, false, !renew);
-        }
-        return getX509Certificate(pemEncodedCert).getSerialNumber().toString();
-      } else {
-        throw new CertificateException("Unable to retrieve recon certificate " +
-            "chain");
-      }
-    } catch (IOException | java.security.cert.CertificateException e) {
-      LOG.error("Error while signing and storing SCM signed certificate.", e);
-      throw new CertificateException(
-          "Error while signing and storing SCM signed certificate.", e);
-    }
+  protected SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest request) throws IOException {
+    SCMGetCertResponseProto response;
+    HddsProtos.NodeDetailsProto.Builder reconDetailsProtoBuilder =
+        HddsProtos.NodeDetailsProto.newBuilder()
+            .setHostName(InetAddress.getLocalHost().getHostName())
+            .setClusterId(clusterID)
+            .setUuid(reconID)
+            .setNodeType(HddsProtos.NodeType.RECON);
+    // TODO: For SCM CA we should fetch certificate from multiple SCMs.
+    response = getScmSecureClient().getCertificateChain(
+        reconDetailsProtoBuilder.build(), getEncodedString(request));
+    return response;
   }
 
   @Override

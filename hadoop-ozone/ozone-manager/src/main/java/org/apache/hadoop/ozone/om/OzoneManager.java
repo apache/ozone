@@ -110,7 +110,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeySignerClient;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
@@ -346,14 +345,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneBlockTokenSecretManager blockTokenMgr;
   private CertificateClient certClient;
   private SecretKeySignerClient secretKeyClient;
-  private String caCertPem = null;
-  private List<String> caCertPemList = new ArrayList<>();
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
   private final InetSocketAddress omRpcAddress;
   private final String omId;
+  private ServiceInfoProvider serviceInfo;
 
   private OMMetadataManager metadataManager;
   private OMMultiTenantManager multiTenantManager;
@@ -642,6 +640,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           HddsServerUtil.getSecretKeyClientForOm(conf);
       secretKeyClient = new DefaultSecretKeySignerClient(secretKeyProtocol);
     }
+    serviceInfo = new ServiceInfoProvider(secConfig, this, certClient,
+        testSecureOmFlag);
+
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager();
     }
@@ -826,7 +827,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
-        this, LOG, AUDIT, metrics);
+        this, LOG, AUDIT, metrics, true);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
     rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
@@ -1114,6 +1115,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       certClient.close();
     }
     certClient = newClient;
+    serviceInfo = new ServiceInfoProvider(secConfig, this, certClient);
   }
 
   /**
@@ -1634,13 +1636,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               "version ({}) than OM DB ({}). That is expected if this " +
               "OM has never been finalized to a newer layout version.",
           versionManager.getMetadataLayoutVersion(), layoutVersionInDB);
-    }
-
-    // Perform this to make it work with old clients.
-    if (certClient != null) {
-      caCertPem =
-          CertificateCodec.getPEMEncodedString(certClient.getCACertificate());
-      caCertPemList = HAUtils.buildCAList(certClient, configuration);
     }
 
     // Set metrics and start metrics back ground thread
@@ -3091,7 +3086,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
-    return new ServiceInfoEx(getServiceList(), caCertPem, caCertPemList);
+    return serviceInfo.provide();
   }
 
   @Override
@@ -3577,7 +3572,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
    */
-  public TermIndex installSnapshotFromLeader(String leaderId) {
+  public synchronized TermIndex installSnapshotFromLeader(String leaderId) {
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
@@ -3632,7 +3627,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       keyManager.stop();
       stopSecretManager();
       stopTrashEmptier();
-
+      omSnapshotManager.getSnapshotCache().invalidateAll();
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
       // pending transactions in the buffer, they are discarded.
@@ -4039,7 +4034,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public DBUpdates getDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     long limitCount = Long.MAX_VALUE;
     if (dbUpdatesRequest.hasLimitCount()) {
       limitCount = dbUpdatesRequest.getLimitCount();
@@ -4615,16 +4610,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         false);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse snapshotDiff(String volume,
                                            String bucket,
                                            String fromSnapshot,
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff)
       throws IOException {
     return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+        disableNativeDiff);
   }
 
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,

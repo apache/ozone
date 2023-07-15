@@ -48,10 +48,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PRIVATE_KEY_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_FILE;
@@ -131,6 +135,8 @@ public class SecurityConfig {
       Pattern.compile("\\d{2}:\\d{2}:\\d{2}");
   private final Duration caAckTimeout;
   private final SslProvider grpcSSLProvider;
+  private final Duration rootCaCertificatePollingInterval;
+  private final boolean autoCARotationEnabled;
 
   /**
    * Constructs a SecurityConfig.
@@ -225,8 +231,17 @@ public class SecurityConfig {
         HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
         HDDS_X509_CA_ROTATION_ACK_TIMEOUT_DEFAULT);
     caAckTimeout = Duration.parse(ackTimeString);
+    autoCARotationEnabled = configuration.getBoolean(
+        HDDS_X509_CA_ROTATION_ENABLED, HDDS_X509_CA_ROTATION_ENABLED_DEFAULT);
 
     validateCertificateValidityConfig();
+
+    String rootCaCertificatePollingIntervalString = configuration.get(
+        HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL,
+        HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL_DEFAULT);
+
+    this.rootCaCertificatePollingInterval =
+        Duration.parse(rootCaCertificatePollingIntervalString);
 
     this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
@@ -550,6 +565,14 @@ public class SecurityConfig {
 
   public Duration getCaAckTimeout() {
     return caAckTimeout;
+  }
+
+  public Duration getRootCaCertificatePollingInterval() {
+    return rootCaCertificatePollingInterval;
+  }
+
+  public boolean isAutoCARotationEnabled() {
+    return autoCARotationEnabled;
   }
 
   /**

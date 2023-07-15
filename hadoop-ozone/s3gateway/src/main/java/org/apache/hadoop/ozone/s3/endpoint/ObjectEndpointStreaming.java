@@ -21,11 +21,14 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -33,6 +36,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 
 /**
  * Key level rest endpoints for Streaming.
@@ -108,5 +112,40 @@ final class ObjectEndpointStreaming {
       n += readLength;
     }
     return n;
+  }
+
+  public static Response createMultipartKey(OzoneBucket ozoneBucket, String key,
+                                            long length, int partNumber,
+                                            String uploadID, int chunkSize,
+                                            InputStream body)
+      throws IOException, OS3Exception {
+    OzoneDataStreamOutput streamOutput = null;
+    String eTag = "";
+    S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    try {
+      streamOutput = ozoneBucket
+          .createMultipartStreamKey(key, length, partNumber, uploadID);
+      long putLength =
+          writeToStreamOutput(streamOutput, body, chunkSize, length);
+      metrics.incPutKeySuccessLength(putLength);
+    } catch (OMException ex) {
+      if (ex.getResult() ==
+          OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
+        throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
+            uploadID);
+      } else if (ex.getResult() == OMException.ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED,
+            ozoneBucket.getName() + "/" + key);
+      }
+      throw ex;
+    } finally {
+      if (streamOutput != null) {
+        streamOutput.close();
+        OmMultipartCommitUploadPartInfo commitUploadPartInfo =
+            streamOutput.getCommitUploadPartInfo();
+        eTag = commitUploadPartInfo.getPartName();
+      }
+    }
+    return Response.ok().header("ETag", eTag).build();
   }
 }
