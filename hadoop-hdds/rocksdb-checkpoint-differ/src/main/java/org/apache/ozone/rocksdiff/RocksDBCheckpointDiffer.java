@@ -1524,6 +1524,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
+  public int getTarballRequestCount() {
+    return tarballRequestCount.get();
+  }
+
+  @VisibleForTesting
   public boolean debugEnabled(Integer level) {
     return DEBUG_LEVEL.contains(level);
   }

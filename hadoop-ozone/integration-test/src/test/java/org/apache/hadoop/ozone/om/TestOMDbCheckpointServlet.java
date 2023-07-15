@@ -87,6 +87,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -397,6 +398,10 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
+
+    // Verify that tarball request count reaches to zero once doGet completes.
+    Assertions.assertEquals(0,
+        dbStore.getRocksDBCheckpointDiffer().getTarballRequestCount());
     dbCheckpoint = realCheckpoint.get();
 
     // Untar the file into a temp folder to be examined.
