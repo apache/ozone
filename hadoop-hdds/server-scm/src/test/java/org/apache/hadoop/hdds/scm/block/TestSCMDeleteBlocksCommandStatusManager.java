@@ -19,8 +19,11 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -28,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
 
 import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus.NEED_RESEND;
 import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus.PENDING_EXECUTED;
@@ -58,7 +62,11 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   @BeforeEach
   public void setup() throws Exception {
-    manager = new SCMDeleteBlocksCommandStatusManager();
+    manager = new SCMDeleteBlocksCommandStatusManager(
+        Mockito.mock(DeletedBlockLogStateManager.class),
+        Mockito.mock(ScmBlockDeletingServiceMetrics.class),
+        Mockito.mock(ContainerManager.class), Mockito.mock(Lock.class),
+        Mockito.mock(SCMContext.class), 300);
     // Create test data
     dnId1 = UUID.randomUUID();
     dnId2 = UUID.randomUUID();

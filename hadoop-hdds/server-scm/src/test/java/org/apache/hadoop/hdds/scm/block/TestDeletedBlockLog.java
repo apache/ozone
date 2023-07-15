@@ -250,7 +250,7 @@ public class TestDeletedBlockLog {
       List<DeleteBlockTransactionResult> transactionResults,
       DatanodeDetails... dns) throws IOException {
     for (DatanodeDetails dnDetails : dns) {
-      deletedBlockLog
+      deletedBlockLog.getScmCommandStatusManager()
           .commitTransactions(transactionResults, dnDetails.getUuid());
     }
     scmHADBTransactionBuffer.flush();
@@ -282,7 +282,8 @@ public class TestDeletedBlockLog {
   private void commitTransactions(DatanodeDeletedBlockTransactions
       transactions) {
     transactions.getDatanodeTransactionMap().forEach((uuid,
-        deletedBlocksTransactions) -> deletedBlockLog
+        deletedBlocksTransactions) ->
+        deletedBlockLog.getScmCommandStatusManager()
         .commitTransactions(deletedBlocksTransactions.stream()
             .map(this::createDeleteBlockTransactionResult)
             .collect(Collectors.toList()), uuid));
@@ -513,7 +514,8 @@ public class TestDeletedBlockLog {
         .build()
         .getProtoBufMessage());
 
-    deletedBlockLog.commitSCMCommandStatus(deleteBlockStatus, dnID);
+    deletedBlockLog.getScmCommandStatusManager()
+        .commitSCMCommandStatus(deleteBlockStatus, dnID);
   }
 
   private void createDeleteBlocksCommandAndAction(

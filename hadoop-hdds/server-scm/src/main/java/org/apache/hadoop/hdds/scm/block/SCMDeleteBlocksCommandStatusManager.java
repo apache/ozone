@@ -20,21 +20,39 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
+import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.stream.Collectors;
 
+import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus.EXECUTED;
 import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus.NEED_RESEND;
 import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.CmdStatus.PENDING_EXECUTED;
@@ -44,9 +62,21 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManag
 /**
  * SCM DeleteBlocksCommand manager.
  */
-public class SCMDeleteBlocksCommandStatusManager {
+public class SCMDeleteBlocksCommandStatusManager
+    implements EventHandler<DeleteBlockStatus> {
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMDeleteBlocksCommandStatusManager.class);
+
+  // Maps txId to set of DNs which are successful in committing the transaction
+  private final Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  // Maps txId to its retry counts;
+  private final Map<Long, Integer> transactionToRetryCountMap;
+  // The access to DeletedBlocksTXTable is protected by
+  // DeletedBlockLogStateManager.
+  private final DeletedBlockLogStateManager deletedBlockLogStateManager;
+  private final ContainerManager containerManager;
+  private final ScmBlockDeletingServiceMetrics metrics;
+  private final SCMContext scmContext;
 
   /**
    * Status of SCMDeleteBlocksCommand.
@@ -77,10 +107,25 @@ public class SCMDeleteBlocksCommandStatusManager {
       Arrays.asList(EXECUTED, NEED_RESEND));
   private final Set<CmdStatus> failedStatuses = new HashSet<>(
       Arrays.asList(NEED_RESEND));
-
+  private int failureTransactionCount;
+  private Lock lock;
+  private long scmCommandTimeoutMs;
   private final Map<UUID, Map<Long, CmdStatusData>> scmCmdStatusRecord;
 
-  public SCMDeleteBlocksCommandStatusManager() {
+  public SCMDeleteBlocksCommandStatusManager(
+      DeletedBlockLogStateManager deletedBlockLogStateManager,
+      ScmBlockDeletingServiceMetrics metrics,
+      ContainerManager containerManager, Lock lock, SCMContext scmContext,
+      long scmCommandTimeoutMs) {
+    // maps transaction to dns which have committed it.
+    this.deletedBlockLogStateManager = deletedBlockLogStateManager;
+    this.metrics = metrics;
+    this.containerManager = containerManager;
+    this.scmContext = scmContext;
+    this.lock = lock;
+    this.scmCommandTimeoutMs = scmCommandTimeoutMs;
+    transactionToDNsCommitMap = new ConcurrentHashMap<>();
+    transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.scmCmdStatusRecord = new ConcurrentHashMap<>();
   }
 
@@ -102,10 +147,6 @@ public class SCMDeleteBlocksCommandStatusManager {
       this.scmCmdId = scmTxID;
       this.deletedBlocksTxIds = deletedBlocksTxIds;
       setStatus(DEFAULT_STATUS);
-    }
-
-    public boolean isContainDeletedBlocksTx(long deletedBlocksTxId) {
-      return deletedBlocksTxIds.contains(deletedBlocksTxId);
     }
 
     public Set<Long> getDeletedBlocksTxIds() {
@@ -214,6 +255,7 @@ public class SCMDeleteBlocksCommandStatusManager {
 
   public void clear() {
     scmCmdStatusRecord.clear();
+    transactionToDNsCommitMap.clear();
   }
 
   private void cleanFinalStatusSCMCommand(UUID dnId) {
@@ -373,6 +415,168 @@ public class SCMDeleteBlocksCommandStatusManager {
           "to ScmDeleteBlockCommandStatus", protoCmdStatus);
       return null;
     }
+  }
+
+  public void recordTransactionToDNsCommitMap(long txId) {
+    transactionToDNsCommitMap
+        .putIfAbsent(txId, new LinkedHashSet<>());
+  }
+
+  public boolean alreadyExecuted(UUID dnId, long txId) {
+    Set<UUID> dnsWithTransactionCommitted =
+        transactionToDNsCommitMap.get(txId);
+    return dnsWithTransactionCommitted != null && dnsWithTransactionCommitted
+        .contains(dnId);
+  }
+
+  /**
+   * Commits a transaction means to delete all footprints of a transaction
+   * from the log. This method doesn't guarantee all transactions can be
+   * successfully deleted, it tolerate failures and tries best efforts to.
+   *  @param transactionResults - delete block transaction results.
+   * @param dnId - ID of datanode which acknowledges the delete block command.
+   */
+  public void commitTransactions(
+      List<DeleteBlockTransactionResult> transactionResults, UUID dnId) {
+
+    ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
+    Set<UUID> dnsWithCommittedTxn;
+    for (DeleteBlockTransactionResult transactionResult :
+        transactionResults) {
+      if (isTransactionFailed(transactionResult)) {
+        metrics.incrBlockDeletionTransactionFailure();
+        continue;
+      }
+      try {
+        metrics.incrBlockDeletionTransactionSuccess();
+        long txID = transactionResult.getTxID();
+        // set of dns which have successfully committed transaction txId.
+        dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
+        final ContainerID containerId = ContainerID.valueOf(
+            transactionResult.getContainerID());
+        if (dnsWithCommittedTxn == null) {
+          // Mostly likely it's a retried delete command response.
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "Transaction txId={} commit by dnId={} for containerID={}"
+                    + " failed. Corresponding entry not found.", txID, dnId,
+                containerId);
+          }
+          continue;
+        }
+
+        dnsWithCommittedTxn.add(dnId);
+        final ContainerInfo container =
+            containerManager.getContainer(containerId);
+        final Set<ContainerReplica> replicas =
+            containerManager.getContainerReplicas(containerId);
+        // The delete entry can be safely removed from the log if all the
+        // corresponding nodes commit the txn. It is required to check that
+        // the nodes returned in the pipeline match the replication factor.
+        if (min(replicas.size(), dnsWithCommittedTxn.size())
+            >= container.getReplicationConfig().getRequiredNodes()) {
+          List<UUID> containerDns = replicas.stream()
+              .map(ContainerReplica::getDatanodeDetails)
+              .map(DatanodeDetails::getUuid)
+              .collect(Collectors.toList());
+          if (dnsWithCommittedTxn.containsAll(containerDns)) {
+            transactionToDNsCommitMap.remove(txID);
+            transactionToRetryCountMap.remove(txID);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Purging txId={} from block deletion log", txID);
+            }
+            txIDsToBeDeleted.add(txID);
+          }
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
+              txID, containerId, dnId);
+        }
+      } catch (IOException e) {
+        LOG.warn("Could not commit delete block transaction: " +
+            transactionResult.getTxID(), e);
+      }
+    }
+    try {
+      deletedBlockLogStateManager.removeTransactionsFromDB(txIDsToBeDeleted);
+      metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
+    } catch (IOException e) {
+      LOG.warn("Could not commit delete block transactions: "
+          + txIDsToBeDeleted, e);
+    }
+  }
+
+  @Override
+  public void onMessage(
+      DeleteBlockStatus deleteBlockStatus, EventPublisher publisher) {
+    if (!scmContext.isLeader()) {
+      LOG.warn("Skip commit transactions since current SCM is not leader.");
+      return;
+    }
+
+    DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
+    UUID dnId = details.getUuid();
+    for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
+      CommandStatus.Status status = commandStatus.getStatus();
+      lock.lock();
+      try {
+        if (status == CommandStatus.Status.EXECUTED) {
+          ContainerBlocksDeletionACKProto ackProto =
+              commandStatus.getBlockDeletionAck();
+          commitTransactions(ackProto.getResultsList(), dnId);
+          metrics.incrBlockDeletionCommandSuccess();
+        } else if (status == CommandStatus.Status.FAILED) {
+          metrics.incrBlockDeletionCommandFailure();
+        } else {
+          LOG.debug("Delete Block Command {} is not executed on the Datanode" +
+                  " {}.", commandStatus.getCmdId(), dnId);
+        }
+
+        commitSCMCommandStatus(deleteBlockStatus.getCmdStatus(), dnId);
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  public void commitSCMCommandStatus(List<CommandStatus> deleteBlockStatus,
+      UUID dnId) {
+    processSCMCommandStatus(deleteBlockStatus, dnId);
+    cleanSCMCommandForDn(dnId, scmCommandTimeoutMs);
+  }
+
+  private void processSCMCommandStatus(List<CommandStatus> deleteBlockStatus,
+      UUID dnID) {
+    Map<Long, CommandStatus> lastStatus = new HashMap<>();
+    Map<Long, CommandStatus.Status> summary = new HashMap<>();
+
+    // The CommandStatus is ordered in the report. So we can focus only on the
+    // last status in the command report.
+    deleteBlockStatus.forEach(cmdStatus -> {
+      lastStatus.put(cmdStatus.getCmdId(), cmdStatus);
+      summary.put(cmdStatus.getCmdId(), cmdStatus.getStatus());
+    });
+    LOG.debug("CommandStatus {} from Datanode {} ", summary, dnID);
+    for (Map.Entry<Long, CommandStatus> entry : lastStatus.entrySet()) {
+      CommandStatus.Status status = entry.getValue().getStatus();
+      updateStatusByDNCommandStatus(
+          dnID, entry.getKey(), status);
+
+    }
+  }
+
+  private boolean isTransactionFailed(DeleteBlockTransactionResult result) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "Got block deletion ACK from datanode, TXIDs={}, " + "success={}",
+          result.getTxID(), result.getSuccess());
+    }
+    if (!result.getSuccess()) {
+      LOG.warn("Got failed ACK for TXID={}, prepare to resend the "
+          + "TX in next interval", result.getTxID());
+      return true;
+    }
+    return false;
   }
 
   @VisibleForTesting
