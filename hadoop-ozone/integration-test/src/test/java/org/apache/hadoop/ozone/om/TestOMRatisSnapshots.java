@@ -90,6 +90,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -401,7 +402,9 @@ public class TestOMRatisSnapshots {
         80);
 
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap80");
-
+    followerOM.getConfiguration().setInt(
+        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+        KeyManagerImpl.DISABLE_VALUE);
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
 
@@ -436,7 +439,6 @@ public class TestOMRatisSnapshots {
     }, 1000, 30000);
 
     assertEquals(3, followerOM.getOmSnapshotProvider().getNumDownloaded());
-
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
     OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
