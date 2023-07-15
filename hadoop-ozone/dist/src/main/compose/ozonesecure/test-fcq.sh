@@ -29,7 +29,3 @@ export COMPOSE_FILE=docker-compose.yaml:fcq.yaml
 start_docker_env
 
 execute_robot_test s3g fcq/s3_om_fcq.robot
-
-stop_docker_env
-
-generate_report

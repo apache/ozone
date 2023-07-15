@@ -35,7 +35,3 @@ start_docker_env
 startOMs
 
 execute_robot_test scm omha/testOMHA.robot
-
-stop_docker_env
-
-generate_report

@@ -28,9 +28,6 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
+wait_for_port scm 1234 5
 execute_robot_test scm failing/test1.robot
 execute_robot_test scm failing/test2.robot
-
-stop_docker_env
-
-generate_report
