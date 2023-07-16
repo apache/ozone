@@ -21,9 +21,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+
 import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -37,6 +39,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ozone.graph.PrintableGraph;
+import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
@@ -1081,11 +1085,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  public MutableGraph<CompactionNode> getForwardCompactionDAG() {
+  @VisibleForTesting
+  MutableGraph<CompactionNode> getForwardCompactionDAG() {
     return forwardCompactionDAG;
   }
 
-  public MutableGraph<CompactionNode> getBackwardCompactionDAG() {
+  @VisibleForTesting
+  MutableGraph<CompactionNode> getBackwardCompactionDAG() {
     return backwardCompactionDAG;
   }
 
@@ -1539,5 +1545,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  public String pngPrintMutableGraph(String fileName, GraphType graphType)
+      throws IOException {
+    Objects.requireNonNull(fileName, "Image file name is required.");
+    Objects.requireNonNull(graphType, "Graph type is required.");
+
+    PrintableGraph graph;
+    synchronized (this) {
+      graph = new PrintableGraph(forwardCompactionDAG, graphType);
+    }
+
+    graph.generateImage(fileName);
+    return fileName;
   }
 }

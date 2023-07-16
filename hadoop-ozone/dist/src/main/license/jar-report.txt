@@ -3,6 +3,7 @@ share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/aopalliance.jar
+share/ozone/lib/antlr4-runtime.jar
 share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
@@ -145,6 +146,10 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jgraph.jar
+share/ozone/lib/jgrapht-core.jar
+share/ozone/lib/jgrapht-ext.jar
+share/ozone/lib/jgraphx.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
