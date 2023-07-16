@@ -556,8 +556,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
         datanodeStartAdminHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
-    eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS,
-        scmBlockManager.getDeletedBlockLog().getScmCommandStatusManager());
+    eventQueue.addHandler(SCMEvents.DELETE_BLOCK_STATUS, scmBlockManager
+        .getDeletedBlockLog().getSCMDeletedBlockTransactionStatusManager());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);

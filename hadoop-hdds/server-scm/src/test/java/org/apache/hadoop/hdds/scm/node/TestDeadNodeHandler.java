@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
-import org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager;
+import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -92,7 +92,8 @@ public class TestDeadNodeHandler {
   private EventQueue eventQueue;
   private String storageDir;
   private SCMContext scmContext;
-  private SCMDeleteBlocksCommandStatusManager deleteBlocksCommandStatusManager;
+  private SCMDeletedBlockTransactionStatusManager
+      deleteBlocksCommandStatusManager;
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
@@ -122,8 +123,8 @@ public class TestDeadNodeHandler {
     containerManager = scm.getContainerManager();
     DeletedBlockLog deletedBlockLog = Mockito.mock(DeletedBlockLog.class);
     deleteBlocksCommandStatusManager =
-        Mockito.mock(SCMDeleteBlocksCommandStatusManager.class);
-    Mockito.when(deletedBlockLog.getScmCommandStatusManager())
+        Mockito.mock(SCMDeletedBlockTransactionStatusManager.class);
+    Mockito.when(deletedBlockLog.getSCMDeletedBlockTransactionStatusManager())
         .thenReturn(deleteBlocksCommandStatusManager);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
         Mockito.mock(PipelineManager.class), containerManager, deletedBlockLog);

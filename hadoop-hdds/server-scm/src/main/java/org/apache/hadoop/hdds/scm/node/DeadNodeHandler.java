@@ -112,7 +112,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       // is IN_MAINTENANCE
       if (deletedBlockLog != null &&
           !nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
-        deletedBlockLog.getScmCommandStatusManager()
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
             .onDatanodeDead(datanodeDetails.getUuid());
       }
 

@@ -522,7 +522,7 @@ public class SCMNodeManager implements NodeManager {
         if (command.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
           DeletedBlockLog deletedBlockLog = scmContext.getScm().
               getScmBlockManager().getDeletedBlockLog();
-          deletedBlockLog.getScmCommandStatusManager()
+          deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
               .onSent(datanodeDetails.getUuid(), command.getId());
         }
       }

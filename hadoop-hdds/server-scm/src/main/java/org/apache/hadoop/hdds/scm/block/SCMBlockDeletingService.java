@@ -56,7 +56,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.block.SCMDeleteBlocksCommandStatusManager.createScmCmdStatusData;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 
@@ -184,8 +183,8 @@ public class SCMBlockDeletingService extends BackgroundService
               command.setTerm(scmContext.getTermOfLeader());
               eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId, command));
-              deletedBlockLog.getScmCommandStatusManager().recordScmCommand(
-                  createScmCmdStatusData(dnId, command.getId(), dnTxSet));
+              deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
+                  .recordTransactionCreated(dnId, command.getId(), dnTxSet);
               metrics.incrBlockDeletionCommandSent();
               metrics.incrBlockDeletionTransactionSent(dnTXs.size());
               if (LOG.isDebugEnabled()) {

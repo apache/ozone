@@ -84,10 +84,11 @@ public interface DeletedBlockLog extends Closeable {
   int resetCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Get ScmDeleteBlocksCommandStatusManager.
-   * @return an Object of ScmDeleteBlocksCommandStatusManager
+   * Get SCMDeletedBlockTransactionStatusManager.
+   * @return an Object of SCMDeletedBlockTransactionStatusManager
    */
-  SCMDeleteBlocksCommandStatusManager getScmCommandStatusManager();
+  SCMDeletedBlockTransactionStatusManager
+      getSCMDeletedBlockTransactionStatusManager();
 
   /**
    * Creates block deletion transactions for a set of containers,
