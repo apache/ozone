@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collection;
+import java.util.function.BiConsumer;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -88,6 +89,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         defaultLayoutVersionProto());
+  }
+
+  /**
+   * Register a SendCommandNotify handler for a specific type of SCMCommand.
+   * @param type The type of the SCMCommand.
+   * @param scmCommand A BiConsumer that takes a DatanodeDetails and a
+   *                   SCMCommand object and performs the necessary actions.
+   * @return whatever the regular register command returns with default
+   * layout version passed in.
+   */
+  default void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
   }
 
   /**

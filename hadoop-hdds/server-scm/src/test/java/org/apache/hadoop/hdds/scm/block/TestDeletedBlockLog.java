@@ -32,10 +32,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -49,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -109,7 +114,16 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    scm = HddsTestUtils.getScm(conf);
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
+    StorageContainerManager storageContainerManager =
+        Mockito.mock(StorageContainerManager.class);
+    when(storageContainerManager.getScmNodeManager()).thenReturn(Mockito.mock(
+        SCMNodeManager.class));
+    SCMContext context =
+        new SCMContext.Builder().setSCM(storageContainerManager).build();
+    configurator.setScmContext(context);
+    scm = HddsTestUtils.getScm(conf, configurator);
     containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
@@ -457,9 +471,9 @@ public class TestDeletedBlockLog {
         .recordTransactionCreated(dnId, command.getId(), dnTxSet);
   }
 
-  private void sendSCMDeleteBlocksCommand(UUID dnId, long scmCmdId) {
+  private void sendSCMDeleteBlocksCommand(UUID dnId, SCMCommand<?> scmCommand) {
     deletedBlockLog.getSCMDeletedBlockTransactionStatusManager().onSent(
-        dnId, scmCmdId);
+        DatanodeDetails.newBuilder().setUuid(dnId).build(), scmCommand);
   }
 
   private void assertNoDuplicateTransactions(
@@ -553,7 +567,7 @@ public class TestDeletedBlockLog {
     assertNoDuplicateTransactions(transactions1, transactions2);
     createDeleteBlocksCommandAndAction(transactions2, (dnId, command) -> {
       recordScmCommandToStatusManager(dnId, command);
-      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      sendSCMDeleteBlocksCommand(dnId, command);
     });
 
     // - If the DN reports the command status as PENDING
@@ -562,7 +576,7 @@ public class TestDeletedBlockLog {
     assertNoDuplicateTransactions(transactions1, transactions3);
     createDeleteBlocksCommandAndAction(transactions3, (dnId, command) -> {
       recordScmCommandToStatusManager(dnId, command);
-      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      sendSCMDeleteBlocksCommand(dnId, command);
       commitSCMCommandStatus(command.getId(), dnId,
           StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
     });
@@ -590,7 +604,7 @@ public class TestDeletedBlockLog {
         deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
     createDeleteBlocksCommandAndAction(transactions, (dnId, command) -> {
       recordScmCommandToStatusManager(dnId, command);
-      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      sendSCMDeleteBlocksCommand(dnId, command);
       commitSCMCommandStatus(command.getId(), dnId,
           StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
     });
@@ -600,7 +614,7 @@ public class TestDeletedBlockLog {
         deletedBlockLog.getTransactions(blockLimit, new HashSet<>(dnList));
     createDeleteBlocksCommandAndAction(transactions2, (dnId, command) -> {
       recordScmCommandToStatusManager(dnId, command);
-      sendSCMDeleteBlocksCommand(dnId, command.getId());
+      sendSCMDeleteBlocksCommand(dnId, command);
       commitSCMCommandStatus(command.getId(), dnId,
           StorageContainerDatanodeProtocolProtos.CommandStatus.Status.FAILED);
     });
