@@ -594,6 +594,18 @@ public class ObjectStore {
   }
 
   /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileName     name of the image file.
+   * @param graphType    type of node name to use in the graph image.
+   * @return path of the image file.
+   * @throws IOException
+   */
+  public String printCompactionLogDag(String fileName, String graphType)
+      throws IOException {
+    return proxy.printCompactionLogDag(fileName, graphType);
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneSnapshot} list.
    */
   private class SnapshotIterator implements Iterator<OzoneSnapshot> {

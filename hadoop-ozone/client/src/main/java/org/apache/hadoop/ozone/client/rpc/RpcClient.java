@@ -987,6 +987,19 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.deleteSnapshot(volumeName, bucketName, snapshotName);
   }
 
+  /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileName     name of the image file.
+   * @param graphType    type of node name to use in the graph image.
+   * @return path of the image file.
+   * @throws IOException
+   */
+  @Override
+  public String printCompactionLogDag(String fileName,
+                                      String graphType) throws IOException {
+    return ozoneManagerClient.printCompactionLogDag(fileName, graphType);
+  }
+
   @Override
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,

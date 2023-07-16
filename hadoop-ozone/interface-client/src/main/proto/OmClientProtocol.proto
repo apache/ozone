@@ -140,6 +140,7 @@ enum Type {
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
+  PrintCompactionLogDag = 125;
 }
 
 enum SafeMode {
@@ -265,11 +266,12 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
-  optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional SetTimesRequest                  SetTimesRequest               = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
-  optional CancelSnapshotDiffRequest       CancelSnapshotDiffRequest     = 123;
+  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest     = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest          = 125;
 }
 
 message OMResponse {
@@ -380,11 +382,12 @@ message OMResponse {
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
   optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
-  optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional SetTimesResponse                  SetTimesResponse             = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
-  optional CancelSnapshotDiffResponse       cancelSnapshotDiffResponse   = 123;
+  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse   = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse           = 125;
 }
 
 enum Status {
@@ -1779,6 +1782,11 @@ message DeleteSnapshotRequest {
   optional uint64 deletionTime = 4;
 }
 
+message PrintCompactionLogDagRequest {
+  optional string fileName = 1;
+  optional string graphType = 2;
+}
+
 message SnapshotMoveDeletedKeysRequest {
   optional SnapshotInfo fromSnapshot = 1;
   repeated SnapshotMoveKeyInfos nextDBKeys = 2;
@@ -1868,6 +1876,10 @@ message ListSnapshotDiffJobResponse {
 
 message DeleteSnapshotResponse {
 
+}
+
+message PrintCompactionLogDagResponse {
+  optional string imagePath = 1;
 }
 
 message SnapshotMoveDeletedKeysResponse {
