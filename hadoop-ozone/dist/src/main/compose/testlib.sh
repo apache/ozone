@@ -269,7 +269,7 @@ create_containers() {
 
 save_container_logs() {
   local c
-  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | grep $(basename $(pwd))); do
+  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
     docker logs "${c}" &> "$RESULT_DIR/docker-${c}.log"
   done
 }
