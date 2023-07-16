@@ -85,18 +85,23 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     // Load initial active secret key from SCM, retries with exponential
     // backoff when SCM has not initialized secret keys yet.
 
-    // Exponential backoff policy, 10 retries/1s will give maximum wait time
-    // around 10 min (2^9 = 512s).
-    int maxRetries = 10;
+    // Exponential backoff policy, 100 max retries, exponential backoff
+    // wait time that repeats each 10. The wait times can be illustrated as:
+    // 1 2 4 8 ... 512 1 2 4 8 ... 512 1 2 ...
+    // Maximum total delay is around 200min.
+    int maxRetries = 100;
+    int backoffCircle = 10;
     int baseWaitTime = 1;
     final RetryPolicy expBackoff =
-        exponentialBackoffRetry(maxRetries, baseWaitTime, TimeUnit.SECONDS);
+        exponentialBackoffRetry(backoffCircle, baseWaitTime, TimeUnit.SECONDS);
 
     RetryPolicy retryPolicy = (ex, retries, failovers, isIdempotent) -> {
       if (ex instanceof SCMSecretKeyException) {
         ErrorCode errorCode = ((SCMSecretKeyException) ex).getErrorCode();
-        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED) {
-          return expBackoff.shouldRetry(ex, retries, failovers, isIdempotent);
+        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED
+            && retries < maxRetries) {
+          return expBackoff.shouldRetry(ex, retries % backoffCircle,
+              failovers, isIdempotent);
         }
       }
       return FAIL;
