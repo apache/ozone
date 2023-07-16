@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
@@ -984,7 +985,8 @@ public final class RocksDatabase implements Closeable {
         if (!isKeyWithPrefixPresent) {
           LOG.info("Deleting sst file {} corresponding to column family"
                   + " {} from db: {}", liveFileMetaData.fileName(),
-              liveFileMetaData.columnFamilyName(), db.get().getName());
+              StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
+              db.get().getName());
           db.deleteFile(liveFileMetaData);
         }
       }
@@ -1007,5 +1009,9 @@ public final class RocksDatabase implements Closeable {
       LOG.warn(warning);
     }
     super.finalize();
+  }
+
+  public ManagedRocksDB getManagedRocksDb() {
+    return db;
   }
 }
