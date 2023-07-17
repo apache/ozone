@@ -29,6 +29,8 @@ services:
       - ../common/hadoop.conf
       - ../common/hadoop${HADOOP_MAJOR_VERSION}.conf
     command: ["yarn", "resourcemanager"]
+    profiles:
+      - hadoop
   nm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: nm
@@ -42,3 +44,5 @@ services:
     environment:
       WAITFOR: rm:8088
     command: ["yarn","nodemanager"]
+    profiles:
+      - hadoop

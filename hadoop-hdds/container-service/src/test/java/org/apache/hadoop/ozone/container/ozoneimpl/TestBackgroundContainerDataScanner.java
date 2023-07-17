@@ -19,22 +19,37 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for the background container data scanner.
@@ -53,7 +68,7 @@ public class TestBackgroundContainerDataScanner extends
 
   @Test
   @Override
-  public void testRecentlyScannedContainerIsSkipped() {
+  public void testRecentlyScannedContainerIsSkipped() throws Exception {
     setScannedTimestampRecent(healthy);
     scanner.runIteration();
     Mockito.verify(healthy, never()).scanData(any(), any());
@@ -61,7 +76,7 @@ public class TestBackgroundContainerDataScanner extends
 
   @Test
   @Override
-  public void testPreviouslyScannedContainerIsScanned() {
+  public void testPreviouslyScannedContainerIsScanned() throws Exception {
     // If the last scan time is before than the configured gap, the container
     // should be scanned.
     setScannedTimestampOld(healthy);
@@ -71,7 +86,7 @@ public class TestBackgroundContainerDataScanner extends
 
   @Test
   @Override
-  public void testUnscannedContainerIsScanned() {
+  public void testUnscannedContainerIsScanned() throws Exception {
     // If there is no last scanned time, the container should be scanned.
     Mockito.when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
@@ -130,5 +145,97 @@ public class TestBackgroundContainerDataScanner extends
     Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainerNotRescanned() throws Exception {
+    Container<?> unhealthy = mockKeyValueContainer();
+    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
+    when(unhealthy.scanData(any(DataTransferThrottler.class),
+        any(Canceler.class))).thenReturn(getUnhealthyScanResult());
+
+    setContainers(unhealthy, healthy);
+
+    // First iteration should find the unhealthy container.
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    assertEquals(1, metrics.getNumScanIterations());
+    assertEquals(2, metrics.getNumContainersScanned());
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+
+    // The unhealthy container should have been moved to the unhealthy state.
+    Mockito.verify(unhealthy.getContainerData(), atMostOnce())
+        .setState(UNHEALTHY);
+    // Update the mock to reflect this.
+    Mockito.when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    assertFalse(unhealthy.shouldScanData());
+
+    // Clear metrics to check the next run.
+    metrics.resetNumContainersScanned();
+    metrics.resetNumUnhealthyContainers();
+
+    scanner.runIteration();
+    // The only invocation of unhealthy on this container should have been from
+    // the previous scan.
+    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    // This iteration should skip the already unhealthy container.
+    assertEquals(2, metrics.getNumScanIterations());
+    assertEquals(1, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+  }
+
+  /**
+   * A datanode will have one background data scanner per volume. When the
+   * volume fails, the scanner thread should be terminated.
+   */
+  @Test
+  @Override
+  // Override findbugs warning about Mockito.verify
+  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+  public void testWithVolumeFailure() throws Exception {
+    Mockito.when(vol.isFailed()).thenReturn(true);
+    // Run the scanner thread in the background. It should be terminated on
+    // the first iteration because the volume is unhealthy.
+    ContainerDataScannerMetrics metrics = scanner.getMetrics();
+    scanner.start();
+    GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
+
+    // Volume health should have been checked.
+    Mockito.verify(vol, atLeastOnce()).isFailed();
+    // No iterations should have been run.
+    assertEquals(0, metrics.getNumScanIterations());
+    assertEquals(0, metrics.getNumContainersScanned());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
+    // All containers were on the unhealthy volume, so they should not have
+    // been scanned.
+    Mockito.verify(healthy, never()).scanData(any(), any());
+    Mockito.verify(openContainer, never()).scanData(any(), any());
+    Mockito.verify(corruptData, never()).scanData(any(), any());
+    Mockito.verify(openCorruptMetadata, never()).scanData(any(), any());
+  }
+
+
+  @Test
+  @Override
+  public void testShutdownDuringScan() throws Exception {
+    CountDownLatch latch = new CountDownLatch(1);
+
+    // Make the data scan block until interrupt.
+    Mockito.when(healthy.scanData(any(), any())).then(i -> {
+      latch.countDown();
+      Thread.sleep(Duration.ofDays(1).toMillis());
+      return null;
+    });
+
+    scanner.start();
+    // Wait for the scanner to reach the healthy container.
+    assertTrue(latch.await(5, TimeUnit.SECONDS));
+    // Terminate the scanner while it is blocked scanning the healthy container.
+    scanner.shutdown();
+    // The container should remain healthy.
+    verifyContainerMarkedUnhealthy(healthy, never());
+
   }
 }

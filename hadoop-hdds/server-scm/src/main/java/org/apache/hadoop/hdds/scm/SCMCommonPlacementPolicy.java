@@ -48,6 +48,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -157,7 +158,7 @@ public abstract class SCMCommonPlacementPolicy implements
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
       DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuidString());
+          nodeManager.getNodeByUuid(node.getUuid());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -435,9 +436,13 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    Map<Node, Long> currentRackCount = dns.stream()
-            .collect(Collectors.groupingBy(this::getPlacementGroup,
-                    Collectors.counting()));
+    List<Integer> currentRackCount = new ArrayList<>(dns.stream()
+        .map(this::getPlacementGroup)
+        .filter(Objects::nonNull)
+        .collect(Collectors.groupingBy(
+            Function.identity(),
+            Collectors.reducing(0, e -> 1, Integer::sum)))
+        .values());
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
@@ -449,8 +454,7 @@ public abstract class SCMCommonPlacementPolicy implements
             Math.min(requiredRacks, numRacks));
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
-            currentRackCount.values().stream().map(Long::intValue)
-                    .collect(Collectors.toList()));
+            currentRackCount);
   }
 
   /**
@@ -473,7 +477,7 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuidString());
+        .getNodeByUuid(datanodeDetails.getUuid());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);

@@ -34,7 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -461,7 +460,7 @@ public class ReconStorageContainerManagerFacade
       List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();
       LOG.info("Obtained {} pipelines from SCM.", pipelinesFromScm.size());
       pipelineManager.initializePipelines(pipelinesFromScm);
-    } catch (IOException | TimeoutException ioEx) {
+    } catch (IOException ioEx) {
       LOG.error("Exception encountered while getting pipelines from SCM.",
           ioEx);
     }
@@ -543,9 +542,6 @@ public class ReconStorageContainerManagerFacade
                   } catch (IOException e) {
                     LOG.error("Could not get container with pipeline " +
                         "for container : {}", containerID);
-                  } catch (TimeoutException e) {
-                    LOG.error("Could not add new container {} in Recon " +
-                        "container manager cache.", containerID);
                   }
                 }
               });

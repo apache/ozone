@@ -28,9 +28,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -329,8 +329,16 @@ public class OzoneContainer {
       return;
     }
     initOnDemandContainerScanner(c);
-    initMetadataScanner(c);
-    initContainerScanner(c);
+
+    // This config is for testing the scanners in isolation.
+    if (c.isMetadataScanEnabled()) {
+      initMetadataScanner(c);
+    }
+
+    // This config is for testing the scanners in isolation.
+    if (c.isDataScanEnabled()) {
+      initContainerScanner(c);
+    }
   }
 
   private void initContainerScanner(ContainerScannerConfiguration c) {

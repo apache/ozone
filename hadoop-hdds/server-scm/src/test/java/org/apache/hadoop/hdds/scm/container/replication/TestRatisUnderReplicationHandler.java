@@ -76,6 +76,7 @@ public class TestRatisUnderReplicationHandler {
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private ReplicationManagerMetrics metrics;
 
   @Before
   public void setup() throws NodeNotFoundException,
@@ -93,6 +94,8 @@ public class TestRatisUnderReplicationHandler {
     Mockito.when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManagerConfiguration.class));
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -220,6 +223,7 @@ public class TestRatisUnderReplicationHandler {
     Assert.assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(0, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -239,6 +243,7 @@ public class TestRatisUnderReplicationHandler {
     // One command should be sent to the replication manager as we could only
     // fine one node rather than two.
     Assert.assertEquals(1, commandsSent.size());
+    Assert.assertEquals(1, metrics.getPartialReplicationTotal());
   }
 
   @Test

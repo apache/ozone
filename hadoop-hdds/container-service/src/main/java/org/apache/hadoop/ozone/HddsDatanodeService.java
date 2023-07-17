@@ -42,9 +42,10 @@ import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStoreImpl;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -63,7 +64,6 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -78,10 +78,12 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -129,30 +131,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
 
-  public HddsDatanodeService(boolean printBanner, String[] args) {
-    this.printBanner = printBanner;
-    this.args = args != null ? Arrays.copyOf(args, args.length) : null;
-  }
-
-  private void cleanTmpDir() {
-    if (datanodeStateMachine != null) {
-      MutableVolumeSet volumeSet =
-          datanodeStateMachine.getContainer().getVolumeSet();
-      for (StorageVolume volume : volumeSet.getVolumesList()) {
-        if (volume instanceof HddsVolume) {
-          HddsVolume hddsVolume = (HddsVolume) volume;
-          try {
-            KeyValueContainerUtil.ContainerDeleteDirectory
-                .cleanTmpDir(hddsVolume);
-          } catch (IOException ex) {
-            LOG.error("Error while cleaning tmp delete directory " +
-                "under {}", hddsVolume.getWorkingDir(), ex);
-          }
-        }
-      }
-    }
-  }
-
   /**
    * Create a Datanode instance based on the supplied command-line arguments.
    * <p>
@@ -160,12 +138,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * startup/shutdown message and skips registering Unix signal handlers.
    *
    * @param args      command line arguments.
-   * @return Datanode instance
    */
   @VisibleForTesting
-  public static HddsDatanodeService createHddsDatanodeService(
-      String[] args) {
-    return createHddsDatanodeService(args, false);
+  public HddsDatanodeService(String[] args) {
+    this(false, args);
   }
 
   /**
@@ -173,11 +149,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    *
    * @param args        command line arguments.
    * @param printBanner if true, then log a verbose startup message.
-   * @return Datanode instance
    */
-  private static HddsDatanodeService createHddsDatanodeService(
-      String[] args, boolean printBanner) {
-    return new HddsDatanodeService(printBanner, args);
+  private HddsDatanodeService(boolean printBanner, String[] args) {
+    this.printBanner = printBanner;
+    this.args = args != null ? Arrays.copyOf(args, args.length) : null;
   }
 
   public static void main(String[] args) {
@@ -185,7 +160,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
               new OzoneConfiguration());
       HddsDatanodeService hddsDatanodeService =
-          createHddsDatanodeService(args, true);
+          new HddsDatanodeService(true, args);
       hddsDatanodeService.run(args);
     } catch (Throwable e) {
       LOG.error("Exception in HddsDatanodeService.", e);
@@ -267,17 +242,13 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         component = "dn-" + datanodeDetails.getUuidString();
-
         secConf = new SecurityConfig(conf);
-        dnCertClient = new DNCertificateClient(secConf, datanodeDetails,
-            datanodeDetails.getCertSerialId(), this::saveNewCertId,
-            this::terminateDatanode);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
             UserGroupInformation.AuthenticationMethod.KERBEROS)) {
           LOG.info("Ozone security is enabled. Attempting login for Hdds " +
                   "Datanode user. Principal: {},keytab: {}", conf.get(
-              DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+                  DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
               conf.get(
                   DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY));
 
@@ -375,6 +346,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  @VisibleForTesting
+  SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient()
+      throws IOException {
+    return getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
+  }
+
   /**
    * Initialize and start Ratis server.
    * <p>
@@ -408,12 +385,21 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       CertificateClient certClient) throws IOException {
     LOG.info("Initializing secure Datanode.");
 
+    if (certClient == null) {
+      dnCertClient = new DNCertificateClient(secConf,
+          createScmSecurityClient(),
+          datanodeDetails,
+          datanodeDetails.getCertSerialId(), this::saveNewCertId,
+          this::terminateDatanode);
+      certClient = dnCertClient;
+    }
     CertificateClient.InitResponse response = certClient.init();
     if (response.equals(CertificateClient.InitResponse.REINIT)) {
       certClient.close();
       LOG.info("Re-initialize certificate client.");
-      certClient = new DNCertificateClient(secConf, datanodeDetails, null,
-          this::saveNewCertId, this::terminateDatanode);
+      certClient = new DNCertificateClient(secConf,
+          createScmSecurityClient(),
+          datanodeDetails, null, this::saveNewCertId, this::terminateDatanode);
       response = certClient.init();
     }
     LOG.info("Init response: {}", response);
@@ -584,8 +570,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public void stop() {
     if (!isStopped.getAndSet(true)) {
-      // Clean <HddsVolume>/tmp/container_delete_service dir.
-      cleanTmpDir();
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {

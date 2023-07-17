@@ -34,6 +34,8 @@ public final class DeletedContainerBlocksSummary {
   // key : txID
   // value : times of this tx has been processed
   private final Map<Long, Integer> txSummary;
+  private int numOfRetryTxs;
+
   // key : container name
   // value : the number of blocks need to be deleted in this container
   // if the message contains multiple entries for same block,
@@ -48,6 +50,9 @@ public final class DeletedContainerBlocksSummary {
     blockSummary = Maps.newHashMap();
     blocks.forEach(entry -> {
       txSummary.put(entry.getTxID(), entry.getCount());
+      if (entry.getCount() > 0) {
+        numOfRetryTxs++;
+      }
       if (blockSummary.containsKey(entry.getContainerID())) {
         blockSummary.put(entry.getContainerID(),
             blockSummary.get(entry.getContainerID())
@@ -66,6 +71,10 @@ public final class DeletedContainerBlocksSummary {
 
   public int getNumOfBlocks() {
     return numOfBlocks;
+  }
+
+  public int getNumOfRetryTxs() {
+    return numOfRetryTxs;
   }
 
   public int getNumOfContainers() {

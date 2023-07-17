@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
@@ -73,6 +75,7 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+  private final SecretKeyProtocolScm secretKeyClient;
   private final boolean containerTokenEnabled;
   private final OzoneConfiguration configuration;
   private XceiverClientManager xceiverClientManager;
@@ -85,9 +88,10 @@ public class ContainerOperationClient implements ScmClient {
     return xceiverClientManager;
   }
 
-  public ContainerOperationClient(OzoneConfiguration conf) {
+  public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
     this.configuration = conf;
     storageContainerLocationClient = newContainerRpcClient(conf);
+    secretKeyClient = newSecretKeyClient(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
@@ -122,6 +126,11 @@ public class ContainerOperationClient implements ScmClient {
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
+  }
+
+  public static SecretKeyProtocolScm newSecretKeyClient(
+      ConfigurationSource configSource) throws IOException {
+    return HddsServerUtil.getSecretKeyClientForSCM(configSource);
   }
 
   @Override
@@ -464,6 +473,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<String> getScmRatisRoles() throws IOException {
     return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
+
+  @Override
+  public boolean rotateSecretKeys(boolean force) throws IOException {
+    return secretKeyClient.checkAndRotate(force);
   }
 
   @Override

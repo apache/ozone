@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
@@ -93,7 +92,7 @@ public class WritableECContainerProvider
   @Override
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
     int openPipelineCount = 0;
     synchronized (this) {
@@ -103,14 +102,21 @@ public class WritableECContainerProvider
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
-          LOG.warn("Unable to allocate a container for {} with {} existing "
-              + "containers", repConfig, openPipelineCount, e);
+          LOG.warn("Unable to allocate a container with {} existing ones; "
+              + "requested size={}, replication={}, owner={}, {}",
+              openPipelineCount, size, repConfig, owner, excludeList, e);
         }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("Pipeline count {} reached limit {}, checking existing ones; "
+            + "requested size={}, replication={}, owner={}, {}",
+            openPipelineCount, maximumPipelines, size, repConfig, owner,
+            excludeList);
       }
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
+    final int pipelineCount = existingPipelines.size();
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
@@ -137,6 +143,7 @@ public class WritableECContainerProvider
             if (containerIsExcluded(containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
+              containerInfo.updateLastUsedTime();
               return containerInfo;
             }
           }
@@ -156,13 +163,13 @@ public class WritableECContainerProvider
         if (openPipelineCount < maximumPipelines) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-        throw new IOException("Unable to allocate a pipeline for "
-            + repConfig + " after trying all existing pipelines as the max "
-            + "limit has been reached and no pipelines where closed");
+        throw new IOException("Pipeline limit (" + maximumPipelines
+            + ") reached (" + openPipelineCount + "), none closed");
       }
     } catch (IOException e) {
-      LOG.error("Unable to allocate a container for {} after trying all "
-          + "existing containers", repConfig, e);
+      LOG.warn("Unable to allocate a container after trying {} existing ones; "
+          + "requested size={}, replication={}, owner={}, {}",
+          pipelineCount, size, repConfig, owner, excludeList, e);
       throw e;
     }
   }
@@ -179,7 +186,7 @@ public class WritableECContainerProvider
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
       long size, String owner, ExcludeList excludeList)
-      throws IOException, TimeoutException {
+      throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
     if (excludeList.getDatanodes().size() > 0) {
@@ -191,6 +198,7 @@ public class WritableECContainerProvider
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
     pipelineManager.openPipeline(newPipeline.getId());
+    LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
   }
 

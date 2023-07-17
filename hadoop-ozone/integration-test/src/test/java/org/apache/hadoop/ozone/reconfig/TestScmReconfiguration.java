@@ -19,13 +19,19 @@
 package org.apache.hadoop.ozone.reconfig;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.Set;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -41,11 +47,18 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void reconfigurableProperties() {
-    assertProperties(getSubject(), ImmutableSet.of(OZONE_ADMINISTRATORS));
+    Set<String> expected = ImmutableSet.<String>builder()
+        .add(OZONE_ADMINISTRATORS)
+        .add(OZONE_READONLY_ADMINISTRATORS)
+        .addAll(new ReplicationManagerConfiguration()
+            .reconfigurableProperties())
+        .build();
+
+    assertProperties(getSubject(), expected);
   }
 
   @Test
-  void adminUsernames() {
+  void adminUsernames() throws ReconfigurationException {
     final String newValue = randomAlphabetic(10);
 
     getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
@@ -53,6 +66,35 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
         getCluster().getStorageContainerManager().getScmAdminUsernames());
+  }
+
+  @Test
+  void readOnlyAdminUsernames() throws ReconfigurationException {
+    final String newValue = randomAlphabetic(10);
+
+    getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
+        newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        getCluster().getStorageContainerManager()
+            .getScmReadOnlyAdminUsernames());
+  }
+
+  @Test
+  void replicationInterval() throws ReconfigurationException {
+    ReplicationManagerConfiguration config = replicationManagerConfig();
+
+    getSubject().reconfigurePropertyImpl(
+        "hdds.scm.replication.thread.interval",
+        "120s");
+
+    assertEquals(Duration.ofSeconds(120), config.getInterval());
+  }
+
+  private ReplicationManagerConfiguration replicationManagerConfig() {
+    return getCluster().getStorageContainerManager().getReplicationManager()
+        .getConfig();
   }
 
   @Test
