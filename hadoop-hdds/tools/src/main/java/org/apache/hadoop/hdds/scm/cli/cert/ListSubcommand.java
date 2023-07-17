@@ -18,20 +18,29 @@
 package org.apache.hadoop.hdds.scm.cli.cert;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
+
+import static java.lang.System.err;
 
 /**
  * This is the handler that process certificate list command.
@@ -65,6 +74,12 @@ public class ListSubcommand extends ScmCertSubcommand {
       description = "Filter certificate by the type: valid or revoked",
       defaultValue = "valid", showDefaultValue = Visibility.ALWAYS)
   private String type;
+  
+  @Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s";
 
   private HddsProtos.NodeType parseCertRole(String r) {
@@ -89,12 +104,31 @@ public class ListSubcommand extends ScmCertSubcommand {
     HddsProtos.NodeType nodeType = parseCertRole(role);
     List<String> certPemList = client.listCertificate(nodeType,
         startSerialId, count, isRevoked);
-    LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
-        type.toUpperCase(), count, certPemList.size());
     if (count == certPemList.size()) {
       LOG.info("The certificate list could be longer than the batch size: {}." +
           " Please use the \"-c\" option to see more certificates.", count);
     }
+
+    if (json) {
+      err.println("Certificate list:(Type=" + type.toUpperCase() +
+          ", BatchSize=" + count + ", CertCount=" + certPemList.size() + ")");
+      List<Certificate> certList = new ArrayList<>();
+      for (String certPemStr : certPemList) {
+        try {
+          X509Certificate cert =
+              CertificateCodec.getX509Certificate(certPemStr);
+          certList.add(new Certificate(cert));
+        } catch (CertificateException ex) {
+          LOG.error("Failed to parse certificate.");
+        }
+      }
+      System.out.println(
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(certList));
+      return;
+    }
+
+    LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
+        type.toUpperCase(), count, certPemList.size());
     LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
         "Expiry", "Subject", "Issuer"));
     for (String certPemStr : certPemList) {
@@ -104,6 +138,52 @@ public class ListSubcommand extends ScmCertSubcommand {
       } catch (CertificateException ex) {
         LOG.error("Failed to parse certificate.");
       }
+    }
+  }
+
+  private static class BigIntJsonSerializer extends JsonSerializer<BigInteger> {
+    @Override
+    public void serialize(BigInteger value, JsonGenerator jgen,
+                          SerializerProvider provider)
+        throws IOException {
+      jgen.writeNumber(String.format("%d", value));
+    }
+  }
+
+  private static class Certificate {
+    private BigInteger serialNumber;
+    private String validFrom;
+    private String expiry;
+    private String subjectDN;
+    private String issuerDN;
+
+    Certificate(X509Certificate cert) {
+      serialNumber = cert.getSerialNumber();
+      validFrom = cert.getNotBefore().toString();
+      expiry = cert.getNotAfter().toString();
+      subjectDN = cert.getSubjectDN().toString();
+      issuerDN = cert.getIssuerDN().toString();
+    }
+
+    @JsonSerialize(using = BigIntJsonSerializer.class)
+    public BigInteger getSerialNumber() {
+      return serialNumber;
+    }
+
+    public String getValidFrom() {
+      return validFrom;
+    }
+
+    public String getExpiry() {
+      return expiry;
+    }
+
+    public String getSubjectDN() {
+      return subjectDN;
+    }
+
+    public String getIssuerDN() {
+      return issuerDN;
     }
   }
 }
