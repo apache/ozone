@@ -205,7 +205,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public void registerRootCARotationListener(
+  public synchronized void registerRootCARotationListener(
       Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
     if (securityConfig.isAutoCARotationEnabled()) {
       rootCaRotationPoller.addRootCARotationProcessor(listener);
