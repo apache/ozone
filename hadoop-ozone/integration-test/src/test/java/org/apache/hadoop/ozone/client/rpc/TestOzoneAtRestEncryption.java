@@ -78,8 +78,14 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -117,7 +123,7 @@ class TestOzoneAtRestEncryption {
         TestSecureOzoneRpcClient.class.getSimpleName());
 
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
-    Assert.assertTrue(kmsDir.mkdirs());
+    assertTrue(kmsDir.mkdirs());
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
     miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
     miniKMS.start();
@@ -248,11 +254,11 @@ class TestOzoneAtRestEncryption {
       Instant testStartTime) throws Exception {
     // Verify content.
     OzoneKeyDetails key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
 
     // Check file encryption info is set,
     // if set key will use this encryption info and encrypt data.
-    Assert.assertNotNull(key.getFileEncryptionInfo());
+    assertNotNull(key.getFileEncryptionInfo());
 
     byte[] fileContent;
     int len = 0;
@@ -263,13 +269,13 @@ class TestOzoneAtRestEncryption {
     }
 
 
-    Assert.assertEquals(len, value.length());
-    Assert.assertTrue(verifyRatisReplication(bucket.getVolumeName(),
-        bucket.getName(), keyName, ReplicationType.RATIS,
-        ReplicationFactor.ONE));
-    Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
-    Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+    assertEquals(len, value.length());
+    assertTrue(verifyRatisReplication(bucket.getVolumeName(),
+        bucket.getName(), keyName, RATIS,
+        ONE));
+    assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
+    assertFalse(key.getCreationTime().isBefore(testStartTime));
+    assertFalse(key.getModificationTime().isBefore(testStartTime));
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
@@ -320,10 +326,9 @@ class TestOzoneAtRestEncryption {
         .setBucketLayout(bucketLayout).build();
     volume.createBucket(bucketName, bucketArgs);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertNotNull(bucket.getMetadata());
-    Assert.assertEquals("true",
-        bucket.getMetadata().get(OzoneConsts.GDPR_FLAG));
+    assertEquals(bucketName, bucket.getName());
+    assertNotNull(bucket.getMetadata());
+    assertEquals("true", bucket.getMetadata().get(OzoneConsts.GDPR_FLAG));
 
     //Step 2
     String keyName = UUID.randomUUID().toString();
@@ -337,7 +342,7 @@ class TestOzoneAtRestEncryption {
     }
 
     OzoneKeyDetails key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     byte[] fileContent;
     int len = 0;
 
@@ -346,16 +351,16 @@ class TestOzoneAtRestEncryption {
       len = is.read(fileContent);
     }
 
-    Assert.assertEquals(len, value.length());
-    Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-        keyName, ReplicationType.RATIS,
-        ReplicationFactor.ONE));
-    Assert.assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
-    Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
-    Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
+    assertEquals(len, value.length());
+    assertTrue(verifyRatisReplication(volumeName, bucketName,
+        keyName, RATIS,
+        ONE));
+    assertEquals(value, new String(fileContent, StandardCharsets.UTF_8));
+    assertFalse(key.getCreationTime().isBefore(testStartTime));
+    assertFalse(key.getModificationTime().isBefore(testStartTime));
+    assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     //As TDE is enabled, the TDE encryption details should not be null.
-    Assert.assertNotNull(key.getFileEncryptionInfo());
+    assertNotNull(key.getFileEncryptionInfo());
 
     //Step 3
     bucket.deleteKey(key.getName());
@@ -371,15 +376,13 @@ class TestOzoneAtRestEncryption {
     }, 500, 100000);
     RepeatedOmKeyInfo deletedKeys =
         getMatchedKeyInfo(keyName, omMetadataManager);
-    Assert.assertNotNull(deletedKeys);
+    assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    Assert.assertFalse(
-        deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
-    Assert.assertNull(
-        deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
+    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
+    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
+    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    assertNull(deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
   static boolean verifyRatisReplication(String volumeName, String bucketName,
@@ -552,14 +555,14 @@ class TestOzoneAtRestEncryption {
     // Create an input stream to read the data
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
-      Assert.assertTrue(inputStream.getInputStream()
+      assertTrue(inputStream.getInputStream()
           instanceof MultipartInputStream);
 
       // Test complete read
       byte[] completeRead = new byte[keySize];
       int bytesRead = inputStream.read(completeRead, 0, keySize);
-      Assert.assertEquals(bytesRead, keySize);
-      Assert.assertArrayEquals(inputData, completeRead);
+      assertEquals(bytesRead, keySize);
+      assertArrayEquals(inputData, completeRead);
 
       // Read different data lengths and starting from different offsets and
       // verify the data matches.
@@ -588,9 +591,8 @@ class TestOzoneAtRestEncryption {
           int actualReadLen = inputStream.read(readData, 0, readDataLen);
 
           assertReadContent(inputData, readData, readFromPosition);
-          Assert.assertEquals(readFromPosition + readDataLen,
-              inputStream.getPos());
-          Assert.assertEquals(readDataLen, actualReadLen);
+          assertEquals(readFromPosition + readDataLen, inputStream.getPos());
+          assertEquals(readDataLen, actualReadLen);
         }
       }
     }
@@ -609,7 +611,7 @@ class TestOzoneAtRestEncryption {
         replicationConfig);
 
     String uploadID = multipartInfo.getUploadID();
-    Assert.assertNotNull(uploadID);
+    assertNotNull(uploadID);
     return uploadID;
   }
 
@@ -628,8 +630,8 @@ class TestOzoneAtRestEncryption {
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         multipartStreamKey.getCommitUploadPartInfo();
 
-    Assert.assertNotNull(omMultipartCommitUploadPartInfo);
-    Assert.assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
+    assertNotNull(omMultipartCommitUploadPartInfo);
+    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
     return omMultipartCommitUploadPartInfo.getPartName();
   }
 
@@ -643,8 +645,8 @@ class TestOzoneAtRestEncryption {
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
         ozoneOutputStream.getCommitUploadPartInfo();
 
-    Assert.assertNotNull(omMultipartCommitUploadPartInfo);
-    Assert.assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
+    assertNotNull(omMultipartCommitUploadPartInfo);
+    assertNotNull(omMultipartCommitUploadPartInfo.getPartName());
     return omMultipartCommitUploadPartInfo.getPartName();
   }
 
@@ -653,41 +655,41 @@ class TestOzoneAtRestEncryption {
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo = bucket
         .completeMultipartUpload(keyName, uploadID, partsMap);
 
-    Assert.assertNotNull(omMultipartUploadCompleteInfo);
-    Assert.assertEquals(omMultipartUploadCompleteInfo.getBucket(), bucket
+    assertNotNull(omMultipartUploadCompleteInfo);
+    assertEquals(omMultipartUploadCompleteInfo.getBucket(), bucket
         .getName());
-    Assert.assertEquals(omMultipartUploadCompleteInfo.getVolume(), bucket
+    assertEquals(omMultipartUploadCompleteInfo.getVolume(), bucket
         .getVolumeName());
-    Assert.assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
-    Assert.assertNotNull(omMultipartUploadCompleteInfo.getHash());
+    assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
+    assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
   private static void assertReadContent(byte[] inputData, byte[] readData,
       int offset) {
     byte[] inputDataForComparison = Arrays.copyOfRange(inputData, offset,
         offset + readData.length);
-    Assert.assertArrayEquals("Read data does not match input data at offset " +
-        offset + " and length " + readData.length,
-        inputDataForComparison, readData);
+    assertArrayEquals(inputDataForComparison, readData,
+        "Read data does not match input data at offset " +
+            offset + " and length " + readData.length);
   }
 
   @Test
   void testGetKeyProvider() throws Exception {
     KeyProvider kp1 = store.getKeyProvider();
     KeyProvider kpSpy = Mockito.spy(kp1);
-    Assert.assertNotEquals(kpSpy, kp1);
+    assertNotEquals(kpSpy, kp1);
     Cache<URI, KeyProvider> cacheSpy =
         ((RpcClient)store.getClientProxy()).getKeyProviderCache();
     cacheSpy.put(store.getKeyProviderUri(), kpSpy);
     KeyProvider kp2 = store.getKeyProvider();
-    Assert.assertEquals(kpSpy, kp2);
+    assertEquals(kpSpy, kp2);
 
     // Verify the spied key provider is closed upon ozone client close
     ozClient.close();
     Mockito.verify(kpSpy).close();
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
-    Assert.assertNotEquals(kp3, kpSpy);
+    assertNotEquals(kp3, kpSpy);
     // Restore ozClient and store
     TestOzoneRpcClient.setOzClient(OzoneClientFactory.getRpcClient(conf));
     TestOzoneRpcClient.setStore(ozClient.getObjectStore());
