@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.Collection;
 
 import com.google.common.cache.Cache;
 import org.apache.hadoop.conf.StorageUnit;
@@ -80,26 +79,15 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
-/**
- * This class is to test all the public facing APIs of Ozone Client.
- */
-@RunWith(Parameterized.class)
-public class TestOzoneAtRestEncryption {
-
-  @Parameterized.Parameters
-  public static Collection<BucketLayout> data() {
-    return Arrays.asList(
-        BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        BucketLayout.OBJECT_STORE);
-  }
+class TestOzoneAtRestEncryption {
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
@@ -122,14 +110,9 @@ public class TestOzoneAtRestEncryption {
   private static final int DEFAULT_CRYPTO_BUFFER_SIZE = 8 * 1024; // 8KB
   // (this is the default Crypto Buffer size as determined by the config
   // hadoop.security.crypto.buffer.size)
-  private final BucketLayout bucketLayout;
 
-  public TestOzoneAtRestEncryption(BucketLayout layout) {
-    bucketLayout = layout;
-  }
-
-  @BeforeClass
-  public static void init() throws Exception {
+  @BeforeAll
+  static void init() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestSecureOzoneRpcClient.class.getSimpleName());
 
@@ -178,11 +161,8 @@ public class TestOzoneAtRestEncryption {
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
   }
 
-  /**
-   * Close OzoneClient and shutdown MiniOzoneCluster.
-   */
-  @AfterClass
-  public static void shutdown() throws IOException {
+  @AfterAll
+  static void shutdown() throws IOException {
     if (ozClient != null) {
       ozClient.close();
     }
@@ -200,8 +180,9 @@ public class TestOzoneAtRestEncryption {
     }
   }
 
-  @Test
-  public void testPutKeyWithEncryption() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void testPutKeyWithEncryption(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -217,13 +198,14 @@ public class TestOzoneAtRestEncryption {
     createAndVerifyStreamKeyData(bucket);
   }
 
-  @Test
-  public void testLinkEncryptedBuckets() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void testLinkEncryptedBuckets(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
     // Create source volume/bucket.
-    createVolumeAndBucket(volumeName, bucketName);
+    createVolumeAndBucket(volumeName, bucketName, bucketLayout);
 
     // Create link volume/bucket.
     String linkVolumeName = UUID.randomUUID().toString();
@@ -291,7 +273,7 @@ public class TestOzoneAtRestEncryption {
   }
 
   private OzoneBucket createVolumeAndBucket(String volumeName,
-      String bucketName) throws Exception {
+      String bucketName, BucketLayout bucketLayout) throws Exception {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
@@ -306,8 +288,9 @@ public class TestOzoneAtRestEncryption {
     store.createVolume(linkVol);
     OzoneVolume linkVolume = store.getVolume(linkVol);
     BucketArgs linkBucketArgs = BucketArgs.newBuilder()
-        .setSourceVolume(sourceVol).setSourceBucket(sourceBucket)
-        .setBucketLayout(bucketLayout).build();
+        .setSourceVolume(sourceVol)
+        .setSourceBucket(sourceBucket)
+        .build();
     linkVolume.createBucket(linkBucket, linkBucketArgs);
     return linkVolume.getBucket(linkBucket);
   }
@@ -317,10 +300,11 @@ public class TestOzoneAtRestEncryption {
    * 1. Create a GDPR enforced bucket
    * 2. PutKey with Encryption in above bucket and verify.
    * 3. DeleteKey and confirm the metadata does not have encryption key.
-   * @throws Exception
    */
-  @Test
-  public void testKeyWithEncryptionAndGdpr() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void testKeyWithEncryptionAndGdpr(BucketLayout bucketLayout)
+      throws Exception {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -439,65 +423,74 @@ public class TestOzoneAtRestEncryption {
     provider.flush();
   }
 
-  @Test
-  public void testMPUwithOnePart() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuOnePart(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
-    testMultipartUploadWithEncryption(bucket, 1);
+    testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 1);
   }
 
-  @Test
-  public void testMPUwithTwoParts() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuTwoParts(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
-    testMultipartUploadWithEncryption(bucket, 2);
+    testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 2);
   }
 
-  @Test
-  public void testMPUwithThreePartsOverride() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuThreePartsOverride(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName,
+        bucketLayout);
     testMultipartUploadWithEncryption(bucket, 3);
 
     // override the key and check content
     testMultipartUploadWithEncryption(bucket, 3);
   }
 
-  @Test
-  public void testMPUwithOneStreamPart() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuStreamOnePart(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
-    testMultipartUploadWithEncryption(bucket, 1, true);
+    testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 1, true);
   }
 
-  @Test
-  public void testMPUwithTwoStreamParts() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuStreamTwoParts(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
-    testMultipartUploadWithEncryption(bucket, 2, true);
+    testMultipartUploadWithEncryption(
+        createVolumeAndBucket(volumeName, bucketName, bucketLayout), 2, true);
   }
 
-  @Test
-  public void testMPUwithThreeStreamPartsOverride() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuStreamThreePartsOverride(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName);
+    OzoneBucket bucket = createVolumeAndBucket(volumeName, bucketName,
+        bucketLayout);
     testMultipartUploadWithEncryption(bucket, 3);
 
     // override the key and check content
     testMultipartUploadWithEncryption(bucket, 3, true);
   }
 
-  @Test
-  public void testMPUwithLinkBucket() throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void mpuWithLink(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    createVolumeAndBucket(volumeName, bucketName);
+    createVolumeAndBucket(volumeName, bucketName, bucketLayout);
 
     String linkVolumeName = UUID.randomUUID().toString();
     String linkBucketName = UUID.randomUUID().toString();
@@ -506,12 +499,12 @@ public class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(linkBucket, 2);
   }
 
-  public void testMultipartUploadWithEncryption(OzoneBucket bucket,
+  private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts) throws Exception {
     testMultipartUploadWithEncryption(bucket, numParts, false);
   }
 
-  public void testMultipartUploadWithEncryption(OzoneBucket bucket,
+  private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts, boolean isStream) throws Exception {
     String keyName = "mpu_test_key_" + numParts;
 
@@ -679,7 +672,7 @@ public class TestOzoneAtRestEncryption {
   }
 
   @Test
-  public void testGetKeyProvider() throws Exception {
+  void testGetKeyProvider() throws Exception {
     KeyProvider kp1 = store.getKeyProvider();
     KeyProvider kpSpy = Mockito.spy(kp1);
     Assert.assertNotEquals(kpSpy, kp1);
