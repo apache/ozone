@@ -46,10 +46,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -93,6 +93,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
@@ -163,6 +164,9 @@ public class TestOMRatisSnapshots {
           1, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
           OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
+          20, TimeUnit.SECONDS);
+      conf.setTimeDuration(
+          OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
           20, TimeUnit.SECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
@@ -1036,7 +1040,7 @@ public class TestOMRatisSnapshots {
   @DisplayName("testSnapshotBackgroundServices")
   @SuppressWarnings("methodlength")
   public void testSnapshotBackgroundServices()
-      throws IOException, InterruptedException, TimeoutException {
+      throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -1185,26 +1189,33 @@ public class TestOMRatisSnapshots {
     Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
-    Assertions.assertNotNull(omKeyInfoTableBeforeDeletion.get(newKey));
+    OmKeyInfo newKeyInfo = omKeyInfoTableBeforeDeletion.get(newKey);
+    Assertions.assertNotNull(newKeyInfo);
 
-    Table<String, RepeatedOmKeyInfo> deletedTableBeforeDeletion = newLeaderOM
-        .getMetadataManager()
-        .getDeletedTable();
-    Assertions.assertNull(deletedTableBeforeDeletion.get(newKey));
+    long usedBytes = getUsedBytes(newLeaderOM);
 
     ozoneBucket.deleteKeys(newKeys);
 
-    // TODO: See why this is not working
-//    GenericTestUtils.waitFor(() -> {
-//      Table<String, RepeatedOmKeyInfo> deletedTableAfterDeletion = newLeaderOM
-//          .getMetadataManager()
-//          .getDeletedTable();
-//      try {
-//        return Objects.nonNull(deletedTableAfterDeletion.get(newKey));
-//      } catch (IOException e) {
-//        throw new RuntimeException(e);
-//      }
-//    }, 100, 10000);
+    KeyDeletingService keyDeletingService = newLeaderOM
+        .getKeyManager()
+        .getDeletingService();
+    try {
+      GenericTestUtils.waitFor(() -> {
+        long newUsedBytes;
+        try {
+          newUsedBytes = getUsedBytes(newLeaderOM);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+        return newUsedBytes == usedBytes - newKeyInfo.getDataSize();
+      }, 1000, 10000);
+    } catch (TimeoutException e) {
+      // Force key deletion
+      keyDeletingService.runPeriodicalTaskNow();
+      long newUsedBytes = getUsedBytes(newLeaderOM);
+      Assertions.assertEquals(newUsedBytes,
+          usedBytes - newKeyInfo.getDataSize());
+    }
 
     GenericTestUtils.waitFor(() -> {
       Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
@@ -1293,6 +1304,13 @@ public class TestOMRatisSnapshots {
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
+  }
+
+  private long getUsedBytes(OzoneManager newLeaderOM) throws IOException {
+    return newLeaderOM
+        .getBucketManager()
+        .getBucketInfo(ozoneBucket.getVolumeName(), ozoneBucket.getName())
+        .getUsedBytes();
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
