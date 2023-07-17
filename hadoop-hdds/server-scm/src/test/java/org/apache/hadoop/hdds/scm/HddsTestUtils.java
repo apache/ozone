@@ -83,7 +83,6 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -642,19 +641,6 @@ public final class HddsTestUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
     conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-
-    // Adding ScmNodeManager to SCMContext for
-    // SCMDeletedBlockTransactionStatusManager
-    if (configurator.getScmContext().getScm() == null) {
-      StorageContainerManager storageContainerManager =
-          Mockito.mock(StorageContainerManager.class);
-      when(storageContainerManager.getScmNodeManager()).thenReturn(Mockito.mock(
-          SCMNodeManager.class));
-      SCMContext context =
-          new SCMContext.Builder().setSCM(storageContainerManager).build();
-      configurator.setScmContext(context);
-    }
-
     if (scmStore.getState() != Storage.StorageState.INITIALIZED) {
       String clusterId = UUID.randomUUID().toString();
       String scmId = UUID.randomUUID().toString();

@@ -112,8 +112,8 @@ public class SCMDeletedBlockTransactionStatusManager
     this.transactionToRetryCountMap = transactionToRetryCountMap;
     this.scmDeleteBlocksCommandStatusManager =
         new SCMDeleteBlocksCommandStatusManager();
-    this.scmContext.getScm().getScmNodeManager().registerSendCommandNotify(
-        SCMCommandProto.Type.deleteBlocksCommand, this::onSent);
+//    this.scmContext.getScm().getScmNodeManager().registerSendCommandNotify(
+//        SCMCommandProto.Type.deleteBlocksCommand, this::onSent);
   }
 
   /**
