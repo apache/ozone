@@ -32,7 +32,7 @@ ozone instance on your machine.
 
 {{< highlight bash >}}
 cd compose/ozone/
-export OZONE_REPLICATION_TYPE=RATIS
+
 docker-compose up -d
 {{< /highlight >}}
 
