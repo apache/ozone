@@ -436,7 +436,7 @@ public final class TestNSSummaryTask {
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration);
+        omConfiguration, null);
 
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =

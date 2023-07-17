@@ -2481,9 +2481,11 @@ public class TestRootedOzoneFileSystem {
         diff.getDiffList().get(0).getType());
     Assert.assertEquals(SnapshotDiffReport.DiffType.CREATE,
         diff.getDiffList().get(1).getType());
-    Assert.assertArrayEquals("key1".getBytes(StandardCharsets.UTF_8),
+    Assert.assertArrayEquals(
+        "key1".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(0).getSourcePath());
-    Assert.assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8),
+    Assert.assertArrayEquals(
+        "key2".getBytes(StandardCharsets.UTF_8),
         diff.getDiffList().get(1).getSourcePath());
 
     // test whether snapdiff returns aggregated response as
@@ -2504,9 +2506,14 @@ public class TestRootedOzoneFileSystem {
     Path file =
         new Path(bucketPath1, "key" + RandomStringUtils.randomAlphabetic(5));
     ContractTestUtils.touch(fs, file);
-    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, ".");
+    diff = ofs.getSnapshotDiffReport(bucketPath1, toSnap, "");
     Assert.assertEquals(1, diff.getDiffList().size());
 
+    diff = ofs.getSnapshotDiffReport(bucketPath1, "", toSnap);
+    Assert.assertEquals(1, diff.getDiffList().size());
+
+    diff = ofs.getSnapshotDiffReport(bucketPath1, "", "");
+    Assert.assertEquals(0, diff.getDiffList().size());
 
     // try snapDiff between non-bucket paths
     String errorMsg = "Path is not a bucket";
@@ -2543,4 +2550,5 @@ public class TestRootedOzoneFileSystem {
     // verify that mtime is NOT updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
+
 }

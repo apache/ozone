@@ -262,9 +262,12 @@ public final class TestSecretKeySnapshot {
             !leaderSecretKeyManager.getCurrentSecretKey()
                 .equals(currentKeyPostSnapshot),
         ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
-    assertEquals(leaderSecretKeyManager.getSortedKeys(),
-        followerSecretKeyManager.getSortedKeys());
-
+    List<ManagedSecretKey> latestLeaderKeys =
+        leaderSecretKeyManager.getSortedKeys();
+    GenericTestUtils.waitFor(() ->
+            latestLeaderKeys.equals(
+            followerSecretKeyManager.getSortedKeys()),
+        ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
   }
 
   private List<ContainerInfo> writeToIncreaseLogIndex(

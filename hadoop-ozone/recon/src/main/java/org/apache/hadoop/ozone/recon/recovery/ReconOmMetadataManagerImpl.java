@@ -131,7 +131,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (null == rocksDBStore) {
       return 0;
     } else {
-      return rocksDBStore.getDb().getLatestSequenceNumber();
+      try {
+        return rocksDBStore.getDb().getLatestSequenceNumber();
+      } catch (IOException e) {
+        return 0;
+      }
     }
   }
 

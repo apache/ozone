@@ -38,6 +38,10 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -79,10 +83,18 @@ public class TestS3MultipartRequest {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = Mockito.mock(AuditLogger.class);
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
+        Mockito.mock(ReferenceCounted.class);
+    when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
+    // Init OmMetadataReader to let the test pass
+    OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
+    when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
+    when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
         ReplicationConfig.getDefault(ozoneConfiguration));
