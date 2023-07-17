@@ -22,7 +22,6 @@ package org.apache.hadoop.hdds.scm.block;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
@@ -112,8 +111,6 @@ public class SCMDeletedBlockTransactionStatusManager
     this.transactionToRetryCountMap = transactionToRetryCountMap;
     this.scmDeleteBlocksCommandStatusManager =
         new SCMDeleteBlocksCommandStatusManager();
-//    this.scmContext.getScm().getScmNodeManager().registerSendCommandNotify(
-//        SCMCommandProto.Type.deleteBlocksCommand, this::onSent);
   }
 
   /**
