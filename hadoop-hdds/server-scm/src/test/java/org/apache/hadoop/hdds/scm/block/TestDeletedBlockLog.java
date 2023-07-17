@@ -32,14 +32,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
-import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -114,16 +110,7 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
-    StorageContainerManager storageContainerManager =
-        Mockito.mock(StorageContainerManager.class);
-    when(storageContainerManager.getScmNodeManager()).thenReturn(Mockito.mock(
-        SCMNodeManager.class));
-    SCMContext context =
-        new SCMContext.Builder().setSCM(storageContainerManager).build();
-    configurator.setScmContext(context);
-    scm = HddsTestUtils.getScm(conf, configurator);
+    scm = HddsTestUtils.getScm(conf);
     containerManager = Mockito.mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
