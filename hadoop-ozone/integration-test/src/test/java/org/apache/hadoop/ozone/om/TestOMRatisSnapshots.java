@@ -1127,7 +1127,6 @@ public class TestOMRatisSnapshots {
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
-    String diffKey = newKeys.get(0);
     readKeys(newKeys);
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
@@ -1329,11 +1328,13 @@ public class TestOMRatisSnapshots {
     }
 
     // Snap diff
-    String previouslyNonDeletedSnapshotName = snapshotName;
-    String lastSnapshotName = createOzoneSnapshot(newLeaderOM,
+    String firstSnapshot = createOzoneSnapshot(newLeaderOM,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
+    String diffKey = writeKeys(1).get(0);
+    String secondSnapshot = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
     SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
-        previouslyNonDeletedSnapshotName, lastSnapshotName);
+        firstSnapshot, secondSnapshot);
     Assertions.assertEquals(Collections.singletonList(
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
