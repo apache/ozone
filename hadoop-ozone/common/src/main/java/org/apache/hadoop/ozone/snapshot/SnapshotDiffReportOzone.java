@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.snapshot;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -101,6 +102,12 @@ public class SnapshotDiffReportOzone
         .append(" and snapshot: ")
         .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
+
+    if (CollectionUtils.isEmpty(getDiffList())) {
+      str.append(LINE_SEPARATOR);
+      return str.toString();
+    }
+
     for (DiffReportEntry entry : getDiffList()) {
       str.append(entry.toString()).append(LINE_SEPARATOR);
     }
