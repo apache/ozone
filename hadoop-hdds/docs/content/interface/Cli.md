@@ -139,6 +139,26 @@ $ ozone sh volume list /
   ....
 } ]
 ```
+
+If Volume is empty, we can delete volume using below command. 
+
+```shell
+$ ozone sh volume delete /vol1
+Volume vol1 is deleted
+```
+
+If Volume contains some buckets/keys, we can delete volume recursively. Which will delete all the buckets, keys for the specified volume and also volume will be deleted.
+After running this command there is no way to recover deleted contents.
+
+```shell
+$ ozone sh volume delete -r /vol1
+This command will delete volume recursively.
+There is no recovery option after using this command, and no trash for FSO buckets.
+Delay is expected running this command.
+Enter 'yes' to proceed': yes
+Volume vol1 is deleted
+```
+
 ## Bucket operations
 
 Bucket is the second level of the object hierarchy, and is similar to AWS S3 buckets. Users can create buckets in volumes, if they have the necessary permissions.
@@ -163,6 +183,24 @@ $ ozone sh bucket info /vol1/bucket1
   "sourceVolume" : null,
   "sourceBucket" : null
 }
+```
+
+If Bucket is empty we can delete bucket using below command.
+
+```shell
+$ ozone sh bucket delete /vol1/bucket1
+Bucket bucket1 is deleted
+```
+
+If Bucket contains some keys, we can delete bucket recursively. Which will delete all the keys for the specified bucket and also bucket will be deleted.
+After running this command there is no way to recover deleted contents.
+
+```shell
+$ ozone sh bucket delete -r /vol1/bucket1
+This command will delete bucket recursively.
+There is no recovery option after using this command, and deleted keys won't move to trash.
+Enter 'yes' to proceed': yes
+Bucket bucket1 is deleted
 ```
 
 [Transparent Data Encryption]({{< ref "security/SecuringTDE.md" >}}) can be enabled at the bucket level.
@@ -206,6 +244,13 @@ $ ozone sh key info /vol1/bucket1/README.md
 
 ```shell
 $ ozone sh key get /vol1/bucket1/README.md /tmp/
+```
+
+In delete key operation, if trash is enabled then for FSO bucket deleted key will move inside trash. 
+Whereas for OBS bucket keys will be deleted permanently irrespective of trash is enabled or disabled.
+
+```shell
+$ ozone sh key delete /vol1/bucket1/key1
 ```
 
 ## Querying CLI Results
