@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -98,7 +98,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
     serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
-    SecretKeyProtocol {
+    SecretKeyProtocolScm {
 
   private static final Logger LOGGER = LoggerFactory
       .getLogger(SCMSecurityProtocolServer.class);
@@ -190,8 +190,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -207,8 +208,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         nodeDetails.getNodeType(), nodeDetails.getHostName(),
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -249,6 +251,18 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
+  public boolean checkAndRotate(boolean force) throws SCMSecretKeyException {
+    validateSecretKeyStatus();
+    try {
+      return secretKeyManager.checkAndRotate(force);
+    } catch (SCMException ex) {
+      LOGGER.error("Error rotating secret keys", ex);
+      throw new SCMSecretKeyException(ex.getMessage(),
+          SCMSecretKeyException.ErrorCode.INTERNAL_ERROR);
+    }
+  }
+
+  @Override
   public synchronized List<String> getAllRootCaCertificates()
       throws IOException {
     List<String> pemEncodedList = new ArrayList<>();
@@ -275,8 +289,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress()) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress()) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
@@ -317,8 +332,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           + storageContainerManager.getClusterId());
     }
 
-    if (storageContainerManager.getRootCARotationManager()
-        .isRotationInProgress() && !isRenew) {
+    if (storageContainerManager.getRootCARotationManager() != null &&
+        storageContainerManager.getRootCARotationManager()
+            .isRotationInProgress() && !isRenew) {
       throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
           " Please try the operation later again."),
           SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);

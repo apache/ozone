@@ -20,6 +20,7 @@ package org.apache.ozone.rocksdiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+
 import com.google.common.graph.GraphBuilder;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,7 +49,9 @@ import java.util.stream.Stream;
 
 import com.google.common.graph.MutableGraph;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
@@ -105,6 +108,8 @@ public class TestRocksDBCheckpointDiffer {
    */
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
   private final List<DifferSnapshotInfo> snapshots = new ArrayList<>();
+
+  private final List<List<ColumnFamilyHandle>> colHandles = new ArrayList<>();
 
   private final String activeDbDirName = "./rocksdb-data";
   private final String metadataDirName = "./metadata";
@@ -175,13 +180,13 @@ public class TestRocksDBCheckpointDiffer {
   private static Stream<Arguments> casesGetSSTDiffListWithoutDB() {
 
     DifferSnapshotInfo snapshotInfo1 = new DifferSnapshotInfo(
-        "/path/to/dbcp1", UUID.randomUUID(), 3008L, null);
+        "/path/to/dbcp1", UUID.randomUUID(), 3008L, null, null);
     DifferSnapshotInfo snapshotInfo2 = new DifferSnapshotInfo(
-        "/path/to/dbcp2", UUID.randomUUID(), 14980L, null);
+        "/path/to/dbcp2", UUID.randomUUID(), 14980L, null, null);
     DifferSnapshotInfo snapshotInfo3 = new DifferSnapshotInfo(
-        "/path/to/dbcp3", UUID.randomUUID(), 17975L, null);
+        "/path/to/dbcp3", UUID.randomUUID(), 17975L, null, null);
     DifferSnapshotInfo snapshotInfo4 = new DifferSnapshotInfo(
-        "/path/to/dbcp4", UUID.randomUUID(), 18000L, null);
+        "/path/to/dbcp4", UUID.randomUUID(), 18000L, null, null);
 
     Set<String> snapshotSstFiles1 = new HashSet<>(asList(
         "000059", "000053"));
@@ -282,22 +287,23 @@ public class TestRocksDBCheckpointDiffer {
         // Snapshot 0
         + "S 1000 df6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Additional "compaction" to trigger and test early exit condition
-        + "C 000001,000002:000062\n"
+        + "C 1291 000001,000002:000062\n"
         // Snapshot 1
         + "S 3008 ef6410c7-151b-4e90-870e-5ef12875acd5 " + createdTime + " \n"
         // Regular compaction
-        + "C 000068,000062:000069\n"
+        + "C 4023 000068,000062:000069\n"
         // Trivial move
-        + "C 000071,000064,000060,000052:000071,000064,000060,000052\n"
-        + "C 000073,000066:000074\n"
-        + "C 000082,000076,000069:000083\n"
-        + "C 000087,000080,000074:000088\n"
+        + "C 5647 000071,000064,000060,000052:000071,000064,000060,000052\n"
+        + "C 7658 000073,000066:000074\n"
+        + "C 7872 000082,000076,000069:000083\n"
+        + "C 9001 000087,000080,000074:000088\n"
         // Deletion?
-        + "C 000093,000090,000083:\n"
+        + "C 12755 000093,000090,000083:\n"
         // Snapshot 2
         + "S 14980 e7ad72f8-52df-4430-93f6-0ee91d4a47fd " + createdTime + "\n"
-        + "C 000098,000096,000085,000078,000071,000064,000060,000052:000099\n"
-        + "C 000105,000095,000088:000107\n"
+        + "C 16192 000098,000096,000085,000078,000071,000064,000060,000052"
+        + ":000099\n"
+        + "C 16762 000105,000095,000088:000107\n"
         // Snapshot 3
         + "S 17975 4f084f6e-ed3d-4780-8362-f832303309ea " + createdTime + "\n";
 
@@ -348,7 +354,6 @@ public class TestRocksDBCheckpointDiffer {
             compactionLogDirName,
             activeDbDirName,
             config);
-
     RocksDB rocksDB =
         createRocksDBInstanceAndWriteKeys(activeDbDirName, differ);
     readRocksDBInstance(activeDbDirName, rocksDB, null, differ);
@@ -377,6 +382,24 @@ public class TestRocksDBCheckpointDiffer {
     }
 
     rocksDB.close();
+    cleanUp();
+  }
+
+  public void cleanup() {
+    for (DifferSnapshotInfo snap : snapshots) {
+      snap.getRocksDB().close();
+    }
+    for (List<ColumnFamilyHandle> colHandle : colHandles) {
+      for (ColumnFamilyHandle handle : colHandle) {
+        handle.close();
+      }
+    }
+  }
+
+  private static List<ColumnFamilyDescriptor> getColumnFamilyDescriptors() {
+    return Stream.of("fileTable", "directoryTable", "keyTable", "default")
+        .map(StringUtils::string2Bytes)
+        .map(ColumnFamilyDescriptor::new).collect(Collectors.toList());
   }
 
   /**
@@ -403,7 +426,7 @@ public class TestRocksDBCheckpointDiffer {
     for (DifferSnapshotInfo snap : snapshots) {
       // Returns a list of SST files to be fed into RocksDiff
       List<String> sstDiffList = differ.getSSTDiffList(src, snap);
-      LOG.debug("SST diff list from '{}' to '{}': {}",
+      LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
       Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
@@ -415,7 +438,7 @@ public class TestRocksDBCheckpointDiffer {
    * Helper function that creates an RDB checkpoint (= Ozone snapshot).
    */
   private void createCheckpoint(RocksDBCheckpointDiffer differ,
-      RocksDB rocksDB) {
+      RocksDB rocksDB) throws RocksDBException {
 
     LOG.trace("Current time: " + System.currentTimeMillis());
     long t1 = System.currentTimeMillis();
@@ -433,8 +456,12 @@ public class TestRocksDBCheckpointDiffer {
 
     createCheckPoint(activeDbDirName, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
+    List<ColumnFamilyHandle> colHandle = new ArrayList<>();
+    colHandles.add(colHandle);
     final DifferSnapshotInfo currentSnapshot =
-        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null);
+        new DifferSnapshotInfo(cpPath, snapshotId, snapshotGeneration, null,
+            ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(),
+                colHandle));
     this.snapshots.add(currentSnapshot);
 
     // Same as what OmSnapshotManager#createOmSnapshotCheckpoint would do
@@ -468,6 +495,21 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
+  /**
+   * Get a list of relevant column family descriptors.
+   * @param cfOpts ColumnFamilyOptions
+   * @return List of ColumnFamilyDescriptor
+   */
+  static List<ColumnFamilyDescriptor> getCFDescriptorList(
+      ColumnFamilyOptions cfOpts) {
+    return asList(
+        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
+        new ColumnFamilyDescriptor("keyTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("directoryTable".getBytes(UTF_8), cfOpts),
+        new ColumnFamilyDescriptor("fileTable".getBytes(UTF_8), cfOpts)
+    );
+  }
+
   // Test Code to create sample RocksDB instance.
   private RocksDB createRocksDBInstanceAndWriteKeys(String dbPathArg,
       RocksDBCheckpointDiffer differ) throws RocksDBException {
@@ -483,7 +525,7 @@ public class TestRocksDBCheckpointDiffer {
     final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
         .optimizeUniversalStyleCompaction();
     final List<ColumnFamilyDescriptor> cfDescriptors =
-        RocksDBCheckpointDiffer.getCFDescriptorList(cfOpts);
+        getCFDescriptorList(cfOpts);
     List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
 
     // Create a RocksDB instance with compaction tracking
@@ -921,38 +963,38 @@ public class TestRocksDBCheckpointDiffer {
 
     String compactionLogFile0 = "S 1000 snapshotId0 " +
         (currentTimeMillis - MINUTES.toMillis(30)) + " \n";
-    String compactionLogFile1 = "C 000015,000013,000011,000009:000018,000016," +
-        "000017\n"
+    String compactionLogFile1 = "C 1000 000015,000013,000011,000009:000018," +
+        "000016,000017\n"
         + "S 2000 snapshotId1 " +
         (currentTimeMillis - MINUTES.toMillis(24)) + " \n";
 
-    String compactionLogFile2 = "C 000018,000016,000017,000026,000024,000022," +
-        "000020:000027,000030,000028,000031,000029\n"
+    String compactionLogFile2 = "C 1000 000018,000016,000017,000026,000024," +
+        "000022,000020:000027,000030,000028,000031,000029\n"
         + "S 3000 snapshotId2 " +
         (currentTimeMillis - MINUTES.toMillis(18)) + " \n";
 
-    String compactionLogFile3 = "C 000027,000030,000028,000031,000029,000039," +
-        "000037,000035,000033:000040,000044,000042,000043,000046,000041," +
-        "000045\n"
+    String compactionLogFile3 = "C 1000 000027,000030,000028,000031,000029," +
+        "000039,000037,000035,000033:000040,000044,000042,000043,000046," +
+        "000041,000045\n"
         + "S 3000 snapshotId3 " +
         (currentTimeMillis - MINUTES.toMillis(12)) + " \n";
 
-    String compactionLogFile4 = "C 000040,000044,000042,000043,000046,000041," +
-        "000045,000054,000052,000050,000048:000059,000055,000056,000060," +
-        "000057,000058\n"
+    String compactionLogFile4 = "C 1000 000040,000044,000042,000043,000046," +
+        "000041,000045,000054,000052,000050,000048:000059,000055,000056," +
+        "000060,000057,000058\n"
         + "S 3000 snapshotId4 " +
         (currentTimeMillis - MINUTES.toMillis(6)) + " \n";
 
-    String compactionLogFileWithoutSnapshot1 = "C 000015,000013,000011," +
+    String compactionLogFileWithoutSnapshot1 = "C 1000 000015,000013,000011," +
         "000009:000018,000016,000017\n" +
-        "C 000018,000016,000017,000026,000024,000022,000020:000027,000030," +
-        "000028,000031,000029\n";
+        "C 2000 000018,000016,000017,000026,000024,000022,000020" +
+        ":000027,000030,000028,000031,000029\n";
 
-    String compactionLogFileWithoutSnapshot2 = "C 000027,000030,000028," +
+    String compactionLogFileWithoutSnapshot2 = "C 3000 000027,000030,000028," +
         "000031,000029,000039,000037,000035,000033:000040,000044,000042," +
         "000043,000046,000041,000045\n";
 
-    String compactionLogFileWithoutSnapshot3 = "C 000040,000044,000042," +
+    String compactionLogFileWithoutSnapshot3 = "C 4000 000040,000044,000042," +
         "000043,000046,000041,000045,000054,000052,000050,000048:000059," +
         "000055,000056,000060,000057,000058\n";
 
@@ -1156,19 +1198,19 @@ public class TestRocksDBCheckpointDiffer {
             Arrays.asList("000015", "000013", "000011", "000009")
         ),
         Arguments.of("Case 2: One level compaction.",
-            "C 000015,000013,000011,000009:000018,000016,000017\n",
+            "C 1 000015,000013,000011,000009:000018,000016,000017\n",
             Arrays.asList("000015", "000013", "000011", "000009", "000018",
                 "000016", "000017", "000026", "000024", "000022", "000020"),
             Arrays.asList("000015", "000013", "000011", "000009", "000026",
                 "000024", "000022", "000020")
         ),
         Arguments.of("Case 3: Multi-level compaction.",
-            "C 000015,000013,000011,000009:000018,000016,000017\n" +
-                "C 000018,000016,000017,000026,000024,000022,000020:000027," +
+            "C 1 000015,000013,000011,000009:000018,000016,000017\n" +
+                "C 2 000018,000016,000017,000026,000024,000022,000020:000027," +
                 "000030,000028,000031,000029\n" +
-                "C 000027,000030,000028,000031,000029,000039,000037,000035," +
+                "C 3 000027,000030,000028,000031,000029,000039,000037,000035," +
                 "000033:000040,000044,000042,000043,000046,000041,000045\n" +
-                "C 000040,000044,000042,000043,000046,000041,000045,000054," +
+                "C 4 000040,000044,000042,000043,000046,000041,000045,000054," +
                 "000052,000050,000048:000059,000055,000056,000060,000057," +
                 "000058\n",
             Arrays.asList("000015", "000013", "000011", "000009", "000018",

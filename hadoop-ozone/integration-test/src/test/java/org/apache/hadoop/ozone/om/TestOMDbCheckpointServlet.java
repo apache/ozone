@@ -71,6 +71,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -84,7 +85,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SN
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
-
 
 import org.apache.ozone.test.GenericTestUtils;
 
@@ -396,6 +396,10 @@ public class TestOMDbCheckpointServlet {
     // Get the tarball.
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
+
+    // Verify that tarball request count reaches to zero once doGet completes.
+    Assertions.assertEquals(0,
+        dbStore.getRocksDBCheckpointDiffer().getTarballRequestCount());
     dbCheckpoint = realCheckpoint.get();
 
     // Untar the file into a temp folder to be examined.
@@ -703,7 +707,9 @@ public class TestOMDbCheckpointServlet {
         if (file.toFile().isDirectory()) {
           getFiles(file, truncateLength, fileSet);
         }
-        if (!file.getFileName().toString().startsWith("fabricated")) {
+        String filename = file.getFileName().toString();
+        if (!filename.startsWith("fabricated") &&
+            !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME)) {
           fileSet.add(truncateFileName(truncateLength, file));
         }
       }

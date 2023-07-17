@@ -35,6 +35,8 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
@@ -232,6 +234,15 @@ public interface CertificateClient extends Closeable {
    */
   void registerNotificationReceiver(CertificateNotification receiver);
 
+  /**
+   * Registers a listener that will be notified if the CA certificates are
+   * changed.
+   *
+   * @param listener the listener to call with the actualized list of CA
+   *                 certificates.
+   */
+  void registerRootCARotationListener(
+      Function<List<X509Certificate>, CompletableFuture<Void>> listener);
 
   /**
    * Initialize certificate client.
