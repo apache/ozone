@@ -14,22 +14,24 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
-Library             BuiltIn
+Documentation       Test ozone admin cert command
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
-*** Variables ***
+*** Keywords ***
+Setup Test
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
 Run cert list
-    ${output} =         Execute          ozone admin cert list
-    Should Contain      ${output}        Certificate list:(Type=
+    Pass Execution If       '${SECURITY_ENABLED}' == 'false'    N/A
+    ${output} =             Execute          ozone admin cert list
+    Should Contain          ${output}        Certificate list:(Type=
 
 cert list as JSON
-    ${output} =         Execute             ozone admin cert list --json 2>> certInfo
-    ${errOutput} =      Execute             cat certInfo
-                        Execute             echo '${output}' | jq -r '.'
-    Should Contain      ${errOutput}        Certificate list:(Type=
-                        Execute             rm certInfo
+    Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
+    ${output} =             Execute             ozone admin cert list --json 2>> certInfo
+    ${errOutput} =          Execute             cat certInfo
+                            Execute             echo '${output}' | jq -r '.'
+    Should Contain          ${errOutput}        Certificate list:(Type=
+                            Execute             rm certInfo
