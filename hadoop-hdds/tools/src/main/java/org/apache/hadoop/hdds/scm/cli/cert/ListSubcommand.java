@@ -22,7 +22,9 @@ import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
@@ -105,8 +107,9 @@ public class ListSubcommand extends ScmCertSubcommand {
     List<String> certPemList = client.listCertificate(nodeType,
         startSerialId, count, isRevoked);
     if (count == certPemList.size()) {
-      LOG.info("The certificate list could be longer than the batch size: {}." +
-          " Please use the \"-c\" option to see more certificates.", count);
+      err.println("The certificate list could be longer than the batch size: "
+          + count + ". Please use the \"-c\" option to see more" +
+          " certificates.");
     }
 
     if (json) {
@@ -154,15 +157,41 @@ public class ListSubcommand extends ScmCertSubcommand {
     private BigInteger serialNumber;
     private String validFrom;
     private String expiry;
-    private String subjectDN;
-    private String issuerDN;
+    private Map<String, String> subjectDN = new HashMap<>();
+    private Map<String, String> issuerDN = new HashMap<>();;
 
     Certificate(X509Certificate cert) {
       serialNumber = cert.getSerialNumber();
       validFrom = cert.getNotBefore().toString();
       expiry = cert.getNotAfter().toString();
-      subjectDN = cert.getSubjectDN().toString();
-      issuerDN = cert.getIssuerDN().toString();
+
+      String[] subject = cert.getSubjectDN().getName().split(",");
+      if(subject.length == 0) {
+        err.println("Invalid format of subjectDN name");
+      } else {
+        for(String elem : subject) {
+          String[] subjectComponents = elem.split("=");
+          if(subjectComponents.length == 2) {
+            subjectDN.put(subjectComponents[0], subjectComponents[1]);
+          } else {
+            err.println("Invalid format of subjectDN name");
+          }
+        }
+      }
+
+      String[] issuer = cert.getIssuerDN().getName().split(",");
+      if(issuer.length == 0) {
+        err.println("Invalid format of issuerDN name");
+      } else {
+        for(String elem : issuer) {
+          String[] issuerComponents = elem.split("=");
+          if(issuerComponents.length == 2) {
+            issuerDN.put(issuerComponents[0], issuerComponents[1]);
+          } else {
+            err.println("Invalid format of issueDN name");
+          }
+        }
+      }
     }
 
     @JsonSerialize(using = BigIntJsonSerializer.class)
@@ -178,11 +207,11 @@ public class ListSubcommand extends ScmCertSubcommand {
       return expiry;
     }
 
-    public String getSubjectDN() {
+    public Map<String, String> getSubjectDN() {
       return subjectDN;
     }
 
-    public String getIssuerDN() {
+    public Map<String, String> getIssuerDN() {
       return issuerDN;
     }
   }
