@@ -256,6 +256,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -304,7 +305,9 @@ import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGr
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import static org.apache.ozone.graph.PrintableGraph.GraphType.FILE_NAME;
 
+import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -827,7 +830,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager = new KeyManagerImpl(this, scmClient, configuration,
         perfMetrics);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
-        this, LOG, AUDIT, metrics);
+        this, LOG, AUDIT, metrics, true);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
     rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
@@ -4641,6 +4644,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     return omSnapshotManager.getSnapshotDiffList(volume,
         bucket, jobStatus, listAll);
+  }
+
+  public String printCompactionLogDag(String fileName,
+                                      String graphType)
+      throws IOException {
+
+    if (StringUtils.isBlank(fileName)) {
+      fileName = "dag-" + System.currentTimeMillis();
+    }
+
+    // Append the tmp file prefix and image file suffix.
+    fileName = "/tmp" + OZONE_URI_DELIMITER + fileName + ".png";
+
+    PrintableGraph.GraphType type;
+
+    try {
+      type = PrintableGraph.GraphType.valueOf(graphType);
+    } catch (IllegalArgumentException e) {
+      type = FILE_NAME;
+    }
+
+    return getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .pngPrintMutableGraph(fileName, type);
   }
 
   private String reconfOzoneAdmins(String newVal) {

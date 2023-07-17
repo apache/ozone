@@ -631,6 +631,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  public String printCompactionLogDag(String fileName,
+                                      String graphType) throws IOException {
+    return null;
+  }
+
   @Override
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,

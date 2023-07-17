@@ -172,7 +172,12 @@ public class DBCheckpointServlet extends HttpServlet
     }
 
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+      if (dbStore.getRocksDBCheckpointDiffer() != null) {
+        dbStore.getRocksDBCheckpointDiffer().incrementTarballRequestCount();
+      }
+
       checkpoint = dbStore.getCheckpoint(flush);
+
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
             "Checkpoint request returned null.");
@@ -215,6 +220,13 @@ public class DBCheckpointServlet extends HttpServlet
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       dbMetrics.incNumCheckpointFails();
     } finally {
+      if (dbStore.getRocksDBCheckpointDiffer() != null) {
+        synchronized (dbStore.getRocksDBCheckpointDiffer()) {
+          dbStore.getRocksDBCheckpointDiffer().decrementTarballRequestCount();
+          dbStore.getRocksDBCheckpointDiffer().notifyAll();
+        }
+      }
+
       if (checkpoint != null) {
         try {
           checkpoint.cleanupCheckpoint();

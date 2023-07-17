@@ -85,6 +85,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
@@ -339,6 +341,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         SetSafeModeResponse setSafeModeResponse =
             setSafeMode(request.getSetSafeModeRequest());
         responseBuilder.setSetSafeModeResponse(setSafeModeResponse);
+        break;
+      case PrintCompactionLogDag:
+        PrintCompactionLogDagResponse printCompactionLogDagResponse =
+            printCompactionLogDag(request.getPrintCompactionLogDagRequest());
+        responseBuilder
+            .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -1323,6 +1332,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  private PrintCompactionLogDagResponse printCompactionLogDag(
+      PrintCompactionLogDagRequest printCompactionLogDagRequest)
+      throws IOException {
+    String imagePath = impl.printCompactionLogDag(
+        printCompactionLogDagRequest.getFileName(),
+        printCompactionLogDagRequest.getGraphType());
+    return PrintCompactionLogDagResponse.newBuilder()
+        .setImagePath(imagePath)
+        .build();
+  }
 
   public OzoneManager getOzoneManager() {
     return impl;

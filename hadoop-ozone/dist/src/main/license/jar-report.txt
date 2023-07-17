@@ -3,6 +3,7 @@ share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/aopalliance.jar
+share/ozone/lib/antlr4-runtime.jar
 share/ozone/lib/aopalliance-repackaged.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
@@ -145,6 +146,10 @@ share/ozone/lib/jetty-util-ajax.jar
 share/ozone/lib/jetty-util.jar
 share/ozone/lib/jetty-webapp.jar
 share/ozone/lib/jetty-xml.jar
+share/ozone/lib/jgraph.jar
+share/ozone/lib/jgrapht-core.jar
+share/ozone/lib/jgrapht-ext.jar
+share/ozone/lib/jgraphx.jar
 share/ozone/lib/jmespath-java.jar
 share/ozone/lib/jna.jar
 share/ozone/lib/jna-platform.jar
@@ -162,6 +167,8 @@ share/ozone/lib/kerby-asn1.jar
 share/ozone/lib/kerby-pkix.jar
 share/ozone/lib/kerby-util.jar
 share/ozone/lib/kotlin-stdlib-common.jar
+share/ozone/lib/kotlin-stdlib-jdk7.jar
+share/ozone/lib/kotlin-stdlib-jdk8.jar
 share/ozone/lib/kotlin-stdlib.jar
 share/ozone/lib/libthrift.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
@@ -191,6 +198,7 @@ share/ozone/lib/netty-transport-native-epoll.Final-linux-x86_64.jar
 share/ozone/lib/netty-transport-native-unix-common.Final.jar
 share/ozone/lib/nimbus-jose-jwt.jar
 share/ozone/lib/okhttp.jar
+share/ozone/lib/okio-jvm.jar
 share/ozone/lib/okio.jar
 share/ozone/lib/opentracing-api.jar
 share/ozone/lib/opentracing-noop.jar
