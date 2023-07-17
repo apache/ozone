@@ -35,6 +35,7 @@ import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,12 +61,14 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
    */
   static final char[] EMPTY_PASSWORD = new char[0];
   private final AtomicReference<X509ExtendedKeyManager> keyManagerRef;
+
   /**
    * Current private key and cert used in keyManager. Used to detect if these
    * materials are changed.
    */
   private PrivateKey currentPrivateKey;
   private List<String> currentCertIdsList = new ArrayList<>();
+  private String alias;
 
   /**
    * Construct a <code>Reloading509KeystoreManager</code>.
@@ -85,15 +88,62 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
   @Override
   public String chooseEngineClientAlias(String[] strings,
       Principal[] principals, SSLEngine sslEngine) {
-    return keyManagerRef.get()
+    String ret = keyManagerRef.get()
         .chooseEngineClientAlias(strings, principals, sslEngine);
+
+    if (ret == null) {
+        /*
+        Workaround to address that netty tc-native cannot handle the dynamic
+        key and certificate refresh well. What happens is during the setup of
+        the grpc channel, an SSLContext is created, which is
+        ReferenceCountedOpenSslServerContext in the native tc-native case.
+        This class uses the TrustManager's getAcceptedIssuers() as the trusted
+        CA certificate list. The list is not updated after channel is built.
+        With the list being used to present the Principals during the mTLS
+        authentication via the Netty channel under Ratis implementation,
+        the counterpart(client) KeyManager's
+        chooseEngineClientAlias(String, Principal[], SSLEngine) method is
+        called with this old root certificate subject principal, which is now
+        not available in the new Key Manager after refreshed, so the method
+        will return null, which cause the mutual TLS connection establish
+        failure.
+
+        Example error message:
+        Engine client aliases for RSA, DH_RSA, EC, EC_RSA, EC_EC,
+        O=CID-f9f2b2cf-a784-49d7-8577-5d3b13bf0b46,
+        OU=9f52487c-f8f9-45ee-bb56-aca60b56327f,
+        CN=scm-1@scm1.org,
+        org.apache.ratis.thirdparty.io.netty.handler.ssl.OpenSslEngine@5eec0d10
+        is null
+
+        Example success message:
+        Engine client aliases for RSA, DH_RSA, EC, EC_RSA, EC_EC,
+        O=CID-f9f2b2cf-a784-49d7-8577-5d3b13bf0b46,
+        OU=9f52487c-f8f9-45ee-bb56-aca60b56327f,
+        CN=scm-1@scm1.org,
+        org.apache.ratis.thirdparty.io.netty.handler.ssl.OpenSslEngine@5eec0d10
+        is scm/sub-ca_key
+       */
+      ret = alias;
+      LOG.info("Engine client aliases for {}, {}, {} is returned as {}",
+          strings == null ? "" : Arrays.toString(strings),
+          principals == null ? "" : Arrays.toString(principals),
+          sslEngine == null ? "" : sslEngine, ret);
+    }
+    return ret;
   }
 
   @Override
   public String chooseEngineServerAlias(String s, Principal[] principals,
       SSLEngine sslEngine) {
-    return keyManagerRef.get()
+    String ret = keyManagerRef.get()
         .chooseEngineServerAlias(s, principals, sslEngine);
+    if (ret == null && LOG.isDebugEnabled()) {
+      LOG.debug("Engine server aliases for {}, {}, {} is null", s,
+          principals == null ? "" : Arrays.toString(principals),
+          sslEngine == null ? "" : sslEngine);
+    }
+    return ret;
   }
 
   @Override
@@ -138,7 +188,7 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     try {
       X509ExtendedKeyManager manager = loadKeyManager(caClient);
       if (manager != null) {
-        this.keyManagerRef.set(manager);
+        keyManagerRef.set(manager);
         LOG.info("ReloadingX509KeyManager is reloaded");
       }
     } catch (Exception ex) {
@@ -155,9 +205,8 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     if (currentPrivateKey != null && currentPrivateKey.equals(privateKey) &&
         currentCertIdsList.size() > 0 &&
         newCertList.size() == currentCertIdsList.size() &&
-        !newCertList.stream().filter(
-            c -> !currentCertIdsList.contains(c.getSerialNumber().toString()))
-            .findAny().isPresent()) {
+        newCertList.stream().allMatch(c ->
+            currentCertIdsList.contains(c.getSerialNumber().toString()))) {
       // Security materials(key and certificates) keep the same.
       return null;
     }
@@ -166,9 +215,14 @@ public class ReloadingX509KeyManager extends X509ExtendedKeyManager {
     KeyStore keystore = KeyStore.getInstance(type);
     keystore.load(null, null);
 
-    keystore.setKeyEntry(caClient.getComponentName() + "_key",
-        privateKey, EMPTY_PASSWORD,
+    alias = caClient.getComponentName() + "_key";
+    keystore.setKeyEntry(alias, privateKey, EMPTY_PASSWORD,
         newCertList.toArray(new X509Certificate[0]));
+
+    LOG.info("Key manager is loaded with certificate chain");
+    for (X509Certificate x509Certificate : newCertList) {
+      LOG.info(x509Certificate.toString());
+    }
 
     KeyManagerFactory keyMgrFactory = KeyManagerFactory.getInstance(
         KeyManagerFactory.getDefaultAlgorithm());

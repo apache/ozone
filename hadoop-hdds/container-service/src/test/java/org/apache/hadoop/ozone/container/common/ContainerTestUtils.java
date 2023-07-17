@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.mockito.Mockito;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Random;
@@ -172,25 +174,65 @@ public final class ContainerTestUtils {
 
   public static void setupMockContainer(
       Container<ContainerData> c, boolean shouldScanData,
-      boolean scanMetaDataSuccess, boolean scanDataSuccess,
+      ScanResult metadataScanResult, ScanResult dataScanResult,
       AtomicLong containerIdSeq, HddsVolume vol) {
     ContainerData data = mock(ContainerData.class);
     when(data.getContainerID()).thenReturn(containerIdSeq.getAndIncrement());
     when(c.getContainerData()).thenReturn(data);
     when(c.shouldScanData()).thenReturn(shouldScanData);
-    when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(scanDataSuccess);
-    Mockito.lenient().when(c.scanMetaData()).thenReturn(scanMetaDataSuccess);
+    when(c.shouldScanMetadata()).thenReturn(true);
     when(c.getContainerData().getVolume()).thenReturn(vol);
+
+    try {
+      when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+          .thenReturn(dataScanResult);
+      Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
+    } catch (InterruptedException ex) {
+      // Mockito.when invocations will not throw this exception. It is just
+      // required for compilation.
+    }
   }
 
-  public static KeyValueContainer setUpTestContainerUnderTmpDir(
+  /**
+   * Construct an unhealthy scan result to use for testing purposes.
+   */
+  public static ScanResult getUnhealthyScanResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
+        new File(""),
+        new IOException("Fake corruption failure for testing"));
+  }
+
+  public static KeyValueContainer addContainerToDeletedDir(
       HddsVolume volume, String clusterId,
       OzoneConfiguration conf, String schemaVersion)
       throws IOException {
+    KeyValueContainer container = addContainerToVolumeDir(volume, clusterId,
+        conf, schemaVersion);
+
+    // For testing, we are moving the container
+    // under the tmp directory, in order to delete
+    // it from there, during datanode startup or shutdown
+    KeyValueContainerUtil
+        .moveToDeletedContainerDir(container.getContainerData(), volume);
+
+    return container;
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion)
+      throws IOException {
+    long containerId = ContainerTestHelper.getTestContainerID();
+    return addContainerToVolumeDir(volume, clusterId, conf, schemaVersion,
+        containerId);
+  }
+
+  public static KeyValueContainer addContainerToVolumeDir(
+      HddsVolume volume, String clusterId,
+      OzoneConfiguration conf, String schemaVersion, long containerId)
+      throws IOException {
     VolumeChoosingPolicy volumeChoosingPolicy =
         new RoundRobinVolumeChoosingPolicy();
-    long containerId = ContainerTestHelper.getTestContainerID();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
@@ -205,12 +247,6 @@ public final class ContainerTestUtils {
     container.create(volume.getVolumeSet(), volumeChoosingPolicy, clusterId);
 
     container.close();
-
-    // For testing, we are moving the container
-    // under the tmp directory, in order to delete
-    // it from there, during datanode startup or shutdown
-    KeyValueContainerUtil.ContainerDeleteDirectory
-        .moveToTmpDeleteDirectory(keyValueContainerData, volume);
 
     return container;
   }

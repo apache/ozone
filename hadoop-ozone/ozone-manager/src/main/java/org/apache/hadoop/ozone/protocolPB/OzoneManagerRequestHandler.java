@@ -27,15 +27,16 @@ import java.util.stream.Collectors;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -70,6 +71,8 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -82,6 +85,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
@@ -112,6 +117,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
@@ -308,6 +315,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getSnapshotDiffRequest());
         responseBuilder.setSnapshotDiffResponse(snapshotDiffReport);
         break;
+      case CancelSnapshotDiff:
+        CancelSnapshotDiffResponse cancelSnapshotDiff = cancelSnapshotDiff(
+                request.getCancelSnapshotDiffRequest());
+        responseBuilder.setCancelSnapshotDiffResponse(cancelSnapshotDiff);
+        break;
       case ListSnapshotDiffJobs:
         ListSnapshotDiffJobResponse listSnapDiffResponse =
             listSnapshotDiffJobs(request.getListSnapshotDiffJobRequest());
@@ -324,6 +336,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case RefetchSecretKey:
         responseBuilder.setRefetchSecretKeyResponse(refetchSecretKey());
+        break;
+      case SetSafeMode:
+        SetSafeModeResponse setSafeModeResponse =
+            setSafeMode(request.getSetSafeModeRequest());
+        responseBuilder.setSetSafeModeResponse(setSafeModeResponse);
+        break;
+      case PrintCompactionLogDag:
+        PrintCompactionLogDagResponse printCompactionLogDagResponse =
+            printCompactionLogDag(request.getPrintCompactionLogDagRequest());
+        responseBuilder
+            .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -361,7 +384,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private DBUpdatesResponse getOMDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
 
     DBUpdatesResponse.Builder builder = DBUpdatesResponse
         .newBuilder();
@@ -1254,16 +1277,39 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize(),
             snapshotDiffRequest.getForceFullDiff(),
-            snapshotDiffRequest.getCancel());
+            snapshotDiffRequest.getDisableNativeDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())
-        .setWaitTimeInMs(response.getWaitTimeInMs())
-        .setJobCancelResult(response.getJobCancelResult().toProtobuf());
+        .setWaitTimeInMs(response.getWaitTimeInMs());
 
+    if (StringUtils.isNotEmpty(response.getReason())) {
+      builder.setReason(response.getReason());
+    }
     if (response.getSnapshotDiffReport() != null) {
       builder.setSnapshotDiffReport(
           response.getSnapshotDiffReport().toProtobuf());
+    }
+
+    return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private CancelSnapshotDiffResponse cancelSnapshotDiff(
+      CancelSnapshotDiffRequest cancelSnapshotDiffRequest) throws IOException {
+
+    org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse response =
+        impl.cancelSnapshotDiff(
+            cancelSnapshotDiffRequest.getVolumeName(),
+            cancelSnapshotDiffRequest.getBucketName(),
+            cancelSnapshotDiffRequest.getFromSnapshot(),
+            cancelSnapshotDiffRequest.getToSnapshot());
+
+    CancelSnapshotDiffResponse.Builder builder = CancelSnapshotDiffResponse
+        .newBuilder();
+
+    if (StringUtils.isNotEmpty(response.getMessage())) {
+      builder.setReason(response.getMessage());
     }
 
     return builder.build();
@@ -1286,6 +1332,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  private PrintCompactionLogDagResponse printCompactionLogDag(
+      PrintCompactionLogDagRequest printCompactionLogDagRequest)
+      throws IOException {
+    String imagePath = impl.printCompactionLogDag(
+        printCompactionLogDagRequest.getFileName(),
+        printCompactionLogDagRequest.getGraphType());
+    return PrintCompactionLogDagResponse.newBuilder()
+        .setImagePath(imagePath)
+        .build();
+  }
 
   public OzoneManager getOzoneManager() {
     return impl;
@@ -1325,5 +1381,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     String newLeaderId = req.getNewLeaderId();
     impl.transferLeadership(newLeaderId);
     return TransferLeadershipResponseProto.getDefaultInstance();
+  }
+
+  private SetSafeModeResponse setSafeMode(
+      SetSafeModeRequest req) throws IOException {
+    OzoneManagerProtocolProtos.SafeMode safeMode = req.getSafeMode();
+    boolean response = impl.setSafeMode(toSafeModeAction(safeMode), false);
+    return SetSafeModeResponse.newBuilder()
+        .setResponse(response)
+        .build();
+  }
+
+  private SafeModeAction toSafeModeAction(
+      OzoneManagerProtocolProtos.SafeMode safeMode) {
+    switch (safeMode) {
+    case ENTER:
+      return SafeModeAction.ENTER;
+    case LEAVE:
+      return SafeModeAction.LEAVE;
+    case FORCE_EXIT:
+      return SafeModeAction.FORCE_EXIT;
+    case GET:
+      return SafeModeAction.GET;
+    default:
+      throw new IllegalArgumentException("Unexpected safe mode action " +
+          safeMode);
+    }
   }
 }

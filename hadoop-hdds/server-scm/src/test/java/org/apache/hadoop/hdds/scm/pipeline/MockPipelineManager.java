@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -48,7 +47,7 @@ import java.util.stream.Stream;
  */
 public class MockPipelineManager implements PipelineManager {
 
-  private PipelineStateManager stateManager;
+  private final PipelineStateManager stateManager;
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager,
                              NodeManager nodeManager) throws IOException {
@@ -62,7 +61,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig)
-      throws IOException, TimeoutException {
+      throws IOException {
     return createPipeline(replicationConfig, Collections.emptyList(),
         Collections.emptyList());
   }
@@ -70,9 +69,21 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException, TimeoutException {
+      throws IOException {
+    Pipeline pipeline = buildECPipeline(replicationConfig, excludedNodes,
+        favoredNodes);
+
+    stateManager.addPipeline(pipeline.getProtobufMessage(
+        ClientVersion.CURRENT_VERSION));
+    return pipeline;
+  }
+
+  @Override
+  public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      throws IOException {
     final List<DatanodeDetails> nodes = Stream.generate(
-        MockDatanodeDetails::randomDatanodeDetails)
+            MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
         .collect(Collectors.toList());
     final Pipeline pipeline = Pipeline.newBuilder()
@@ -81,10 +92,14 @@ public class MockPipelineManager implements PipelineManager {
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
+    return pipeline;
+  }
 
+  @Override
+  public void addEcPipeline(Pipeline pipeline)
+      throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION));
-    return pipeline;
   }
 
   @Override
@@ -206,14 +221,14 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void openPipeline(final PipelineID pipelineId)
-      throws IOException, TimeoutException {
+      throws IOException {
     stateManager.updatePipelineState(
         pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_OPEN);
   }
 
   @Override
   public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
-      throws IOException, TimeoutException {
+      throws IOException {
     stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
   }
@@ -260,7 +275,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void deactivatePipeline(final PipelineID pipelineID)
-      throws IOException, TimeoutException {
+      throws IOException {
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_DORMANT);
   }

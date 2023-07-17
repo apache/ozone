@@ -122,7 +122,8 @@ public class TestOzoneManagerRatisServer {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     initialTermIndex = TermIndex.valueOf(0, 0);
     RatisSnapshotInfo omRatisSnapshotInfo = new RatisSnapshotInfo();

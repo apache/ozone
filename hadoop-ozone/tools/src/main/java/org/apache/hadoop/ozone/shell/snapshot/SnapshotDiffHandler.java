@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.snapshot;
 
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -67,6 +68,12 @@ public class SnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean cancel;
 
+  @CommandLine.Option(names = {"--dnld", "--disable-native-libs-diff"},
+      description = "perform diff of snapshot without using" +
+          " native libs (optional)",
+      hidden = true)
+  private boolean diffDisableNativeLibs;
+
   @Override
   protected OzoneAddress getAddress() {
     return snapshotPath.getValue();
@@ -81,10 +88,26 @@ public class SnapshotDiffHandler extends Handler {
     OmUtils.validateSnapshotName(fromSnapshot);
     OmUtils.validateSnapshotName(toSnapshot);
 
+    if (cancel) {
+      cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    } else {
+      getSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    }
+  }
+
+  private void getSnapshotDiff(ObjectStore store, String volumeName,
+                               String bucketName) throws IOException {
     try (PrintStream stream = out()) {
-      stream.print(client.getObjectStore()
-          .snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-              token, pageSize, forceFullDiff, cancel));
+      stream.print(store.snapshotDiff(volumeName, bucketName, fromSnapshot,
+          toSnapshot, token, pageSize, forceFullDiff, diffDisableNativeLibs));
+    }
+  }
+
+  private void cancelSnapshotDiff(ObjectStore store, String volumeName,
+                                  String bucketName) throws IOException {
+    try (PrintStream stream = out()) {
+      stream.print(store.cancelSnapshotDiff(volumeName, bucketName,
+          fromSnapshot, toSnapshot));
     }
   }
 }

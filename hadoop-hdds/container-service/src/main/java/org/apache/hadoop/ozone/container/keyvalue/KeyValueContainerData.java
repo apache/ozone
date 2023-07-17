@@ -90,8 +90,6 @@ public class KeyValueContainerData extends ContainerData {
 
   private long blockCommitSequenceId;
 
-  private int replicaIndex;
-
   static {
     // Initialize YAML fields
     KV_YAML_FIELDS = Lists.newArrayList();
@@ -123,7 +121,6 @@ public class KeyValueContainerData extends ContainerData {
     this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
-    this.replicaIndex = source.getReplicaIndex();
   }
 
   /**
@@ -324,14 +321,6 @@ public class KeyValueContainerData extends ContainerData {
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
-  }
-
-  public int getReplicaIndex() {
-    return replicaIndex;
-  }
-
-  public void setReplicaIndex(int replicaIndex) {
-    this.replicaIndex = replicaIndex;
   }
 
   // NOTE: Below are some helper functions to format keys according

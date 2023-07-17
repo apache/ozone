@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.node;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -128,7 +127,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?
-              } catch (IOException | TimeoutException ex) {
+              } catch (IOException ex) {
                 LOG.warn("Exception while finalizing pipeline {}",
                     id, ex);
               }

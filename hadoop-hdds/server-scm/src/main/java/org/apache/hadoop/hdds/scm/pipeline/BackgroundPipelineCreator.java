@@ -229,7 +229,8 @@ public class BackgroundPipelineCreator implements SCMService {
           (ReplicationConfig) it.next();
 
       try {
-        pipelineManager.createPipeline(replicationConfig);
+        Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+        LOG.info("Created new pipeline {}", pipeline);
       } catch (IOException ioe) {
         it.remove();
       } catch (Throwable t) {

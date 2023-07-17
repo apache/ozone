@@ -1013,6 +1013,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.lock.stripes</name>
+    <value>512</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The number of stripes created for the container state manager lock.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.address</name>
     <value/>
     <tag>OZONE, MANAGEMENT</tag>
@@ -2014,6 +2022,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
+    <value>100000000</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Max size of SST files in OM Ratis Snapshot tarball.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.snapshot.provider.socket.timeout</name>
     <value>5000s</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
@@ -2250,6 +2266,32 @@
     <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
       daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
       and second.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.ack.timeout</name>
+    <value>PT15M</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Max time that SCM leader will wait for the rotation preparation acks before it believes the rotation
+      is failed. Default is 15 minutes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is disabled.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
+    <value>PT2h</value>
+    <description>Interval to use for polling in certificate clients for a new
+      root ca certificate. Every time the specified time duration elapses,
+      the clients send a request to the SCMs to see if a new root ca
+      certificate was generated. Once there is a change, the system
+      automatically adds the new root ca to the clients'
+      trust stores and requests a new certificate to be signed.
     </description>
   </property>
   <property>
@@ -3935,6 +3977,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.diff.max.page.size</name>
     <value>1000</value>
     <tag>OZONE, OM</tag>
@@ -3983,7 +4034,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
-    <value>60m</value>
+    <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.

@@ -26,3 +26,8 @@ Test Timeout        5 minutes
 Run scm roles
     ${output} =         Execute          ozone admin scm roles
                         Should Match Regexp   ${output}  [scm:9894(:LEADER|)]
+
+List scm roles as JSON
+    ${output} =         Execute          ozone admin scm roles --json
+    ${leader} =         Execute          echo '${output}' | jq -r '.[] | select(.raftPeerRole == "LEADER")'
+                        Should Not Be Equal       ${leader}       ${EMPTY}

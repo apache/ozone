@@ -363,6 +363,15 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return
+   * @throws IOException
+   */
+  boolean rotateSecretKeys(boolean force) throws IOException;
+
+  /**
    * Transfer the raft leadership.
    *
    * @param newLeaderId  the newLeaderId of the target expected leader

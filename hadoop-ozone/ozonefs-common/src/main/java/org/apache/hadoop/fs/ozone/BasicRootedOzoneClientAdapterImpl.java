@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -74,7 +75,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -83,7 +83,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,8 +115,6 @@ public class BasicRootedOzoneClientAdapterImpl
   private int configuredDnPort;
   private BucketLayout defaultOFSBucketLayout;
   private OzoneConfiguration config;
-
-  public static final String ACTIVE_FS_SNAPSHOT_NAME = ".";
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -1317,11 +1314,21 @@ public class BasicRootedOzoneClientAdapterImpl
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
-    boolean takeTemporarySnapshot = false;
-    if (toSnapshot.equals(ACTIVE_FS_SNAPSHOT_NAME)) {
-      takeTemporarySnapshot = true;
+    boolean takeTemporaryToSnapshot = false;
+    boolean takeTemporaryFromSnapshot = false;
+    if (toSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the fromSnapshot &
+      // current state.
+      takeTemporaryToSnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          OzoneFSUtils.generateUniqueTempSnapshotName());
+    }
+    if (fromSnapshot.isEmpty()) {
+      // empty fromSnapshot implies diff b/w the current state
+      // & the toSnapshot
+      takeTemporaryFromSnapshot = true;
+      fromSnapshot = createSnapshot(snapshotDir.toString(),
+          OzoneFSUtils.generateUniqueTempSnapshotName());
     }
     OFSPath ofsPath = new OFSPath(snapshotDir, config);
     String volume = ofsPath.getVolumeName();
@@ -1346,10 +1353,13 @@ public class BasicRootedOzoneClientAdapterImpl
       return aggregated;
     } finally {
       // delete the temp snapshot
-      if (takeTemporarySnapshot) {
-        ozoneClient.getObjectStore()
-            .deleteSnapshot(ofsPath.getVolumeName(), ofsPath.getBucketName(),
-                toSnapshot);
+      if (takeTemporaryToSnapshot) {
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), toSnapshot);
+      }
+      if (takeTemporaryFromSnapshot) {
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), fromSnapshot);
       }
     }
   }
@@ -1370,8 +1380,31 @@ public class BasicRootedOzoneClientAdapterImpl
     return snapshotDiffResponse.getSnapshotDiffReport();
   }
 
-  public boolean recoverLease(final Path f) throws IOException {
-    OFSPath ofsPath = new OFSPath(f, config);
+  @Override
+  public boolean isFileClosed(String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    String key = ofsPath.getKeyName();
+    if (ofsPath.isRoot() || ofsPath.isVolume()) {
+      throw new IOException("not a file");
+    } else {
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      if (ofsPath.isSnapshotPath()) {
+        throw new IOException("file is in a snapshot.");
+      } else {
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        if (!status.isFile()) {
+          throw new IOException("not a file");
+        }
+        return !status.getKeyInfo().isHsync();
+      }
+    }
+  }
+
+  @Override
+  public boolean recoverLease(final String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
@@ -1379,11 +1412,21 @@ public class BasicRootedOzoneClientAdapterImpl
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
   }
 
+  @Override
   public void setTimes(String key, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     OFSPath ofsPath = new OFSPath(key, config);
 
     OzoneBucket bucket = getBucket(ofsPath, false);
     bucket.setTimes(ofsPath.getKeyName(), mtime, atime);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_SAFE_MODE, 1);
+
+    return ozoneClient.getProxy().getOzoneManagerClient().setSafeMode(
+        action, isChecked);
   }
 }

@@ -41,7 +41,3 @@ execute_robot_test scm basic/single_node.robot
 execute_robot_test scm admincli/pipeline.robot
 
 ${COMPOSE_DIR}/stop.sh
-
-stop_docker_env
-
-generate_report

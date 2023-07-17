@@ -25,6 +25,8 @@ import java.security.PublicKey;
 import java.security.cert.CertificateExpiredException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -47,6 +49,7 @@ import org.apache.hadoop.util.ServicePlugin;
 
 import org.apache.commons.io.FileUtils;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
@@ -105,7 +108,7 @@ public class TestHddsSecureDatanodeInit {
     conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT5S"); // 5s
     conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S"); // 1s
     conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
-
+    conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT1S"); // 1s
     securityConfig = new SecurityConfig(conf);
 
     service = new HddsDatanodeService(args) {
@@ -315,13 +318,16 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
         .thenReturn(responseProto);
 
+    List<String> rootCaList = new ArrayList<>();
+    rootCaList.add(pemCert);
+    when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
     Assert.assertFalse(certId.equals(
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    client.startCertificateMonitor();
+    client.startCertificateRenewerService();
 
     // check after renew, client will have the new cert ID
     GenericTestUtils.waitFor(() -> {
@@ -337,6 +343,7 @@ public class TestHddsSecureDatanodeInit {
     // test the second time certificate rotation, generate a new cert
     newCertHolder = generateX509CertHolder(null, null,
         Duration.ofSeconds(CERT_LIFETIME));
+    rootCaList.remove(pemCert);
     pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
     responseProto = SCMSecurityProtocolProtos.SCMGetCertResponseProto
         .newBuilder().setResponseCode(SCMSecurityProtocolProtos
@@ -347,6 +354,8 @@ public class TestHddsSecureDatanodeInit {
         .build();
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
         .thenReturn(responseProto);
+    rootCaList.add(pemCert);
+    when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     String certId2 = newCertHolder.getSerialNumber().toString();
 
     // check after renew, client will have the new cert ID
@@ -393,7 +402,7 @@ public class TestHddsSecureDatanodeInit {
         client.getCertificate().getSerialNumber().toString()));
 
     // start monitor task to renew key and cert
-    client.startCertificateMonitor();
+    client.startCertificateRenewerService();
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);

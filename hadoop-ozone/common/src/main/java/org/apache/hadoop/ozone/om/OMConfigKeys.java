@@ -202,6 +202,11 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT = 400000;
 
+  public static final String OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY
+      = "ozone.om.ratis.snapshot.max.total.sst.size";
+  public static final long
+      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 100_000_000;
+
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
       = "ozone.om.ratis.server.request.timeout";
@@ -489,6 +494,11 @@ public final class OMConfigKeys {
 
   public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS =
+      "ozone.om.snapshot.diff.disable.native.libs";
+
+  public static final boolean
+      OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT = false;
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
       = "ozone.om.snapshot.diff.db.dir";
 
@@ -527,7 +537,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
