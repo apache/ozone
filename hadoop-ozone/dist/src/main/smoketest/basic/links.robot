@@ -115,11 +115,12 @@ Key list passthrough
 
 Key delete passthrough
                         Execute                     ozone sh key delete ${target}/link1/key2
-    ${source_list} =    Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
-                        Should Contain Any          ${source_list}     .Trash/hadoop    .Trash/testuser    .Trash/root
+                        Execute                     ozone sh key list ${source}/bucket1 > bucket1keylist.json
+    ${source_list} =    Execute                     jq -r '.[] | select(.name | startswith(".Trash")) | .name' bucket1keylist.json
+                        Should Contain Any          ${source_list}    .Trash/hadoop    .Trash/testuser    .Trash/root
                         Should contain              ${source_list}    key2
-    ${result} =         Execute                     ozone sh key list ${source}/bucket1 | jq -r '.[] | select(.name | startswith(".Trash") | not) | .name'
-                        Should Not contain          ${result}         key2
+    ${result} =         Execute                     jq -r '.[] | select(.name | startswith(".Trash") | not) | .name' bucket1keylist.json
+                        Should Not contain          ${result}    key2
 
 Bucket list contains links
     ${result} =         Execute                     ozone sh bucket list ${target}
