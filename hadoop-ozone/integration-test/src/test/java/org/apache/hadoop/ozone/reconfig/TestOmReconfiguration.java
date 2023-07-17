@@ -69,7 +69,7 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void keyDeletingLimitPerTask() {
+  public void keyDeletingLimitPerTask() throws ReconfigurationException {
     int originLimit = getCluster().getOzoneManager()
         .getKeyManager().getDeletingService().getKeyLimitPerTask();
 

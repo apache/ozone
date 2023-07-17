@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.reconfig;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
@@ -49,7 +50,7 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeletingLimitPerInterval() {
+  public void blockDeletingLimitPerInterval() throws ReconfigurationException {
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
         HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, "1");
 
@@ -61,7 +62,7 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeleteThreadMax() {
+  public void blockDeleteThreadMax() throws ReconfigurationException {
     // Start the service and get the original pool size
     ThreadPoolExecutor executor = ((DeleteBlocksCommandHandler)
         getFirstDatanode().getDatanodeStateMachine().getCommandDispatcher()
@@ -84,7 +85,7 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeletingServiceWorkers() {
+  public void blockDeletingServiceWorkers() throws ReconfigurationException {
     ScheduledThreadPoolExecutor executor = (ScheduledThreadPoolExecutor)
         getFirstDatanode().getDatanodeStateMachine().getContainer()
             .getBlockDeletingService().getExecutorService();

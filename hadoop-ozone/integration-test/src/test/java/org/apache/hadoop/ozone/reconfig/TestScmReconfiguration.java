@@ -98,7 +98,8 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeletionPerIntervalMaxReconfigure() {
+  public void blockDeletionPerIntervalMaxReconfigure()
+      throws ReconfigurationException {
     SCMBlockDeletingService blockDeletingService =
         getCluster().getStorageContainerManager().getScmBlockManager()
         .getSCMBlockDeletingService();
