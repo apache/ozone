@@ -25,8 +25,11 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Run cert list
     ${output} =         Execute          ozone admin cert list
-    Should Contain      ${output}       Certificate list:(Type=
+    Should Contain      ${output}        Certificate list:(Type=
 
 cert list as JSON
-    ${output} =         Execute          ozone admin cert list --json
-                        Execute          echo '${output}' | jq -r '.'
+    ${output} =         Execute             ozone admin cert list --json 2>> certInfo
+    ${errOutput} =      Execute             cat certInfo
+                        Execute             echo '${output}' | jq -r '.'
+    Should Contain      ${errOutput}        Certificate list:(Type=
+                        Execute             rm certInfo
