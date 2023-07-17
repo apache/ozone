@@ -86,6 +86,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -459,6 +460,7 @@ class TestOzoneAtRestEncryption {
 
   @ParameterizedTest
   @EnumSource
+  @Flaky("HDDS-8947")
   void mpuStreamOnePart(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -468,6 +470,7 @@ class TestOzoneAtRestEncryption {
 
   @ParameterizedTest
   @EnumSource
+  @Flaky("HDDS-8947")
   void mpuStreamTwoParts(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -477,6 +480,7 @@ class TestOzoneAtRestEncryption {
 
   @ParameterizedTest
   @EnumSource
+  @Flaky("HDDS-8947")
   void mpuStreamThreePartsOverride(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
