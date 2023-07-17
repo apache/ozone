@@ -1046,6 +1046,16 @@ public interface ClientProtocol {
       String bucketName, String snapshotName) throws IOException;
 
   /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileName     name of the image file.
+   * @param graphType    type of node name to use in the graph image.
+   * @return path of the image file.
+   * @throws IOException
+   */
+  String printCompactionLogDag(String fileName, String graphType)
+      throws IOException;
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
