@@ -173,10 +173,10 @@ public class ListSubcommand extends ScmCertSubcommand {
 
     }
 
-    private void parseDnInfo(String DnName, boolean isSubject) {
-      String[] dnNameComponents = DnName.split(",");
+    private void parseDnInfo(String dnName, boolean isSubject) {
+      String[] dnNameComponents = dnName.split(",");
       if (dnNameComponents.length == 0) {
-        err.println("Invalid format of name: " + DnName);
+        err.println("Invalid format of name: " + dnName);
       } else {
         for (String elem : dnNameComponents) {
           String[] components = elem.split("=");
@@ -184,7 +184,7 @@ public class ListSubcommand extends ScmCertSubcommand {
             (isSubject ? subjectDN : issuerDN)
                 .put(components[0], components[1]);
           } else {
-            err.println("Invalid format of name: " + DnName);
+            err.println("Invalid format of name: " + dnName);
           }
         }
       }
