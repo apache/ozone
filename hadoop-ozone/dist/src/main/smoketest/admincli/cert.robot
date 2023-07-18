@@ -30,8 +30,10 @@ Run cert list
 
 cert list as JSON
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
-    ${output} =             Execute             ozone admin cert list --json 2>> certInfo
-    ${errOutput} =          Execute             cat certInfo
-                            Execute             echo '${output}' | jq -r '.'
-    Should Contain          ${errOutput}        Certificate list:(Type=
-                            Execute             rm certInfo
+    Execute                 ozone admin cert list --json 1>> outStream 2>> errStream
+    ${output}               Execute             cat outStream | jq -r '.[0] | keys'
+                            Should Contain          ${output}           serialNumber
+    ${errOutput} =          Execute                 cat errStream
+                            Should Contain          ${errOutput}        Certificate list:(Type=
+    Execute                 rm outStream
+    Execute                 rm errStream
