@@ -2295,6 +2295,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.expired.certificate.removal.interval</name>
+    <value>P1D</value>
+    <description>Interval to use for removing expired certificates. A background
+      task to remove expired certificates from the scm metadata store is
+      scheduled to run at the rate this configuration option specifies.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.security.handler.count.key</name>
     <value>2</value>
     <tag>OZONE, HDDS, SECURITY</tag>

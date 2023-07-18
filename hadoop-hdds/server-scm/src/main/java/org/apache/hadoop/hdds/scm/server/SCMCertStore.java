@@ -25,6 +25,7 @@ import java.math.BigInteger;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.ArrayList;
 
 import java.util.List;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -218,6 +220,37 @@ public final class SCMCertStore implements CertificateStore {
   public void removeExpiredCertificate(BigInteger serialID)
       throws IOException {
     // TODO: Later this allows removal of expired certificates from the system.
+  }
+
+  @Override
+  public void removeAllExpiredCertificates() {
+    lock.lock();
+    try (BatchOperation batchOperation =
+             scmMetadataStore.getBatchHandler().initBatchOperation()) {
+      addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidCertsTable());
+      addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidSCMCertsTable());
+      scmMetadataStore.getStore().commitBatchOperation(batchOperation);
+    } catch (IOException e) {
+      LOG.error("Error while trying to remove expired certificate.", e);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void addExpiredCertsToBeRemoved(BatchOperation batchOperation,
+      Table<BigInteger, X509Certificate> certTable) throws IOException {
+    TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
+        X509Certificate>> certsIterator = certTable.iterator();
+    while (certsIterator.hasNext()) {
+      Table.KeyValue<BigInteger, X509Certificate> certEntry =
+          certsIterator.next();
+      if (certEntry.getValue().getNotAfter().toInstant().isBefore(
+          Instant.now())) {
+        certTable.deleteWithBatch(batchOperation, certEntry.getKey());
+      }
+    }
   }
 
   @Override

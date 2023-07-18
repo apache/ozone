@@ -219,6 +219,17 @@ public class RootCARotationManager implements SCMService {
     LOG.info("Monitor task for root certificate {} is started with " +
         "interval {}.", scmCertClient.getCACertificate().getSerialNumber(),
         checkInterval);
+    executorService.scheduleAtFixedRate(this::removeExpiredCertTask, 0,
+        secConf.getExpiredCertificateRemovalInterval().toMillis(),
+        TimeUnit.MILLISECONDS);
+    LOG.info("Scheduling expired certificate removal with interval {}s",
+        secConf.getExpiredCertificateRemovalInterval().getSeconds());
+  }
+
+  private void removeExpiredCertTask() {
+    if (scm.getCertificateStore() != null) {
+      scm.getCertificateStore().removeAllExpiredCertificates();
+    }
   }
 
   public boolean isRunning() {
