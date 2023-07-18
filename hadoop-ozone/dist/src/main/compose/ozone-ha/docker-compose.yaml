@@ -27,7 +27,7 @@ x-common-config:
 
 x-replication:
   &replication
-  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
+  OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
 services:
   datanode:
