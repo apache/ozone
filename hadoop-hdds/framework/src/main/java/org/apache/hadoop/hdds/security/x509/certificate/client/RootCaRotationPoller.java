@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
   private final Duration pollingInterval;
   private Set<X509Certificate> knownRootCerts;
   private final SCMSecurityProtocolClientSideTranslatorPB scmSecureClient;
+  private final AtomicBoolean certificateRenewalError;
 
   public RootCaRotationPoller(SecurityConfig securityConfig,
       Set<X509Certificate> initiallyKnownRootCaCerts,
@@ -67,6 +69,7 @@ public class RootCaRotationPoller implements Runnable, Closeable {
             .setDaemon(true).build());
     pollingInterval = securityConfig.getRootCaCertificatePollingInterval();
     rootCARotationProcessors = new ArrayList<>();
+    certificateRenewalError = new AtomicBoolean(false);
   }
 
   private void pollRootCas() {
@@ -86,15 +89,22 @@ public class RootCaRotationPoller implements Runnable, Closeable {
           getPrintableCertIds(knownRootCerts) + ". Root CA Cert ids from " +
           "SCM not known by the client: " +
           getPrintableCertIds(scmCertsWithoutKnownCerts));
-
+      certificateRenewalError.set(false);
       CompletableFuture<Void> allRootCAProcessorFutures =
           CompletableFuture.allOf(rootCARotationProcessors.stream()
               .map(c -> c.apply(rootCAsFromSCM))
               .toArray(CompletableFuture[]::new));
 
       allRootCAProcessorFutures.whenComplete((unused, throwable) -> {
-        if (throwable == null) {
+        if (throwable == null && !certificateRenewalError.get()) {
           knownRootCerts = new HashSet<>(rootCAsFromSCM);
+        } else {
+          LOG.info("Certificate consumption was unsuccesfull. " +
+              (certificateRenewalError.get() ?
+                  "There was a caught exception when trying to sign the " +
+                      "certificate" :
+                  "There was an unexpected error during cert rotation" +
+                      throwable));
         }
       });
     } catch (IOException e) {
@@ -132,6 +142,10 @@ public class RootCaRotationPoller implements Runnable, Closeable {
       LOG.warn("{} couldn't be stopped gracefully", getClass().getSimpleName());
       Thread.currentThread().interrupt();
     }
+  }
+
+  public void setCertificateRenewalError() {
+    certificateRenewalError.set(true);
   }
 
   private String getPrintableCertIds(Collection<X509Certificate> certs) {
