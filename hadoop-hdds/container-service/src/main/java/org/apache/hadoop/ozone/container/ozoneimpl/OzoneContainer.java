@@ -423,7 +423,10 @@ public class OzoneContainer {
     // proceeding.
     volumeSet.checkAllVolumes();
     metaVolumeSet.checkAllVolumes();
-    dbVolumeSet.checkAllVolumes();
+    // DB volume set may be null if dedicated DB volumes are not used.
+    if (dbVolumeSet != null) {
+      dbVolumeSet.checkAllVolumes();
+    }
 
     LOG.info("Attempting to start container services.");
     startContainerScrub();
