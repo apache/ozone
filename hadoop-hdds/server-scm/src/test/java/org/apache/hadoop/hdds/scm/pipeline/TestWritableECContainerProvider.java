@@ -244,8 +244,7 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude all the associated
-    // containers.
+    // We have the min limit of pipelines, but then exclude them all
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addPipeline(c.getPipelineID());
@@ -265,7 +264,8 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude them all
+    // We have the min limit of pipelines, but then exclude all the associated
+    // containers.
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addConatinerId(c.containerID());
