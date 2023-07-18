@@ -199,7 +199,6 @@ public class MutableVolumeSet implements VolumeSet {
       throw new DiskOutOfSpaceException("No storage locations configured");
     }
 
-    checkAllVolumes();
     initialized = true;
   }
 
