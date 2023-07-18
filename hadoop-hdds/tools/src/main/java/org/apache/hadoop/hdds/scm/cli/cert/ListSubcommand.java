@@ -22,7 +22,7 @@ import java.math.BigInteger;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -157,38 +157,34 @@ public class ListSubcommand extends ScmCertSubcommand {
     private BigInteger serialNumber;
     private String validFrom;
     private String expiry;
-    private Map<String, String> subjectDN = new HashMap<>();
-    private Map<String, String> issuerDN = new HashMap<>();;
+    private Map<String, String> subjectDN = new LinkedHashMap<>();
+    private Map<String, String> issuerDN = new LinkedHashMap<>();;
 
     Certificate(X509Certificate cert) {
       serialNumber = cert.getSerialNumber();
       validFrom = cert.getNotBefore().toString();
       expiry = cert.getNotAfter().toString();
 
-      String[] subject = cert.getSubjectDN().getName().split(",");
-      if(subject.length == 0) {
-        err.println("Invalid format of subjectDN name");
-      } else {
-        for(String elem : subject) {
-          String[] subjectComponents = elem.split("=");
-          if(subjectComponents.length == 2) {
-            subjectDN.put(subjectComponents[0], subjectComponents[1]);
-          } else {
-            err.println("Invalid format of subjectDN name");
-          }
-        }
-      }
+      String subject = cert.getSubjectDN().getName();
+      parseDnInfo(subject, true);
 
-      String[] issuer = cert.getIssuerDN().getName().split(",");
-      if(issuer.length == 0) {
-        err.println("Invalid format of issuerDN name");
+      String issuer = cert.getIssuerDN().getName();
+      parseDnInfo(issuer, false);
+
+    }
+
+    private void parseDnInfo(String DnName, boolean isSubject) {
+      String[] dnNameComponents = DnName.split(",");
+      if (dnNameComponents.length == 0) {
+        err.println("Invalid format of name: " + DnName);
       } else {
-        for(String elem : issuer) {
-          String[] issuerComponents = elem.split("=");
-          if(issuerComponents.length == 2) {
-            issuerDN.put(issuerComponents[0], issuerComponents[1]);
+        for (String elem : dnNameComponents) {
+          String[] components = elem.split("=");
+          if (components.length == 2) {
+            (isSubject ? subjectDN : issuerDN)
+                .put(components[0], components[1]);
           } else {
-            err.println("Invalid format of issueDN name");
+            err.println("Invalid format of name: " + DnName);
           }
         }
       }
