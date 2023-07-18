@@ -400,16 +400,16 @@ public class SnapshotDiffManager implements AutoCloseable {
         checkpointPath,
         snapshotId,
         dbTxSequenceNumber,
-        getTablePrefixes(snapshotOMMM, volumeName, bucketName));
+        getTablePrefixes(snapshotOMMM, volumeName, bucketName),
+        ((RDBStore)snapshotOMMM.getStore()).getDb().getManagedRocksDb());
   }
 
   @VisibleForTesting
   protected Set<String> getSSTFileListForSnapshot(OmSnapshot snapshot,
-                                                  List<String> tablesToLookUp)
-      throws RocksDBException {
-    return RdbUtil.getSSTFilesForComparison(snapshot
-        .getMetadataManager().getStore().getDbLocation()
-        .getPath(), tablesToLookUp);
+                                                  List<String> tablesToLookUp) {
+    return RdbUtil.getSSTFilesForComparison(((RDBStore)snapshot
+        .getMetadataManager().getStore()).getDb().getManagedRocksDb(),
+        tablesToLookUp);
   }
 
   /**
@@ -1217,7 +1217,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                             boolean useFullDiff,
                             Map<String, String> tablePrefixes,
                             String diffDir)
-      throws RocksDBException, IOException {
+      throws IOException {
     // TODO: [SNAPSHOT] Refactor the parameter list
     final Set<String> deltaFiles = new HashSet<>();
 
@@ -1252,13 +1252,13 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       Set<String> fromSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(
-              fromSnapshot.getMetadataManager().getStore()
-                  .getDbLocation().getPath(),
+              ((RDBStore)fromSnapshot.getMetadataManager().getStore())
+                  .getDb().getManagedRocksDb(),
               tablesToLookUp);
       Set<String> toSnapshotFiles =
           RdbUtil.getSSTFilesForComparison(
-              toSnapshot.getMetadataManager().getStore()
-                  .getDbLocation().getPath(),
+              ((RDBStore)toSnapshot.getMetadataManager().getStore()).getDb()
+                  .getManagedRocksDb(),
               tablesToLookUp);
 
       deltaFiles.addAll(fromSnapshotFiles);
