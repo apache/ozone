@@ -252,10 +252,10 @@ Test Delete key with Trash
                    Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
                    Execute               ozone sh key delete ${protocol}${server}/${volume}/bfso/key3
     ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
-    ${result} =    Execute               jq -r '.[] | select(.name | startswith(".Trash")) | .name' ${fsokey}
+    ${result} =    Execute               echo ${fsokey} | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
                    Should Contain Any    ${result}    .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}    key3
-    ${result} =    Execute               jq -r '.[] | select(.name | startswith(".Trash") | not) | .name' ${fsokey}
+    ${result} =    Execute               echo ${fsokey} | jq -r '.[] | select(.name | startswith(".Trash") | not) | .name'
                    Should Not contain    ${result}    key3
                    Execute               ozone sh bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
                    Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
