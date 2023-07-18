@@ -1827,6 +1827,7 @@ public class TestOzoneFileSystem {
       }
     }
 
+    GenericTestUtils.setLogLevel(log, Level.INFO);
     Assert.assertNotEquals(nonZeroLines, 0);
   }
 }

@@ -98,6 +98,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
       () -> Short.valueOf((short)0));
 
+  private ThreadLocal<OMLockDetails> omLockDetails =
+      ThreadLocal.withInitial(OMLockDetails::new);
+
   /**
    * Creates new OzoneManagerLock instance.
    * @param conf Configuration object
@@ -175,7 +178,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private OMLockDetails acquireLock(Resource resource, boolean isReadLock,
       String... keys) {
-    OMLockDetails omLockDetails = new OMLockDetails();
+    omLockDetails.get().clear();
     if (!resource.canLock(lockSet.get())) {
       String errorMessage = getErrorMessage(resource);
       LOG.error(errorMessage);
@@ -187,19 +190,19 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     ReentrantReadWriteLock lock = getLock(resource, keys);
     if (isReadLock) {
       lock.readLock().lock();
-      updateReadLockMetrics(resource, lock, startWaitingTimeNanos, omLockDetails);
+      updateReadLockMetrics(resource, lock, startWaitingTimeNanos);
     } else {
       lock.writeLock().lock();
-      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos, omLockDetails);
+      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos);
     }
 
     lockSet.set(resource.setLock(lockSet.get()));
-    return omLockDetails;
+    omLockDetails.get().setLockAcquired(true);
+    return omLockDetails.get();
   }
 
   private void updateReadLockMetrics(Resource resource,
-      ReentrantReadWriteLock lock, long startWaitingTimeNanos,
-      OMLockDetails omLockDetails) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
 
     /*
      *  readHoldCount helps in metrics updation only once in case
@@ -212,16 +215,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric readLockWaitingTimeMsStat.
       omLockMetrics.setReadLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
-      updateProcessingDetails(Timing.LOCKWAIT, readLockWaitingTimeNanos,
-          omLockDetails);
+      updateProcessingDetails(Timing.LOCKWAIT, readLockWaitingTimeNanos);
 
       resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
   private void updateWriteLockMetrics(Resource resource,
-      ReentrantReadWriteLock lock, long startWaitingTimeNanos,
-      OMLockDetails omLockDetails) {
+      ReentrantReadWriteLock lock, long startWaitingTimeNanos) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
@@ -235,8 +236,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric writeLockWaitingTimeMsStat.
       omLockMetrics.setWriteLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
-      updateProcessingDetails(Timing.LOCKWAIT, writeLockWaitingTimeNanos,
-          omLockDetails);
+      updateProcessingDetails(Timing.LOCKWAIT, writeLockWaitingTimeNanos);
 
       resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
     }
@@ -336,23 +336,23 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
       String... keys) {
-    OMLockDetails omLockDetails = new OMLockDetails();
+    omLockDetails.get().clear();
     ReentrantReadWriteLock lock = getLock(resource, keys);
     if (isReadLock) {
       lock.readLock().unlock();
-      updateReadUnlockMetrics(resource, lock, omLockDetails);
+      updateReadUnlockMetrics(resource, lock);
     } else {
       boolean isWriteLocked = lock.isWriteLockedByCurrentThread();
       lock.writeLock().unlock();
-      updateWriteUnlockMetrics(resource, lock, isWriteLocked, omLockDetails);
+      updateWriteUnlockMetrics(resource, lock, isWriteLocked);
     }
 
     lockSet.set(resource.clearLock(lockSet.get()));
-    return omLockDetails;
+    return omLockDetails.get();
   }
 
   private void updateReadUnlockMetrics(Resource resource,
-      ReentrantReadWriteLock lock, OMLockDetails omLockDetails) {
+      ReentrantReadWriteLock lock) {
     /*
      *  readHoldCount helps in metrics updation only once in case
      *  of reentrant locks.
@@ -364,14 +364,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric readLockHeldTimeMsStat.
       omLockMetrics.setReadLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
-      updateProcessingDetails(Timing.LOCKSHARED, readLockHeldTimeNanos,
-          omLockDetails);
+      updateProcessingDetails(Timing.LOCKSHARED, readLockHeldTimeNanos);
     }
   }
 
   private void updateWriteUnlockMetrics(Resource resource,
-      ReentrantReadWriteLock lock, boolean isWriteLocked,
-      OMLockDetails omLockDetails) {
+      ReentrantReadWriteLock lock, boolean isWriteLocked) {
     /*
      *  writeHoldCount helps in metrics updation only once in case
      *  of reentrant locks. Metrics are updated only if the write lock is held
@@ -384,8 +382,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric writeLockHeldTimeMsStat.
       omLockMetrics.setWriteLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
-      updateProcessingDetails(Timing.LOCKEXCLUSIVE, writeLockHeldTimeNanos,
-          omLockDetails);
+      updateProcessingDetails(Timing.LOCKEXCLUSIVE, writeLockHeldTimeNanos);
     }
   }
 
@@ -612,23 +609,21 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * we can update ThreadLocal variable directly.
    * @param type IPC Timing types
    * @param deltaNanos consumed time
-   * @param omLockDetails
    */
-  private static void updateProcessingDetails(Timing type, long deltaNanos,
-      OMLockDetails omLockDetails) {
+  private void updateProcessingDetails(Timing type, long deltaNanos) {
     Server.Call call = Server.getCurCall().get();
     if (call != null) {
       call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);
     } else {
       switch (type) {
       case LOCKWAIT:
-        omLockDetails.add(deltaNanos, OMLockDetails.LockType.WAIT);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.WAIT);
         break;
       case LOCKSHARED:
-        omLockDetails.add(deltaNanos, OMLockDetails.LockType.READ);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.READ);
         break;
       case LOCKEXCLUSIVE:
-        omLockDetails.add(deltaNanos, OMLockDetails.LockType.WRITE);
+        omLockDetails.get().add(deltaNanos, OMLockDetails.LockType.WRITE);
         break;
       default:
         LOG.error("Unsupported Timing type {}", type);

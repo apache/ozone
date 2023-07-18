@@ -120,4 +120,11 @@ public class OMLockDetails {
         ", writeLockNanos=" + writeLockNanos +
         '}';
   }
+
+  public void clear() {
+    lockAcquired = false;
+    waitLockNanos = 0;
+    readLockNanos = 0;
+    writeLockNanos = 0;
+  }
 }
