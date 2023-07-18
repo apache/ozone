@@ -23,12 +23,12 @@ Setup Test
     Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
-Run cert list
+List certificates
     Pass Execution If       '${SECURITY_ENABLED}' == 'false'    N/A
     ${output} =             Execute          ozone admin cert list
     Should Contain          ${output}        Certificate list:(Type=
 
-cert list as JSON
+List certificates as JSON
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
     Execute                 ozone admin cert list --json 1>> outStream 2>> errStream
     ${output}               Execute             cat outStream | jq -r '.[0] | keys'
