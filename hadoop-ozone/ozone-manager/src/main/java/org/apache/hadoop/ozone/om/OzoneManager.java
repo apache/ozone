@@ -256,7 +256,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -4646,16 +4645,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         bucket, jobStatus, listAll);
   }
 
-  public String printCompactionLogDag(String fileName,
+  public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType)
       throws IOException {
 
-    if (StringUtils.isBlank(fileName)) {
-      fileName = "dag-" + System.currentTimeMillis();
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      throw new OMException(
+          "Only Ozone admins are allowed to print compaction DAG.",
+          PERMISSION_DENIED);
     }
 
-    // Append the tmp file prefix and image file suffix.
-    fileName = "/tmp" + OZONE_URI_DELIMITER + fileName + ".png";
+    if (StringUtils.isBlank(fileNamePrefix)) {
+      fileNamePrefix = "dag-";
+    } else {
+      fileNamePrefix = fileNamePrefix + "-";
+    }
+    File tempFile = File.createTempFile(fileNamePrefix, ".png");
 
     PrintableGraph.GraphType type;
 
@@ -4665,10 +4671,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       type = FILE_NAME;
     }
 
-    return getMetadataManager()
+    getMetadataManager()
         .getStore()
         .getRocksDBCheckpointDiffer()
-        .pngPrintMutableGraph(fileName, type);
+        .pngPrintMutableGraph(tempFile.getAbsolutePath(), type);
+
+    return String.format("File: '%s' was created in \\tmp dir of OM leader " +
+        "node: '%s'.", tempFile.getName(), getOMNodeId());
   }
 
   private String reconfOzoneAdmins(String newVal) {
