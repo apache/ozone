@@ -4676,8 +4676,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .getRocksDBCheckpointDiffer()
         .pngPrintMutableGraph(tempFile.getAbsolutePath(), type);
 
-    return String.format("File: '%s' was created in \\tmp dir of OM leader " +
-        "node: '%s'.", tempFile.getName(), getOMNodeId());
+    return String.format("Graph was generated at '\\tmp\\%s' on OM " +
+        "node '%s'.", tempFile.getName(), getOMNodeId());
   }
 
   private String reconfOzoneAdmins(String newVal) {

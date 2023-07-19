@@ -48,7 +48,7 @@ public class CompactionLogDagPrinter extends Handler
   @CommandLine.Option(names = {"-t", "--graph-type"},
       description = "Type of node name to use in the graph image. " +
           "(optional)\n Accepted values are: \n" +
-          "  file_name: to use file name as node name in DAG,\n" +
+          "  file_name (default) : to use file name as node name in DAG,\n" +
           "  key_size: to show the no. of keys in the file along with file " +
           "name in the DAG node name,\n" +
           "  cumulative_size: to show the cumulative size along with file " +
