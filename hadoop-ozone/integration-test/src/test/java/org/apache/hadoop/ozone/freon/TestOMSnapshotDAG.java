@@ -284,6 +284,7 @@ public class TestOMSnapshotDAG {
     snapDB1.close();
     snapDB2.close();
     snapDB3.close();
+    ozoneManager.getOmSnapshotManager().getSnapshotCache().invalidateAll();
     // Test DAG reconstruction by restarting OM. Then do the same diffs again
     cluster.restartOzoneManager();
     ozoneManager = cluster.getOzoneManager();
@@ -319,6 +320,7 @@ public class TestOMSnapshotDAG {
     snapDB1.close();
     snapDB2.close();
     snapDB3.close();
+    ozoneManager.getOmSnapshotManager().getSnapshotCache().invalidateAll();
   }
 
   @Test
