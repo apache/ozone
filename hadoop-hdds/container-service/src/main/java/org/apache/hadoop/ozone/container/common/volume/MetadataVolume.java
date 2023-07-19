@@ -31,6 +31,9 @@ public class MetadataVolume extends StorageVolume {
 
   protected MetadataVolume(Builder b) throws IOException {
     super(b);
+    // Tmp directory on Metadata Volume uses the volume root as the working
+    // directory. It is not dependent on the cluster ID from SCM.
+    createTmpDirs("");
   }
 
   public VolumeType getType() {
