@@ -42,7 +42,8 @@ class TestOmReconfiguration extends ReconfigurationTestBase {
   @Test
   void reconfigurableProperties() {
     assertProperties(getSubject(),
-        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS));
+        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS,
+            OZONE_KEY_DELETING_LIMIT_PER_TASK));
   }
 
   @Test
