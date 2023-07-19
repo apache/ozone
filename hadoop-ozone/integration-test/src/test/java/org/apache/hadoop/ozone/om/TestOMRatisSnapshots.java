@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -175,7 +174,7 @@ public class TestOMRatisSnapshots {
           20, TimeUnit.SECONDS);
       conf.setTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-          20, TimeUnit.SECONDS);
+          5, TimeUnit.SECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
@@ -1227,26 +1226,14 @@ public class TestOMRatisSnapshots {
 
     ozoneBucket.deleteKeys(newKeys);
 
-    KeyDeletingService keyDeletingService = newLeaderOM
-        .getKeyManager()
-        .getDeletingService();
-    try {
-      GenericTestUtils.waitFor(() -> {
-        long newUsedBytes;
-        try {
-          newUsedBytes = getUsedBytes(newLeaderOM);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-        return newUsedBytes == usedBytes - newKeyInfo.getDataSize();
-      }, 1000, 10000);
-    } catch (TimeoutException e) {
-      // Force key deletion
-      keyDeletingService.runPeriodicalTaskNow();
-      long newUsedBytes = getUsedBytes(newLeaderOM);
-      Assertions.assertEquals(newUsedBytes,
-          usedBytes - newKeyInfo.getDataSize());
-    }
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return getUsedBytes(newLeaderOM) ==
+            usedBytes - newKeyInfo.getDataSize();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
 
     GenericTestUtils.waitFor(() -> {
       Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
