@@ -80,7 +80,6 @@ function ozonecmd_case
   # TODO: Fix the problem related to netty resource leak detector throwing
   # exception as mentioned in HDDS-3812
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
-  RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled ${RATIS_OPTS}"
   # Add JVM parameter for Java 17
   OZONE_MODULE_ACCESS_ARGS=""
 
