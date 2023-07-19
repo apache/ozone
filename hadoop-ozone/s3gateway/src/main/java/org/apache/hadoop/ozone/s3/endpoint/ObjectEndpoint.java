@@ -44,6 +44,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -241,26 +242,32 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
-      if (length == 0 &&
-          ozoneConfiguration
-              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
-          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      boolean canCreateDirectory = ozoneConfiguration
+          .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+              OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      if (length == 0 && canCreateDirectory) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
-        // create directory
-        getClientProtocol()
-            .createDirectory(volume.getName(), bucketName, keyPath);
+        createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
+      }
+
+      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+        body = new SignedChunksInputStream(body);
+
+        if (IOUtils.toString(body, StandardCharsets.UTF_8).isEmpty() &&
+            canCreateDirectory) {
+          s3GAction = S3GAction.CREATE_DIRECTORY;
+          createDirectory(volume.getName(), bucketName, keyPath);
+          return Response.ok().status(HttpStatus.SC_OK).build();
+        }
       }
 
       // Normal put object
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
 
-      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
-          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
-        body = new SignedChunksInputStream(body);
-      }
       long putLength = 0;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
         getMetrics().updatePutKeyMetadataStats(startNanos);
@@ -320,6 +327,12 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCreateKeySuccessStats(startNanos);
       }
     }
+  }
+
+  private void createDirectory(String volumeName,
+      String bucketName, String keyPath) throws IOException {
+    getClientProtocol()
+        .createDirectory(volumeName, bucketName, keyPath);
   }
 
   /**
