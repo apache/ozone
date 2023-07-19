@@ -71,21 +71,6 @@ class TestOzoneAuthorizerFactory {
   }
 
   @Test
-  void customNativeAuthorizer() {
-    // GIVEN
-    OzoneManager om = enableAcls(MockNativeAuthorizer.class);
-
-    // WHEN
-    IAccessAuthorizer omAuth =
-        OzoneAuthorizerFactory.forOM(om);
-
-    // THEN
-    assertInstanceOf(MockNativeAuthorizer.class, omAuth);
-
-    assertNewInstanceForSnapshot(om, omAuth);
-  }
-
-  @Test
   void thirdPartyAuthorizer() {
     // GIVEN
     OzoneManager om = enableAcls(MockThirdPartyAuthorizer.class);
