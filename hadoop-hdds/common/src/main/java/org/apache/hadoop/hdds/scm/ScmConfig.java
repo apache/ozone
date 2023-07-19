@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 
 import java.time.Duration;
 
@@ -29,13 +30,7 @@ import java.time.Duration;
  * The configuration class for the SCM service.
  */
 @ConfigGroup(prefix = "hdds.scm")
-public class ScmConfig {
-  public static final String CONFIG_PREFIX = "hdds.scm";
-  public static final String BLOCK_DELETION_PER_INTERVAL_MAX
-      = "block.deletion.per-interval.max";
-  public static final String HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX =
-      CONFIG_PREFIX + "." + BLOCK_DELETION_PER_INTERVAL_MAX;
-
+public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
@@ -98,9 +93,10 @@ public class ScmConfig {
   )
   private String ecPipelineChoosePolicyName;
 
-  @Config(key = BLOCK_DELETION_PER_INTERVAL_MAX,
+  @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
       defaultValue = "100000",
+      reconfigurable = true,
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "

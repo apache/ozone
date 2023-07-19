@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.reconfig;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,6 @@ import java.time.Duration;
 import java.util.Set;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
-import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +52,7 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_READONLY_ADMINISTRATORS)
         .addAll(new ReplicationManagerConfiguration()
             .reconfigurableProperties())
+        .addAll(new ScmConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
@@ -98,19 +99,18 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeletionPerIntervalMaxReconfigure()
-      throws ReconfigurationException {
+  void blockDeletionPerInterval() throws ReconfigurationException {
     SCMBlockDeletingService blockDeletingService =
         getCluster().getStorageContainerManager().getScmBlockManager()
         .getSCMBlockDeletingService();
     int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
+    int newValue = blockDeleteTXNum + 1;
 
     getSubject().reconfigurePropertyImpl(
-        HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX,
-        String.valueOf(blockDeleteTXNum + 1));
+        "hdds.scm.block.deletion.per-interval.max",
+        String.valueOf(newValue));
 
-    assertEquals(blockDeleteTXNum + 1,
-        blockDeletingService.getBlockDeleteTXNum());
+    assertEquals(newValue, blockDeletingService.getBlockDeleteTXNum());
   }
 
 }

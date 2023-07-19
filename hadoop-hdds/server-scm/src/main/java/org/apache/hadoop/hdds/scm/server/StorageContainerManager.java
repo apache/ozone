@@ -190,7 +190,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
-import static org.apache.hadoop.hdds.scm.ScmConfig.HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
@@ -318,6 +317,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SecretKeyManagerService secretKeyManagerService;
 
   private Clock systemClock;
+  private final ScmConfig scmConfig;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -355,6 +355,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
+    scmConfig = conf.getObject(ScmConfig.class);
     initMetrics();
 
     boolean ratisEnabled = SCMHAUtils.isSCMHAEnabled(conf);
@@ -397,8 +398,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
-            .register(HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX,
-                this::reconfHddsScmBlockDeletionPerIntervalMax);
+            .register(scmConfig);
 
     initializeSystemManagers(conf, configurator);
 
@@ -584,6 +584,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public OzoneConfiguration getConfiguration() {
     return configuration;
+  }
+
+  public ScmConfig getScmConfig() {
+    return scmConfig;
   }
 
   /**
@@ -773,7 +777,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerReplicaPendingOps);
     }
 
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     pipelineChoosePolicy = PipelineChoosePolicyFactory
         .getPolicy(scmConfig, false);
     ecPipelineChoosePolicy = PipelineChoosePolicyFactory
@@ -2126,14 +2129,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         OZONE_READONLY_ADMINISTRATORS,
         newVal, admins);
     return String.valueOf(newVal);
-  }
-
-  private String reconfHddsScmBlockDeletionPerIntervalMax(String newVal) {
-    getConfiguration().set(HDDS_SCM_BLOCK_DELETION_PER_INTERVAL_MAX, newVal);
-
-    getScmBlockManager().getSCMBlockDeletingService()
-        .setBlockDeleteTXNum(Integer.parseInt(newVal));
-    return newVal;
   }
 
   /**
