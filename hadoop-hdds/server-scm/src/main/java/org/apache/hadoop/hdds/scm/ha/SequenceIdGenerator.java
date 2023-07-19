@@ -178,9 +178,9 @@ public class SequenceIdGenerator {
    */
   public void reinitialize(Table<String, Long> sequenceIdTable)
       throws IOException {
+    LOG.info("reinitialize SequenceIdGenerator.");
     lock.lock();
     try {
-      LOG.info("reinitialize SequenceIdGenerator.");
       invalidateBatchInternal();
       stateManager.reinitialize(sequenceIdTable);
     } finally {
