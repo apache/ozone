@@ -270,6 +270,7 @@ public final class OmUtils {
     case ListSnapshotDiffJobs:
     case TransferLeadership:
     case SetSafeMode:
+    case PrintCompactionLogDag:
       return true;
     case CreateVolume:
     case SetVolumeProperty:

@@ -692,6 +692,19 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileName     name of the image file.
+   * @param graphType    type of node name to use in the graph image.
+   * @return path of the image file.
+   * @throws IOException
+   */
+  default String printCompactionLogDag(String fileName, String graphType)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
    * List snapshots in a volume/bucket.
    * @param volumeName     volume name
    * @param bucketName     bucket name
@@ -720,13 +733,15 @@ public interface OzoneManagerProtocol
    * @return the difference report between two snapshots
    * @throws IOException in case of any exception while generating snapshot diff
    */
+  @SuppressWarnings("parameternumber")
   default SnapshotDiffResponse snapshotDiff(String volumeName,
                                             String bucketName,
                                             String fromSnapshot,
                                             String toSnapshot,
                                             String token,
                                             int pageSize,
-                                            boolean forceFullDiff)
+                                            boolean forceFullDiff,
+                                            boolean disableNativeDiff)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

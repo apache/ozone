@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -49,12 +51,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -86,6 +87,8 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicLong snapshotFilteredCount;
 
+  private AtomicBoolean running;
+
   private BooleanTriFunction<String, String, String, Boolean> filterFunction =
       (first, last, prefix) -> {
         String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
@@ -103,18 +106,33 @@ public class SstFilteringService extends BackgroundService
         .getLong(SNAPSHOT_SST_DELETING_LIMIT_PER_TASK,
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
+    running = new AtomicBoolean(false);
   }
 
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
+
+  @Override
+  public void start() {
+    running.set(true);
+    super.start();
+  }
 
   private class SstFilteringTask implements BackgroundTask {
 
     @Override
     public BackgroundTaskResult call() throws Exception {
 
+      Optional<SnapshotCache> snapshotCache = Optional.ofNullable(ozoneManager)
+          .map(OzoneManager::getOmSnapshotManager)
+          .map(OmSnapshotManager::getSnapshotCache);
+      if (!snapshotCache.isPresent()) {
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
+      }
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
+
+
       try (
           TableIterator<String, ? extends Table.KeyValue
               <String, SnapshotInfo>> iterator = snapshotInfoTable
@@ -123,7 +141,7 @@ public class SstFilteringService extends BackgroundService
 
         long snapshotLimit = snapshotLimitPerTask;
 
-        while (iterator.hasNext() && snapshotLimit > 0) {
+        while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
           Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
@@ -151,15 +169,12 @@ public class SstFilteringService extends BackgroundService
           List<Pair<String, String>> prefixPairs =
               constructPrefixPairs(snapshotInfo);
 
-          String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
-
-          String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
-              OM_SNAPSHOT_CHECKPOINT_DIR;
-          try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(),
-                      new File(snapshotCheckpointDir),
-                      dbName, true, Optional.of(Boolean.TRUE),
-                      Optional.empty(), false, false)) {
+          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                   snapshotMetadataReader = snapshotCache.get()
+              .get(snapshotInfo.getTableKey())) {
+            OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+            RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
+                .getStore();
             RocksDatabase db = rdbStore.getDb();
             try (BootstrapStateHandler.Lock lock =
                 getBootstrapStateLock().lock()) {
@@ -199,10 +214,12 @@ public class SstFilteringService extends BackgroundService
           ozoneManager.getMetadataManager().getBucketId(volumeName, bucketName);
 
       String filterPrefix =
-          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName;
+          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
+              + OM_KEY_PREFIX;
 
       String filterPrefixFSO =
-          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId;
+          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId
+              + OM_KEY_PREFIX;
 
       List<Pair<String, String>> prefixPairs = new ArrayList<>();
       prefixPairs
@@ -230,5 +247,11 @@ public class SstFilteringService extends BackgroundService
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  @Override
+  public void shutdown() {
+    running.set(false);
+    super.shutdown();
   }
 }

@@ -587,6 +587,7 @@ public class RootCARotationManager implements SCMService {
       String newSubCACertId) {
     // Send ack to rotationPrepare request
     try {
+      handler.setSubCACertId(newSubCACertId);
       handler.rotationPrepareAck(newRootCACertId, newSubCACertId,
           scm.getScmId());
       LOG.info("SubCARotationPrepareTask[rootCertId = {}] - " +
@@ -598,8 +599,6 @@ public class RootCARotationManager implements SCMService {
           e.getMessage() + ") when sending out rotationPrepare ack";
       scm.shutDown(message);
     }
-
-    handler.setSubCACertId(newSubCACertId);
   }
 
   /**
