@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
@@ -78,9 +80,12 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
                     String volumeName,
                     String bucketName,
                     String snapshotName) {
+    IAccessAuthorizer accessAuthorizer =
+        OzoneAuthorizerFactory.forSnapshot(ozoneManager,
+            keyManager, prefixManager);
     omMetadataReader = new OmMetadataReader(keyManager, prefixManager,
         ozoneManager, LOG, AUDIT,
-        OmSnapshotMetrics.getInstance(), false);
+        OmSnapshotMetrics.getInstance(), accessAuthorizer);
     this.snapshotName = snapshotName;
     this.bucketName = bucketName;
     this.volumeName = volumeName;
