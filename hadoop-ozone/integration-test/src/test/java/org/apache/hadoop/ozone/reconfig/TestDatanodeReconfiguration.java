@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,58 +52,39 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
   }
 
   @Test
-  public void blockDeletingLimitPerInterval() throws ReconfigurationException {
+  void blockDeletingLimitPerInterval() throws ReconfigurationException {
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
         HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, "1");
-
-    getFirstDatanode().getDatanodeStateMachine().getContainer()
-        .getBlockDeletingService().getBlockLimitPerInterval();
 
     assertEquals(1, getFirstDatanode().getDatanodeStateMachine().getContainer()
         .getBlockDeletingService().getBlockLimitPerInterval());
   }
 
-  @Test
-  public void blockDeleteThreadMax() throws ReconfigurationException {
-    // Start the service and get the original pool size
+  @ParameterizedTest
+  @ValueSource(ints = { -1, +1 })
+  void blockDeleteThreadMax(int delta) throws ReconfigurationException {
     ThreadPoolExecutor executor = ((DeleteBlocksCommandHandler)
         getFirstDatanode().getDatanodeStateMachine().getCommandDispatcher()
             .getDeleteBlocksCommandHandler()).getExecutor();
-    int originPoolSize = executor.getMaximumPoolSize();
+    int newValue = executor.getMaximumPoolSize() + delta;
 
-    // Attempt to increase the pool size by 1 and verify if it's successful
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-        String.valueOf(originPoolSize + 1));
-    assertEquals(originPoolSize + 1, executor.getMaximumPoolSize());
-    assertEquals(originPoolSize + 1, executor.getCorePoolSize());
-
-    // Attempt to decrease the pool size by 1 and verify if it's successful
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-        String.valueOf(originPoolSize - 1));
-    assertEquals(originPoolSize - 1, executor.getMaximumPoolSize());
-    assertEquals(originPoolSize - 1,  executor.getCorePoolSize());
+        HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, String.valueOf(newValue));
+    assertEquals(newValue, executor.getMaximumPoolSize());
+    assertEquals(newValue, executor.getCorePoolSize());
   }
 
-  @Test
-  public void blockDeletingServiceWorkers() throws ReconfigurationException {
+  @ParameterizedTest
+  @ValueSource(ints = { -1, +1 })
+  void blockDeletingServiceWorkers(int delta) throws ReconfigurationException {
     ScheduledThreadPoolExecutor executor = (ScheduledThreadPoolExecutor)
         getFirstDatanode().getDatanodeStateMachine().getContainer()
             .getBlockDeletingService().getExecutorService();
-    int originPoolSize = executor.getCorePoolSize();
+    int newValue = executor.getCorePoolSize() + delta;
 
-    // Attempt to increase the pool size by 1 and verify if it's successful
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-        String.valueOf(originPoolSize + 1));
-    assertEquals(originPoolSize + 1, executor.getCorePoolSize());
-
-    // Attempt to decrease the pool size by 1 and verify if it's successful
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-        String.valueOf(originPoolSize - 1));
-    assertEquals(originPoolSize - 1, executor.getCorePoolSize());
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS, String.valueOf(newValue));
+    assertEquals(newValue, executor.getCorePoolSize());
   }
 
   private HddsDatanodeService getFirstDatanode() {
