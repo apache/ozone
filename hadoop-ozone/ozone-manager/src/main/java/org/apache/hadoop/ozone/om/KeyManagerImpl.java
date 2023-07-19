@@ -1426,10 +1426,13 @@ public class KeyManagerImpl implements KeyManager {
             if (entryKeyName.equals(immediateChild)) {
               cacheKeyMap.put(cacheKey, fileStatus);
             } else {
-              //If immediateChild isn't equal entryKeyName, it is a fake directory.
+              //If immediateChild isn't equal entryKeyName, it is a fakeDir.
               OmKeyInfo fakeDirEntry = createDirectoryKey(
                       cacheOmKeyInfo, immediateChild);
-              cacheKeyMap.put(cacheKey, new OzoneFileStatus(
+              String fakeDirKey = metadataManager.getOzoneDirKey(
+                  fakeDirEntry.getVolumeName(), fakeDirEntry.getBucketName(),
+                  immediateChild);
+              cacheKeyMap.put(fakeDirKey, new OzoneFileStatus(
                       fakeDirEntry, scmBlockSize, true));
             }
           }
@@ -1572,10 +1575,10 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @SuppressWarnings("parameternumber")
-  private void listStatusFindKeyInDb(boolean recursive, String startKey,
-                                     long numEntries, String volumeName, String bucketName, String keyName,
-                                     TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
-                                     Table<String, OmKeyInfo> keyTable)
+  private void listStatusFindKeyInDb(
+      boolean recursive, String startKey, long numEntries, String volumeName,
+      String bucketName, String keyName, TreeMap<String, OzoneFileStatus>
+          cacheKeyMap, String keyArgs, Table<String, OmKeyInfo> keyTable)
       throws IOException {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
             = keyTable.iterator();
@@ -1624,7 +1627,9 @@ public class KeyManagerImpl implements KeyManager {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo, immediateChild);
-                  cacheKeyMap.put(entryInDb,
+                  String fakeDirKey = metadataManager.getOzoneDirKey(
+                      volumeName, bucketName, immediateChild);
+                  cacheKeyMap.put(fakeDirKey,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
                 } else {
