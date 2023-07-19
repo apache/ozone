@@ -1129,7 +1129,7 @@ public class TestOMRatisSnapshots {
 
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
 
-    // verify that the bootstrap Follower OM can become leader again
+    // verify that the bootstrap Follower OM can become leader
     leaderOM.transferLeadership(followerNodeId);
 
     GenericTestUtils.waitFor(() -> {
