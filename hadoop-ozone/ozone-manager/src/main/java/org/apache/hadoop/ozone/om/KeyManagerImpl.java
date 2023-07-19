@@ -1391,10 +1391,11 @@ public class KeyManagerImpl implements KeyManager {
    * Helper function for listStatus to find key in TableCache.
    */
   private void listStatusFindKeyInTableCache(
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
-      String keyArgs, String startCacheKey, boolean recursive,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap) {
-
+          boolean recursive, String startKeyInTable, String keyName,
+          TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+          Table<String, OmKeyInfo> keyTable) throws IOException {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+            cacheIter = keyTable.cacheIterator();
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
           cacheIter.next();
@@ -1405,19 +1406,36 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
       // cacheOmKeyInfo is null if an entry is deleted in cache
       if (cacheOmKeyInfo != null
-          && cacheKey.startsWith(startCacheKey)
-          && cacheKey.compareTo(startCacheKey) >= 0) {
-        if (!recursive) {
-          String remainingKey = StringUtils.stripEnd(cacheKey.substring(
-              startCacheKey.length()), OZONE_URI_DELIMITER);
-          // For non-recursive, the remaining part of key can't have '/'
-          if (remainingKey.contains(OZONE_URI_DELIMITER)) {
-            continue;
-          }
-        }
+          && cacheKey.startsWith(keyArgs)
+          && cacheKey.compareTo(startKeyInTable) >= 0) {
         OzoneFileStatus fileStatus = new OzoneFileStatus(
-            cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
-        cacheKeyMap.put(cacheKey, fileStatus);
+                cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
+        if (!recursive) {
+          if (enableFileSystemPaths) {
+            String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+                    keyArgs.length()), OZONE_URI_DELIMITER);
+            // For non-recursive, the remaining part of key can't have '/'
+            if (remainingKey.contains(OZONE_URI_DELIMITER)) {
+              continue;
+            }
+            cacheKeyMap.put(cacheKey, fileStatus);
+          } else {
+            String entryKeyName = cacheOmKeyInfo.getKeyName();
+            String immediateChild = OzoneFSUtils.getImmediateChild(
+                    entryKeyName, keyName);
+            if (entryKeyName.equals(immediateChild)) {
+              cacheKeyMap.put(cacheKey, fileStatus);
+            } else {
+              //If immediateChild isn't equal entryKeyName, it is a fake directory.
+              OmKeyInfo fakeDirEntry = createDirectoryKey(
+                      cacheOmKeyInfo, immediateChild);
+              cacheKeyMap.put(cacheKey, new OzoneFileStatus(
+                      fakeDirEntry, scmBlockSize, true));
+            }
+          }
+        } else {
+          cacheKeyMap.put(cacheKey, fileStatus);
+        }
       }
     }
   }
@@ -1510,20 +1528,17 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      keyTable = metadataManager
-          .getKeyTable(getBucketLayout(metadataManager, volName, buckName));
-      iterator = getIteratorForKeyInTableCache(recursive, startKey,
-          volumeName, bucketName, cacheKeyMap, keyArgs, keyTable);
+      keyTable = metadataManager.getKeyTable(
+              getBucketLayout(metadataManager, volName, buckName));
+      String startKeyInTable = metadataManager.getOzoneKey(
+              volumeName, bucketName, startKey);
+      listStatusFindKeyInTableCache(recursive, startKeyInTable, keyName,
+              cacheKeyMap, keyArgs, keyTable);
+      listStatusFindKeyInDb(recursive, startKey, numEntries, volumeName,
+              bucketName, keyName, cacheKeyMap, keyArgs, keyTable);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
-    }
-
-    try {
-      findKeyInDbWithIterator(recursive, startKey, numEntries, volumeName,
-          bucketName, keyName, cacheKeyMap, keyArgs, keyTable, iterator);
-    } finally {
-      iterator.close();
+              bucketName);
     }
 
     int countEntries;
@@ -1556,33 +1571,14 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
-  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getIteratorForKeyInTableCache(
-      boolean recursive, String startKey, String volumeName, String bucketName,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
-      Table<String, OmKeyInfo> keyTable) throws IOException {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-        cacheIter = keyTable.cacheIterator();
-    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
-
-    // First, find key in TableCache
-    listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
-        recursive, cacheKeyMap);
-    iterator = keyTable.iterator();
-    return iterator;
-  }
-
   @SuppressWarnings("parameternumber")
-  private void findKeyInDbWithIterator(boolean recursive, String startKey,
-      long numEntries, String volumeName, String bucketName, String keyName,
-      TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
-      Table<String, OmKeyInfo> keyTable,
-      TableIterator<String,
-          ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
+  private void listStatusFindKeyInDb(boolean recursive, String startKey,
+                                     long numEntries, String volumeName, String bucketName, String keyName,
+                                     TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
+                                     Table<String, OmKeyInfo> keyTable)
       throws IOException {
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator
+            = keyTable.iterator();
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1648,6 +1644,7 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
     }
+    iterator.close();
   }
 
   private List<OzoneFileStatus> buildFinalStatusList(
