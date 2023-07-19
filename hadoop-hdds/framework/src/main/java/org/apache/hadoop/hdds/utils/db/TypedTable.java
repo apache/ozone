@@ -66,7 +66,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final boolean supportCodecBuffer;
   private final CodecBuffer.Capacity bufferCapacity
       = new CodecBuffer.Capacity(this, BUFFER_SIZE_DEFAULT);
-  private final TableCache<CacheKey<KEY>, CacheValue<VALUE>> cache;
+  private final TableCache<KEY, VALUE> cache;
 
   /**
    * The same as this(rawTable, codecRegistry, keyType, valueType,
@@ -181,7 +181,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public boolean isExist(KEY key) throws IOException {
 
-    CacheResult<CacheValue<VALUE>> cacheResult =
+    CacheResult<VALUE> cacheResult =
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
@@ -217,7 +217,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     // Here the metadata lock will guarantee that cache is not updated for same
     // key during get key.
 
-    CacheResult<CacheValue<VALUE>> cacheResult =
+    CacheResult<VALUE> cacheResult =
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
@@ -266,7 +266,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     // Here the metadata lock will guarantee that cache is not updated for same
     // key during get key.
 
-    CacheResult<CacheValue<VALUE>> cacheResult =
+    CacheResult<VALUE> cacheResult =
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
@@ -283,7 +283,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     // Here the metadata lock will guarantee that cache is not updated for same
     // key during get key.
 
-    CacheResult<CacheValue<VALUE>> cacheResult =
+    CacheResult<VALUE> cacheResult =
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
@@ -530,7 +530,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @VisibleForTesting
-  TableCache<CacheKey<KEY>, CacheValue<VALUE>> getCache() {
+  TableCache<KEY, VALUE> getCache() {
     return cache;
   }
 
