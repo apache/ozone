@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -32,7 +33,9 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,7 +131,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   HttpServletRequest request,
                                   OutputStream destination,
                                   List<String> toExcludeList,
-                                  List<String> excludedList)
+                                  List<String> excludedList,
+                                  Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
     Objects.requireNonNull(excludedList);
@@ -151,7 +155,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
           excludedList);
-      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
+      writeFilesToArchive(fixupCopyFiles(tmpdir,copyFiles), hardLinkFiles, archiveOutputStream,
           completed);
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
@@ -175,6 +179,61 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return paths;
   }
 
+  protected DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
+      throws IOException {
+    DBCheckpoint checkpoint;
+    RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
+    // make temp directories
+    String sstBackupDirStr = differ.getSSTBackupDir();
+    String compactionLogDirStr = differ.getCompactionLogDir();
+    File sstBackupDir = new File(sstBackupDirStr);
+    File compactionLogDir = new File(compactionLogDirStr);
+    File tempSSTBackupDir = new File(tmpdir.toString(),
+        sstBackupDir.getName());
+    File tempCompactionLogDir = new File(tmpdir.toString(),
+        compactionLogDir.getName());
+    tempSSTBackupDir.mkdirs();
+    tempCompactionLogDir.mkdirs();
+
+    try {
+      differ.incrementTarballRequestCount();
+      FileUtils.copyDirectory(compactionLogDir, tempCompactionLogDir);
+      OmSnapshotUtils.linkFiles(sstBackupDir, tempSSTBackupDir);
+      checkpoint = dbStore.getCheckpoint(flush);
+    } finally {
+      synchronized (dbStore.getRocksDBCheckpointDiffer()) {
+        differ.decrementTarballRequestCount();
+        differ.notifyAll();
+      }
+    }
+
+    return checkpoint;
+  }
+
+  private Set<Path> fixupCopyFiles(Path tmpdir, Set<Path> copyFiles) {
+    RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
+    String sstBackupDirStr = differ.getSSTBackupDir();
+    String compactionLogDirStr = differ.getCompactionLogDir();
+    File sstBackupDir = new File(sstBackupDirStr);
+    File compactionLogDir = new File(compactionLogDirStr);
+    String tempSSTBackupDirStr = new File(tmpdir.toString(),
+        sstBackupDir.getName()).toString();
+    String tempCompactionLogDirStr = new File(tmpdir.toString(),
+        compactionLogDir.getName()).toString();
+    Set<Path> fixups = new HashSet<>();
+    for (Path f : copyFiles) {
+      String fileName = f.getFileName().toString();
+      String parent = f.getParent().toString();
+      if (parent.equals(sstBackupDirStr)) {
+        fixups.add(Paths.get(tempSSTBackupDirStr, fileName));
+      } else if (parent.equals(compactionLogDirStr)) {
+        fixups.add(Paths.get(tempCompactionLogDirStr, fileName));
+      } else {
+        fixups.add(f);
+      }
+    }
+    return fixups;
+  }
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Set<Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,

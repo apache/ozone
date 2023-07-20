@@ -219,7 +219,7 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -272,7 +272,7 @@ public class TestOMDbCheckpointServlet {
         getNumCheckpoints() > initialCheckpointCount);
 
     Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
-        any(), any(), eq(toExcludeList), any());
+        any(), any(), eq(toExcludeList), any(), any());
   }
 
   @Test
@@ -477,9 +477,10 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
+    Path tmpdir = Files.createTempDirectory("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>());
+          fileOutputStream, new ArrayList<>(), new ArrayList<>(), tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -519,9 +520,10 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
+    Path tmpdir = Files.createTempDirectory("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList, excludedList);
+          fileOutputStream, toExcludeList, excludedList, tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.

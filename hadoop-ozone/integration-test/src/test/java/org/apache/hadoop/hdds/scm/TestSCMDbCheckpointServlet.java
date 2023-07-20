@@ -126,7 +126,7 @@ public class TestSCMDbCheckpointServlet {
         Collections.emptyList(),
         false);
     doCallRealMethod().when(scmDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any(), any());
     doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
         responseMock);
     doCallRealMethod().when(scmDbCheckpointServletMock).doGet(requestMock,
@@ -207,7 +207,7 @@ public class TestSCMDbCheckpointServlet {
           getNumCheckpoints() > initialCheckpointCount);
 
       Mockito.verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
-          any(), any(), eq(toExcludeList), any());
+          any(), any(), eq(toExcludeList), any(), any());
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }
