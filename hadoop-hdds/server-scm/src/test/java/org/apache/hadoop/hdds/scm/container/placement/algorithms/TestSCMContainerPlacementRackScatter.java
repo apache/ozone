@@ -154,7 +154,7 @@ public class TestSCMContainerPlacementRackScatter {
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
   }
 
-    private void setup(int datanodeCount, int nodesPerRack) {
+  private void setup(int datanodeCount, int nodesPerRack) {
     setupConfiguration();
     // build datanodes, and network topology
     String rack = "/rack";
