@@ -146,9 +146,11 @@ public class DefaultApprover extends BaseApprover {
 
     Extensions exts = getPkcs9Extensions(certificationRequest);
     for (ASN1ObjectIdentifier extId : getProfile().getSupportedExtensions()) {
-      Extension ext = exts.getExtension(extId);
-      if (ext != null) {
-        certificateGenerator.addExtension(ext);
+      if (null != extId) {
+        Extension ext = exts.getExtension(extId);
+        if (ext != null) {
+          certificateGenerator.addExtension(ext);
+        }
       }
     }
 
