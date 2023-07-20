@@ -350,7 +350,7 @@ public final class SCMContainerPlacementRackScatter
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>(
         chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, nodesRequired, metadataSizeRequired,
-            dataSizeRequired, nodesRequired, usedRacksCntMap,
+            dataSizeRequired, maxReplicasPerRack, usedRacksCntMap,
             maxReplicasPerRack));
 
     if (chosenNodes.size() < additionalRacksRequired) {
@@ -363,7 +363,7 @@ public final class SCMContainerPlacementRackScatter
               reason, racks.size(), excludedNodesCount, usedNodesCount);
 
       /*
-      Couldn't choose enough nodes to satisfy the rack scatter policy. If
+      Couldn't choose enough racks to satisfy the rack scatter policy. If
       fallback is not allowed, then throw an exception.
       */
       if (!fallback) {
