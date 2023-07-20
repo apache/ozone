@@ -61,17 +61,9 @@ public class DeleteVolumeHandler extends VolumeHandler {
       description = "Delete volume recursively"
   )
   private boolean bRecursive;
-
-  @CommandLine.Option(
-      names = {"-id", "--om-service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
   @CommandLine.Option(names = {"-t", "--threads", "--thread"},
       description = "Number of threads used to execute recursive delete")
   private int threadNo = 10;
-
   @CommandLine.Option(names = {"-y", "--yes"},
       description = "Continue without interactive user confirmation")
   private boolean yes;
@@ -84,6 +76,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
   private AtomicInteger numberOfBucketsCleaned = new AtomicInteger(0);
   private volatile Throwable exception;
   private static final int MAX_KEY_DELETE_BATCH_SIZE = 1000;
+  private String omServiceId;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -92,16 +85,17 @@ public class DeleteVolumeHandler extends VolumeHandler {
     String volumeName = address.getVolumeName();
     try {
       if (bRecursive) {
-        Collection<String> serviceIds = getConf().getTrimmedStringCollection(
-            OZONE_OM_SERVICE_IDS_KEY);
-        if (Strings.isNullOrEmpty(omServiceId)) {
-          if (serviceIds.size() > 1) {
-            out().printf("OmServiceID not provided, provide using " +
-                "-id <OM_SERVICE_ID>%n");
-            return;
-          } else if (serviceIds.size() == 1) {
+        if (!Strings.isNullOrEmpty(address.getOmHost())) {
+          omServiceId = address.getOmHost();
+        } else {
+          Collection<String> serviceIds = getConf().getTrimmedStringCollection(
+              OZONE_OM_SERVICE_IDS_KEY);
+          if (serviceIds.size() == 1) {
             // Only one OM service ID configured, we can use that
+            // If more than 1, it will fail in createClient step itself
             omServiceId = serviceIds.iterator().next();
+          } else {
+            omServiceId = getConf().get(OZONE_OM_ADDRESS_KEY);
           }
         }
         if (!yes) {
@@ -185,13 +179,8 @@ public class DeleteVolumeHandler extends VolumeHandler {
    */
   private boolean cleanFSBucket(OzoneBucket bucket) {
     try {
-      String hostPrefix = OZONE_OFS_URI_SCHEME + "://";
-      if (!Strings.isNullOrEmpty(omServiceId)) {
-        hostPrefix += omServiceId + PATH_SEPARATOR_STR;
-      } else {
-        hostPrefix += getConf().get(OZONE_OM_ADDRESS_KEY) +
-            PATH_SEPARATOR_STR;
-      }
+      String hostPrefix = OZONE_OFS_URI_SCHEME + "://" +
+          omServiceId + PATH_SEPARATOR_STR;
       String ofsPrefix = hostPrefix + vol.getName() + PATH_SEPARATOR_STR +
           bucket.getName();
       final Path path = new Path(ofsPrefix);
