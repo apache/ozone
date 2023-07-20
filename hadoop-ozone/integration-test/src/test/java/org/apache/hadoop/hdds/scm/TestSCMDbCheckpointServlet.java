@@ -62,6 +62,7 @@ import org.mockito.Mockito;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -131,6 +132,8 @@ public class TestSCMDbCheckpointServlet {
         responseMock);
     doCallRealMethod().when(scmDbCheckpointServletMock).doGet(requestMock,
         responseMock);
+    doCallRealMethod().when(scmDbCheckpointServletMock).getCheckpoint(any(),
+        anyBoolean());
 
     servletContextMock = mock(ServletContext.class);
     when(scmDbCheckpointServletMock.getServletContext())

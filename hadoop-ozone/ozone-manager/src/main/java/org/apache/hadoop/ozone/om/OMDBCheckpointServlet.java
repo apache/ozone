@@ -179,7 +179,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return paths;
   }
 
-  protected DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
+  @Override
+  public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
       throws IOException {
     DBCheckpoint checkpoint;
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();

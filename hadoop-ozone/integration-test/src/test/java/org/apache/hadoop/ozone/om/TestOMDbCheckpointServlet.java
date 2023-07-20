@@ -105,6 +105,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -223,6 +224,9 @@ public class TestOMDbCheckpointServlet {
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
+
+    doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
+        anyBoolean());
   }
 
   @ParameterizedTest
