@@ -21,24 +21,28 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
+
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.ozone.rocksdb.util.RdbUtil;
+import org.apache.ozone.graph.PrintableGraph;
+import org.apache.ozone.graph.PrintableGraph.GraphType;
 import org.rocksdb.AbstractEventListener;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LiveFileMetaData;
@@ -179,6 +183,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
+  private final AtomicInteger tarballRequestCount;
 
   /**
    * This is a package private constructor and should not be used other than
@@ -240,6 +245,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } else {
       this.executor = null;
     }
+    this.tarballRequestCount = new AtomicInteger(0);
   }
 
   private String createCompactionLogDir(String metadataDirName,
@@ -481,7 +487,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       @Override
       public void onCompactionBegin(RocksDB db,
                                     CompactionJobInfo compactionJobInfo) {
-
         if (compactionJobInfo.inputFiles().size() == 0) {
           LOG.error("Compaction input files list is empty");
           return;
@@ -588,6 +593,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             return;
           }
 
+          waitForTarballCreation();
+
           // Write input and output file names to compaction log
           appendToCurrentCompactionLog(content);
 
@@ -599,6 +606,22 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         }
       }
     };
+  }
+
+  /**
+   * Check if there is any in_progress tarball creation request and wait till
+   * all tarball creation finish, and it gets notified.
+   */
+  private void waitForTarballCreation() {
+    while (tarballRequestCount.get() != 0) {
+      try {
+        wait(Integer.MAX_VALUE);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        LOG.error("Compaction log thread {} is interrupted.",
+            Thread.currentThread().getName());
+      }
+    }
   }
 
   /**
@@ -681,58 +704,27 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   /**
-   * Get a list of relevant column family descriptors.
-   * @param cfOpts ColumnFamilyOptions
-   * @return List of ColumnFamilyDescriptor
-   */
-  @VisibleForTesting
-  static List<ColumnFamilyDescriptor> getCFDescriptorList(
-      ColumnFamilyOptions cfOpts) {
-    return asList(
-        new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
-        new ColumnFamilyDescriptor("keyTable".getBytes(UTF_8), cfOpts),
-        new ColumnFamilyDescriptor("directoryTable".getBytes(UTF_8), cfOpts),
-        new ColumnFamilyDescriptor("fileTable".getBytes(UTF_8), cfOpts)
-    );
-  }
-
-  /**
    * Read the current Live manifest for a given RocksDB instance (Active or
    * Checkpoint).
-   * @param dbPathArg path to a RocksDB directory
+   * @param rocksDB open rocksDB instance.
    * @return a list of SST files (without extension) in the DB.
    */
-  public HashSet<String> readRocksDBLiveFiles(String dbPathArg) {
-    ManagedRocksDB rocksDB = null;
+  public HashSet<String> readRocksDBLiveFiles(ManagedRocksDB rocksDB) {
     HashSet<String> liveFiles = new HashSet<>();
 
-    final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions();
-    final List<ColumnFamilyDescriptor> cfDescriptors =
-        getCFDescriptorList(cfOpts);
-    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-
-    try (ManagedDBOptions managedDBOptions = new ManagedDBOptions()) {
-      managedDBOptions.setParanoidChecks(true);
-      rocksDB = ManagedRocksDB.openReadOnly(managedDBOptions, dbPathArg,
-          cfDescriptors, columnFamilyHandles);
-      // Note it retrieves only the selected column families by the descriptor
-      // i.e. keyTable, directoryTable, fileTable
-      List<LiveFileMetaData> liveFileMetaDataList =
-          rocksDB.get().getLiveFilesMetaData();
-      LOG.debug("SST File Metadata for DB: " + dbPathArg);
-      for (LiveFileMetaData m : liveFileMetaDataList) {
-        LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
-        final String trimmedFilename = trimSSTFilename(m.fileName());
-        liveFiles.add(trimmedFilename);
-      }
-    } catch (RocksDBException e) {
-      LOG.error("Error during RocksDB operation: {}", e.getMessage());
-      e.printStackTrace();
-    } finally {
-      if (rocksDB != null) {
-        rocksDB.close();
-      }
-      cfOpts.close();
+    final List<String> cfs = Arrays.asList(
+        org.apache.hadoop.hdds.StringUtils.bytes2String(
+            RocksDB.DEFAULT_COLUMN_FAMILY), "keyTable", "directoryTable",
+        "fileTable");
+    // Note it retrieves only the selected column families by the descriptor
+    // i.e. keyTable, directoryTable, fileTable
+    List<LiveFileMetaData> liveFileMetaDataList =
+        RdbUtil.getLiveSSTFilesForCFs(rocksDB, cfs);
+    LOG.debug("SST File Metadata for DB: " + rocksDB.get().getName());
+    for (LiveFileMetaData m : liveFileMetaDataList) {
+      LOG.debug("File: {}, Level: {}", m.fileName(), m.level());
+      final String trimmedFilename = trimSSTFilename(m.fileName());
+      liveFiles.add(trimmedFilename);
     }
     return liveFiles;
   }
@@ -905,9 +897,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
     // TODO: Reject or swap if dest is taken after src, once snapshot chain
     //  integration is done.
-
-    HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getDbPath());
-    HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getDbPath());
+    HashSet<String> srcSnapFiles = readRocksDBLiveFiles(src.getRocksDB());
+    HashSet<String> destSnapFiles = readRocksDBLiveFiles(dest.getRocksDB());
 
     HashSet<String> fwdDAGSameFiles = new HashSet<>();
     HashSet<String> fwdDAGDifferentFiles = new HashSet<>();
@@ -1094,11 +1085,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  public MutableGraph<CompactionNode> getForwardCompactionDAG() {
+  @VisibleForTesting
+  MutableGraph<CompactionNode> getForwardCompactionDAG() {
     return forwardCompactionDAG;
   }
 
-  public MutableGraph<CompactionNode> getBackwardCompactionDAG() {
+  @VisibleForTesting
+  MutableGraph<CompactionNode> getBackwardCompactionDAG() {
     return backwardCompactionDAG;
   }
 
@@ -1495,6 +1488,19 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
+  public void incrementTarballRequestCount() {
+    tarballRequestCount.incrementAndGet();
+  }
+
+  public void decrementTarballRequestCount() {
+    tarballRequestCount.decrementAndGet();
+  }
+
+  @VisibleForTesting
+  public int getTarballRequestCount() {
+    return tarballRequestCount.get();
+  }
+
   @VisibleForTesting
   public boolean debugEnabled(Integer level) {
     return DEBUG_LEVEL.contains(level);
@@ -1539,5 +1545,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  public void pngPrintMutableGraph(String filePath, GraphType graphType)
+      throws IOException {
+    Objects.requireNonNull(filePath, "Image file path is required.");
+    Objects.requireNonNull(graphType, "Graph type is required.");
+
+    PrintableGraph graph;
+    synchronized (this) {
+      graph = new PrintableGraph(backwardCompactionDAG, graphType);
+    }
+
+    graph.generateImage(filePath);
   }
 }
