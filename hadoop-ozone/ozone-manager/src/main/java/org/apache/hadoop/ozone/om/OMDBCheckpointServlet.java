@@ -155,7 +155,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
           excludedList);
-      writeFilesToArchive(fixupCopyFiles(tmpdir,copyFiles), hardLinkFiles, archiveOutputStream,
+      writeFilesToArchive(fixupFilesToBeCopied(tmpdir,copyFiles), hardLinkFiles, archiveOutputStream,
           completed);
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
@@ -180,11 +180,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Override
+  // Pauses rocksdb compaction threads while creating copies of
+  // compaction logs and hard links of sst backups.
   public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
       throws IOException {
     DBCheckpoint checkpoint;
+
+    // make tmp directories to contain the copies
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
-    // make tmp directories
     DirectoryData sstBackupDir = new DirectoryData(tmpdir,
         differ.getSSTBackupDir());
     DirectoryData compactionLogDir = new DirectoryData(tmpdir,
@@ -198,6 +201,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       OmSnapshotUtils.linkFiles(sstBackupDir.dir, sstBackupDir.tmpDir);
       checkpoint = dbStore.getCheckpoint(flush);
     } finally {
+      // Unpause the compaction threads.
       synchronized (dbStore.getRocksDBCheckpointDiffer()) {
         differ.decrementTarballRequestCount();
         differ.notifyAll();
@@ -207,7 +211,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return checkpoint;
   }
 
-  private Set<Path> fixupCopyFiles(Path tmpdir, Set<Path> copyFiles) {
+  // Fixes the paths of the files to be copied so they point to
+  // the correct directories.
+  private Set<Path> fixupFilesToBeCopied(Path tmpdir, Set<Path> copyFiles) {
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
     DirectoryData sstBackupDir = new DirectoryData(tmpdir,
         differ.getSSTBackupDir());
@@ -218,10 +224,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     for (Path f : copyFiles) {
       String fileName = f.getFileName().toString();
       String parent = f.getParent().toString();
+      // sstbackup files should be copied from the temp dir
       if (parent.equals(sstBackupDir.dirStr)) {
         fixups.add(Paths.get(sstBackupDir.tmpDirStr, fileName));
+
+        // compaction log files should be copied from the temp dir
       } else if (parent.equals(compactionLogDir.dirStr)) {
         fixups.add(Paths.get(compactionLogDir.tmpDirStr, fileName));
+
+        // All other files can be copied as is.
       } else {
         fixups.add(f);
       }
@@ -241,6 +252,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       tmpDirStr = tmpdir.toString();
     }
   }
+
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Set<Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
