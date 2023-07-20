@@ -145,7 +145,7 @@ public class TopologySubcommand extends ScmSubcommand
   // Location: rack1
   //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes,
-                                      String nodeState) throws IOException {
+                                      String nState) throws IOException {
     HashMap<String, TreeSet<DatanodeDetails>> tree =
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
@@ -166,7 +166,7 @@ public class TopologySubcommand extends ScmSubcommand
       List<NodeTopologyOrder> nodesJson = new ArrayList<>();
       locations.forEach(location -> {
         tree.get(location).forEach(n -> {
-          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nodeState,
+          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nState,
               state.get(n).toString());
           nodesJson.add(nodeJson);
         });
@@ -175,7 +175,7 @@ public class TopologySubcommand extends ScmSubcommand
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
     } else {
       // show node state
-      System.out.println("State = " + nodeState);
+      System.out.println("State = " + nState);
       locations.forEach(location -> {
         System.out.println("Location: " + location);
         tree.get(location).forEach(n -> {
@@ -205,7 +205,7 @@ public class TopologySubcommand extends ScmSubcommand
   // Format "ipAddress(hostName):PortName1=PortValue1    OperationalState
   //     networkLocation
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes,
-                                      String state) throws IOException{
+                                      String state) throws IOException {
     if (json) {
       if (fullInfo) {
         ArrayList<NodeTopologyFull> nodesJson = new ArrayList<>();
@@ -218,7 +218,7 @@ public class TopologySubcommand extends ScmSubcommand
         System.out.println(
             JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
       } else {
-        ArrayList<NodeTopologyDefault> nodesJson = new ArrayList<>();;
+        ArrayList<NodeTopologyDefault> nodesJson = new ArrayList<>();
         nodes.forEach(node -> {
           NodeTopologyDefault nodeJson = new NodeTopologyDefault(
               DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
@@ -264,7 +264,7 @@ public class TopologySubcommand extends ScmSubcommand
     private String operationalState;
     private String networkLocation;
 
-    NodeTopologyOrder(DatanodeDetails node, String nState, String opState){
+    NodeTopologyOrder(DatanodeDetails node, String nState, String opState) {
       ipAddress = node.getIpAddress();
       hostName = node.getHostName();
       nodeState = nState;
