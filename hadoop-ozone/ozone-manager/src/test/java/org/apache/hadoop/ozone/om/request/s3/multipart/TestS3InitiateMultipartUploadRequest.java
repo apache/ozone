@@ -87,14 +87,10 @@ public class TestS3InitiateMultipartUploadRequest
 
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(), omMetadataManager
-            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-            .get(multipartKey).getModificationTime());
+            .getModificationTime(), openMPUKeyInfo.getModificationTime());
     Assert.assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
-            .getModificationTime(), omMetadataManager
-            .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
-            .get(multipartKey).getCreationTime());
+            .getModificationTime(), openMPUKeyInfo.getCreationTime());
 
   }
 
