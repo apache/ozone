@@ -28,6 +28,10 @@ import java.util.List;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -39,6 +43,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -82,14 +87,17 @@ public class TopologySubcommand extends ScmSubcommand
           " HEALTHY, STALE, DEAD)")
   private String nodeState;
 
+  @CommandLine.Option(names = { "--json" },
+      defaultValue = "false",
+      description = "Format output as JSON")
+  private boolean json;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     for (HddsProtos.NodeState state : STATES) {
       List<HddsProtos.Node> nodes = scmClient.queryNode(null, state,
           HddsProtos.QueryScope.CLUSTER, "");
       if (nodes != null && nodes.size() > 0) {
-        // show node state
-        System.out.println("State = " + state.toString());
         if (nodeOperationalState != null) {
           if (nodeOperationalState.equals("IN_SERVICE") ||
               nodeOperationalState.equals("DECOMMISSIONING") ||
@@ -120,9 +128,9 @@ public class TopologySubcommand extends ScmSubcommand
           }
         }
         if (order) {
-          printOrderedByLocation(nodes);
+          printOrderedByLocation(nodes, state.toString());
         } else {
-          printNodesWithLocation(nodes);
+          printNodesWithLocation(nodes, state.toString());
         }
       }
     }
@@ -136,7 +144,8 @@ public class TopologySubcommand extends ScmSubcommand
   // Format
   // Location: rack1
   //  ipAddress(hostName) OperationalState
-  private void printOrderedByLocation(List<HddsProtos.Node> nodes) {
+  private void printOrderedByLocation(List<HddsProtos.Node> nodes,
+                                      String nodeState) throws IOException {
     HashMap<String, TreeSet<DatanodeDetails>> tree =
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
@@ -153,13 +162,28 @@ public class TopologySubcommand extends ScmSubcommand
     ArrayList<String> locations = new ArrayList<>(tree.keySet());
     Collections.sort(locations);
 
-    locations.forEach(location -> {
-      System.out.println("Location: " + location);
-      tree.get(location).forEach(n -> {
-        System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
-            + ") " + state.get(n));
+    if (json) {
+      List<NodeTopologyOrder> nodesJson = new ArrayList<>();
+      locations.forEach(location -> {
+        tree.get(location).forEach(n -> {
+          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nodeState,
+              state.get(n).toString());
+          nodesJson.add(nodeJson);
+        });
       });
-    });
+      System.out.println(
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+    } else {
+      // show node state
+      System.out.println("State = " + nodeState);
+      locations.forEach(location -> {
+        System.out.println("Location: " + location);
+        tree.get(location).forEach(n -> {
+          System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
+              + ") " + state.get(n));
+        });
+      });
+    }
   }
 
   private String formatPortOutput(List<HddsProtos.Port> ports) {
@@ -180,16 +204,119 @@ public class TopologySubcommand extends ScmSubcommand
 
   // Format "ipAddress(hostName):PortName1=PortValue1    OperationalState
   //     networkLocation
-  private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
-    nodes.forEach(node -> {
-      System.out.print(" " + getAdditionNodeOutput(node) +
-          node.getNodeID().getIpAddress() + "(" +
-          node.getNodeID().getHostName() + ")" +
-          ":" + formatPortOutput(node.getNodeID().getPortsList()));
-      System.out.println("    "
-          + node.getNodeOperationalStates(0) + "    " +
-          (node.getNodeID().getNetworkLocation() != null ?
-              node.getNodeID().getNetworkLocation() : "NA"));
-    });
+  private void printNodesWithLocation(Collection<HddsProtos.Node> nodes,
+                                      String state) throws IOException{
+    if (json) {
+      if (fullInfo) {
+        ArrayList<NodeTopologyFull> nodesJson = new ArrayList<>();
+        nodes.forEach(node -> {
+          NodeTopologyFull nodeJson =
+              new NodeTopologyFull(
+                  DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
+          nodesJson.add(nodeJson);
+        });
+        System.out.println(
+            JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+      } else {
+        ArrayList<NodeTopologyDefault> nodesJson = new ArrayList<>();;
+        nodes.forEach(node -> {
+          NodeTopologyDefault nodeJson = new NodeTopologyDefault(
+              DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
+          nodesJson.add(nodeJson);
+        });
+        System.out.println(
+            JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+      }
+    } else {
+      // show node state
+      System.out.println("State = " + state);
+      nodes.forEach(node -> {
+        System.out.print(" " + getAdditionNodeOutput(node) +
+            node.getNodeID().getIpAddress() + "(" +
+            node.getNodeID().getHostName() + ")" +
+            ":" + formatPortOutput(node.getNodeID().getPortsList()));
+        System.out.println("    "
+            + node.getNodeOperationalStates(0) + "    " +
+            (node.getNodeID().getNetworkLocation() != null ?
+                node.getNodeID().getNetworkLocation() : "NA"));
+      });
+    }
+  }
+
+  private static class ListJsonSerializer extends
+      JsonSerializer<List<DatanodeDetails.Port>> {
+    @Override
+    public void serialize(List<DatanodeDetails.Port> value, JsonGenerator jgen,
+                          SerializerProvider provider)
+        throws IOException {
+      jgen.writeStartObject();
+      for (DatanodeDetails.Port port : value) {
+        jgen.writeNumberField(port.getName().toString(), port.getValue());
+      }
+      jgen.writeEndObject();
+    }
+  }
+
+  private static class NodeTopologyOrder {
+    private String ipAddress;
+    private String hostName;
+    private String nodeState;
+    private String operationalState;
+    private String networkLocation;
+
+    NodeTopologyOrder(DatanodeDetails node, String nState, String opState){
+      ipAddress = node.getIpAddress();
+      hostName = node.getHostName();
+      nodeState = nState;
+      operationalState = opState;
+      networkLocation = node.getNetworkLocation();
+    }
+
+    public String getIpAddress() {
+      return ipAddress;
+    }
+
+    public String getHostName() {
+      return hostName;
+    }
+
+    public String getNodeState() {
+      return nodeState;
+    }
+
+    public String getOperationalState() {
+      return operationalState;
+    }
+
+    public String getNetworkLocation() {
+      return networkLocation;
+    }
+  }
+
+  private static class NodeTopologyDefault extends NodeTopologyOrder {
+    private List<DatanodeDetails.Port> ports;
+
+    NodeTopologyDefault(DatanodeDetails node, String state) {
+      super(node, state, node.getPersistedOpState().toString());
+      ports = node.getPorts();
+    }
+
+    @JsonSerialize(using = ListJsonSerializer.class)
+    public List<DatanodeDetails.Port> getPorts() {
+      return ports;
+    }
+  }
+
+  private static class NodeTopologyFull extends NodeTopologyDefault {
+    private String uuid;
+
+    NodeTopologyFull(DatanodeDetails node, String state) {
+      super(node, state);
+      uuid = node.getUuid().toString();
+    }
+
+    public String getUuid() {
+      return uuid;
+    }
   }
 }
