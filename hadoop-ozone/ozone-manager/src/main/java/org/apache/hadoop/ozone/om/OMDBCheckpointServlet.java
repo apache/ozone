@@ -154,8 +154,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           ServerUtils.getOzoneMetaDirPath(getConf()).toString());
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
-          excludedList);
-      writeFilesToArchive(fixupFilesToBeCopied(tmpdir,copyFiles), hardLinkFiles, archiveOutputStream,
+          excludedList, tmpdir);
+      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
           completed);
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
@@ -211,36 +211,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return checkpoint;
   }
 
-  // Fixes the paths of the files to be copied so they point to
-  // the correct directories.
-  private Set<Path> fixupFilesToBeCopied(Path tmpdir, Set<Path> copyFiles) {
-    RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
-    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-        differ.getSSTBackupDir());
-    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-        differ.getCompactionLogDir());
-
-    Set<Path> fixups = new HashSet<>();
-    for (Path f : copyFiles) {
-      String fileName = f.getFileName().toString();
-      String parent = f.getParent().toString();
-      // sstbackup files should be copied from the temp dir
-      if (parent.equals(sstBackupDir.dirStr)) {
-        fixups.add(Paths.get(sstBackupDir.tmpDirStr, fileName));
-
-        // compaction log files should be copied from the temp dir
-      } else if (parent.equals(compactionLogDir.dirStr)) {
-        fixups.add(Paths.get(compactionLogDir.tmpDirStr, fileName));
-
-        // All other files can be copied as is.
-      } else {
-        fixups.add(f);
-      }
-    }
-    return fixups;
-  }
-
-  private class DirectoryData {
+  private static class DirectoryData {
     File dir;
     String dirStr;
     File tmpDir;
@@ -258,7 +229,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   Map<Path, Path> hardLinkFiles,
                                   Set<Path> toExcludeFiles,
                                   boolean includeSnapshotData,
-                                  List<String> excluded)
+                                  List<String> excluded, Path tmpdir)
       throws IOException {
 
     maxTotalSstSize = getConf().getLong(
@@ -281,8 +252,29 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
-    return processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
-        snapshotPaths, excluded, copySize);
+    if (!processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
+        snapshotPaths, excluded, copySize)) {
+      return false;
+    }
+    RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
+
+    // Process the tmp sst compaction dir.
+    if (!processDir(sstBackupDir.tmpDir.toPath(), copyFiles, hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded, copySize)) {
+      return false;
+    }
+
+    // Process the tmp compaction log dir.
+    if (!processDir(compactionLogDir.tmpDir.toPath(), copyFiles, hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded, copySize)) {
+      return false;
+    }
+    return true;
+
   }
 
   /**
@@ -341,6 +333,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           if (parent != null && parent.endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
               && !snapshotPaths.contains(file)) {
             LOG.debug("Skipping unneeded file: " + file);
+            continue;
+          }
+          String compactionLogDir = dbStore.
+              getRocksDBCheckpointDiffer().getCompactionLogDir();
+          if (f.toString().startsWith(compactionLogDir)) {
+            LOG.debug("Skipping compaction log dir");
+            continue;
+          }
+          String sstBackupDir = dbStore.
+              getRocksDBCheckpointDiffer().getSSTBackupDir();
+          if (f.toString().startsWith(sstBackupDir)) {
+            LOG.debug("Skipping sst backup dir");
             continue;
           }
           if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
