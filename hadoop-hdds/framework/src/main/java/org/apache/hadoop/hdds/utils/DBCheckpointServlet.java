@@ -224,6 +224,7 @@ public class DBCheckpointServlet extends HttpServlet
       } catch (IOException e) {
         LOG.error("unable to delete: " + tmpdir);
       }
+
       if (checkpoint != null) {
         try {
           checkpoint.cleanupCheckpoint();
