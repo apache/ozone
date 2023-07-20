@@ -476,6 +476,10 @@ public class TestOMDbCheckpointServlet {
       throws Exception {
     prepSnapshotData();
 
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        any(), any(), anyBoolean(), any(), any(), anyBoolean());
+    omDbCheckpointServletMock.init();
+
     // Set http param to exclude snapshot data.
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn(null);
@@ -507,6 +511,10 @@ public class TestOMDbCheckpointServlet {
   public void testWriteDbDataWithToExcludeFileList()
       throws Exception {
     prepSnapshotData();
+
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+        any(), any(), anyBoolean(), any(), any(), anyBoolean());
+    omDbCheckpointServletMock.init();
 
     File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
         "dummy.sst");
