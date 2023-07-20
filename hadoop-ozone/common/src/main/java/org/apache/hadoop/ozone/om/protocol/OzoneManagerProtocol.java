@@ -693,12 +693,12 @@ public interface OzoneManagerProtocol
 
   /**
    * Create an image of the current compaction log DAG in the OM.
-   * @param fileName     name of the image file.
-   * @param graphType    type of node name to use in the graph image.
-   * @return path of the image file.
-   * @throws IOException
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
    */
-  default String printCompactionLogDag(String fileName, String graphType)
+  default String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");

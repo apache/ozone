@@ -631,7 +631,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
-  public String printCompactionLogDag(String fileName,
+  public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;
   }
