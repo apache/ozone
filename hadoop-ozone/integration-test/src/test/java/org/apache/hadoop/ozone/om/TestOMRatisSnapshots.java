@@ -1148,7 +1148,7 @@ public class TestOMRatisSnapshots {
     checkSnapshot(newLeaderOM, newFollowerOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
-    // Prepare baseline data for SST pruning
+    // Prepare baseline data for compaction backup pruning pruning
     String sstBackupDir = newLeaderOM
         .getMetadataManager()
         .getStore()
@@ -1216,10 +1216,10 @@ public class TestOMRatisSnapshots {
     String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
         OM_KEY_PREFIX + ozoneBucket.getName() +
         OM_KEY_PREFIX + newKeys.get(0);
-    Table<String, OmKeyInfo> omKeyInfoTableBeforeDeletion = newLeaderOM
+    Table<String, OmKeyInfo> omKeyInfoTable = newLeaderOM
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
-    OmKeyInfo newKeyInfo = omKeyInfoTableBeforeDeletion.get(newKey);
+    OmKeyInfo newKeyInfo = omKeyInfoTable.get(newKey);
     Assertions.assertNotNull(newKeyInfo);
 
     long usedBytes = getUsedBytes(newLeaderOM);
@@ -1231,16 +1231,14 @@ public class TestOMRatisSnapshots {
         return getUsedBytes(newLeaderOM) ==
             usedBytes - newKeyInfo.getDataSize();
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        Assertions.fail();
+        return false;
       }
     }, 1000, 10000);
 
     GenericTestUtils.waitFor(() -> {
-      Table<String, OmKeyInfo> omKeyInfoTableAfterDeletion = newLeaderOM
-          .getMetadataManager()
-          .getKeyTable(ozoneBucket.getBucketLayout());
       try {
-        return Objects.isNull(omKeyInfoTableAfterDeletion.get(newKey));
+        return Objects.isNull(omKeyInfoTable.get(newKey));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -1259,8 +1257,7 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
 
-    // Check whether compaction logs get appeneded to
-    // Force compaction
+    // Check whether compaction logs get appeneded to by forcning compaction
     newLeaderOM.getMetadataManager()
         .getStore()
         .compactDB();
@@ -1280,7 +1277,7 @@ public class TestOMRatisSnapshots {
     Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
         || contentLength != newContentLength);
 
-    // Check whether sst files were pruned
+    // Check whether compaction backup files were pruned
     final int finalNumberOfSstFiles = numberOfSstFiles;
     try {
       GenericTestUtils.waitFor(() -> {
