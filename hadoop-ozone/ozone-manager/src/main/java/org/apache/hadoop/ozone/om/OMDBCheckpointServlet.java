@@ -183,22 +183,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     DBCheckpoint checkpoint;
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
-    // make temp directories
-    String sstBackupDirStr = differ.getSSTBackupDir();
-    String compactionLogDirStr = differ.getCompactionLogDir();
-    File sstBackupDir = new File(sstBackupDirStr);
-    File compactionLogDir = new File(compactionLogDirStr);
-    File tempSSTBackupDir = new File(tmpdir.toString(),
-        sstBackupDir.getName());
-    File tempCompactionLogDir = new File(tmpdir.toString(),
-        compactionLogDir.getName());
-    tempSSTBackupDir.mkdirs();
-    tempCompactionLogDir.mkdirs();
+    // make tmp directories
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
+    sstBackupDir.tmpDir.mkdirs();
+    compactionLogDir.tmpDir.mkdirs();
 
     try {
       differ.incrementTarballRequestCount();
-      FileUtils.copyDirectory(compactionLogDir, tempCompactionLogDir);
-      OmSnapshotUtils.linkFiles(sstBackupDir, tempSSTBackupDir);
+      FileUtils.copyDirectory(compactionLogDir.dir, compactionLogDir.tmpDir);
+      OmSnapshotUtils.linkFiles(sstBackupDir.dir, sstBackupDir.tmpDir);
       checkpoint = dbStore.getCheckpoint(flush);
     } finally {
       synchronized (dbStore.getRocksDBCheckpointDiffer()) {
@@ -212,27 +208,37 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   private Set<Path> fixupCopyFiles(Path tmpdir, Set<Path> copyFiles) {
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
-    String sstBackupDirStr = differ.getSSTBackupDir();
-    String compactionLogDirStr = differ.getCompactionLogDir();
-    File sstBackupDir = new File(sstBackupDirStr);
-    File compactionLogDir = new File(compactionLogDirStr);
-    String tempSSTBackupDirStr = new File(tmpdir.toString(),
-        sstBackupDir.getName()).toString();
-    String tempCompactionLogDirStr = new File(tmpdir.toString(),
-        compactionLogDir.getName()).toString();
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
+
     Set<Path> fixups = new HashSet<>();
     for (Path f : copyFiles) {
       String fileName = f.getFileName().toString();
       String parent = f.getParent().toString();
-      if (parent.equals(sstBackupDirStr)) {
-        fixups.add(Paths.get(tempSSTBackupDirStr, fileName));
-      } else if (parent.equals(compactionLogDirStr)) {
-        fixups.add(Paths.get(tempCompactionLogDirStr, fileName));
+      if (parent.equals(sstBackupDir.dirStr)) {
+        fixups.add(Paths.get(sstBackupDir.tmpDirStr, fileName));
+      } else if (parent.equals(compactionLogDir.dirStr)) {
+        fixups.add(Paths.get(compactionLogDir.tmpDirStr, fileName));
       } else {
         fixups.add(f);
       }
     }
     return fixups;
+  }
+
+  private class DirectoryData {
+    File dir;
+    String dirStr;
+    File tmpDir;
+    String tmpDirStr;
+    DirectoryData(Path tmpdir, String dirStr) {
+      this.dirStr = dirStr;
+      dir = new File(dirStr);
+      tmpDir = new File(tmpdir.toString(), dir.getName());
+      tmpDirStr = tmpdir.toString();
+    }
   }
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Set<Path> copyFiles,
