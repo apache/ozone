@@ -20,6 +20,10 @@ package org.apache.hadoop.hdds.security.symmetric;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode;
+import org.apache.hadoop.hdds.utils.RetriableTask;
+import org.apache.hadoop.io.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +38,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.hadoop.io.retry.RetryPolicies.exponentialBackoffRetry;
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 
 /**
  * Default implementation of {@link SecretKeySignerClient} that fetches
@@ -68,11 +74,49 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
 
   @Override
   public void start(ConfigurationSource conf) throws IOException {
-    final ManagedSecretKey initialKey =
-        secretKeyProtocol.getCurrentSecretKey();
+    final ManagedSecretKey initialKey = loadInitialSecretKey();
+
     LOG.info("Initial secret key fetched from SCM: {}.", initialKey);
     cache.set(initialKey);
     scheduleSecretKeyPoller(conf, initialKey.getCreationTime());
+  }
+
+  private ManagedSecretKey loadInitialSecretKey() throws IOException {
+    // Load initial active secret key from SCM, retries with exponential
+    // backoff when SCM has not initialized secret keys yet.
+
+    // Exponential backoff policy, 100 max retries, exponential backoff
+    // wait time that repeats each 10. The wait times can be illustrated as:
+    // 1 2 4 8 ... 512 1 2 4 8 ... 512 1 2 ...
+    // Maximum total delay is around 200min.
+    int maxRetries = 100;
+    int backoffCircle = 10;
+    int baseWaitTime = 1;
+    final RetryPolicy expBackoff =
+        exponentialBackoffRetry(backoffCircle, baseWaitTime, TimeUnit.SECONDS);
+
+    RetryPolicy retryPolicy = (ex, retries, failovers, isIdempotent) -> {
+      if (ex instanceof SCMSecretKeyException) {
+        ErrorCode errorCode = ((SCMSecretKeyException) ex).getErrorCode();
+        if (errorCode == ErrorCode.SECRET_KEY_NOT_INITIALIZED
+            && retries < maxRetries) {
+          return expBackoff.shouldRetry(ex, retries % backoffCircle,
+              failovers, isIdempotent);
+        }
+      }
+      return FAIL;
+    };
+
+    RetriableTask<ManagedSecretKey> task = new RetriableTask<>(retryPolicy,
+        "getCurrentSecretKey", secretKeyProtocol::getCurrentSecretKey);
+    try {
+      return task.call();
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Unexpected exception getting current secret key", e);
+    }
   }
 
   @Override

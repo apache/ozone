@@ -50,13 +50,17 @@ public class WritableContainerFactory {
         scm.getContainerManager(), scm.getPipelineChoosePolicy());
     this.standaloneProvider = ratisProvider;
 
+    WritableECContainerProviderConfig ecProviderConfig =
+        conf.getObject(WritableECContainerProviderConfig.class);
     this.ecProvider = new WritableECContainerProvider(
-        conf.getObject(WritableECContainerProviderConfig.class),
+        ecProviderConfig,
         getConfiguredContainerSize(conf),
         scm.getScmNodeManager(),
         scm.getPipelineManager(),
         scm.getContainerManager(),
         scm.getEcPipelineChoosePolicy());
+
+    scm.getReconfigurationHandler().register(ecProviderConfig);
   }
 
   public ContainerInfo getContainer(final long size,

@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -95,6 +96,8 @@ public class TestS3MultipartRequest {
     OmMetadataReader omMetadataReader = Mockito.mock(OmMetadataReader.class);
     when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
     when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
+    when(ozoneManager.getAccessAuthorizer())
+        .thenReturn(new OzoneNativeAuthorizer());
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
         ReplicationConfig.getDefault(ozoneConfiguration));

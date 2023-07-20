@@ -154,14 +154,15 @@ execute_robot_test(){
   unset 'ARGUMENTS[${#ARGUMENTS[@]}-1]' #Remove the last element, remainings are the custom parameters
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
-  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+
+  local output_name=$(get_output_name)
 
   # find unique filename
   declare -i i=0
-  OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
+  OUTPUT_FILE="robot-${output_name}1.xml"
   while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
     let ++i
-    OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
+    OUTPUT_FILE="robot-${output_name}${i}.xml"
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
@@ -267,16 +268,18 @@ create_containers() {
   docker-compose --ansi never up -d $@
 }
 
-save_container_logs() {
-  local output_name="${OUTPUT_NAME:-}"
-  if [[ -z "${output_name}" ]]; then
-    output_name="$COMPOSE_ENV_NAME"
+get_output_name() {
+  if [[ -n "${OUTPUT_NAME}" ]]; then
+    echo "${OUTPUT_NAME}-"
   fi
-  if [[ -z "${output_name}" ]]; then
-    output_name="$(basename $(pwd))"
-  fi
+}
 
-  docker-compose --ansi never logs $@ >> "$RESULT_DIR/docker-${output_name}.log"
+save_container_logs() {
+  local output_name=$(get_output_name)
+  local c
+  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
+    docker logs "${c}" &>> "$RESULT_DIR/docker-${output_name}${c}.log"
+  done
 }
 
 
