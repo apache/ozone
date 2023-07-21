@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.NavigableSet;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
@@ -161,7 +162,7 @@ public class WritableECContainerProvider
     // allocate a new one.
     try {
       if (openPipelineCount >= maximumPipelines) {
-        final int nodeCount = nodeManager.getNodeCount(null, null);
+        final int nodeCount = nodeManager.getNodeCount(inServiceHealthy());
         if (nodeCount > maximumPipelines) {
           LOG.debug("Increasing pipeline limit {} -> {} for final attempt",
               maximumPipelines, nodeCount);
