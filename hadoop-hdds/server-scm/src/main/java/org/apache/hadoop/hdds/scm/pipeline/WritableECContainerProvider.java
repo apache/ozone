@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
@@ -235,12 +236,14 @@ public class WritableECContainerProvider
    * Class to hold configuration for WriteableECContainerProvider.
    */
   @ConfigGroup(prefix = WritableECContainerProviderConfig.PREFIX)
-  public static class WritableECContainerProviderConfig {
+  public static class WritableECContainerProviderConfig
+      extends ReconfigurableConfig {
 
     private static final String PREFIX = "ozone.scm.ec";
 
     @Config(key = "pipeline.minimum",
         defaultValue = "5",
+        reconfigurable = true,
         type = ConfigType.INT,
         description = "The minimum number of pipelines to have open for each " +
             "Erasure Coding configuration",
@@ -265,6 +268,7 @@ public class WritableECContainerProvider
     @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
+        reconfigurable = true,
         tags = {SCM},
         description = "TODO"
     )

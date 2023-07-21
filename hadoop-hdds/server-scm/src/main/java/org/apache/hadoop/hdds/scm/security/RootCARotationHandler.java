@@ -37,7 +37,7 @@ public interface RootCARotationHandler {
   void rotationPrepare(String rootCertId)
       throws IOException;
 
-  @Replicate
+  @Replicate(invocationType = Replicate.InvocationType.CLIENT)
   void rotationPrepareAck(String rootCertId, String scmCertId, String scmId)
       throws IOException;
 
