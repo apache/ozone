@@ -372,14 +372,15 @@ public class TestOmSnapshotManager {
 
     Set<Path> toExcludeFiles = new HashSet<>(
         Collections.singletonList(excludeFile));
-    Set<Path> copyFiles = new HashSet<>(Collections.singletonList(copyFile));
+    Map<Path, Path> copyFiles = new HashMap<>();
+    copyFiles.put(copyFile, copyFile);
     List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
     // Confirm the exclude file gets added to the excluded list,
     //  (and thus is excluded.)
     fileSize = processFile(excludeFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded);
+        toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 1);
     Assert.assertEquals((excluded.get(0)), excludeFile.toString());
     Assert.assertEquals(copyFiles.size(), 1);
@@ -389,7 +390,7 @@ public class TestOmSnapshotManager {
 
     // Confirm the linkToExcludedFile gets added as a link.
     fileSize = processFile(linkToExcludedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded);
+        toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 1);
     Assert.assertEquals(hardLinkFiles.size(), 1);
@@ -399,7 +400,7 @@ public class TestOmSnapshotManager {
 
     // Confirm the linkToCopiedFile gets added as a link.
     fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded);
+        toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 1);
     Assert.assertEquals(hardLinkFiles.size(), 1);
@@ -409,20 +410,21 @@ public class TestOmSnapshotManager {
 
     // Confirm the addToCopiedFiles gets added to list of copied files
     fileSize = processFile(addToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded);
+        toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
-    Assert.assertTrue(copyFiles.contains(addToCopiedFiles));
+    Assert.assertNotNull(copyFiles.get(addToCopiedFiles));
     Assert.assertEquals(fileSize, expectedFileSize);
-    copyFiles = new HashSet<>(Collections.singletonList(copyFile));
+    copyFiles = new HashMap<>();
+    copyFiles.put(copyFile, copyFile);
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
     fileSize = processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded);
+        toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertEquals(fileSize, 0);
-    Assert.assertTrue(copyFiles.contains(addNonSstToCopiedFiles));
+    Assert.assertNotNull(copyFiles.get(addNonSstToCopiedFiles));
   }
 
   @Test
