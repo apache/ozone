@@ -137,8 +137,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Objects.requireNonNull(toExcludeList);
     Objects.requireNonNull(excludedList);
 
-    // Files to be added to tarball
-    Set<Path> copyFiles = new HashSet<>();
+    // copyFiles is a map of files to be added to tarball.  The keys
+    // are the src path of the file, (where they are copied from on
+    // the leader.) The values are the dest path of the file, (where
+    // they are copied to on the follower.)  In most cases these are
+    // the same.  For synchronization purposes, some files are copied
+    // to a temp directory on the leader.  In those cases the source
+    // and dest won't be the same.
+
+    Map<Path,Path> copyFiles = new HashMap<>();
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
@@ -225,7 +232,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
-                                  Set<Path> copyFiles,
+                                  Map<Path,Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
                                   Set<Path> toExcludeFiles,
                                   boolean includeSnapshotData,
@@ -269,11 +276,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     // Process the tmp compaction log dir.
-    if (!processDir(compactionLogDir.tmpDir.toPath(), copyFiles, hardLinkFiles, toExcludeFiles,
-        new HashSet<>(), excluded, copySize, compactionLogDir.dir.toPath())) {
-      return false;
-    }
-    return true;
+    return processDir(compactionLogDir.tmpDir.toPath(), copyFiles,
+        hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded, copySize, compactionLogDir.dir.toPath());
 
   }
 
@@ -317,7 +322,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  private boolean processDir(Path dir, Set<Path> copyFiles,
+  private boolean processDir(Path dir, Map<Path,Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
                           Set<Path> toExcludeFiles,
                           Set<Path> snapshotPaths,
@@ -382,14 +387,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @param excluded The list of db files that actually were excluded.
    */
   @VisibleForTesting
-  public static long processFile(Path file, Set<Path> copyFiles,
+  public static long processFile(Path file, Map<Path,Path> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
                                  Set<Path> toExcludeFiles,
                                  List<String> excluded, Path destDir)
       throws IOException {
     long fileSize = 0;
-    if (toExcludeFiles.contains(file)) {
-      excluded.add(file.toString());
+    Path destFile = file;
+    if (destDir != null) {
+      destFile = Paths.get(destDir.toString(), file.getFileName().toString());
+    }
+    if (toExcludeFiles.contains(destFile)) {
+      excluded.add(destFile.toString());
     } else {
       Path fileNamePath = file.getFileName();
       if (fileNamePath == null) {
@@ -400,21 +409,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         // If same as existing excluded file, add a link for it.
         Path linkPath = findLinkPath(toExcludeFiles, fileName);
         if (linkPath != null) {
-          hardLinkFiles.put(file, linkPath);
+          hardLinkFiles.put(destFile, linkPath);
         } else {
           // If already in tarball add a link for it.
-          linkPath = findLinkPath(copyFiles, fileName);
+          linkPath = findLinkPath(copyFiles.values(), fileName);
           if (linkPath != null) {
-            hardLinkFiles.put(file, linkPath);
+            hardLinkFiles.put(destFile, linkPath);
           } else {
             // Add to tarball.
-            copyFiles.add(file);
+            copyFiles.put(file, destFile);
             fileSize = Files.size(file);
           }
         }
       } else {
         // Not sst file.
-        copyFiles.add(file);
+        copyFiles.put(file, destFile);
       }
     }
     return fileSize;
@@ -422,7 +431,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   // If fileName exists in "files" parameter,
   // it should be linked to path in files.
-  private static Path findLinkPath(Set<Path> files, String fileName) {
+  private static Path findLinkPath(Collection<Path> files, String fileName) {
     for (Path p: files) {
       if (p.toString().endsWith(fileName)) {
         return p;
@@ -438,7 +447,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return Boolean.parseBoolean(includeParam);
   }
 
-  private void writeFilesToArchive(Set<Path> copyFiles,
+  private void writeFilesToArchive(Map<Path,Path> copyFiles,
                                    Map<Path, Path> hardLinkFiles,
                                    ArchiveOutputStream archiveOutputStream,
                                    boolean completed)
@@ -447,14 +456,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
     int truncateLength = metaDirPath.toString().length() + 1;
 
-    Set<Path> filteredCopyFiles = completed ? copyFiles :
-        copyFiles.stream().filter(path ->
-          path.getFileName().toString().toLowerCase().endsWith(".sst")).
-          collect(Collectors.toSet());
+    Map<Path,Path> filteredCopyFiles = completed ? copyFiles :
+        copyFiles.entrySet().stream().filter(entry ->
+          entry.getKey().getFileName().toString().toLowerCase().endsWith(".sst")).
+          collect(Collectors.toMap(e -> e.getKey(), e -> e.getValue()));
 
     // Go through each of the files to be copied and add to archive.
-    for (Path file : filteredCopyFiles) {
-      String fixedFile = truncateFileName(truncateLength, file);
+    for (Map.Entry<Path, Path> entry : filteredCopyFiles.entrySet()) {
+      String fixedFile = truncateFileName(truncateLength, entry.getValue());
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
         Path f = Paths.get(fixedFile).getFileName();
@@ -462,7 +471,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           fixedFile = f.toString();
         }
       }
-      includeFile(file.toFile(), fixedFile, archiveOutputStream);
+      includeFile(entry.getKey().toFile(), fixedFile, archiveOutputStream);
     }
 
     if (completed) {
