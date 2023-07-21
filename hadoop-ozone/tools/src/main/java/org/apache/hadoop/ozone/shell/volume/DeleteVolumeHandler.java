@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
@@ -47,8 +45,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Executes deleteVolume call for the shell.
@@ -83,21 +79,9 @@ public class DeleteVolumeHandler extends VolumeHandler {
       throws IOException {
 
     String volumeName = address.getVolumeName();
+    omServiceId = address.getOmServiceId(getConf());
     try {
       if (bRecursive) {
-        if (!Strings.isNullOrEmpty(address.getOmHost())) {
-          omServiceId = address.getOmHost();
-        } else {
-          Collection<String> serviceIds = getConf().getTrimmedStringCollection(
-              OZONE_OM_SERVICE_IDS_KEY);
-          if (serviceIds.size() == 1) {
-            // Only one OM service ID configured, we can use that
-            // If more than 1, it will fail in createClient step itself
-            omServiceId = serviceIds.iterator().next();
-          } else {
-            omServiceId = getConf().get(OZONE_OM_ADDRESS_KEY);
-          }
-        }
         if (!yes) {
           // Ask for user confirmation
           out().print("This command will delete volume recursively." +
