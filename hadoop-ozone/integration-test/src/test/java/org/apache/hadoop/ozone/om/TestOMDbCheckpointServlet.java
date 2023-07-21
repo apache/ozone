@@ -383,17 +383,22 @@ public class TestOMDbCheckpointServlet {
     DBStore dbStore =  om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
 
+    int metaDirLength = metaDir.toString().length() + 1;
     String compactionLogDir = dbStore.
         getRocksDBCheckpointDiffer().getCompactionLogDir();
     String sstBackupDir = dbStore.
         getRocksDBCheckpointDiffer().getSSTBackupDir();
 
     Path expectedLog = Paths.get(compactionLogDir, "expected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    String expectedLogStr = truncateFileName(metaDirLength, expectedLog);
     Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    String unExpectedLogStr = truncateFileName(metaDirLength, unExpectedLog);
     Files.write(expectedLog,
         "fabricatedData".getBytes(StandardCharsets.UTF_8));
     Path expectedSst = Paths.get(sstBackupDir, "expected.sst");
+    String expectedSstStr = truncateFileName(metaDirLength, expectedSst);
     Path unExpectedSst = Paths.get(sstBackupDir, "unexpected.sst");
+    String unExpectedSstStr = truncateFileName(metaDirLength, unExpectedSst);
     Files.write(expectedSst,
         "fabricatedData".getBytes(StandardCharsets.UTF_8));
 
@@ -453,7 +458,6 @@ public class TestOMDbCheckpointServlet {
     finalCheckpointSet.remove(OM_HARDLINK_FILE);
     Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
-    int metaDirLength = metaDir.toString().length() + 1;
     String shortSnapshotLocation =
         truncateFileName(metaDirLength, Paths.get(snapshotDirName));
     String shortSnapshotLocation2 =
@@ -488,9 +492,13 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
-    // remove the dummy files that should not be copied over
-    initialFullSet.remove(truncateFileName(metaDirLength, unExpectedLog));
-    initialFullSet.remove(truncateFileName(metaDirLength, unExpectedSst));
+    Assertions.assertTrue(finalFullSet.contains(expectedLogStr));
+    Assertions.assertTrue(finalFullSet.contains(expectedSstStr));
+    Assertions.assertTrue(initialFullSet.contains(unExpectedLogStr));
+    Assertions.assertTrue(initialFullSet.contains(unExpectedSstStr));
+    // remove the dummy files that should not have been copied over
+    initialFullSet.remove(unExpectedLogStr);
+    initialFullSet.remove(unExpectedSstStr);
     Assertions.assertEquals(initialFullSet, finalFullSet,
         "expected snapshot files not found");
   }
