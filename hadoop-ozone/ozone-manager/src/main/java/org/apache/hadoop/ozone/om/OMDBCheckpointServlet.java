@@ -347,8 +347,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             LOG.debug("Skipping sst backup dir");
             continue;
           }
+          Path destSubDir = null;
+          if (destDir != null) {
+            destSubDir = Paths.get(destDir.toString(),
+                file.getFileName().toString());
+          }
           if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
-                          snapshotPaths, excluded, copySize, null)) {
+                          snapshotPaths, excluded, copySize, destSubDir)) {
             return false;
           }
         } else {
