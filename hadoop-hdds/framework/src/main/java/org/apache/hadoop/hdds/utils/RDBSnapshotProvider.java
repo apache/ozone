@@ -114,7 +114,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
 
     while (true) {
       count++;
-      if (count > 1000) {
+      if (count > 100) {
         throw new IOException("too many downloads. exiting");
       }
       String snapshotFileName = getSnapshotFileName(leaderNodeID);

@@ -388,9 +388,11 @@ public class TestOMDbCheckpointServlet {
     String sstBackupDir = dbStore.
         getRocksDBCheckpointDiffer().getSSTBackupDir();
 
-    Path expectedLog = Paths.get(compactionLogDir, "expected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    Path expectedLog = Paths.get(compactionLogDir, "expected" +
+        COMPACTION_LOG_FILE_NAME_SUFFIX);
     String expectedLogStr = truncateFileName(metaDirLength, expectedLog);
-    Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" +
+        COMPACTION_LOG_FILE_NAME_SUFFIX);
     String unExpectedLogStr = truncateFileName(metaDirLength, unExpectedLog);
     Files.write(expectedLog,
         "fabricatedData".getBytes(StandardCharsets.UTF_8));

@@ -67,7 +67,7 @@ public class DBCheckpointServlet extends HttpServlet
       LoggerFactory.getLogger(DBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
 
-  protected transient DBStore dbStore;
+  private transient DBStore dbStore;
   private transient DBCheckpointMetrics dbMetrics;
 
   private boolean aclEnabled;
@@ -320,6 +320,10 @@ public class DBCheckpointServlet extends HttpServlet
 
     writeDBCheckpointToStream(checkpoint, destination,
         toExcludeList, excludedList);
+  }
+
+  protected DBStore getDbStore() {
+    return dbStore;
   }
 
   @Override

@@ -497,7 +497,8 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 1);
     Assert.assertEquals(hardLinkFiles.size(), 1);
-    Assert.assertEquals(hardLinkFiles.get(destLinkToExcludedFile), destExcludeFile);
+    Assert.assertEquals(hardLinkFiles.get(destLinkToExcludedFile),
+        destExcludeFile);
     Assert.assertEquals(fileSize, 0);
     hardLinkFiles = new HashMap<>();
 
