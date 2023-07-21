@@ -107,11 +107,16 @@ public abstract class RDBSnapshotProvider implements Closeable {
    */
   public DBCheckpoint downloadDBSnapshotFromLeader(String leaderNodeID)
       throws IOException {
+    int count = 0;
     LOG.info("Prepare to download the snapshot from leader OM {} and " +
         "reloading state from the snapshot.", leaderNodeID);
     checkLeaderConsistency(leaderNodeID);
 
     while (true) {
+      count++;
+      if (count > 1000) {
+        throw new IOException("too many downloads. exiting");
+      }
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
       downloadSnapshot(leaderNodeID, targetFile);
