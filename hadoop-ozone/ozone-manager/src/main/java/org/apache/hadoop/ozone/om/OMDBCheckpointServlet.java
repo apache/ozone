@@ -210,7 +210,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getDir(),
           compactionLogDir.getTmpDir());
-      OmSnapshotUtils.linkFiles(sstBackupDir.getDir(), sstBackupDir.getTmpDir());
+      OmSnapshotUtils.linkFiles(sstBackupDir.getDir(),
+          sstBackupDir.getTmpDir());
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
       // Unpause the compaction threads.
@@ -295,7 +296,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Process the tmp compaction log dir.
     return processDir(compactionLogDir.getTmpDir().toPath(), copyFiles,
         hardLinkFiles, toExcludeFiles,
-        new HashSet<>(), excluded, copySize, compactionLogDir.getDir().toPath());
+        new HashSet<>(), excluded, copySize,
+        compactionLogDir.getDir().toPath());
 
   }
 
