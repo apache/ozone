@@ -128,7 +128,9 @@ class SendContainerRequestHandler
 
   private void deleteTarball() {
     try {
-      Files.deleteIfExists(path);
+      if (null != path) {
+        Files.deleteIfExists(path);
+      }
     } catch (IOException e) {
       LOG.warn("Error removing {}", path);
     }
