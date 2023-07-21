@@ -243,6 +243,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
 
+    // Tarball limits are not implemented for processes that don't
+    // include snapshots.  Currently this is just for recon.
+    if (!includeSnapshotData) {
+      maxTotalSstSize = Long.MAX_VALUE;
+    }
+
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
