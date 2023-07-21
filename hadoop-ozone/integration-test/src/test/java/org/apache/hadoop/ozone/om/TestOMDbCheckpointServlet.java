@@ -395,12 +395,15 @@ public class TestOMDbCheckpointServlet {
     Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" +
         COMPACTION_LOG_FILE_NAME_SUFFIX);
     String unExpectedLogStr = truncateFileName(metaDirLength, unExpectedLog);
-    Files.write(expectedLog,
-        "fabricatedData".getBytes(StandardCharsets.UTF_8));
     Path expectedSst = Paths.get(sstBackupDir, "expected.sst");
     String expectedSstStr = truncateFileName(metaDirLength, expectedSst);
     Path unExpectedSst = Paths.get(sstBackupDir, "unexpected.sst");
     String unExpectedSstStr = truncateFileName(metaDirLength, unExpectedSst);
+
+    // put "expected" fabricated files onto the fs before the files get
+    //  copied to the temp dir.
+    Files.write(expectedLog,
+        "fabricatedData".getBytes(StandardCharsets.UTF_8));
     Files.write(expectedSst,
         "fabricatedData".getBytes(StandardCharsets.UTF_8));
 
@@ -411,6 +414,10 @@ public class TestOMDbCheckpointServlet {
       // with the snapshot data.
       doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
+      // put "unexpected" fabricated files onto the fs after the files
+      // get copied to the temp dir.  Since these appear in the "real"
+      // dir after the copy, they shouldn't exist in the final file
+      // set.  That will show that the copy only happened from the temp dir.
       Files.write(unExpectedLog,
           "fabricatedData".getBytes(StandardCharsets.UTF_8));
       Files.write(unExpectedSst,
@@ -498,7 +505,8 @@ public class TestOMDbCheckpointServlet {
     Assertions.assertTrue(finalFullSet.contains(expectedSstStr));
     Assertions.assertTrue(initialFullSet.contains(unExpectedLogStr));
     Assertions.assertTrue(initialFullSet.contains(unExpectedSstStr));
-    // remove the dummy files that should not have been copied over
+    // Remove the dummy files that should not have been copied over
+    // from the expected data.
     initialFullSet.remove(unExpectedLogStr);
     initialFullSet.remove(unExpectedSstStr);
     Assertions.assertEquals(initialFullSet, finalFullSet,
@@ -859,7 +867,7 @@ public class TestOMDbCheckpointServlet {
 
     // Confirm the other handlers are locked out when the bootstrap
     //  servlet takes the lock.
-    try (BootstrapStateHandler.Lock lock =
+    try (BootstrapStateHandler.Lock ignoredLock =
         spyServlet.getBootstrapStateLock().lock()) {
       confirmServletLocksOutOtherHandler(keyDeletingService, executorService);
       confirmServletLocksOutOtherHandler(snapshotDeletingService,
@@ -901,7 +909,7 @@ public class TestOMDbCheckpointServlet {
   private void confirmOtherHandlerLocksOutServlet(BootstrapStateHandler handler,
       BootstrapStateHandler servlet, ExecutorService executorService)
       throws InterruptedException {
-    try (BootstrapStateHandler.Lock lock =
+    try (BootstrapStateHandler.Lock ignoredLock =
         handler.getBootstrapStateLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.

@@ -339,9 +339,10 @@ public class TestOmSnapshotManager {
   /*
    * Confirm that processFile() correctly determines whether a file
    * should be copied, linked, or excluded from the tarball entirely.
+   * This test always passes in a null dest dir.
    */
   @Test
-  public void testProcessFile() throws IOException {
+  public void testProcessFileWithNullDestDirParameter() throws IOException {
     Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());
     Assert.assertTrue(new File(testDir.toString(), "snap2").mkdirs());
     Path copyFile = Paths.get(testDir.toString(),
@@ -413,7 +414,7 @@ public class TestOmSnapshotManager {
         toExcludeFiles, excluded, null);
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
-    Assert.assertNotNull(copyFiles.get(addToCopiedFiles));
+    Assert.assertEquals(copyFiles.get(addToCopiedFiles), addToCopiedFiles);
     Assert.assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
     copyFiles.put(copyFile, copyFile);
@@ -424,9 +425,15 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertEquals(fileSize, 0);
-    Assert.assertNotNull(copyFiles.get(addNonSstToCopiedFiles));
+    Assert.assertEquals(copyFiles.get(addNonSstToCopiedFiles),
+        addNonSstToCopiedFiles);
   }
 
+  /*
+   * Confirm that processFile() correctly determines whether a file
+   * should be copied, linked, or excluded from the tarball entirely.
+   * This test always passes in a non-null dest dir.
+   */
   @Test
   public void testProcessFileWithDestDirParameter() throws IOException {
     Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());

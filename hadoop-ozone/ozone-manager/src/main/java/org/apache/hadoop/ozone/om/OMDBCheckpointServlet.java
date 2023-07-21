@@ -225,6 +225,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return checkpoint;
   }
 
+
+  // Convenience class for keeping track of the tmp dir's.
   private static class DirectoryData {
     private final File dir;
     private final File tmpDir;
@@ -372,6 +374,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             LOG.debug("Skipping sst backup dir");
             continue;
           }
+          // Update the dest dir to point to the subdir
           Path destSubDir = null;
           if (destDir != null) {
             destSubDir = Paths.get(destDir.toString(),
@@ -414,6 +417,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     long fileSize = 0;
     Path destFile = file;
+    // if the dest dir is not null then the file needs to be copied/linked
+    // to the dest dir on the follower.
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), file.getFileName().toString());
     }
