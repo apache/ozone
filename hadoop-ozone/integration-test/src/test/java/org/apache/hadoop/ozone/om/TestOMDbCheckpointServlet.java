@@ -377,7 +377,6 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
-
     // Create a "spy" dbstore keep track of the checkpoint.
     OzoneManager om = cluster.getOzoneManager();
     DBStore dbStore =  om.getMetadataManager().getStore();
