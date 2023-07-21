@@ -240,7 +240,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
     if (!processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
-        new HashSet<>(), excluded, copySize)) {
+        new HashSet<>(), excluded, copySize, null)) {
       return false;
     }
 
@@ -253,7 +253,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
     if (!processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
-        snapshotPaths, excluded, copySize)) {
+        snapshotPaths, excluded, copySize, null)) {
       return false;
     }
     RocksDBCheckpointDiffer differ = dbStore.getRocksDBCheckpointDiffer();
@@ -264,13 +264,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Process the tmp sst compaction dir.
     if (!processDir(sstBackupDir.tmpDir.toPath(), copyFiles, hardLinkFiles, toExcludeFiles,
-        new HashSet<>(), excluded, copySize)) {
+        new HashSet<>(), excluded, copySize, sstBackupDir.dir.toPath())) {
       return false;
     }
 
     // Process the tmp compaction log dir.
     if (!processDir(compactionLogDir.tmpDir.toPath(), copyFiles, hardLinkFiles, toExcludeFiles,
-        new HashSet<>(), excluded, copySize)) {
+        new HashSet<>(), excluded, copySize, compactionLogDir.dir.toPath())) {
       return false;
     }
     return true;
@@ -322,7 +322,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                           Set<Path> toExcludeFiles,
                           Set<Path> snapshotPaths,
                           List<String> excluded,
-                          AtomicLong copySize)
+                          AtomicLong copySize, Path destDir)
       throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
@@ -348,12 +348,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             continue;
           }
           if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
-                          snapshotPaths, excluded, copySize)) {
+                          snapshotPaths, excluded, copySize, null)) {
             return false;
           }
         } else {
           long fileSize = processFile(file, copyFiles, hardLinkFiles,
-              toExcludeFiles, excluded);
+              toExcludeFiles, excluded, destDir);
           if (copySize.get() + fileSize > maxTotalSstSize) {
             return false;
           } else {
@@ -380,7 +380,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   public static long processFile(Path file, Set<Path> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
                                  Set<Path> toExcludeFiles,
-                                 List<String> excluded) throws IOException {
+                                 List<String> excluded, Path destDir)
+      throws IOException {
     long fileSize = 0;
     if (toExcludeFiles.contains(file)) {
       excluded.add(file.toString());
