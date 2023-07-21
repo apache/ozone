@@ -199,6 +199,7 @@ public class TestOMDbCheckpointServlet {
     BootstrapStateHandler.Lock lock =
         new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
+    doCallRealMethod().when(omDbCheckpointServletMock).getDbStore();
 
     requestMock = mock(HttpServletRequest.class);
     // Return current user short name when asked

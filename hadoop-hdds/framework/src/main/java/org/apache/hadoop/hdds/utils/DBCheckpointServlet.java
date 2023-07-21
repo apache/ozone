@@ -322,7 +322,7 @@ public class DBCheckpointServlet extends HttpServlet
         toExcludeList, excludedList);
   }
 
-  protected DBStore getDbStore() {
+  public DBStore getDbStore() {
     return dbStore;
   }
 
