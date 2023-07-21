@@ -175,7 +175,7 @@ public class DBCheckpointServlet extends HttpServlet
 
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-      tmpdir = Files.createTempDirectory("bootstrapData");
+      tmpdir = Files.createTempDirectory("tmpBootstrapData");
       checkpoint = getCheckpoint(tmpdir, flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +

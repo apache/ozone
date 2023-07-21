@@ -335,20 +335,20 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         if (f.isDirectory()) {
           // Skip any unexpected snapshot files.
           String parent = f.getParent();
-          if (parent != null && parent.endsWith(OM_SNAPSHOT_CHECKPOINT_DIR)
+          if (parent != null && parent.contains(OM_SNAPSHOT_CHECKPOINT_DIR)
               && !snapshotPaths.contains(file)) {
             LOG.debug("Skipping unneeded file: " + file);
             continue;
           }
-          String compactionLogDir = dbStore.
-              getRocksDBCheckpointDiffer().getCompactionLogDir();
-          if (f.toString().startsWith(compactionLogDir)) {
+          File compactionLogDir = new File(dbStore.
+              getRocksDBCheckpointDiffer().getCompactionLogDir());
+          if (f.equals(compactionLogDir)) {
             LOG.debug("Skipping compaction log dir");
             continue;
           }
-          String sstBackupDir = dbStore.
-              getRocksDBCheckpointDiffer().getSSTBackupDir();
-          if (f.toString().startsWith(sstBackupDir)) {
+          File sstBackupDir = new File(dbStore.
+              getRocksDBCheckpointDiffer().getSSTBackupDir());
+          if (f.equals(sstBackupDir)) {
             LOG.debug("Skipping sst backup dir");
             continue;
           }
@@ -433,7 +433,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // it should be linked to path in files.
   private static Path findLinkPath(Collection<Path> files, String fileName) {
     for (Path p: files) {
-      if (p.toString().endsWith(fileName)) {
+      if (p.getFileName().toString().equals(fileName)) {
         return p;
       }
     }

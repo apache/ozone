@@ -103,6 +103,7 @@ import org.mockito.Mockito;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -376,10 +377,26 @@ public class TestOMDbCheckpointServlet {
     when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA))
         .thenReturn("true");
 
+
     // Create a "spy" dbstore keep track of the checkpoint.
     OzoneManager om = cluster.getOzoneManager();
     DBStore dbStore =  om.getMetadataManager().getStore();
     DBStore spyDbStore = spy(dbStore);
+
+    String compactionLogDir = dbStore.
+        getRocksDBCheckpointDiffer().getCompactionLogDir();
+    String sstBackupDir = dbStore.
+        getRocksDBCheckpointDiffer().getSSTBackupDir();
+
+    Path expectedLog = Paths.get(compactionLogDir, "expected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    Path unExpectedLog = Paths.get(compactionLogDir, "unexpected" + COMPACTION_LOG_FILE_NAME_SUFFIX);
+    Files.write(expectedLog,
+        "fabricatedData".getBytes(StandardCharsets.UTF_8));
+    Path expectedSst = Paths.get(sstBackupDir, "expected.sst");
+    Path unExpectedSst = Paths.get(sstBackupDir, "unexpected.sst");
+    Files.write(expectedSst,
+        "fabricatedData".getBytes(StandardCharsets.UTF_8));
+
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
       DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
@@ -387,6 +404,10 @@ public class TestOMDbCheckpointServlet {
       // with the snapshot data.
       doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
+      Files.write(unExpectedLog,
+          "fabricatedData".getBytes(StandardCharsets.UTF_8));
+      Files.write(unExpectedSst,
+          "fabricatedData".getBytes(StandardCharsets.UTF_8));
       return checkpoint;
     });
 
@@ -467,6 +488,9 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
+    // remove the dummy files that should not be copied over
+    initialFullSet.remove(truncateFileName(metaDirLength, unExpectedLog));
+    initialFullSet.remove(truncateFileName(metaDirLength, unExpectedSst));
     Assertions.assertEquals(initialFullSet, finalFullSet,
         "expected snapshot files not found");
   }
@@ -767,15 +791,15 @@ public class TestOMDbCheckpointServlet {
       String[] files = line.split("\t");
       Assertions.assertTrue(
           files[0].startsWith(dir0) || files[0].startsWith(dir1),
-          "fabricated entry contains valid first directory");
+          "fabricated entry contains valid first directory: " + line);
       Assertions.assertTrue(files[1].startsWith(realDir),
-          "fabricated entry contains correct real directory");
+          "fabricated entry contains correct real directory: " + line);
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
       Assertions.assertTrue(
           path0.getFileName().toString().equals(FABRICATED_FILE_NAME) &&
               path1.getFileName().toString().equals(FABRICATED_FILE_NAME),
-          "fabricated entries contains correct file name");
+          "fabricated entries contains correct file name: " + line);
     }
   }
 
@@ -787,7 +811,7 @@ public class TestOMDbCheckpointServlet {
     String[] files = line.split("\t");
     Assertions.assertTrue(files[0].startsWith(shortSnapshotLocation) ||
         files[0].startsWith(shortSnapshotLocation2),
-        "hl entry starts with valid snapshot dir");
+        "hl entry starts with valid snapshot dir: " + line);
 
     String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
     String file1 = files[1];
