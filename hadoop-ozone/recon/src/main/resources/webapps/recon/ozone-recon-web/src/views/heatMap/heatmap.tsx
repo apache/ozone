@@ -17,12 +17,14 @@
  */
 import React from 'react';
 import axios from 'axios';
-import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker } from 'antd';
+import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker, Form } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import { showDataFetchError } from 'utils/common';
 import './heatmap.less';
 import HeatMapConfiguration from './heatMapConfiguration';
+
+type inputPathValidity = "" | "error" | "success" | "warning" | "validating" | undefined
 
 interface ITreeResponse {
   label: string;
@@ -49,6 +51,8 @@ interface ITreeState {
   entityType: string;
   date: string;
   treeEndpointFailed: boolean;
+  inputPathValid: inputPathValidity;
+  helpMessage: string;
 }
 
 let minSize = Infinity;
@@ -113,7 +117,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       entityType: 'key',
       inputPath: '/',
       date: '24H',
-      treeEndpointFailed: false
+      treeEndpointFailed: false,
+      inputPathValid: undefined,
+      helpMessage: ""
     };
   }
 
@@ -145,18 +151,18 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
 
   handleChange = (e: any) => {
     const value = e.target.value;
-    let validExpression;
+    let inputValid = "";
+    let helpMessage = ""
     // Only allow letters, numbers,underscores and forward slashes
     const regex = /^[a-zA-Z0-9_/]*$/;
-    if (regex.test(value)) {
-      validExpression = value;
-    }
-    else {
-      alert("Please Enter Valid Input Path.");
-      validExpression = '/';
+    if (!regex.test(value)) {
+      helpMessage = "Please enter valid path"
+      inputValid = "error"
     }
     this.setState({
-      inputPath: validExpression
+      inputPath: value,
+      inputPathValid: inputValid as inputPathValidity,
+      helpMessage: helpMessage
     });
   };
 
@@ -306,7 +312,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   render() {
-    const { treeResponse, isLoading, inputPath, date, treeEndpointFailed } = this.state;
+    const { treeResponse, isLoading, inputPath, date, treeEndpointFailed, inputPathValid, helpMessage } = this.state;
+    
     const menuCalendar = (
       <Menu
         defaultSelectedKeys={[date]}
@@ -365,9 +372,11 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                           <Button type='primary' onClick={e => this.resetInputpath(e, inputPath)}><Icon type='undo' /></Button>
                         </div>
                         <div className='path-input-container'>
-                          <h4 style={{ margin: "auto" }}>Path</h4>
+                          <h4 style={{ marginTop: "10px" }}>Path</h4>
                           <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
-                            <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange} />
+                            <Form.Item  className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
+                              <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange}/>
+                            </Form.Item>
                           </form>
                         </div>
                         <div className='entity-dropdown-button'>

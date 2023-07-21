@@ -19,6 +19,7 @@
 .heatmap-container {
 
   .heatmap-header-container {
+    height: 7vh;
     display: flex;
     justify-content: space-between;
     align-items: stretch;
@@ -31,6 +32,10 @@
     .path-input-container {
       display: inline-flex;
       margin-left: 15px;
+      align-items: flex-start;
+      .path-input-element{
+        margin: 0px;
+      }
     }
 
   .entity-dropdown-button {
@@ -57,6 +62,8 @@
 
     .heatmap-legend-container {
       display: flex !important;
+      align-self: flex-start;
+      margin-top: 10px;
 
       .heatmap-legend-item{
         display: flex;
