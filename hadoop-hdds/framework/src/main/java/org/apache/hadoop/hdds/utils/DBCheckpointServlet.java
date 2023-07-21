@@ -220,7 +220,9 @@ public class DBCheckpointServlet extends HttpServlet
       dbMetrics.incNumCheckpointFails();
     } finally {
       try {
-        FileUtils.deleteDirectory(tmpdir.toFile());
+        if (tmpdir != null) {
+          FileUtils.deleteDirectory(tmpdir.toFile());
+        }
       } catch (IOException e) {
         LOG.error("unable to delete: " + tmpdir);
       }

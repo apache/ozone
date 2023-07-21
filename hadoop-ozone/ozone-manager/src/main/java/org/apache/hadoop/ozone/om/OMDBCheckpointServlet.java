@@ -201,9 +201,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         differ.getSSTBackupDir());
     DirectoryData compactionLogDir = new DirectoryData(tmpdir,
         differ.getCompactionLogDir());
-    sstBackupDir.getTmpDir().mkdirs();
-    compactionLogDir.getTmpDir().mkdirs();
+    if (!sstBackupDir.getTmpDir().mkdirs()) {
+      throw new IOException("mkdirs failed: " + sstBackupDir.getTmpDir());
+    }
+    if (!compactionLogDir.getTmpDir().mkdirs()) {
+      throw new IOException("mkdirs failed: " + compactionLogDir.getTmpDir());
+    }
 
+    long startTime = System.currentTimeMillis();
     try {
       pauseCounter++;
       LOG.info("Compaction pausing started: " + pauseCounter);
@@ -218,7 +223,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
         differ.decrementTarballRequestCount();
         differ.notifyAll();
-        LOG.info("Compaction pausing ended: " + pauseCounter);
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        LOG.info("Compaction pausing ended: {} Elapsed ms: {}",
+            pauseCounter, elapsedTime);
       }
     }
 
@@ -458,7 +465,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // it should be linked to path in files.
   private static Path findLinkPath(Collection<Path> files, String fileName) {
     for (Path p: files) {
-      if (p.getFileName().toString().equals(fileName)) {
+      Path file = p.getFileName();
+      if ((file != null) && file.toString().equals(fileName)) {
         return p;
       }
     }
