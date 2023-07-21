@@ -563,6 +563,9 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Returns Iterator to iterate over all keys after prevKey in the bucket.
    * If shallow is true, iterator will only contain immediate children.
+   * This applies to the aws s3 list with delimiter '/' scenario.
+   * Note: When shallow is true, whether keyPrefix ends with slash or not
+   * will affect the results, see {@code getNextShallowListOfKeys}.
    *
    * @param keyPrefix Bucket prefix to match
    * @param prevKey Keys will be listed after this key name
@@ -1173,11 +1176,14 @@ public class OzoneBucket extends WithMetadata {
      *      a/b3/e2/
      *      a/b3/e3/
      *
-     * Example 1: keyPrefix="a/b2/", prevKey=""
+     * When keyPrefix ends without slash (/), the result as Example 1:
+     * Example 1: keyPrefix="a/b2", prevKey=""
+     *            result: [a/b2/]
+     * Example 2: keyPrefix="a/b2/", prevKey=""
      *            result: [a/b2/d1/, a/b2/d2/, a/b2/d3/]
-     * Example 2: keyPrefix="a/b2/", prevKey="a/b2/d2/d21.txt"
+     * Example 3: keyPrefix="a/b2/", prevKey="a/b2/d2/d21.txt"
      *            result: [a/b2/d2/, a/b2/d3/]
-     * Example 3: keyPrefix="a/b2/", prevKey="a/b2/d2/d22.txt"
+     * Example 4: keyPrefix="a/b2/", prevKey="a/b2/d2/d22.txt"
      *            result: [a/b2/d3/]
      * Say, keyPrefix="a/b" and prevKey="", the results will be
      * [a/b1/, a/b2/, a/b3/]
