@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -93,7 +94,7 @@ public class BlockDeletingService extends BackgroundService {
   public BlockDeletingService(OzoneContainer ozoneContainer,
                               long serviceInterval, long serviceTimeout,
                               TimeUnit timeUnit, int workerSize,
-                              ConfigurationSource conf) {
+                              OzoneConfiguration conf) {
     super("BlockDeletingService", serviceInterval, timeUnit,
         workerSize, serviceTimeout);
     this.ozoneContainer = ozoneContainer;

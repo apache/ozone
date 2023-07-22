@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -98,7 +99,7 @@ public class OzoneContainer {
 
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
-  private final ConfigurationSource config;
+  private final OzoneConfiguration config;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
   private final MutableVolumeSet dbVolumeSet;
@@ -135,7 +136,7 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      DatanodeDetails datanodeDetails, OzoneConfiguration conf,
       StateContext context, CertificateClient certClient,
       SecretKeyVerifierClient secretKeyClient) throws IOException {
     config = conf;
@@ -268,7 +269,7 @@ public class OzoneContainer {
    */
   @VisibleForTesting
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource conf,
+      DatanodeDetails datanodeDetails, OzoneConfiguration conf,
       StateContext context) throws IOException {
     this(datanodeDetails, conf, context, null, null);
   }

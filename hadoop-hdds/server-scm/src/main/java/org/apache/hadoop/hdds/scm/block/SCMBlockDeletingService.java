@@ -30,7 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -97,7 +97,7 @@ public class SCMBlockDeletingService extends BackgroundService
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
              NodeManager nodeManager, EventPublisher eventPublisher,
              SCMContext scmContext, SCMServiceManager serviceManager,
-             ConfigurationSource conf,
+             OzoneConfiguration conf,
              ScmBlockDeletingServiceMetrics metrics,
              Clock clock) {
     super("SCMBlockDeletingService",
