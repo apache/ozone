@@ -418,6 +418,7 @@ public class TestOMDbCheckpointServlet {
       // with the snapshot data.
       doNothing().when(checkpoint).cleanupCheckpoint();
       realCheckpoint.set(checkpoint);
+
       // put "unexpected" fabricated files onto the fs after the files
       // get copied to the temp dir.  Since these appear in the "real"
       // dir after the copy, they shouldn't exist in the final file
@@ -509,6 +510,7 @@ public class TestOMDbCheckpointServlet {
     Assertions.assertTrue(finalFullSet.contains(expectedSstStr));
     Assertions.assertTrue(initialFullSet.contains(unExpectedLogStr));
     Assertions.assertTrue(initialFullSet.contains(unExpectedSstStr));
+
     // Remove the dummy files that should not have been copied over
     // from the expected data.
     initialFullSet.remove(unExpectedLogStr);
