@@ -144,11 +144,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     suspended.set(false);
   }
 
-  public synchronized int getKeyLimitPerTask() {
+  public int getKeyLimitPerTask() {
     return keyLimitPerTask;
   }
 
-  public synchronized void setKeyLimitPerTask(int keyLimitPerTask) {
+  public void setKeyLimitPerTask(int keyLimitPerTask) {
     this.keyLimitPerTask = keyLimitPerTask;
   }
 

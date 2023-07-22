@@ -159,7 +159,7 @@ public class ScmConfig extends ReconfigurableConfig {
     this.ecPipelineChoosePolicyName = policyName;
   }
 
-  public synchronized void setBlockDeletionLimit(int blockDeletionLimit) {
+  public void setBlockDeletionLimit(int blockDeletionLimit) {
     this.blockDeletionLimit = blockDeletionLimit;
   }
 
@@ -183,7 +183,7 @@ public class ScmConfig extends ReconfigurableConfig {
     return ecPipelineChoosePolicyName;
   }
 
-  public synchronized int getBlockDeletionLimit() {
+  public int getBlockDeletionLimit() {
     return blockDeletionLimit;
   }
 

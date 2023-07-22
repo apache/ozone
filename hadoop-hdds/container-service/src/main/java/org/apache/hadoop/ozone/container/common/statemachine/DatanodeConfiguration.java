@@ -237,11 +237,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private int blockLimitPerInterval = 5000;
 
-  public synchronized int getBlockDeletionLimit() {
+  public int getBlockDeletionLimit() {
     return blockLimitPerInterval;
   }
 
-  public synchronized void setBlockDeletionLimit(int limit) {
+  public void setBlockDeletionLimit(int limit) {
     this.blockLimitPerInterval = limit;
   }
 
@@ -684,11 +684,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.diskCheckTimeout = duration.toMillis();
   }
 
-  public synchronized int getBlockDeleteThreads() {
+  public int getBlockDeleteThreads() {
     return blockDeleteThreads;
   }
 
-  public synchronized void setBlockDeleteThreads(int threads) {
+  public void setBlockDeleteThreads(int threads) {
     this.blockDeleteThreads = threads;
   }
 
