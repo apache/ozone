@@ -146,8 +146,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // the same.  For synchronization purposes, some files are copied
     // to a temp directory on the leader.  In those cases the source
     // and dest won't be the same.
-
     Map<Path, Path> copyFiles = new HashMap<>();
+
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
@@ -210,6 +210,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     long startTime = System.currentTimeMillis();
     long pauseCounter = PAUSE_COUNTER.incrementAndGet();
+
+    // Pause compactions, Copy/link files and get checkpoint.
     try {
       LOG.info("Compaction pausing {} started.", pauseCounter);
       differ.incrementTarballRequestCount();
@@ -369,23 +371,28 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             LOG.debug("Skipping unneeded file: " + file);
             continue;
           }
+
+          // Skip the real compaction log dir.
           File compactionLogDir = new File(getDbStore().
               getRocksDBCheckpointDiffer().getCompactionLogDir());
           if (f.equals(compactionLogDir)) {
             LOG.debug("Skipping compaction log dir");
             continue;
           }
+
+          // Skip the real compaction sst backup dir.
           File sstBackupDir = new File(getDbStore().
               getRocksDBCheckpointDiffer().getSSTBackupDir());
           if (f.equals(sstBackupDir)) {
             LOG.debug("Skipping sst backup dir");
             continue;
           }
-          Path filename = file.getFileName();
           // findbugs nonsense
+          Path filename = file.getFileName();
           if (filename == null) {
             throw new IOException("file has no filename:" + file);
           }
+
           // Update the dest dir to point to the subdir
           Path destSubDir = null;
           if (destDir != null) {
@@ -429,11 +436,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     long fileSize = 0;
     Path destFile = file;
-    Path filename = file.getFileName();
+
     // findbugs nonsense
+    Path filename = file.getFileName();
     if (filename == null) {
       throw new IOException("file has no filename:" + file);
     }
+
     // if the dest dir is not null then the file needs to be copied/linked
     // to the dest dir on the follower.
     if (destDir != null) {
@@ -507,10 +516,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Go through each of the files to be copied and add to archive.
     for (Map.Entry<Path, Path> entry : filteredCopyFiles.entrySet()) {
       Path file = entry.getValue();
+
+      // Confirm the data is in the right place.
       if (!file.toString().startsWith(metaDirPath.toString())) {
         throw new IOException("tarball file not in metadata dir: "
             + file + ": " + metaDirPath);
       }
+
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball

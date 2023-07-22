@@ -390,6 +390,9 @@ public class TestOMDbCheckpointServlet {
     String sstBackupDir = dbStore.
         getRocksDBCheckpointDiffer().getSSTBackupDir();
 
+    // Create files to be copied from the compaction pause
+    // temp directories so we can confirm they are correctly
+    // copied.  The unexpected files should NOT be copied.
     Path expectedLog = Paths.get(compactionLogDir, "expected" +
         COMPACTION_LOG_FILE_NAME_SUFFIX);
     String expectedLogStr = truncateFileName(metaDirLength, expectedLog);

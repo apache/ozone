@@ -441,7 +441,7 @@ public class TestOmSnapshotManager {
     Path destDir = Paths.get(testDir.toString(), "destDir");
     Assert.assertTrue(new File(destDir.toString()).mkdirs());
 
-
+    // Create test files.
     Path copyFile = Paths.get(testDir.toString(),
         "snap1/copyfile.sst");
     Path destCopyFile = Paths.get(destDir.toString(),
@@ -480,6 +480,7 @@ public class TestOmSnapshotManager {
     Files.write(addNonSstToCopiedFiles,
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
+    // Create test data structures.
     Set<Path> toExcludeFiles = new HashSet<>(
         Collections.singletonList(destExcludeFile));
     Map<Path, Path> copyFiles = new HashMap<>();
@@ -487,6 +488,7 @@ public class TestOmSnapshotManager {
     List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
+
     // Confirm the exclude file gets added to the excluded list,
     //  (and thus is excluded.)
     fileSize = processFile(excludeFile, copyFiles, hardLinkFiles,

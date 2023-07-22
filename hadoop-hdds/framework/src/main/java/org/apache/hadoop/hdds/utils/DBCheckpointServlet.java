@@ -238,6 +238,7 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  @Override
   public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
       throws IOException {
     return dbStore.getCheckpoint(flush);
