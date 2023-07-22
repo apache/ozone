@@ -93,7 +93,6 @@ public class DatanodeStateMachine implements Closeable {
   private final ExecutorService executorService;
   private final ExecutorService pipelineCommandExecutorService;
   private final ConfigurationSource conf;
-  private final DatanodeConfiguration dnConf;
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
   private StateContext context;
@@ -142,7 +141,9 @@ public class DatanodeStateMachine implements Closeable {
                               SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
                               DatanodeCRLStore crlStore) throws IOException {
-    dnConf = conf.getObject(DatanodeConfiguration.class);
+    DatanodeConfiguration dnConf =
+        conf.getSingletonObject(DatanodeConfiguration.class);
+
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -737,9 +738,5 @@ public class DatanodeStateMachine implements Closeable {
 
   public DatanodeQueueMetrics getQueueMetrics() {
     return queueMetrics;
-  }
-
-  public DatanodeConfiguration getDnConf() {
-    return dnConf;
   }
 }

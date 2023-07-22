@@ -688,7 +688,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   private String reconfigBlockDeleteThreadMax(String value) {
     getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
-    getDatanodeStateMachine().getDnConf()
+    conf.getSingletonObject(DatanodeConfiguration.class)
         .setBlockDeleteThreads(Integer.parseInt(value));
 
     DeleteBlocksCommandHandler handler =
