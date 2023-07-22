@@ -205,7 +205,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public void registerRootCARotationListener(
+  public synchronized void registerRootCARotationListener(
       Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
     if (securityConfig.isAutoCARotationEnabled()) {
       rootCaRotationPoller.addRootCARotationProcessor(listener);
@@ -1333,7 +1333,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return CompletableFuture.completedFuture(null);
     }
     CertificateRenewerService renewerService =
-        new CertificateRenewerService(true);
+        new CertificateRenewerService(
+            true, rootCaRotationPoller::setCertificateRenewalError);
     return CompletableFuture.runAsync(renewerService, executorService);
   }
 
@@ -1355,7 +1356,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
-        new CertificateRenewerService(false),
+        new CertificateRenewerService(false, () -> {
+        }),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateRenewerService for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1367,9 +1369,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   public class CertificateRenewerService implements Runnable {
     private boolean forceRenewal;
+    private Runnable rotationErrorCallback;
 
-    public CertificateRenewerService(boolean forceRenewal) {
+    public CertificateRenewerService(boolean forceRenewal,
+        Runnable rotationErrorCallback) {
       this.forceRenewal = forceRenewal;
+      this.rotationErrorCallback = rotationErrorCallback;
     }
 
     @Override
@@ -1397,6 +1402,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               timeLeft, forceRenewal);
           newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
         } catch (CertificateException e) {
+          rotationErrorCallback.run();
           if (e.errorCode() ==
               CertificateException.ErrorCode.ROLLBACK_ERROR) {
             if (shutdownCallback != null) {

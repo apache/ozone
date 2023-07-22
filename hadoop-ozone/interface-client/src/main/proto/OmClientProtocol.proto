@@ -1783,7 +1783,7 @@ message DeleteSnapshotRequest {
 }
 
 message PrintCompactionLogDagRequest {
-  optional string fileName = 1;
+  optional string fileNamePrefix = 1;
   optional string graphType = 2;
 }
 
@@ -1879,7 +1879,7 @@ message DeleteSnapshotResponse {
 }
 
 message PrintCompactionLogDagResponse {
-  optional string imagePath = 1;
+  optional string message = 1;
 }
 
 message SnapshotMoveDeletedKeysResponse {

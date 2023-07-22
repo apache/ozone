@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -51,6 +52,8 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_READONLY_ADMINISTRATORS)
         .addAll(new ReplicationManagerConfiguration()
+            .reconfigurableProperties())
+        .addAll(new WritableECContainerProviderConfig()
             .reconfigurableProperties())
         .addAll(new ScmConfig().reconfigurableProperties())
         .build();

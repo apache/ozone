@@ -98,7 +98,7 @@ public class SnapshotDiffHandler extends Handler {
   private void getSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
     try (PrintStream stream = out()) {
-      stream.print(store.snapshotDiff(volumeName, bucketName, fromSnapshot,
+      stream.println(store.snapshotDiff(volumeName, bucketName, fromSnapshot,
           toSnapshot, token, pageSize, forceFullDiff, diffDisableNativeLibs));
     }
   }

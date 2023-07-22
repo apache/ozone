@@ -23,6 +23,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
  * */
 public class OzoneAccessAuthorizer implements IAccessAuthorizer {
 
+  private static final OzoneAccessAuthorizer INSTANCE =
+      new OzoneAccessAuthorizer();
+
+  public static OzoneAccessAuthorizer get() {
+    return INSTANCE;
+  }
+
   @Override
   public boolean checkAccess(IOzoneObj ozoneObject, RequestContext context)
       throws OMException {

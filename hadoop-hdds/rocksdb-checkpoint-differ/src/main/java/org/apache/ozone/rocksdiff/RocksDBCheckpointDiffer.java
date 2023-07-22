@@ -1547,17 +1547,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return lock;
   }
 
-  public String pngPrintMutableGraph(String fileName, GraphType graphType)
+  public void pngPrintMutableGraph(String filePath, GraphType graphType)
       throws IOException {
-    Objects.requireNonNull(fileName, "Image file name is required.");
+    Objects.requireNonNull(filePath, "Image file path is required.");
     Objects.requireNonNull(graphType, "Graph type is required.");
 
     PrintableGraph graph;
     synchronized (this) {
-      graph = new PrintableGraph(forwardCompactionDAG, graphType);
+      graph = new PrintableGraph(backwardCompactionDAG, graphType);
     }
 
-    graph.generateImage(fileName);
-    return fileName;
+    graph.generateImage(filePath);
   }
 }

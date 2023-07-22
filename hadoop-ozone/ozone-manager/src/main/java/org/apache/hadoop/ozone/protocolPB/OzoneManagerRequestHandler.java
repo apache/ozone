@@ -1335,11 +1335,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private PrintCompactionLogDagResponse printCompactionLogDag(
       PrintCompactionLogDagRequest printCompactionLogDagRequest)
       throws IOException {
-    String imagePath = impl.printCompactionLogDag(
-        printCompactionLogDagRequest.getFileName(),
+    String message = impl.printCompactionLogDag(
+        printCompactionLogDagRequest.getFileNamePrefix(),
         printCompactionLogDagRequest.getGraphType());
     return PrintCompactionLogDagResponse.newBuilder()
-        .setImagePath(imagePath)
+        .setMessage(message)
         .build();
   }
 

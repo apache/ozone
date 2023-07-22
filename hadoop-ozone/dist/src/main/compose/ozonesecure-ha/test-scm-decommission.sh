@@ -23,36 +23,28 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
-
-: ${OZONE_BUCKET_KEY_NAME:=key1}
+export COMPOSE_FILE=docker-compose.yaml:scm-decommission.yaml
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
+# bootstrap new SCM4
+docker-compose up -d scm4.org
+wait_for_port scm4.org 9894 120
+execute_robot_test scm4.org kinit.robot
+wait_for_execute_command scm4.org 120 "ozone admin scm roles | grep scm4.org"
+execute_robot_test scm4.org scmha/primordial-scm.robot
 
-execute_robot_test s3g kinit.robot
+# add new datanode4
+docker-compose up -d datanode4
+wait_for_port datanode4 9856 120
+wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
 
-execute_robot_test s3g freon
-
-execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link ozonefs/ozonefs.robot
-
-execute_robot_test s3g basic/links.robot
-
-exclude=""
-for bucket in encrypted link; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
-done
-
-execute_robot_test s3g admincli
-
-execute_robot_test s3g omha/om-leader-transfer.robot
-
-execute_robot_test s3g httpfs
-
-export SCM=scm2.org
-execute_robot_test s3g admincli
+# decommission primordial node scm1.org
+SCMID=$(execute_command_in_container scm4.org bash -c "ozone admin scm roles" | grep scm4 | awk -F: '{print $4}')
+docker-compose stop scm4.org
+execute_robot_test scm3.org kinit.robot
+wait_for_execute_command scm3.org 60 "ozone admin scm decommission --nodeid=${SCMID} | grep Decommissioned"
+execute_robot_test scm3.org scmha/scm-decommission.robot
