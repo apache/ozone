@@ -92,7 +92,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private static final AtomicLong pauseCounter = new AtomicLong(0);
+  private static final AtomicLong PAUSE_COUNTER = new AtomicLong(0);
 
   @Override
   public void init() throws ServletException {
@@ -209,8 +209,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
 
     long startTime = System.currentTimeMillis();
+    long pauseCounter = PAUSE_COUNTER.incrementAndGet();
     try {
-      LOG.info("Compaction pausing started: {}", pauseCounter.incrementAndGet());
+      LOG.info("Compaction pausing {} started.", pauseCounter);
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getDir(),
           compactionLogDir.getTmpDir());
@@ -223,8 +224,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         differ.decrementTarballRequestCount();
         differ.notifyAll();
         long elapsedTime = System.currentTimeMillis() - startTime;
-        LOG.info("Compaction pausing ended: {} Elapsed ms: {}",
-            pauseCounter.get(), elapsedTime);
+        LOG.info("Compaction pausing {} ended. Elapsed ms: {}",
+            pauseCounter, elapsedTime);
       }
     }
 
