@@ -21,17 +21,18 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -45,16 +46,19 @@ class TestDatanodeReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void reconfigurableProperties() {
-    assertProperties(getSubject(), ImmutableSet.of(
-        HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL,
-        HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-        OZONE_BLOCK_DELETING_SERVICE_WORKERS));
+    Set<String> expected = ImmutableSet.<String>builder()
+        .add(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX)
+        .add(OZONE_BLOCK_DELETING_SERVICE_WORKERS)
+        .addAll(new DatanodeConfiguration().reconfigurableProperties())
+        .build();
+
+    assertProperties(getSubject(), expected);
   }
 
   @Test
   void blockDeletingLimitPerInterval() throws ReconfigurationException {
     getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
-        HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, "1");
+        "hdds.datanode.block.deleting.limit.per.interval", "1");
 
     assertEquals(1, getFirstDatanode().getDatanodeStateMachine().getContainer()
         .getBlockDeletingService().getBlockLimitPerInterval());

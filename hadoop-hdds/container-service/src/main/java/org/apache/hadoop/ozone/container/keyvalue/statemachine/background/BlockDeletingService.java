@@ -83,8 +83,7 @@ public class BlockDeletingService extends BackgroundService {
   private OzoneContainer ozoneContainer;
   private ContainerDeletionChoosingPolicy containerDeletionPolicy;
   private final ConfigurationSource conf;
-
-  private final DatanodeConfiguration dfsConf;
+  private final DatanodeConfiguration dnConf;
 
   private final BlockDeletingServiceMetrics metrics;
 
@@ -107,7 +106,7 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    dfsConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf = conf.getSingletonObject(DatanodeConfiguration.class);
     metrics = BlockDeletingServiceMetrics.create();
   }
 
@@ -670,10 +669,6 @@ public class BlockDeletingService extends BackgroundService {
   }
 
   public int getBlockLimitPerInterval() {
-    return dfsConf.getBlockDeletionLimit();
-  }
-
-  public DatanodeConfiguration getDfsConf() {
-    return dfsConf;
+    return dnConf.getBlockDeletionLimit();
   }
 }

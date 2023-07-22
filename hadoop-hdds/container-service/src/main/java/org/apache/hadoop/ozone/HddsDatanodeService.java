@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -85,7 +86,6 @@ import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_H
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.slf4j.Logger;
@@ -307,12 +307,11 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
       reconfigurationHandler =
           new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
-              .register(HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL,
-                  this::reconfigBlockDeletingLimitPerInterval)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-                  this::reconfigDeletingServiceWorkers);
+                  this::reconfigDeletingServiceWorkers)
+              .register(conf.getSingletonObject(DatanodeConfiguration.class));
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
@@ -685,14 +684,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
-  }
-
-  private String reconfigBlockDeletingLimitPerInterval(String value) {
-    getConf().set(HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL, value);
-
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
-        .getDfsConf().setBlockDeletionLimit(Integer.parseInt(value));
-    return value;
   }
 
   private String reconfigBlockDeleteThreadMax(String value) {

@@ -26,6 +26,7 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +36,8 @@ import java.time.Duration;
  * Configuration class used for high level datanode configuration parameters.
  */
 @ConfigGroup(prefix = CONFIG_PREFIX)
-public class DatanodeConfiguration {
+public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONFIG_PREFIX = "hdds.datanode";
-
-  private static final String BLOCK_DELETING_LIMIT_PER_INTERVAL
-      = "block.deleting.limit.per.interval";
-  public static final String HDDS_DATANODE_BLOCK_DELETING_LIMIT_PER_INTERVAL =
-      CONFIG_PREFIX + "." + BLOCK_DELETING_LIMIT_PER_INTERVAL;
 
   private static final String BLOCK_DELETE_THREAD_MAX
       = "block.delete.threads.max";
@@ -231,8 +227,9 @@ public class DatanodeConfiguration {
     this.blockDeletionInterval = duration.toMillis();
   }
 
-  @Config(key = BLOCK_DELETING_LIMIT_PER_INTERVAL,
+  @Config(key = "block.deleting.limit.per.interval",
       defaultValue = "5000",
+      reconfigurable = true,
       type = ConfigType.INT,
       tags = { ConfigTag.SCM, ConfigTag.DELETION },
       description =

@@ -184,6 +184,20 @@ public interface ConfigurationSource {
   }
 
   /**
+   * Returns a singleton instance of the given configuration class.
+   * If an instance of the class has already been created,
+   * it will be returned; otherwise, a new instance will be created,
+   * stored in a map for future retrieval.
+   *
+   * @param configurationClass The class for which a singleton
+   *                           instance is required
+   * @return a singleton instance of the given class
+   */
+  default <T> T getSingletonObject(Class<T> configurationClass) {
+    return getObject(configurationClass);
+  }
+
+  /**
    * Update {@code object}'s reconfigurable properties from this configuration.
    */
   default <T> void reconfigure(Class<T> configClass, T object) {

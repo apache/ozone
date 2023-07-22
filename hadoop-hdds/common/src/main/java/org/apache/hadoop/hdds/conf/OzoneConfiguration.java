@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -59,7 +60,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKD
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
-
+  private final Map<Class<?>, Object> singletons = new ConcurrentHashMap<>();
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
           .map(Enum::name)
@@ -335,4 +336,16 @@ public class OzoneConfiguration extends Configuration
             OZONE_CONTAINER_COPY_WORKDIR)
     });
   }
+
+  @Override
+  public synchronized <T> T getSingletonObject(Class<T> configurationClass) {
+    if (singletons.containsKey(configurationClass)) {
+      return (T) singletons.get(configurationClass);
+    }
+
+    T singletonObject = getObject(configurationClass);
+    singletons.put(configurationClass, singletonObject);
+    return singletonObject;
+  }
+
 }
