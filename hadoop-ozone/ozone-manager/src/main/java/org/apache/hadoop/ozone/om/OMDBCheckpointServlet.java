@@ -92,7 +92,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final long serialVersionUID = 1L;
   private transient BootstrapStateHandler.Lock lock;
   private long maxTotalSstSize = 0;
-  private static long pauseCounter;
+  private static final AtomicLong pauseCounter = new AtomicLong(0);
 
   @Override
   public void init() throws ServletException {
@@ -210,8 +210,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     long startTime = System.currentTimeMillis();
     try {
-      pauseCounter++;
-      LOG.info("Compaction pausing started: " + pauseCounter);
+      LOG.info("Compaction pausing started: {}", pauseCounter.incrementAndGet());
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getDir(),
           compactionLogDir.getTmpDir());
@@ -225,7 +224,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         differ.notifyAll();
         long elapsedTime = System.currentTimeMillis() - startTime;
         LOG.info("Compaction pausing ended: {} Elapsed ms: {}",
-            pauseCounter, elapsedTime);
+            pauseCounter.get(), elapsedTime);
       }
     }
 
@@ -381,11 +380,16 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             LOG.debug("Skipping sst backup dir");
             continue;
           }
+          Path filename = file.getFileName();
+          // findbugs nonsense
+          if (filename == null) {
+            throw new IOException("file has no filename:" + file);
+          }
           // Update the dest dir to point to the subdir
           Path destSubDir = null;
           if (destDir != null) {
             destSubDir = Paths.get(destDir.toString(),
-                file.getFileName().toString());
+                filename.toString());
           }
           if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
                           snapshotPaths, excluded, copySize, destSubDir)) {
@@ -424,10 +428,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       throws IOException {
     long fileSize = 0;
     Path destFile = file;
+    Path filename = file.getFileName();
+    // findbugs nonsense
+    if (filename == null) {
+      throw new IOException("file has no filename:" + file);
+    }
     // if the dest dir is not null then the file needs to be copied/linked
     // to the dest dir on the follower.
     if (destDir != null) {
-      destFile = Paths.get(destDir.toString(), file.getFileName().toString());
+      destFile = Paths.get(destDir.toString(), filename.toString());
     }
     if (toExcludeFiles.contains(destFile)) {
       excluded.add(destFile.toString());
