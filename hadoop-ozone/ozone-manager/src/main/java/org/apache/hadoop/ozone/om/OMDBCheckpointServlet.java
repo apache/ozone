@@ -188,9 +188,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return paths;
   }
 
+  /**
+   * Pauses rocksdb compaction threads while creating copies of
+   * compaction logs and hard links of sst backups.
+   * @param  tmpdir - Place to create copies/links
+   * @param  flush -  Whether to flush the db or not.
+   * @return Checkpoint containing snapshot entries expected.
+   */
   @Override
-  // Pauses rocksdb compaction threads while creating copies of
-  // compaction logs and hard links of sst backups.
   public DBCheckpoint getCheckpoint(Path tmpdir, boolean flush)
       throws IOException {
     DBCheckpoint checkpoint;
@@ -201,12 +206,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         differ.getSSTBackupDir());
     DirectoryData compactionLogDir = new DirectoryData(tmpdir,
         differ.getCompactionLogDir());
-    if (!sstBackupDir.getTmpDir().mkdirs()) {
-      throw new IOException("mkdirs failed: " + sstBackupDir.getTmpDir());
-    }
-    if (!compactionLogDir.getTmpDir().mkdirs()) {
-      throw new IOException("mkdirs failed: " + compactionLogDir.getTmpDir());
-    }
 
     long startTime = System.currentTimeMillis();
     long pauseCounter = PAUSE_COUNTER.incrementAndGet();
@@ -215,9 +214,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     try {
       LOG.info("Compaction pausing {} started.", pauseCounter);
       differ.incrementTarballRequestCount();
-      FileUtils.copyDirectory(compactionLogDir.getDir(),
+      FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
           compactionLogDir.getTmpDir());
-      OmSnapshotUtils.linkFiles(sstBackupDir.getDir(),
+      OmSnapshotUtils.linkFiles(sstBackupDir.getOriginalDir(),
           sstBackupDir.getTmpDir());
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
@@ -230,22 +229,24 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             pauseCounter, elapsedTime);
       }
     }
-
     return checkpoint;
   }
 
 
-  // Convenience class for keeping track of the tmp dir's.
+  // Convenience class for keeping track of the tmp dirs.
   private static class DirectoryData {
-    private final File dir;
+    private final File originalDir;
     private final File tmpDir;
-    DirectoryData(Path tmpdir, String dirStr) {
-      dir = new File(dirStr);
-      tmpDir = new File(tmpdir.toString(), getDir().getName());
+    DirectoryData(Path tmpdir, String dirStr) throws IOException {
+      originalDir = new File(dirStr);
+      tmpDir = new File(tmpdir.toString(), getOriginalDir().getName());
+      if (!tmpDir.exists() && !tmpDir.mkdirs()) {
+        throw new IOException("mkdirs failed: " + tmpDir);
+      }
     }
 
-    public File getDir() {
-      return dir;
+    public File getOriginalDir() {
+      return originalDir;
     }
 
     public File getTmpDir() {
@@ -266,7 +267,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
 
     // Tarball limits are not implemented for processes that don't
-    // include snapshots.  Currently this is just for recon.
+    // include snapshots.  Currently, this is just for recon.
     if (!includeSnapshotData) {
       maxTotalSstSize = Long.MAX_VALUE;
     }
@@ -300,7 +301,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Process the tmp sst compaction dir.
     if (!processDir(sstBackupDir.getTmpDir().toPath(), copyFiles, hardLinkFiles,
         toExcludeFiles, new HashSet<>(), excluded, copySize,
-        sstBackupDir.getDir().toPath())) {
+        sstBackupDir.getOriginalDir().toPath())) {
       return false;
     }
 
@@ -308,7 +309,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return processDir(compactionLogDir.getTmpDir().toPath(), copyFiles,
         hardLinkFiles, toExcludeFiles,
         new HashSet<>(), excluded, copySize,
-        compactionLogDir.getDir().toPath());
+        compactionLogDir.getOriginalDir().toPath());
 
   }
 
@@ -393,7 +394,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             throw new IOException("file has no filename:" + file);
           }
 
-          // Update the dest dir to point to the subdir
+          // Update the dest dir to point to the sub dir
           Path destSubDir = null;
           if (destDir != null) {
             destSubDir = Paths.get(destDir.toString(),
