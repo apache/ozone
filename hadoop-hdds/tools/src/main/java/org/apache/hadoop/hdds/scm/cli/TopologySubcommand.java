@@ -145,7 +145,7 @@ public class TopologySubcommand extends ScmSubcommand
   // Location: rack1
   //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes,
-                                      String nState) throws IOException {
+                                      String nodeStateStr) throws IOException {
     HashMap<String, TreeSet<DatanodeDetails>> tree =
         new HashMap<>();
     HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
@@ -166,24 +166,24 @@ public class TopologySubcommand extends ScmSubcommand
       List<NodeTopologyOrder> nodesJson = new ArrayList<>();
       locations.forEach(location -> {
         tree.get(location).forEach(n -> {
-          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nState,
+          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nodeStateStr,
               state.get(n).toString());
           nodesJson.add(nodeJson);
         });
       });
       System.out.println(
           JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
-    } else {
-      // show node state
-      System.out.println("State = " + nState);
-      locations.forEach(location -> {
-        System.out.println("Location: " + location);
-        tree.get(location).forEach(n -> {
-          System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
-              + ") " + state.get(n));
-        });
-      });
+      return;
     }
+    // show node state
+    System.out.println("State = " + nodeStateStr);
+    locations.forEach(location -> {
+      System.out.println("Location: " + location);
+      tree.get(location).forEach(n -> {
+        System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
+            + ") " + state.get(n));
+      });
+    });
   }
 
   private String formatPortOutput(List<HddsProtos.Port> ports) {
@@ -206,41 +206,40 @@ public class TopologySubcommand extends ScmSubcommand
   //     networkLocation
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes,
                                       String state) throws IOException {
-    if (json) {
-      if (fullInfo) {
-        ArrayList<NodeTopologyFull> nodesJson = new ArrayList<>();
-        nodes.forEach(node -> {
-          NodeTopologyFull nodeJson =
-              new NodeTopologyFull(
-                  DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
-          nodesJson.add(nodeJson);
-        });
-        System.out.println(
-            JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
-      } else {
-        ArrayList<NodeTopologyDefault> nodesJson = new ArrayList<>();
-        nodes.forEach(node -> {
-          NodeTopologyDefault nodeJson = new NodeTopologyDefault(
-              DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
-          nodesJson.add(nodeJson);
-        });
-        System.out.println(
-            JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
-      }
-    } else {
-      // show node state
-      System.out.println("State = " + state);
+    if (json && fullInfo) {
+      List<NodeTopologyFull> nodesJson = new ArrayList<>();
       nodes.forEach(node -> {
-        System.out.print(" " + getAdditionNodeOutput(node) +
-            node.getNodeID().getIpAddress() + "(" +
-            node.getNodeID().getHostName() + ")" +
-            ":" + formatPortOutput(node.getNodeID().getPortsList()));
-        System.out.println("    "
-            + node.getNodeOperationalStates(0) + "    " +
-            (node.getNodeID().getNetworkLocation() != null ?
-                node.getNodeID().getNetworkLocation() : "NA"));
+        NodeTopologyFull nodeJson =
+            new NodeTopologyFull(
+                DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
+        nodesJson.add(nodeJson);
       });
+      System.out.println(
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+      return;
+    } else if (json) {
+      List<NodeTopologyDefault> nodesJson = new ArrayList<>();
+      nodes.forEach(node -> {
+        NodeTopologyDefault nodeJson = new NodeTopologyDefault(
+            DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
+        nodesJson.add(nodeJson);
+      });
+      System.out.println(
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+      return;
     }
+    // show node state
+    System.out.println("State = " + state);
+    nodes.forEach(node -> {
+      System.out.print(" " + getAdditionNodeOutput(node) +
+          node.getNodeID().getIpAddress() + "(" +
+          node.getNodeID().getHostName() + ")" +
+          ":" + formatPortOutput(node.getNodeID().getPortsList()));
+      System.out.println("    "
+          + node.getNodeOperationalStates(0) + "    " +
+          (node.getNodeID().getNetworkLocation() != null ?
+              node.getNodeID().getNetworkLocation() : "NA"));
+    });
   }
 
   private static class ListJsonSerializer extends
@@ -264,12 +263,13 @@ public class TopologySubcommand extends ScmSubcommand
     private String operationalState;
     private String networkLocation;
 
-    NodeTopologyOrder(DatanodeDetails node, String nState, String opState) {
+    NodeTopologyOrder(DatanodeDetails node, String nodeStateStr, String opState) {
       ipAddress = node.getIpAddress();
       hostName = node.getHostName();
-      nodeState = nState;
+      nodeState = nodeStateStr;
       operationalState = opState;
-      networkLocation = node.getNetworkLocation();
+      networkLocation = (node.getNetworkLocation() != null ?
+          node.getNetworkLocation() : "NA");
     }
 
     public String getIpAddress() {
