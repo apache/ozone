@@ -145,10 +145,10 @@ public class TopologySubcommand extends ScmSubcommand
   // Location: rack1
   //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes,
-                                      String nodeStateStr) throws IOException {
+                                      String state) throws IOException {
     HashMap<String, TreeSet<DatanodeDetails>> tree =
         new HashMap<>();
-    HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
+    HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> operationalState =
         new HashMap<>();
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
@@ -157,7 +157,7 @@ public class TopologySubcommand extends ScmSubcommand
       }
       DatanodeDetails dn = DatanodeDetails.getFromProtoBuf(node.getNodeID());
       tree.get(location).add(dn);
-      state.put(dn, node.getNodeOperationalStates(0));
+      operationalState.put(dn, node.getNodeOperationalStates(0));
     }
     ArrayList<String> locations = new ArrayList<>(tree.keySet());
     Collections.sort(locations);
@@ -166,8 +166,8 @@ public class TopologySubcommand extends ScmSubcommand
       List<NodeTopologyOrder> nodesJson = new ArrayList<>();
       locations.forEach(location -> {
         tree.get(location).forEach(n -> {
-          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, nodeStateStr,
-              state.get(n).toString());
+          NodeTopologyOrder nodeJson = new NodeTopologyOrder(n, state,
+              operationalState.get(n).toString());
           nodesJson.add(nodeJson);
         });
       });
@@ -176,12 +176,12 @@ public class TopologySubcommand extends ScmSubcommand
       return;
     }
     // show node state
-    System.out.println("State = " + nodeStateStr);
+    System.out.println("State = " + state);
     locations.forEach(location -> {
       System.out.println("Location: " + location);
       tree.get(location).forEach(n -> {
         System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
-            + ") " + state.get(n));
+            + ") " + operationalState.get(n));
       });
     });
   }
@@ -263,10 +263,10 @@ public class TopologySubcommand extends ScmSubcommand
     private String operationalState;
     private String networkLocation;
 
-    NodeTopologyOrder(DatanodeDetails node, String nodeStateStr, String opState) {
+    NodeTopologyOrder(DatanodeDetails node, String state, String opState) {
       ipAddress = node.getIpAddress();
       hostName = node.getHostName();
-      nodeState = nodeStateStr;
+      nodeState = state;
       operationalState = opState;
       networkLocation = (node.getNetworkLocation() != null ?
           node.getNetworkLocation() : "NA");
