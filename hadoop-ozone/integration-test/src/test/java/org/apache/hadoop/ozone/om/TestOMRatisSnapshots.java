@@ -171,7 +171,7 @@ public class TestOMRatisSnapshots {
           1, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
           OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
-          20, TimeUnit.SECONDS);
+          30, TimeUnit.SECONDS);
       conf.setTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
           5, TimeUnit.SECONDS);
@@ -1100,6 +1100,22 @@ public class TestOMRatisSnapshots {
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
     }
 
+    // Prepare baseline data for compaction backup pruning
+    String sstBackupDir = leaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getSSTBackupDir();
+    Assertions.assertNotNull(sstBackupDir);
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    int numberOfSstFiles = 0;
+    try (DirectoryStream<Path> files =
+             Files.newDirectoryStream(sstBackupDirPath)) {
+      for (Path ignored : files) {
+        numberOfSstFiles++;
+      }
+    }
+
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -1147,22 +1163,6 @@ public class TestOMRatisSnapshots {
 
     checkSnapshot(newLeaderOM, newFollowerOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
-
-    // Prepare baseline data for compaction backup pruning pruning
-    String sstBackupDir = newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDir);
-    Path sstBackupDirPath = Paths.get(sstBackupDir);
-    int numberOfSstFiles = 0;
-    try (DirectoryStream<Path> files =
-             Files.newDirectoryStream(sstBackupDirPath)) {
-      for (Path ignored : files) {
-        numberOfSstFiles++;
-      }
-    }
 
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
@@ -1279,35 +1279,18 @@ public class TestOMRatisSnapshots {
 
     // Check whether compaction backup files were pruned
     final int finalNumberOfSstFiles = numberOfSstFiles;
-    try {
-      GenericTestUtils.waitFor(() -> {
-        int newNumberOfSstFiles = 0;
-        try (DirectoryStream<Path> files =
-                 Files.newDirectoryStream(sstBackupDirPath)) {
-          for (Path ignored : files) {
-            newNumberOfSstFiles++;
-          }
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-        return finalNumberOfSstFiles > newNumberOfSstFiles;
-      }, 1000, 10000);
-    } catch (TimeoutException e) {
-      // Force pruning to not introduce flaky test
+    GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = 0;
-      newLeaderOM
-          .getMetadataManager()
-          .getStore()
-          .getRocksDBCheckpointDiffer()
-          .pruneOlderSnapshotsWithCompactionHistory();
       try (DirectoryStream<Path> files =
                Files.newDirectoryStream(sstBackupDirPath)) {
         for (Path ignored : files) {
           newNumberOfSstFiles++;
         }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-      Assertions.assertTrue(numberOfSstFiles > newNumberOfSstFiles);
-    }
+      return finalNumberOfSstFiles > newNumberOfSstFiles;
+    }, 1000, 10000);
 
     // Snap diff
     String firstSnapshot = createOzoneSnapshot(newLeaderOM,
