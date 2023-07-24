@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
-import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
