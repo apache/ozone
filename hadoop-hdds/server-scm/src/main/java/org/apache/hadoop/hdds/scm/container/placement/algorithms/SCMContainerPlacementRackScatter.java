@@ -347,11 +347,10 @@ public final class SCMContainerPlacementRackScatter
 
     So, in both cases, we want to ask for nodesRequired number of nodes.
     */
-    int maxOuterLoopIterations = Math.min(nodesRequired, maxReplicasPerRack);
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>(
         chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, nodesRequired, metadataSizeRequired,
-            dataSizeRequired, maxOuterLoopIterations, usedRacksCntMap,
+            dataSizeRequired, maxReplicasPerRack, usedRacksCntMap,
             maxReplicasPerRack));
 
     if (chosenNodes.size() < additionalRacksRequired) {
@@ -386,10 +385,9 @@ public final class SCMContainerPlacementRackScatter
       LOG.debug("Available racks considering racks with used and exclude " +
               "nodes: {}.", racks);
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
-              mutableFavoredNodes, nodesRequired - chosenNodes.size(),
-              metadataSizeRequired, dataSizeRequired,
-              nodesRequired - chosenNodes.size(),
-              usedRacksCntMap, maxReplicasPerRack));
+          mutableFavoredNodes, nodesRequired - chosenNodes.size(),
+          metadataSizeRequired, dataSizeRequired, Integer.MAX_VALUE,
+          usedRacksCntMap, maxReplicasPerRack));
     }
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     if (nodesRequired != chosenNodes.size()) {
