@@ -23,7 +23,6 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
@@ -161,14 +160,16 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // Format list from follower to match data on leader.
   @VisibleForTesting
   public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
-      Path checkpointLocation) {
+                                               Path checkpointLocation) {
     Set<Path> paths = new HashSet<>();
-    for (String s: toExcludeList) {
+    for (String s : toExcludeList) {
       if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
         paths.add(fixedPath);
       } else {
-        paths.add(Paths.get(checkpointLocation.getParent().getParent().toString(), s));
+        paths.add(
+            Paths.get(checkpointLocation.getParent().getParent().toString(),
+                s));
       }
     }
     return paths;
