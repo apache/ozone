@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -167,8 +169,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
         paths.add(fixedPath);
       } else {
+        Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
         paths.add(
-            Paths.get(checkpointLocation.getParent().getParent().toString(),
+            Paths.get(metaDirPath.toString(),
                 s));
       }
     }
@@ -350,13 +353,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return Boolean.parseBoolean(includeParam);
   }
 
-  private void writeFilesToArchive(Set<Path> copyFiles,
-                                   Map<Path, Path> hardLinkFiles,
-                                   ArchiveOutputStream archiveOutputStream,
-                                   boolean completed, Path checkpointLocation)
+  private void writeFilesToArchive(
+      Set<Path> copyFiles,
+      Map<Path, Path> hardLinkFiles,
+      ArchiveOutputStream archiveOutputStream,
+      boolean completed, Path checkpointLocation)
       throws IOException {
-
-    Path metaDirPath = checkpointLocation.getParent().getParent();
+    Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
     int truncateLength = metaDirPath.toString().length() + 1;
 
     Set<Path> filteredCopyFiles = completed ? copyFiles :
@@ -391,6 +394,19 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
+  }
+
+  @NotNull
+  private static Path getVerifiedCheckPointPath(Path checkpointLocation) {
+    Path metaDirPath = checkpointLocation;
+    // This check is done to take care of findbug else below getParent()
+    // should not be null.
+    Path locationParent = checkpointLocation.getParent();
+    if (null != locationParent) {
+      Path parent = locationParent.getParent();
+      metaDirPath = parent != null ? parent : locationParent;
+    }
+    return metaDirPath;
   }
 
   private OzoneConfiguration getConf() {
