@@ -146,13 +146,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       // Files to be excluded from tarball
       Set<Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation().toString(),
-          ServerUtils.getOzoneMetaDirPath(getConf()).toString());
+          checkpoint.getCheckpointLocation());
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
           excludedList);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
-          completed);
+          completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
       throw e;
@@ -162,14 +161,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // Format list from follower to match data on leader.
   @VisibleForTesting
   public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
-      String checkpointLocation, String metaDirPath) {
+      Path checkpointLocation) {
     Set<Path> paths = new HashSet<>();
     for (String s: toExcludeList) {
       if (!s.startsWith(OM_SNAPSHOT_DIR)) {
-        Path fixedPath = Paths.get(checkpointLocation, s);
+        Path fixedPath = Paths.get(checkpointLocation.toString(), s);
         paths.add(fixedPath);
       } else {
-        paths.add(Paths.get(metaDirPath, s));
+        paths.add(Paths.get(checkpointLocation.getParent().getParent().toString(), s));
       }
     }
     return paths;
@@ -353,10 +352,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private void writeFilesToArchive(Set<Path> copyFiles,
                                    Map<Path, Path> hardLinkFiles,
                                    ArchiveOutputStream archiveOutputStream,
-                                   boolean completed)
+                                   boolean completed, Path checkpointLocation)
       throws IOException {
 
-    File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
+    Path metaDirPath = checkpointLocation.getParent().getParent();
     int truncateLength = metaDirPath.toString().length() + 1;
 
     Set<Path> filteredCopyFiles = completed ? copyFiles :
@@ -366,6 +365,10 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     // Go through each of the files to be copied and add to archive.
     for (Path file : filteredCopyFiles) {
+      if (!file.toString().startsWith(metaDirPath.toString())) {
+        throw new RuntimeException("tarball file not in metadata dir: "
+            + file + ": " + metaDirPath);
+      }
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
