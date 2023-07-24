@@ -263,7 +263,6 @@ public interface CertificateClient extends Closeable {
     SUCCESS,
     FAILURE,
     GETCERT,
-    RECOVER,
-    REINIT
+    RECOVER
   }
 }
