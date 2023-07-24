@@ -172,7 +172,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
             nextPathSnapInfo.getTableKey(), nextPathSnapInfo);
       } else if (nextGlobalSnapInfo != null) {
         nextGlobalSnapInfo.setGlobalPreviousSnapshotId(
-            snapInfo.getPathPreviousSnapshotId());
+            snapInfo.getGlobalPreviousSnapshotId());
         metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
             nextGlobalSnapInfo.getTableKey(), nextGlobalSnapInfo);
       }
