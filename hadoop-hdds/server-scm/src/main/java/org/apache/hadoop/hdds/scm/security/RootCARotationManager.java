@@ -800,6 +800,11 @@ public class RootCARotationManager extends StatefulService {
     if (gap.isNegative()) {
       long delay = -gap.toMillis();
       enterPostProcessing(delay);
+    } else {
+      // this could happen if the service stopped for a long and restarts
+      LOG.info("Root CA certificate ID {} in stateful storage has already " +
+          "come out of post-processing state", cert.getSerialNumber());
+      deleteConfiguration();
     }
   }
 }
