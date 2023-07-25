@@ -507,7 +507,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           }
         }
 
-        waitForTarballCreation();
         // Create hardlink backups for the SST files that are going
         // to be deleted after this RDB compaction.
         for (String file : compactionJobInfo.inputFiles()) {
