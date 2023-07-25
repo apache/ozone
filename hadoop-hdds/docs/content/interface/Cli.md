@@ -140,14 +140,14 @@ $ ozone sh volume list /
 } ]
 ```
 
-If Volume is empty, we can delete volume using below command. 
+If the volume is empty, we can delete volume using below command. 
 
 ```shell
 $ ozone sh volume delete /vol1
 Volume vol1 is deleted
 ```
 
-If Volume contains some buckets/keys, we can delete volume recursively. Which will delete all the buckets, keys for the specified volume and also volume will be deleted.
+If the volume contains some buckets/keys, we can delete volume recursively. Which will delete all the buckets, keys for the specified volume and also volume will be deleted.
 After running this command there is no way to recover deleted contents.
 
 ```shell
@@ -185,14 +185,14 @@ $ ozone sh bucket info /vol1/bucket1
 }
 ```
 
-If Bucket is empty we can delete bucket using below command.
+If the bucket is empty we can delete bucket using below command.
 
 ```shell
 $ ozone sh bucket delete /vol1/bucket1
 Bucket bucket1 is deleted
 ```
 
-If Bucket contains some keys, we can delete bucket recursively. Which will delete all the keys for the specified bucket and also bucket will be deleted.
+If the bucket contains some keys, we can delete bucket recursively. Which will delete all the keys for the specified bucket and also bucket will be deleted.
 After running this command there is no way to recover deleted contents.
 
 ```shell
@@ -246,12 +246,15 @@ $ ozone sh key info /vol1/bucket1/README.md
 $ ozone sh key get /vol1/bucket1/README.md /tmp/
 ```
 
-In delete key operation, if trash is enabled then for FSO bucket deleted key will move inside trash. 
-Whereas for OBS bucket keys will be deleted permanently irrespective of trash is enabled or disabled.
-
 ```shell
 $ ozone sh key delete /vol1/bucket1/key1
 ```
+
+If the key is in an [FSO]({{< ref "feature/PrefixFSO.md">}}) bucket it will be moved to the trash when deleted. Below is the trash location:
+```shell
+$ /<volume>/<bucket>/.Trash/<user>
+```
+If the key is in an OBS bucket it will be permanently deleted.
 
 ## Querying CLI Results
 
