@@ -310,30 +310,32 @@ public class SecurityConfig {
       throw new IllegalArgumentException(msg);
     }
 
-    if (caCheckInterval.isNegative() || caCheckInterval.isZero()) {
-      String msg = "Property " + HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
-          " should not be zero or negative";
-      LOG.error(msg);
-      throw new IllegalArgumentException(msg);
-    }
+    if (autoCARotationEnabled) {
+      if (caCheckInterval.isNegative() || caCheckInterval.isZero()) {
+        String msg = "Property " + HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+            " should not be zero or negative";
+        LOG.error(msg);
+        throw new IllegalArgumentException(msg);
+      }
 
-    if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
-          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
-    }
+      if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
+        throw new IllegalArgumentException("Property value of " +
+            HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+            " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      }
 
-    if (caAckTimeout.isNegative() || caAckTimeout.isZero()) {
-      String msg = "Property " + HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
-          " should not be zero or negative";
-      LOG.error(msg);
-      throw new IllegalArgumentException(msg);
-    }
+      if (caAckTimeout.isNegative() || caAckTimeout.isZero()) {
+        String msg = "Property " + HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
+            " should not be zero or negative";
+        LOG.error(msg);
+        throw new IllegalArgumentException(msg);
+      }
 
-    if (caAckTimeout.compareTo(renewalGracePeriod) >= 0) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
-          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      if (caAckTimeout.compareTo(renewalGracePeriod) >= 0) {
+        throw new IllegalArgumentException("Property value of " +
+            HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
+            " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      }
     }
 
     if (tokenSanityChecksEnabled
