@@ -1038,7 +1038,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     List<BasicOmKeyInfo> list = new ArrayList<>();
     for (OzoneManagerProtocolProtos.BasicKeyInfo
             basicKeyInfo : resp.getBasicKeyInfoList()) {
-      BasicOmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(keyInfo);
+      BasicOmKeyInfo fromProtobuf = BasicOmKeyInfo
+              .getFromProtobuf(basicKeyInfo);
       list.add(fromProtobuf);
     }
     keys.addAll(list);

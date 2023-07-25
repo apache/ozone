@@ -272,7 +272,6 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
-  optional ListKeysLightRequest             listKeysLightRequest           = 126;
 }
 
 message OMResponse {
@@ -389,6 +388,7 @@ message OMResponse {
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional ListKeysLightResponse             listKeysLightResponse         = 126;
 }
 
 enum Status {
