@@ -1007,7 +1007,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * List keys in a bucket.
+   * Lightweight listKeys implementation.
    */
   @Override
   public List<BasicOmKeyInfo> listKeysLight(String volumeName,
