@@ -162,7 +162,7 @@ public class TestOMRatisSnapshots {
         StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.
         OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
-    if (testInfo.getDisplayName().equals("testSnapshotBackgroundServices")) {
+    if ("testSnapshotBackgroundServices".equals(testInfo.getDisplayName())) {
       conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           5, TimeUnit.SECONDS);
       conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 5,
