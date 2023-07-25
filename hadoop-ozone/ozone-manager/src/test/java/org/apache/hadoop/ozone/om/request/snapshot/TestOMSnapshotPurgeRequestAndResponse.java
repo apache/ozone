@@ -47,6 +47,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -63,6 +65,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -327,9 +330,34 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
   }
 
-  @Test
-  public void testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge()
-      throws Exception {
+  private static Stream<Arguments> SnapshotPurgeCases() {
+    return Stream.of(
+        Arguments.of(0, true),
+        Arguments.of(1,  true),
+        Arguments.of(2,  true),
+        Arguments.of(3,  true),
+        Arguments.of(4,  true),
+        Arguments.of(5,  true),
+        Arguments.of(6,  true),
+        Arguments.of(7,  true),
+        Arguments.of(8,  true),
+        Arguments.of(0,  false),
+        Arguments.of(1,  false),
+        Arguments.of(2,  false),
+        Arguments.of(3,  false),
+        Arguments.of(4,  false),
+        Arguments.of(5,  false),
+        Arguments.of(6,  false),
+        Arguments.of(7,  false),
+        Arguments.of(8,  false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("SnapshotPurgeCases")
+  public void testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge(
+      int purgeIndex,
+      boolean createInBucketOrder) throws Exception {
     List<String> buckets = Arrays.asList(
         "buck-1-" + UUID.randomUUID(),
         "buck-2-" + UUID.randomUUID(),
@@ -343,20 +371,23 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
 
-    for (int i = 0; i < 9; i++) {
-      String bucket = buckets.get(i % 3);
-      String snapshotName = UUID.randomUUID().toString();
-      createSnapshotCheckpoint(volumeName, buckets.get(i % 3), snapshotName);
-      String snapshotTableKey =
-          SnapshotInfo.getTableKey(volumeName, bucket, snapshotName);
-      SnapshotInfo snapshotInfo =
-          omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
-      snapshotInfoList.add(snapshotInfo);
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        int bucketIndex = createInBucketOrder ? i : j;
+        String bucket = buckets.get(bucketIndex % 3);
+        String snapshotName = UUID.randomUUID().toString();
+        createSnapshotCheckpoint(volumeName, bucket, snapshotName);
+        String snapshotTableKey =
+            SnapshotInfo.getTableKey(volumeName, bucket, snapshotName);
+        SnapshotInfo snapshotInfo =
+            omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+        snapshotInfoList.add(snapshotInfo);
+      }
     }
 
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList);
 
-    SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(4);
+    SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(purgeIndex);
 
     String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
         purgeSnapshotInfo.getBucketName(),
@@ -368,7 +399,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     List<SnapshotInfo> snapshotInfoListAfterPurge = new ArrayList<>();
     for (int i = 0; i < 9; i++) {
-      if (i == 4) {
+      if (i == purgeIndex) {
         // Ignoring snapshot 4 was purged because it has been purged.
         continue;
       }
@@ -381,7 +412,6 @@ public class TestOMSnapshotPurgeRequestAndResponse {
       snapshotInfoListAfterPurge.add(
           omMetadataManager.getSnapshotInfoTable().get(snapshotKey));
     }
-
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
         snapshotInfoListAfterPurge);
   }
