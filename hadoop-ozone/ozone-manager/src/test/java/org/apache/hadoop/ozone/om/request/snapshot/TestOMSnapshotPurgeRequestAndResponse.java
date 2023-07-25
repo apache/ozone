@@ -43,12 +43,12 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
@@ -58,11 +58,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -111,8 +120,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
-    when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
-        .thenReturn(true);
+    when(ozoneManager.isAdmin(any())).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
@@ -172,10 +180,15 @@ public class TestOMSnapshotPurgeRequestAndResponse {
    * Create snapshot and checkpoint directory.
    */
   private void createSnapshotCheckpoint(String snapshotName) throws Exception {
-    when(ozoneManager.isAdmin(any())).thenReturn(true);
+    createSnapshotCheckpoint(volumeName, bucketName, snapshotName);
+  }
+
+  private void createSnapshotCheckpoint(String volume,
+                                        String bucket,
+                                        String snapshotName) throws Exception {
     batchOperation = omMetadataManager.getStore().initBatchOperation();
     OMRequest omRequest = OMRequestTestUtils
-        .createSnapshotRequest(volumeName, bucketName, snapshotName);
+        .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
@@ -189,18 +202,17 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     batchOperation.close();
 
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+    String key = SnapshotInfo.getTableKey(volume, bucket, snapshotName);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
-    Assertions.assertNotNull(snapshotInfo);
+    assertNotNull(snapshotInfo);
 
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
         checkpointPrefix + snapshotInfo.getCheckpointDir());
-    //Check the DB is still there
-    Assertions.assertTrue(Files.exists(snapshotDirPath));
+    // Check the DB is still there
+    assertTrue(Files.exists(snapshotDirPath));
     checkpointPaths.add(snapshotDirPath);
   }
 
@@ -234,17 +246,17 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   public void testValidateAndUpdateCache() throws Exception {
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
-    Assertions.assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
+    assertFalse(omMetadataManager.getSnapshotInfoTable().isEmpty());
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
     purgeSnapshots(snapshotPurgeRequest);
 
     // Check if the entries are deleted.
-    Assertions.assertTrue(omMetadataManager.getSnapshotInfoTable().isEmpty());
+    assertTrue(omMetadataManager.getSnapshotInfoTable().isEmpty());
 
     // Check if all the checkpoints are cleared.
     for (Path checkpoint : checkpointPaths) {
-      Assertions.assertFalse(Files.exists(checkpoint));
+      assertFalse(Files.exists(checkpoint));
     }
   }
 
@@ -302,7 +314,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     if (nextPathSnapId != null) {
       SnapshotInfo nextPathSnapshotInfoAfterPurge = metadataManager
           .getSnapshotInfoTable().get(chainManager.getTableKey(nextPathSnapId));
-      Assertions.assertEquals(nextPathSnapshotInfoAfterPurge
+      assertEquals(nextPathSnapshotInfoAfterPurge
           .getGlobalPreviousSnapshotId(), prevPathSnapId);
     }
 
@@ -310,11 +322,156 @@ public class TestOMSnapshotPurgeRequestAndResponse {
       SnapshotInfo nextGlobalSnapshotInfoAfterPurge = metadataManager
           .getSnapshotInfoTable().get(chainManager
               .getTableKey(nextGlobalSnapId));
-      Assertions.assertEquals(nextGlobalSnapshotInfoAfterPurge
+      assertEquals(nextGlobalSnapshotInfoAfterPurge
           .getGlobalPreviousSnapshotId(), prevGlobalSnapId);
     }
 
-    Assertions.assertNotEquals(rowsInTableBeforePurge, omMetadataManager
+    assertNotEquals(rowsInTableBeforePurge, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
+  }
+
+  private static Stream<Arguments> snapshotPurgeCases() {
+    return Stream.of(
+        Arguments.of(0, true),
+        Arguments.of(1,  true),
+        Arguments.of(2,  true),
+        Arguments.of(3,  true),
+        Arguments.of(4,  true),
+        Arguments.of(5,  true),
+        Arguments.of(6,  true),
+        Arguments.of(7,  true),
+        Arguments.of(8,  true),
+        Arguments.of(0,  false),
+        Arguments.of(1,  false),
+        Arguments.of(2,  false),
+        Arguments.of(3,  false),
+        Arguments.of(4,  false),
+        Arguments.of(5,  false),
+        Arguments.of(6,  false),
+        Arguments.of(7,  false),
+        Arguments.of(8,  false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("snapshotPurgeCases")
+  public void testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge(
+      int purgeIndex,
+      boolean createInBucketOrder) throws Exception {
+    List<String> buckets = Arrays.asList(
+        "buck-1-" + UUID.randomUUID(),
+        "buck-2-" + UUID.randomUUID(),
+        "buck-3-" + UUID.randomUUID()
+    );
+
+    for (String bucket : buckets) {
+      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
+          omMetadataManager);
+    }
+
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        int bucketIndex = createInBucketOrder ? i : j;
+        String bucket = buckets.get(bucketIndex % 3);
+        String snapshotName = UUID.randomUUID().toString();
+        createSnapshotCheckpoint(volumeName, bucket, snapshotName);
+        String snapshotTableKey =
+            SnapshotInfo.getTableKey(volumeName, bucket, snapshotName);
+        SnapshotInfo snapshotInfo =
+            omMetadataManager.getSnapshotInfoTable().get(snapshotTableKey);
+        snapshotInfoList.add(snapshotInfo);
+      }
+    }
+
+    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList);
+
+    SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(purgeIndex);
+
+    String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
+        purgeSnapshotInfo.getBucketName(),
+        purgeSnapshotInfo.getName());
+
+    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
+        Collections.singletonList(purgeSnapshotKey));
+    purgeSnapshots(snapshotPurgeRequest);
+
+    List<SnapshotInfo> snapshotInfoListAfterPurge = new ArrayList<>();
+    for (int i = 0; i < 9; i++) {
+      if (i == purgeIndex) {
+        // Ignoring purgeIndex because snapshot at purgeIndex has been purged.
+        continue;
+      }
+
+      SnapshotInfo info = snapshotInfoList.get(i);
+      String snapshotKey = SnapshotInfo.getTableKey(volumeName,
+          info.getBucketName(),
+          info.getName());
+
+      snapshotInfoListAfterPurge.add(
+          omMetadataManager.getSnapshotInfoTable().get(snapshotKey));
+    }
+    validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
+        snapshotInfoListAfterPurge);
+  }
+
+  private void validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
+      List<SnapshotInfo> snapshotInfoList
+  ) {
+    if (snapshotInfoList.isEmpty()) {
+      return;
+    }
+
+    OmMetadataManagerImpl metadataManager =
+        (OmMetadataManagerImpl) omMetadataManager;
+    SnapshotChainManager chainManager = metadataManager
+        .getSnapshotChainManager();
+
+    SnapshotInfo previousSnapshotInfo = snapshotInfoList.get(0);
+    for (int i = 1; i < snapshotInfoList.size(); i++) {
+      SnapshotInfo currentSnapshotInfo = snapshotInfoList.get(i);
+      assertEquals(previousSnapshotInfo.getSnapshotId(),
+          currentSnapshotInfo.getGlobalPreviousSnapshotId());
+
+      // Also validate in global chain of SnapshotChainManager.
+      assertEquals(previousSnapshotInfo.getSnapshotId(),
+          chainManager.previousGlobalSnapshot(
+              currentSnapshotInfo.getSnapshotId()));
+      assertEquals(currentSnapshotInfo.getSnapshotId(),
+          chainManager.nextGlobalSnapshot(
+              previousSnapshotInfo.getSnapshotId()));
+
+      previousSnapshotInfo = currentSnapshotInfo;
+    }
+
+    Map<String, List<SnapshotInfo>> collect = snapshotInfoList.stream()
+        .collect(Collectors.groupingBy(SnapshotInfo::getBucketName));
+
+    for (List<SnapshotInfo> pathSnapshotInfoList : collect.values()) {
+      if (pathSnapshotInfoList.isEmpty()) {
+        continue;
+      }
+
+      SnapshotInfo previousPathSnapshotInfo = pathSnapshotInfoList.get(0);
+
+      for (int i = 1; i < pathSnapshotInfoList.size(); i++) {
+        SnapshotInfo currentPathSnapshotInfo = pathSnapshotInfoList.get(i);
+        assertEquals(previousPathSnapshotInfo.getSnapshotId(),
+            currentPathSnapshotInfo.getPathPreviousSnapshotId());
+
+        // Also validate in path chain of SnapshotChainManager.
+        assertEquals(previousPathSnapshotInfo.getSnapshotId(),
+            chainManager.previousPathSnapshot(
+                currentPathSnapshotInfo.getSnapshotPath(),
+                currentPathSnapshotInfo.getSnapshotId()));
+        assertEquals(currentPathSnapshotInfo.getSnapshotId(),
+            chainManager.nextPathSnapshot(
+                currentPathSnapshotInfo.getSnapshotPath(),
+                previousPathSnapshotInfo.getSnapshotId()));
+
+        previousPathSnapshotInfo = currentPathSnapshotInfo;
+      }
+    }
   }
 }
