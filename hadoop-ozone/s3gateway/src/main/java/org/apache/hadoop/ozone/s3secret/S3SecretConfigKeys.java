@@ -25,8 +25,6 @@ package org.apache.hadoop.ozone.s3secret;
 public final class S3SecretConfigKeys {
   public static final String OZONE_S3G_SECRET_HTTP_ENABLED_KEY =
       "ozone.s3g.secret.http.enabled";
-  public static final String OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY =
-      "ozone.s3g.secret.http-bind-host";
   public static final String OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.s3g.secret.http.auth.";
   public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE =

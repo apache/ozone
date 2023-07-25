@@ -31,7 +31,7 @@ public final class ServletElementsFactory {
   }
 
   public static FilterMapping createFilterMapping(String mappingName,
-                                                  String[] urls) {
+      String[] urls) {
     FilterMapping filterMapping = new FilterMapping();
     filterMapping.setPathSpecs(urls);
     filterMapping.setDispatches(FilterMapping.ALL);
@@ -40,9 +40,7 @@ public final class ServletElementsFactory {
   }
 
   public static FilterHolder createFilterHolder(String filterName,
-                                                String classname,
-                                                Map<String, String> parameters
-  ) {
+      String classname, Map<String, String> parameters) {
     FilterHolder holder = new FilterHolder();
     holder.setName(filterName);
     holder.setClassName(classname);

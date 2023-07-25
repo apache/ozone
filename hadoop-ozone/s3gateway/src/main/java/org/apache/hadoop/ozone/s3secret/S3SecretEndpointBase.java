@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.s3secret;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -42,12 +44,15 @@ public class S3SecretEndpointBase implements Auditor {
   @Inject
   private OzoneClient client;
 
+  protected static final AuditLogger AUDIT =
+          new AuditLogger(AuditLoggerType.S3GLOGGER);
+
   protected String shortNameFromRequest() {
     return context.getSecurityContext().getUserPrincipal().getName();
   }
 
   private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
-           Map<String, String> auditMap) {
+      Map<String, String> auditMap) {
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
@@ -59,7 +64,7 @@ public class S3SecretEndpointBase implements Auditor {
 
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-          Map<String, String> auditMap) {
+      Map<String, String> auditMap) {
     AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
         .withResult(AuditEventStatus.SUCCESS);
     return builder.build();
@@ -67,8 +72,7 @@ public class S3SecretEndpointBase implements Auditor {
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
-                                                  Map<String, String> auditMap,
-                                                  Throwable throwable) {
+      Map<String, String> auditMap, Throwable throwable) {
     AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable);
@@ -87,5 +91,9 @@ public class S3SecretEndpointBase implements Auditor {
   @VisibleForTesting
   public void setContext(ContainerRequestContext context) {
     this.context = context;
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    return AuditUtils.getAuditParameters(context);
   }
 }

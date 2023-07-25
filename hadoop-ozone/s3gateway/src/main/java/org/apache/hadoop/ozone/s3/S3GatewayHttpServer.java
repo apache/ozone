@@ -37,8 +37,8 @@ import org.eclipse.jetty.servlet.ServletHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
@@ -78,7 +78,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
             conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
         if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-              principalInConf, conf.get(OZONE_S3G_SECRET_HTTP_BIND_HOST_KEY)));
+              principalInConf, conf.get(OZONE_S3G_HTTP_BIND_HOST_KEY)));
         }
         String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
         if (!Strings.isNullOrEmpty(httpKeytab)) {
@@ -98,7 +98,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
       } else {
         LOG.error("Secret Endpoint should be secured with Kerberos");
         throw new IllegalStateException("Secret Endpoint should be secured"
-                                            + " with Kerberos");
+            + " with Kerberos");
       }
     }
   }
@@ -110,7 +110,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   @Override
   protected String getHttpBindHostKey() {
-    return S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
+    return OZONE_S3G_HTTP_BIND_HOST_KEY;
   }
 
   @Override

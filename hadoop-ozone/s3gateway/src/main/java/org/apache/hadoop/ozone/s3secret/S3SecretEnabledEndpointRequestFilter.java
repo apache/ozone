@@ -48,9 +48,8 @@ public class S3SecretEnabledEndpointRequestFilter
         OZONE_S3G_SECRET_HTTP_ENABLED_KEY, false);
     if (!isSecretEnabled) {
       requestContext.abortWith(Response.status(Response.Status.BAD_REQUEST)
-                                       .entity("S3 Secret endpoint is " +
-                                                   "disabled.")
-                                       .build());
+          .entity("S3 Secret endpoint is disabled.")
+          .build());
     }
   }
 }

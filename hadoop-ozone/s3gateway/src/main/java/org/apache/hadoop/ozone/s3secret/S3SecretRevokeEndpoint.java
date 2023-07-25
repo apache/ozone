@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
+import org.apache.hadoop.ozone.audit.S3GAction;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
@@ -33,6 +35,8 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
   @GET
   public Response get() throws IOException {
     revokeSecret();
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        S3GAction.REVOKE_SECRET, getAuditParameters()));
     return Response.ok().build();
   }
 

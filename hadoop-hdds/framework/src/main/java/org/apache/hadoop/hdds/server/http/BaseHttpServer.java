@@ -126,8 +126,6 @@ public abstract class BaseHttpServer {
           builder.setSecurityEnabled(true);
           builder.setUsernameConfKey(getSpnegoPrincipal());
           builder.setKeytabConfKey(getKeytabFile());
-          builder.setGlobalFilterEnabled(
-              conf.getBoolean(getGlobalAuth(), false));
         }
       }
 
@@ -266,7 +264,7 @@ public abstract class BaseHttpServer {
    * @param parameters The filter parameters
    */
   protected void addFilter(String filterName, String classname,
-                           Map<String, String> parameters) {
+      Map<String, String> parameters) {
     httpServer.addFilter(filterName, classname, parameters);
   }
 
@@ -476,9 +474,5 @@ public abstract class BaseHttpServer {
   protected abstract String getHttpAuthType();
 
   protected abstract String getHttpAuthConfigPrefix();
-
-  protected String getGlobalAuth() {
-    return getHttpAuthConfigPrefix() + "globalEnabled";
-  }
 
 }

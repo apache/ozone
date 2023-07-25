@@ -219,7 +219,6 @@ public final class HttpServer2 implements FilterContainer {
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
     private boolean securityEnabled = false;
-    private boolean globalAuthFilterEnabled = true;
     private String usernameConfKey;
     private String keytabConfKey;
     private boolean needsClientAuth;
@@ -340,11 +339,6 @@ public final class HttpServer2 implements FilterContainer {
 
     public Builder setSecurityEnabled(boolean enabled) {
       this.securityEnabled = enabled;
-      return this;
-    }
-
-    public Builder setGlobalFilterEnabled(boolean enabled) {
-      this.globalAuthFilterEnabled = enabled;
       return this;
     }
 
@@ -593,14 +587,13 @@ public final class HttpServer2 implements FilterContainer {
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
     initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
-        b.authFilterConfigurationPrefix, b.securityEnabled,
-        b.globalAuthFilterEnabled);
+        b.authFilterConfigurationPrefix, b.securityEnabled);
   }
 
   private void initializeWebServer(String name, String hostName,
       MutableConfigurationSource conf, String[] pathSpecs,
       String authFilterConfigPrefix,
-      boolean securityEnabled, boolean globalAuth) throws IOException {
+      boolean securityEnabled) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -643,13 +636,8 @@ public final class HttpServer2 implements FilterContainer {
           authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
         if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
-          if (globalAuth) {
-            addGlobalFilter("authentication",
-                AuthenticationFilter.class.getName(), filterConfig);
-          } else {
-            addFilter("authentication",
-                AuthenticationFilter.class.getName(), filterConfig);
-          }
+          addFilter("authentication",
+              AuthenticationFilter.class.getName(), filterConfig);
         } else {
           c.initFilter(this, hadoopConf);
         }
@@ -721,7 +709,7 @@ public final class HttpServer2 implements FilterContainer {
 
   private static void addNoCacheFilter(ServletContextHandler ctxt) {
     defineFilter(ctxt, NO_CACHE_FILTER, NoCacheFilter.class.getName(),
-        Collections.<String, String>emptyMap(), new String[] {"/*"});
+        Collections.emptyMap(), new String[] {"/*"});
   }
 
   /**
@@ -1165,8 +1153,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initSpnego(ConfigurationSource conf, String hostName,
-                          String usernameConfKey, String keytabConfKey)
-      throws IOException {
+      String usernameConfKey, String keytabConfKey) throws IOException {
     Map<String, String> params = new HashMap<>();
     String principalInConf = conf.get(usernameConfKey);
     if (principalInConf != null && !principalInConf.isEmpty()) {
