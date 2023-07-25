@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -41,6 +42,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -337,6 +339,32 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             auditMap));
       }
     }
+  }
+
+  @Override
+  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
+                                            String bucketName,
+                                            String startKey, String keyPrefix,
+                                            int maxKeys) throws IOException {
+    // Call the existing listKeys method to get the list of OmKeyInfo
+    List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix,
+            maxKeys);
+
+    // Convert OmKeyInfo to BasicOmKeyInfo
+    List<BasicOmKeyInfo> result = new ArrayList<>();
+    for (OmKeyInfo key : keys) {
+      result.add(new BasicOmKeyInfo(
+          key.getVolumeName(),
+          key.getBucketName(),
+          key.getKeyName(),
+          key.getDataSize(),
+          key.getCreationTime(),
+          key.getModificationTime(),
+          key.getReplicationConfig(),
+          key.isFile()
+      ));
+    }
+    return result;
   }
 
   /**

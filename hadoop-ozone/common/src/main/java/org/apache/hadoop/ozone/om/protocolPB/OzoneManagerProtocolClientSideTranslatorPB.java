@@ -39,6 +39,7 @@ import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -125,6 +126,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
@@ -1002,6 +1004,45 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     keys.addAll(list);
     return keys;
 
+  }
+
+  /**
+   * List keys in a bucket.
+   */
+  @Override
+  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
+      String bucketName, String startKey, String prefix,
+      int maxKeys) throws IOException {
+    List<BasicOmKeyInfo> keys = new ArrayList<>();
+    ListKeysRequest.Builder reqBuilder = ListKeysRequest.newBuilder();
+    reqBuilder.setVolumeName(volumeName);
+    reqBuilder.setBucketName(bucketName);
+    reqBuilder.setCount(maxKeys);
+
+    if (startKey != null) {
+      reqBuilder.setStartKey(startKey);
+    }
+
+    if (prefix != null) {
+      reqBuilder.setPrefix(prefix);
+    }
+
+    ListKeysRequest req = reqBuilder.build();
+
+    OMRequest omRequest = createOMRequest(Type.ListKeys)
+            .setListKeysRequest(req)
+            .build();
+
+    ListKeysLightResponse resp =
+            handleError(submitRequest(omRequest)).getListKeysLightResponse();
+    List<BasicOmKeyInfo> list = new ArrayList<>();
+    for (OzoneManagerProtocolProtos.BasicKeyInfo
+            basicKeyInfo : resp.getBasicKeyInfoList()) {
+      BasicOmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(keyInfo);
+      list.add(fromProtobuf);
+    }
+    keys.addAll(list);
+    return keys;
   }
 
   @Override

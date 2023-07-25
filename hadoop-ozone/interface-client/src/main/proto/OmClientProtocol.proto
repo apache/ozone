@@ -272,6 +272,7 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional ListKeysLightRequest             listKeysLightRequest           = 126;
 }
 
 message OMResponse {
@@ -1072,6 +1073,19 @@ message KeyInfo {
     optional bool isFile = 19;
 }
 
+message BasicKeyInfo {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required uint64 dataSize = 4;
+    required uint64 creationTime = 5;
+    required uint64 modificationTime = 6;
+    required hadoop.hdds.ReplicationType type = 7;
+    optional hadoop.hdds.ReplicationFactor factor = 8;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+    optional bool isFile = 10;
+}
+
 message DirectoryInfo {
     required string name = 1;
     required uint64 creationTime = 2;
@@ -1345,6 +1359,10 @@ message ListKeysRequest {
 
 message ListKeysResponse {
     repeated KeyInfo keyInfo = 2;
+}
+
+message ListKeysLightResponse {
+    repeated BasicKeyInfo basicKeyInfo = 2;
 }
 
 message CommitKeyRequest {

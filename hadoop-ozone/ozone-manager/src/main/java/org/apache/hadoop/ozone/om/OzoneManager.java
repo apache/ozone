@@ -152,6 +152,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
@@ -2836,6 +2837,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return rcReader.get().listKeys(
           volumeName, bucketName, startKey, keyPrefix, maxKeys);
     }
+  }
+
+  @Override
+  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
+                                            String bucketName,
+                                            String startKey, String keyPrefix,
+                                            int maxKeys) throws IOException {
+    // Call the existing listKeys method to get the list of OmKeyInfo
+    List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix,
+            maxKeys);
+
+    // Convert OmKeyInfo to BasicOmKeyInfo
+    List<BasicOmKeyInfo> result = new ArrayList<>();
+    for (OmKeyInfo key : keys) {
+      result.add(new BasicOmKeyInfo(
+          key.getVolumeName(),
+          key.getBucketName(),
+          key.getKeyName(),
+          key.getDataSize(),
+          key.getCreationTime(),
+          key.getModificationTime(),
+          key.getReplicationConfig(),
+          key.isFile()
+      ));
+    }
+    return result;
   }
 
   @Override
