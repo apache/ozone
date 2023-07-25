@@ -695,10 +695,12 @@ public class RootCARotationManager extends StatefulService {
             // signing in this period.
             enterPostProcessing(rootCertPollInterval.toMillis());
             // save the new root certificate to rocksdb through ratis
-            saveConfiguration(new CertInfo.Builder()
-                .setX509Certificate(rootCACert)
-                .setTimestamp(rootCACert.getNotBefore().getTime())
-                .build().getProtobuf());
+            if (rootCACert != null) {
+              saveConfiguration(new CertInfo.Builder()
+                  .setX509Certificate(rootCACert)
+                  .setTimestamp(rootCACert.getNotBefore().getTime())
+                  .build().getProtobuf());
+            }
           } catch (Throwable e) {
             LOG.error("Execution error", e);
             handler.resetRotationPrepareAcks();
@@ -780,7 +782,7 @@ public class RootCARotationManager extends StatefulService {
     if (result > 0) {
       // this could happen if the previous stateful configuration is not deleted
       LOG.warn("Root CA certificate ID {} in stateful storage is smaller than" +
-              " current scm's root CA certificate ID {}", cert.getSerialNumber(),
+              " current scm's root certificate ID {}", cert.getSerialNumber(),
           rootCert.getSerialNumber());
 
       deleteConfiguration();
