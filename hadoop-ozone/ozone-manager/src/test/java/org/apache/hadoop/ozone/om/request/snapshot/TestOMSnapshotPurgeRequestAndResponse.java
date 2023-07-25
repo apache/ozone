@@ -330,7 +330,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
   }
 
-  private static Stream<Arguments> SnapshotPurgeCases() {
+  private static Stream<Arguments> snapshotPurgeCases() {
     return Stream.of(
         Arguments.of(0, true),
         Arguments.of(1,  true),
@@ -354,7 +354,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   }
 
   @ParameterizedTest
-  @MethodSource("SnapshotPurgeCases")
+  @MethodSource("snapshotPurgeCases")
   public void testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge(
       int purgeIndex,
       boolean createInBucketOrder) throws Exception {
@@ -400,7 +400,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     List<SnapshotInfo> snapshotInfoListAfterPurge = new ArrayList<>();
     for (int i = 0; i < 9; i++) {
       if (i == purgeIndex) {
-        // Ignoring snapshot 4 was purged because it has been purged.
+        // Ignoring purgeIndex because snapshot at purgeIndex has been purged.
         continue;
       }
 
