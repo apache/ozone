@@ -347,7 +347,7 @@ public class OzoneConfiguration extends Configuration
    *                           instance is required
    * @return a singleton instance of the given class
    */
-  public <T> T getSingletonObject(Class<T> configurationClass) {
+  public <T> T getObject(Class<T> configurationClass) {
     return (T) singletons.computeIfAbsent(configurationClass,
         c -> getObject(configurationClass));
   }

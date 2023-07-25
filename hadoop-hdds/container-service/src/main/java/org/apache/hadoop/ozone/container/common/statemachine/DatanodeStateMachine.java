@@ -137,13 +137,13 @@ public class DatanodeStateMachine implements Closeable {
    *                     enabled
    */
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-                              OzoneConfiguration conf,
+                              ConfigurationSource conf,
                               CertificateClient certClient,
                               SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
                               DatanodeCRLStore crlStore) throws IOException {
     DatanodeConfiguration dnConf =
-        conf.getSingletonObject(DatanodeConfiguration.class);
+        conf.getObject(DatanodeConfiguration.class);
 
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;

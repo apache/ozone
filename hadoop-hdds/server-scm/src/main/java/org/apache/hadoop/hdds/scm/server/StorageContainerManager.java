@@ -396,7 +396,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
-            .register(conf.getSingletonObject(ScmConfig.class));
+            .register(conf.getObject(ScmConfig.class));
 
     initializeSystemManagers(conf, configurator);
 

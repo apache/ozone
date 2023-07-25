@@ -311,7 +311,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
-              .register(conf.getSingletonObject(DatanodeConfiguration.class));
+              .register(conf.getObject(DatanodeConfiguration.class));
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
@@ -688,7 +688,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   private String reconfigBlockDeleteThreadMax(String value) {
     getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
-    conf.getSingletonObject(DatanodeConfiguration.class)
+    conf.getObject(DatanodeConfiguration.class)
         .setBlockDeleteThreads(Integer.parseInt(value));
 
     DeleteBlocksCommandHandler handler =

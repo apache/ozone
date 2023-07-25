@@ -99,7 +99,7 @@ public class OzoneContainer {
 
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
-  private final OzoneConfiguration config;
+  private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final MutableVolumeSet metaVolumeSet;
   private final MutableVolumeSet dbVolumeSet;
@@ -136,7 +136,7 @@ public class OzoneContainer {
    * @throws IOException
    */
   public OzoneContainer(
-      DatanodeDetails datanodeDetails, OzoneConfiguration conf,
+      DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
       SecretKeyVerifierClient secretKeyClient) throws IOException {
     config = conf;
