@@ -42,11 +42,13 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -57,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -378,5 +381,65 @@ public class TestContainerReader {
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
     Assert.assertEquals(0, cache.size());
+  }
+
+  @Test
+  public void testMarkedDeletedContainerCleared() throws Exception {
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        101, layout, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+    //create a container with deleted state
+    containerData.setState(DELETED);
+
+    KeyValueContainer kvContainer =
+        new KeyValueContainer(containerData, conf);
+    kvContainer.create(
+        volumeSet, volumeChoosingPolicy, clusterId);
+    long baseCount = 0;
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      // add db entry for the container ID 101 for V3
+      baseCount = addDbEntry(containerData);
+    }
+    ContainerReader containerReader = new ContainerReader(volumeSet,
+        hddsVolume, containerSet, conf, false);
+
+    containerReader.run();
+
+    // assert that tmp dir is empty
+    File[] leftoverContainers =
+        hddsVolume.getDeletedContainerDir().listFiles();
+    Assertions.assertNotNull(leftoverContainers);
+    Assertions.assertEquals(0, leftoverContainers.length);
+
+    Assertions.assertNull(containerSet.getContainer(101));
+
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      // verify if newly added container is not present as added
+      try (DBHandle dbHandle = BlockUtils.getDB(
+          kvContainer.getContainerData(), conf)) {
+        DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+            dbHandle.getStore();
+        Assertions.assertEquals(baseCount, store.getMetadataTable()
+            .getEstimatedKeyCount());
+      }
+    }
+  }
+
+  private long addDbEntry(KeyValueContainerData containerData)
+      throws Exception {
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, Long> metadataTable = store.getMetadataTable();
+      long baseSize = metadataTable.getEstimatedKeyCount();
+      metadataTable.put(containerData.getBytesUsedKey(), 0L);
+      metadataTable.put(containerData.getBlockCountKey(), 0L);
+      metadataTable.put(containerData.getPendingDeleteBlockCountKey(), 0L);
+
+      // The new keys should have been added in the MetadataTable
+      Assertions.assertEquals(baseSize + 3,
+          metadataTable.getEstimatedKeyCount());
+      return baseSize;
+    }
   }
 }

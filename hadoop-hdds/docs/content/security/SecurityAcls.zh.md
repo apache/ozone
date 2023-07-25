@@ -34,7 +34,7 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ozo
 
 Ozone 的 ACL 是 Posix ACL 和 S3 ACL 的超集。
 
-ACL 的通用格式为 _对象_:_角色_:_权限_.
+ACL 的通用格式为 _对象_:_角色_:_权限_:_范围_.
 
 _对象_ 可选的值包括：
 
@@ -64,7 +64,13 @@ _权限_ 可选的值包括：:
 6. **读 ACL** – 允许用户读取某个对象的 ACL。
 7. **写 ACL** – 允许用户修改某个对象的 ACL。
 
-<h3>Ozone 原生 ACL API</h3>
+_范围_ 可选的值包括：:
+
+1. **ACCESS** – 这类 ACL 仅作用于对象本身，不能被继承。它控制对对象本身的访问。
+2. **DEFAULT** - 这类 ACL 不仅作用于对象本身，还会被对象的后代继承。不能在叶子对象上设置该类 ACL（因为叶子对象下不能再有其他对象）。
+
+
+## Ozone 原生 ACL API
 
 ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包括：
 
@@ -72,3 +78,74 @@ ACL 可以通过 Ozone 提供的一系列 API 进行操作，支持的 API 包�
 2. **GetAcl** – 此 API 的参数为 Ozone 对象名称和 Ozone 对象类型，返回值为 ACL 列表。
 3. **AddAcl** - 此 API 的参数为 Ozone 对象名称、Ozone 对象类型和待添加的 ACL，新的 ACL 会被添加到该 Ozone 对象的 ACL 条目中。
 4. **RemoveAcl** - 此 API 的参数为 Ozone 对象名称、Ozone 对象类型和待删除的 ACL。
+
+## 使用 Ozone CLI 操作 ACL
+
+还可以使用 `ozone sh` 命令来操作 ACL。<br>
+用法 : `ozone sh <object> <action> [-a=<value>[,<value>...]] <object-uri>` <br>
+`-a` 表示以逗号分隔的 ACL 列表。除了 `getacl` 之外的所有子命令都需要它。<br>
+`<value>` 的格式为 **`type:name:rights[scope]`**。<br>
+**_type_** 可以是 user, group, world 或 anonymous。<br>
+**_name_** 是用户/组的名称。如果 type 为 world 和 anonymous，则 name 应留空或分别为 WORLD 或 ANONYMOUS。 <br>
+**_rights_** 可以是 (读取=r, 写入=w, 删除=d, 列举=l, 全部=a, 毫无=n, 创建=c, 读 ACL=x, 写 ACL=y)。<br>
+**_scope_** 可以是 **ACCESS** 或 **DEFAULT**. 如果不指定，默认 **ACCESS**。<br>
+
+<div class="alert alert-warning" role="alert">
+当对象是前缀时，对象路径必须包含从卷到密钥的目录或前缀的完整路径，例如，<br>
+   /volume/bucket/some/key/prefix/ <br>
+   注意：结尾的“/”是需要的。
+</div>
+
+<br>
+以下是 CLI 支持的 ACL 具体操作。
+
+<h3>setacl</h3>
+
+```shell
+$ ozone sh bucket setacl -a user:testuser2:a /vol1/bucket1
+ ACLs set successfully.
+$ ozone sh bucket setacl -a user:om:a,group:om:a /vol1/bucket2
+ ACLs set successfully.
+$ ozone sh bucket setacl -a=anonymous::lr /vol1/bucket3
+ ACLs set successfully.
+$ ozone sh bucket setacl -a world::a /vol1/bucket4
+ ACLs set successfully.
+```
+
+<h3>getacl</h3>
+
+```shell
+$ ozone sh bucket getacl /vol1/bucket2 
+[ {
+  "type" : "USER",
+  "name" : "om/om@EXAMPLE.COM",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+}, {
+  "type" : "GROUP",
+  "name" : "om",
+  "aclScope" : "ACCESS",
+  "aclList" : [ "ALL" ]
+} ]
+```
+
+<h3>addacl</h3>
+
+```shell
+$ ozone sh bucket addacl -a user:testuser2:a /vol1/bucket2
+ACL user:testuser2:a[ACCESS] added successfully.
+
+$ ozone sh bucket addacl -a user:testuser:rxy[DEFAULT] /vol1/bucket2
+ACL user:testuser:rxy[DEFAULT] added successfully.
+
+$ ozone sh prefix addacl -a user:testuser2:a[DEFAULT] /vol1/buck3/dir1/
+ACL user:testuser2:a[DEFAULT] added successfully.
+```
+
+<h3>removeacl</h3>
+
+```shell
+$ ozone sh bucket removeacl -a user:testuser:r[DEFAULT] /vol1/bucket2
+ACL user:testuser:r[DEFAULT] removed successfully.
+```
+

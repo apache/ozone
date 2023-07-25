@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
@@ -102,14 +103,21 @@ public class WritableECContainerProvider
         try {
           return allocateContainer(repConfig, size, owner, excludeList);
         } catch (IOException e) {
-          LOG.warn("Unable to allocate a container for {} with {} existing "
-              + "containers", repConfig, openPipelineCount, e);
+          LOG.warn("Unable to allocate a container with {} existing ones; "
+              + "requested size={}, replication={}, owner={}, {}",
+              openPipelineCount, size, repConfig, owner, excludeList, e);
         }
+      } else if (LOG.isDebugEnabled()) {
+        LOG.debug("Pipeline count {} reached limit {}, checking existing ones; "
+            + "requested size={}, replication={}, owner={}, {}",
+            openPipelineCount, maximumPipelines, size, repConfig, owner,
+            excludeList);
       }
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
+    final int pipelineCount = existingPipelines.size();
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
@@ -156,13 +164,13 @@ public class WritableECContainerProvider
         if (openPipelineCount < maximumPipelines) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-        throw new IOException("Unable to allocate a pipeline for "
-            + repConfig + " after trying all existing pipelines as the max "
-            + "limit has been reached and no pipelines where closed");
+        throw new IOException("Pipeline limit (" + maximumPipelines
+            + ") reached (" + openPipelineCount + "), none closed");
       }
     } catch (IOException e) {
-      LOG.error("Unable to allocate a container for {} after trying all "
-          + "existing containers", repConfig, e);
+      LOG.warn("Unable to allocate a container after trying {} existing ones; "
+          + "requested size={}, replication={}, owner={}, {}",
+          pipelineCount, size, repConfig, owner, excludeList, e);
       throw e;
     }
   }
@@ -228,12 +236,14 @@ public class WritableECContainerProvider
    * Class to hold configuration for WriteableECContainerProvider.
    */
   @ConfigGroup(prefix = WritableECContainerProviderConfig.PREFIX)
-  public static class WritableECContainerProviderConfig {
+  public static class WritableECContainerProviderConfig
+      extends ReconfigurableConfig {
 
     private static final String PREFIX = "ozone.scm.ec";
 
     @Config(key = "pipeline.minimum",
         defaultValue = "5",
+        reconfigurable = true,
         type = ConfigType.INT,
         description = "The minimum number of pipelines to have open for each " +
             "Erasure Coding configuration",
@@ -258,6 +268,7 @@ public class WritableECContainerProvider
     @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
+        reconfigurable = true,
         tags = {SCM},
         description = "TODO"
     )

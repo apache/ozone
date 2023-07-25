@@ -734,13 +734,15 @@ public final class OmSnapshotManager implements AutoCloseable {
         toSnapshot);
   }
 
+  @SuppressWarnings("parameternumber")
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
                                                     final String toSnapshot,
                                                     final String token,
                                                     int pageSize,
-                                                    boolean forceFullDiff)
+                                                    boolean forceFullDiff,
+                                                    boolean disableNativeDiff)
       throws IOException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
@@ -760,7 +762,8 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     SnapshotDiffResponse snapshotDiffReport =
         snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
-            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff);
+            fromSnapshot, toSnapshot, index, pageSize, forceFullDiff,
+            disableNativeDiff);
 
     // Check again to make sure that from and to snapshots are still active and
     // were not deleted in between response generation.
@@ -818,12 +821,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
-
-    // Check snapshot creation time
-    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
-          " should be older than to toSnapshot:" + toSnapInfo.getName());
-    }
   }
 
   private int getIndexFromToken(final String token) throws IOException {

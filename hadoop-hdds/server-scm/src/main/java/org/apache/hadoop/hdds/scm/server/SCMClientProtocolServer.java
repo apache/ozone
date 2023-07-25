@@ -802,6 +802,14 @@ public class SCMClientProtocolServer implements
     if (!SCMHAUtils.isSCMHAEnabled(getScm().getConfiguration())) {
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
+
+    if (scm.getRootCARotationManager() != null &&
+        scm.getRootCARotationManager().isRotationInProgress()) {
+      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
+          " Please try the operation later again."),
+          ResultCodes.CA_ROTATION_IN_PROGRESS);
+    }
+
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("newLeaderId", newLeaderId);

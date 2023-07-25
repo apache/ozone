@@ -222,6 +222,8 @@ public class TestKeyValueContainer {
       keyValueContainer.exportContainerData(fos, packer);
     }
 
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
     keyValueContainer.delete();
 
     // import container.
@@ -253,6 +255,8 @@ public class TestKeyValueContainer {
       }
 
       //delete the original one
+      KeyValueContainerUtil.removeContainer(
+          keyValueContainer.getContainerData(), CONF);
       keyValueContainer.delete();
 
       //create a new one
@@ -468,6 +472,8 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
     keyValueContainer.delete();
 
     String containerMetaDataPath = keyValueContainerData
@@ -807,6 +813,8 @@ public class TestKeyValueContainer {
       }
 
       //delete the original one
+      KeyValueContainerUtil.removeContainer(
+          keyValueContainer.getContainerData(), CONF);
       keyValueContainer.delete();
 
       //create a new one
@@ -852,6 +860,8 @@ public class TestKeyValueContainer {
       }
 
       //delete the original one
+      KeyValueContainerUtil.removeContainer(
+          keyValueContainer.getContainerData(), CONF);
       keyValueContainer.delete();
       //create a new one
       KeyValueContainerData containerData =

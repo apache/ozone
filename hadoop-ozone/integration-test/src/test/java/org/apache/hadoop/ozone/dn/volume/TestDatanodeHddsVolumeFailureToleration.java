@@ -25,16 +25,21 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -124,13 +129,24 @@ public class TestDatanodeHddsVolumeFailureToleration {
     DatanodeTestUtils.simulateBadRootDir(volRootDir1);
 
     // restart datanode to test
-    try {
-      cluster.restartHddsDatanode(0, true);
-      Assert.fail();
-    } catch (RuntimeException e) {
-      Assert.assertTrue(e.getMessage()
-          .contains("Can't start the HDDS datanode plugin"));
-    }
+    // Make datanode throw an exception instead of exiting the jvm when too
+    // many volumes fail so that the test keeps running.
+    ExitUtil.disableSystemExit();
+    // Since the exception will not be thrown from the main thread, the
+    // datanode will not actually exit. Use log messages to determine that
+    // the ExitUtil was invoked which would terminate the process in a normal
+    // deployment.
+    LogCapturer dsmCapturer = LogCapturer.captureLogs(
+        LoggerFactory.getLogger(DatanodeStateMachine.class));
+    LogCapturer exitCapturer = LogCapturer.captureLogs(
+            LoggerFactory.getLogger(ExitUtil.class.getName()));
+    cluster.restartHddsDatanode(0, false);
+    // Give the datanode time to restart. This may be slow in a mini ozone
+    // cluster.
+    GenericTestUtils.waitFor(() -> exitCapturer.getOutput()
+        .contains("Exiting with status 1: ExitException"), 500, 60000);
+    Assert.assertTrue(dsmCapturer.getOutput()
+        .contains("DatanodeStateMachine Shutdown due to too many bad volumes"));
 
     // restore bad volumes
     DatanodeTestUtils.restoreBadRootDir(volRootDir0);

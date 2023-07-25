@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -37,10 +37,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -166,7 +168,7 @@ public class CertificateClientTestImpl implements CertificateClient {
           Duration.between(currentTime, gracePeriodStart);
 
       executorService = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder().setNameFormat("CertificateLifetimeMonitor")
+          new ThreadFactoryBuilder().setNameFormat("CertificateRenewerService")
               .setDaemon(true).build());
       this.executorService.schedule(new RenewCertTask(),
           delay.toMillis(), TimeUnit.MILLISECONDS);
@@ -384,6 +386,13 @@ public class CertificateClientTestImpl implements CertificateClient {
     synchronized (notificationReceivers) {
       notificationReceivers.add(receiver);
     }
+  }
+
+  @Override
+  public void registerRootCARotationListener(
+      Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
+    // we do not have tests that rely on rootCA rotation atm, leaving this
+    // implementation blank for now.
   }
 
   @Override

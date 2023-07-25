@@ -89,7 +89,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
   private int maxVolumeFailuresTolerated;
-  private boolean initialized;
 
   public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
       StateContext context, StorageVolume.VolumeType volumeType,
@@ -101,7 +100,6 @@ public class MutableVolumeSet implements VolumeSet {
       ConfigurationSource conf, StateContext context,
       StorageVolume.VolumeType volumeType, StorageVolumeChecker volumeChecker
   ) throws IOException {
-    this.initialized = false;
     this.context = context;
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
@@ -198,9 +196,6 @@ public class MutableVolumeSet implements VolumeSet {
     if (volumeMap.size() == 0) {
       throw new DiskOutOfSpaceException("No storage locations configured");
     }
-
-    checkAllVolumes();
-    initialized = true;
   }
 
   /**
@@ -253,15 +248,7 @@ public class MutableVolumeSet implements VolumeSet {
 
       // check failed volume tolerated
       if (!hasEnoughVolumes()) {
-        // on startup, we could not try to stop uninitialized services
-        if (!initialized) {
-          throw new IOException("Don't have enough good volumes on startup,"
-              + " bad volumes detected: " + failedVolumes.size()
-              + " max tolerated: " + maxVolumeFailuresTolerated);
-        }
-        if (context != null) {
-          context.getParent().handleFatalVolumeFailures();
-        }
+        context.getParent().handleFatalVolumeFailures();
       }
     } finally {
       this.writeUnlock();
