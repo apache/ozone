@@ -397,15 +397,19 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @NotNull
   private static Path getVerifiedCheckPointPath(Path checkpointLocation) {
-    Path metaDirPath = checkpointLocation;
     // This check is done to take care of findbug else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
-    if (null != locationParent) {
-      Path parent = locationParent.getParent();
-      metaDirPath = parent != null ? parent : locationParent;
+    if (null == locationParent) {
+      throw new RuntimeException(
+          "checkpoint location's immediate parent is null.");
     }
-    return metaDirPath;
+    Path parent = locationParent.getParent();
+    if (null == parent) {
+      throw new RuntimeException(
+          "checkpoint location's path is invalid and could not be verified.");
+    }
+    return parent;
   }
 
   private OzoneConfiguration getConf() {
