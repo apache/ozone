@@ -57,6 +57,7 @@ execute_robot_test scm1.org admincli/pipeline.robot
 wait_for_execute_command scm1.org 240 "ozone admin cert info 3"
 
 # bootstrap new SCM4 and verify certificate
+sleep 5
 docker-compose up -d scm4.org
 wait_for_port scm4.org 9894 120
 execute_robot_test scm4.org kinit.robot
