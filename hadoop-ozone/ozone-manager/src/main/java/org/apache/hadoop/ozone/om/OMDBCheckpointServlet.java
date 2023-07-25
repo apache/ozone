@@ -356,7 +356,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Set<Path> copyFiles,
       Map<Path, Path> hardLinkFiles,
       ArchiveOutputStream archiveOutputStream,
-      boolean completed, Path checkpointLocation)
+      boolean completed,
+      Path checkpointLocation)
       throws IOException {
     Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
     int truncateLength = metaDirPath.toString().length() + 1;
