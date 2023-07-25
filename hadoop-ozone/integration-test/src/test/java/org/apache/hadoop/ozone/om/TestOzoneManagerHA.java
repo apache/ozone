@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.HashMap;
 
@@ -62,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -402,9 +402,9 @@ public abstract class TestOzoneManagerHA {
     Iterator<? extends OzoneKey> iterator = ozoneBucket.listKeys("/");
     while (iterator.hasNext()) {
       OzoneKey ozoneKey = iterator.next();
-      if (Objects.equals(keyName, ozoneKey.getName())) {
+      if (!ozoneKey.getName().endsWith(OM_KEY_PREFIX)) {
         assertTrue(ozoneKey.isFile());
-      } else if (keyName.startsWith(ozoneKey.getName())) {
+      } else {
         assertFalse(ozoneKey.isFile());
       }
     }
