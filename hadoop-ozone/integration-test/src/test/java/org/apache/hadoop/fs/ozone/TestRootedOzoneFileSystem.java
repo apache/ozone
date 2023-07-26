@@ -205,6 +205,14 @@ public class TestRootedOzoneFileSystem {
     return fs;
   }
 
+  public static OzoneClient getClient() {
+    return client;
+  }
+
+  public static BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
+
   public static Path getBucketPath() {
     return bucketPath;
   }
