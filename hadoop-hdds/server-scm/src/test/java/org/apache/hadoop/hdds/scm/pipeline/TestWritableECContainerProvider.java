@@ -67,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
@@ -237,6 +238,8 @@ public class TestWritableECContainerProvider {
   @MethodSource("policies")
   public void testNewPipelineNotCreatedIfAllPipelinesExcluded(
       PipelineChoosePolicy policy) throws IOException {
+    final int nodeCount = nodeManager.getNodeCount(null, null);
+    providerConf.setMinimumPipelines(nodeCount);
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -244,8 +247,7 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude all the associated
-    // containers.
+    // We have the min limit of pipelines, but then exclude them all
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addPipeline(c.getPipelineID());
@@ -256,8 +258,30 @@ public class TestWritableECContainerProvider {
 
   @ParameterizedTest
   @MethodSource("policies")
+  void newPipelineCreatedIfSoftLimitReached(PipelineChoosePolicy policy)
+      throws IOException {
+
+    providerConf.setMinimumPipelines(1);
+    provider = createSubject(policy);
+    ContainerInfo container = provider.getContainer(
+        1, repConfig, OWNER, new ExcludeList());
+
+    ExcludeList exclude = new ExcludeList();
+    exclude.addPipeline(container.getPipelineID());
+    exclude.addDatanode(
+        pipelineManager.getPipeline(container.getPipelineID()).getFirstNode());
+
+    ContainerInfo newContainer = provider.getContainer(
+        1, repConfig, OWNER, exclude);
+    assertNotSame(container, newContainer);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
   public void testNewPipelineNotCreatedIfAllContainersExcluded(
       PipelineChoosePolicy policy) throws IOException {
+    final int nodeCount = nodeManager.getNodeCount(null, null);
+    providerConf.setMinimumPipelines(nodeCount);
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -265,7 +289,8 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude them all
+    // We have the min limit of pipelines, but then exclude all the associated
+    // containers.
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addConatinerId(c.containerID());
