@@ -62,12 +62,15 @@ public class BasicOmKeyInfo {
   public String getKeyName() {
     return keyName;
   }
+
   public long getDataSize() {
     return dataSize;
   }
+
   public long getCreationTime() {
     return creationTime;
   }
+
   public long getModificationTime() {
     return modificationTime;
   }
