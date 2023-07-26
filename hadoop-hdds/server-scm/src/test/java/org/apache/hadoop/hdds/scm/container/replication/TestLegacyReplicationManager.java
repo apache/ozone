@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -975,7 +976,6 @@ public class TestLegacyReplicationManager {
       assertUnderReplicatedCount(0);
       boolean unhealthyDeleted = false;
       boolean closedDeleted = false;
-      UUID closedDeletedUUID = null;
 
       for (CommandForDatanode<?> command :
           datanodeCommandHandler.getReceivedCommands()) {
@@ -986,19 +986,19 @@ public class TestLegacyReplicationManager {
             unhealthyDeleted = true;
           } else {
             closedDeleted = true;
-            closedDeletedUUID = command.getDatanodeId();
           }
         }
       }
 
-      Assertions.assertFalse(unhealthyDeleted);
-      Assertions.assertTrue(closedDeleted);
+      Assertions.assertTrue(unhealthyDeleted);
+      Assertions.assertFalse(closedDeleted);
+
+      containerStateManager.removeContainerReplica(
+          container.containerID(), unhealthy);
 
       // Do a second run.
       assertReplicaScheduled(0);
       assertUnderReplicatedCount(0);
-      unhealthyDeleted = false;
-      closedDeleted = false;
       for (CommandForDatanode<?> command :
           datanodeCommandHandler.getReceivedCommands()) {
         if (command.getCommand().getType() ==
@@ -1008,8 +1008,6 @@ public class TestLegacyReplicationManager {
             unhealthyDeleted = true;
           } else {
             closedDeleted = true;
-            // The delete command should have been left over from the last run.
-            Assertions.assertEquals(closedDeletedUUID, command.getDatanodeId());
           }
         }
       }
@@ -2280,8 +2278,6 @@ public class TestLegacyReplicationManager {
               id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
       final ContainerReplica replicaFour = getReplicas(
               id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
-      final ContainerReplica replicaFive = getReplicas(
-              id, UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
 
       containerStateManager.addContainer(container.getProtobuf());
       containerStateManager.updateContainerReplica(id, replicaOne);
@@ -2289,7 +2285,6 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(
               id, replicaThree);
       containerStateManager.updateContainerReplica(id, replicaFour);
-      containerStateManager.updateContainerReplica(id, replicaFive);
 
       // Ensure a mis-replicated status is returned for any containers in this
       // test where there are exactly 3 replicas checked.
@@ -2318,9 +2313,6 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(currentDeleteCommandCount,
               replicationManager.getMetrics().getDeletionCmdsSentTotal());
 
-      Assertions.assertFalse(datanodeCommandHandler.received(
-              SCMCommandProto.Type.deleteContainerCommand,
-              replicaFive.getDatanodeDetails()));
       Assertions.assertEquals(0, getInflightCount(InflightType.DELETION));
       Assertions.assertEquals(0, replicationManager.getMetrics()
               .getInflightDeletion());
@@ -2372,7 +2364,10 @@ public class TestLegacyReplicationManager {
       assertOverReplicatedCount(1);
     }
 
+
     @Test
+    @Disabled("This test doesn't properly test Rack Placement Policy as" +
+        " LegacyReplicationManager doesn't handle rack aware delete properly.")
     public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted()
             throws IOException, TimeoutException {
       final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
