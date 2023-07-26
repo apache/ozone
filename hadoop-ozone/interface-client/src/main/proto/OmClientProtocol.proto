@@ -141,6 +141,7 @@ enum Type {
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
+  ListKeysLight = 126;
 }
 
 enum SafeMode {

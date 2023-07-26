@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 
@@ -54,64 +55,108 @@ public class BasicOmKeyInfo {
     return volumeName;
   }
 
-  public void setVolumeName(String volumeName) {
-    this.volumeName = volumeName;
-  }
-
   public String getBucketName() {
     return bucketName;
-  }
-
-  public void setBucketName(String bucketName) {
-    this.bucketName = bucketName;
   }
 
   public String getKeyName() {
     return keyName;
   }
-
-  public void setKeyName(String keyName) {
-    this.keyName = keyName;
-  }
-
   public long getDataSize() {
     return dataSize;
   }
-
-  public void setDataSize(long dataSize) {
-    this.dataSize = dataSize;
-  }
-
   public long getCreationTime() {
     return creationTime;
   }
-
-  public void setCreationTime(long creationTime) {
-    this.creationTime = creationTime;
-  }
-
   public long getModificationTime() {
     return modificationTime;
-  }
-
-  public void setModificationTime(long modificationTime) {
-    this.modificationTime = modificationTime;
   }
 
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }
 
-  public void setReplicationConfig(ReplicationConfig replicationConfig) {
-    this.replicationConfig = replicationConfig;
-  }
-
   public boolean isFile() {
     return isFile;
   }
 
-  public void setFile(boolean file) {
-    isFile = file;
+  /**
+   * Builder of BasicOmKeyInfo.
+   */
+  public static class Builder {
+    private String volumeName;
+    private String bucketName;
+    private String keyName;
+    private long dataSize;
+    private long creationTime;
+    private long modificationTime;
+    private ReplicationConfig replicationConfig;
+    private boolean isFile;
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public Builder setBucketName(String bucketName) {
+      this.bucketName = bucketName;
+      return this;
+    }
+
+    public Builder setKeyName(String keyName) {
+      this.keyName = keyName;
+      return this;
+    }
+
+    public Builder setDataSize(long dataSize) {
+      this.dataSize = dataSize;
+      return this;
+    }
+
+    public Builder setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
+      return this;
+    }
+
+    public Builder setModificationTime(long modificationTime) {
+      this.modificationTime = modificationTime;
+      return this;
+    }
+
+    public Builder setReplicationConfig(ReplicationConfig replicationConfig) {
+      this.replicationConfig = replicationConfig;
+      return this;
+    }
+
+    public Builder setIsFile(boolean isFile) {
+      this.isFile = isFile;
+      return this;
+    }
+
+    public BasicOmKeyInfo build() {
+      return new BasicOmKeyInfo(volumeName, bucketName, keyName, dataSize,
+              creationTime, modificationTime, replicationConfig, isFile);
+    }
+  }
+
+  public BasicKeyInfo getProtobuf() {
+    BasicKeyInfo.Builder builder = BasicKeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setDataSize(dataSize)
+            .setCreationTime(creationTime)
+            .setModificationTime(modificationTime)
+            .setType(replicationConfig.getReplicationType());
+    if (replicationConfig instanceof ECReplicationConfig) {
+      builder.setEcReplicationConfig(
+              ((ECReplicationConfig) replicationConfig).toProto());
+    } else {
+      builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
+    }
+    builder.setIsFile(isFile);
+
+    return builder.build();
   }
 
   public static BasicOmKeyInfo getFromProtobuf(BasicKeyInfo basicKeyInfo)
@@ -120,20 +165,22 @@ public class BasicOmKeyInfo {
       return null;
     }
 
-    String volName = basicKeyInfo.getVolumeName();
-    String buckName = basicKeyInfo.getBucketName();
-    String keyName = basicKeyInfo.getKeyName();
-    long dataSize = basicKeyInfo.getDataSize();
-    long creationTime = basicKeyInfo.getCreationTime();
-    long modificationTime = basicKeyInfo.getModificationTime();
-    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(
-            basicKeyInfo.getType(),
-            basicKeyInfo.getFactor(),
-            basicKeyInfo.getEcReplicationConfig()
-    );
-    boolean isFile = basicKeyInfo.getIsFile();
+    Builder builder = new Builder()
+            .setVolumeName(basicKeyInfo.getVolumeName())
+            .setBucketName(basicKeyInfo.getBucketName())
+            .setKeyName(basicKeyInfo.getKeyName())
+            .setDataSize(basicKeyInfo.getDataSize())
+            .setCreationTime(basicKeyInfo.getCreationTime())
+            .setModificationTime(basicKeyInfo.getModificationTime())
+            .setReplicationConfig(ReplicationConfig.fromProto(
+                    basicKeyInfo.getType(),
+                    basicKeyInfo.getFactor(),
+                    basicKeyInfo.getEcReplicationConfig()));
 
-    return new BasicOmKeyInfo(volName, buckName, keyName, dataSize,
-            creationTime, modificationTime, replicationConfig, isFile);
+    if (basicKeyInfo.hasIsFile()) {
+      builder.setIsFile(basicKeyInfo.getIsFile());
+    }
+
+    return builder.build();
   }
 }

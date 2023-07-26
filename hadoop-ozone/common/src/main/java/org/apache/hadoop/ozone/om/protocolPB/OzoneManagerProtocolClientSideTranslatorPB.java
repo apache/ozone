@@ -1029,7 +1029,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     ListKeysRequest req = reqBuilder.build();
 
-    OMRequest omRequest = createOMRequest(Type.ListKeys)
+    OMRequest omRequest = createOMRequest(Type.ListKeysLight)
             .setListKeysRequest(req)
             .build();
 
