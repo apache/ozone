@@ -97,7 +97,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
-      // HDDS-setting Key name back to Ozone Key before updating cache value.
+      // setting Key name back to Ozone Key before updating cache value.
       omKeyInfo.setKeyName(OzoneFSUtils.getFileName(key));
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
