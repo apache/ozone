@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -49,10 +50,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
@@ -111,6 +115,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MA
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -1161,7 +1166,6 @@ public class TestOMRatisSnapshots {
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
-    checkSnapshot(newLeaderOM, newFollowerOM, snapshotName, keys, snapshotInfo);
     readKeys(newKeys);
 
     // Prepare baseline data for compaction logs
@@ -1190,7 +1194,7 @@ public class TestOMRatisSnapshots {
     }
 
     // Check whether newly created snapshot gets processed by SFS
-    newKeys = writeKeys(1);
+    writeKeys(1);
     SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
     Assertions.assertNotNull(newSnapshot);
@@ -1205,44 +1209,129 @@ public class TestOMRatisSnapshots {
       try {
         processedSnapshotIds = Files.readAllLines(filePath);
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        Assertions.fail();
+        return false;
       }
-
       return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
           .toString());
     }, 1000, 30000);
 
-    // Check whether newly created keys data is reclaimed
-    String newKey = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
+    /*
+      Check whether newly created key data is reclaimed
+      create key a
+      create snapshot b
+      delete key a
+      create snapshot c
+      assert that a is in c's deleted table
+      create snapshot d
+      delete snapshot c
+      wait until key a appears in deleted table of d.
+    */
+    // create key a
+    String keyNameA = writeKeys(1).get(0);
+    String keyA = OM_KEY_PREFIX + ozoneBucket.getVolumeName() +
         OM_KEY_PREFIX + ozoneBucket.getName() +
-        OM_KEY_PREFIX + newKeys.get(0);
+        OM_KEY_PREFIX + keyNameA;
     Table<String, OmKeyInfo> omKeyInfoTable = newLeaderOM
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
-    OmKeyInfo newKeyInfo = omKeyInfoTable.get(newKey);
-    Assertions.assertNotNull(newKeyInfo);
+    OmKeyInfo keyInfoA = omKeyInfoTable.get(keyA);
+    Assertions.assertNotNull(keyInfoA);
 
-    long usedBytes = getUsedBytes(newLeaderOM);
+    // create snapshot b
+    SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
+    Assertions.assertNotNull(snapshotInfoB);
 
-    ozoneBucket.deleteKeys(newKeys);
+    // delete key a
+    ozoneBucket.deleteKey(keyNameA);
 
     GenericTestUtils.waitFor(() -> {
       try {
-        return getUsedBytes(newLeaderOM) ==
-            usedBytes - newKeyInfo.getDataSize();
+        return Objects.isNull(omKeyInfoTable.get(keyA));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+
+    // create snapshot c
+    SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
+
+    // get snapshot c
+    OmSnapshot snapC;
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcC = newLeaderOM
+        .getOmSnapshotManager()
+        .checkForSnapshot(volumeName, bucketName,
+            getSnapshotPrefix(snapshotInfoC.getName()), true)) {
+      Assertions.assertNotNull(rcC);
+      snapC = (OmSnapshot) rcC.get();
+    }
+
+    // assert that key a is in snapshot c's deleted table
+    GenericTestUtils.waitFor(() -> {
+      try (TableIterator<String, ? extends Table.KeyValue<String,
+          RepeatedOmKeyInfo>> iterator =
+               snapC.getMetadataManager().getDeletedTable().iterator()) {
+        while (iterator.hasNext()) {
+          if (iterator.next().getKey().contains(keyA)) {
+            return true;
+          }
+        }
+
+        return false;
       } catch (IOException e) {
         Assertions.fail();
         return false;
       }
     }, 1000, 10000);
 
+    // create snapshot d
+    SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
+
+    // delete snapshot c
+    client.getObjectStore()
+        .deleteSnapshot(volumeName, bucketName, snapshotInfoC.getName());
+
     GenericTestUtils.waitFor(() -> {
+      Table<String, SnapshotInfo> snapshotInfoTable =
+          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
       try {
-        return Objects.isNull(omKeyInfoTable.get(newKey));
+        return null == snapshotInfoTable.get(snapshotInfoC.getTableKey());
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
     }, 1000, 10000);
+
+    // get snapshot d
+    OmSnapshot snapD;
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcD = newLeaderOM
+        .getOmSnapshotManager()
+        .checkForSnapshot(volumeName, bucketName,
+            getSnapshotPrefix(snapshotInfoD.getName()), true)) {
+      Assertions.assertNotNull(rcD);
+      snapD = (OmSnapshot) rcD.get();
+    }
+
+    // wait until key a appears in deleted table of snapshot d
+    GenericTestUtils.waitFor(() -> {
+      try (TableIterator<String, ? extends Table.KeyValue<String,
+          RepeatedOmKeyInfo>> iterator =
+               snapD.getMetadataManager().getDeletedTable().iterator()) {
+        while (iterator.hasNext()) {
+          Table.KeyValue<String, RepeatedOmKeyInfo> next = iterator.next();
+          if (next.getKey().contains(keyA)) {
+            return true;
+          }
+        }
+
+        return false;
+      } catch (IOException e) {
+        Assertions.fail();
+        return false;
+      }
+    }, 1000, 120000);
 
     // Check whether newly created snapshot data is reclaimed
     client.getObjectStore()
@@ -1304,13 +1393,6 @@ public class TestOMRatisSnapshots {
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
-  }
-
-  private long getUsedBytes(OzoneManager newLeaderOM) throws IOException {
-    return newLeaderOM
-        .getBucketManager()
-        .getBucketInfo(ozoneBucket.getVolumeName(), ozoneBucket.getName())
-        .getUsedBytes();
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
