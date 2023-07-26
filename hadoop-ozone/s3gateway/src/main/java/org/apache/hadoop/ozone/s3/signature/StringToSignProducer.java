@@ -45,6 +45,9 @@ import org.apache.hadoop.util.StringUtils;
 import com.google.common.annotations.VisibleForTesting;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_PARAM;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_PATH;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_VIRTUAL;
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,6 +172,15 @@ public final class StringToSignProducer {
     List<String> encParts = new ArrayList<>();
     for (String p : parts) {
       encParts.add(urlEncode(p));
+    }
+    if (queryParams.getOrDefault(ENDPOINT_STYLE_PARAM, ENDPOINT_STYLE_PATH)
+        .equals(ENDPOINT_STYLE_VIRTUAL)) {
+      // Remove bucket name from URI if virtual-host style addressing is used.
+      encParts.remove(1);
+      if (encParts.size() == 1) {
+        encParts.add(1, "");
+      }
+      queryParams.remove(ENDPOINT_STYLE_PARAM);
     }
     String canonicalUri = join("/", encParts);
 

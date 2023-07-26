@@ -39,6 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_PARAM;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_VIRTUAL;
 
 /**
  * Filter used to convert virtual host style pattern to path style pattern.
@@ -111,6 +113,10 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       UriBuilder requestAddrBuilder = UriBuilder.fromUri(baseURI).path(newPath);
       queryParams.forEach((k, v) -> requestAddrBuilder.queryParam(k,
           v.toArray()));
+      // Enhance request URI to indicate virtual-host addressing style
+      // for later processing.
+      requestAddrBuilder.queryParam(
+          ENDPOINT_STYLE_PARAM, ENDPOINT_STYLE_VIRTUAL);
       URI requestAddr = requestAddrBuilder.build();
       requestContext.setRequestUri(baseURI, requestAddr);
     }
