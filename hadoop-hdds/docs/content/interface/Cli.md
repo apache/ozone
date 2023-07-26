@@ -140,14 +140,14 @@ $ ozone sh volume list /
 } ]
 ```
 
-If the volume is empty, we can delete volume using below command. 
+If the volume is empty, we can delete the volume using the command below. 
 
 ```shell
 $ ozone sh volume delete /vol1
 Volume vol1 is deleted
 ```
 
-If the volume contains some buckets/keys, we can delete volume recursively. Which will delete all the buckets, keys for the specified volume and also volume will be deleted.
+If the volume contains any buckets or keys, we can delete the volume recursively. This will delete all keys and buckets within the volume, and then delete the volume itself.
 After running this command there is no way to recover deleted contents.
 
 ```shell
@@ -185,14 +185,14 @@ $ ozone sh bucket info /vol1/bucket1
 }
 ```
 
-If the bucket is empty we can delete bucket using below command.
+If the bucket is empty we can delete the bucket using the command below.
 
 ```shell
 $ ozone sh bucket delete /vol1/bucket1
 Bucket bucket1 is deleted
 ```
 
-If the bucket contains some keys, we can delete bucket recursively. Which will delete all the keys for the specified bucket and also bucket will be deleted.
+If the bucket contains any keys, we can delete the bucket recursively. This will delete all the keys within the bucket, and then the bucket itself.
 After running this command there is no way to recover deleted contents.
 
 ```shell
