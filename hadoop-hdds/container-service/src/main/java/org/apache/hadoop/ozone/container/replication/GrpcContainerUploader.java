@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,8 +61,9 @@ public class GrpcContainerUploader implements ContainerUploader {
       StreamObserver<SendContainerRequest> requestStream = client.upload(
           new SendContainerResponseStreamObserver(containerId, target,
               callback));
-      return new SendContainerOutputStream(requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression) {
+      return new SendContainerOutputStream(
+          (CallStreamObserver<SendContainerRequest>) requestStream,
+          containerId, GrpcReplicationService.BUFFER_SIZE, compression) {
         @Override
         public void close() throws IOException {
           try {
