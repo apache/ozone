@@ -56,6 +56,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -119,6 +121,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String rootCaCertId;
   private String component;
   private List<String> pemEncodedCACerts = null;
+  private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
 
@@ -901,20 +904,31 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized List<String> getCAList() {
-    return pemEncodedCACerts;
-  }
-
-  @Override
-  public synchronized List<String> listCA() throws IOException {
-    if (pemEncodedCACerts == null) {
-      updateCAList();
+  public List<String> getCAList() {
+    pemEncodedCACertsLock.lock();
+    try {
+      return pemEncodedCACerts;
+    } finally {
+      pemEncodedCACertsLock.unlock();
     }
-    return pemEncodedCACerts;
   }
 
   @Override
-  public synchronized List<String> updateCAList() throws IOException {
+  public List<String> listCA() throws IOException {
+    pemEncodedCACertsLock.lock();
+    try {
+      if (pemEncodedCACerts == null) {
+        updateCAList();
+      }
+      return pemEncodedCACerts;
+    } finally {
+      pemEncodedCACertsLock.unlock();
+    }
+  }
+
+  @Override
+  public List<String> updateCAList() throws IOException {
+    pemEncodedCACertsLock.lock();
     try {
       pemEncodedCACerts = getScmSecureClient().listCACertificate();
       return pemEncodedCACerts;
@@ -922,6 +936,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().error("Error during updating CA list", e);
       throw new CertificateException("Error during updating CA list", e,
           CERTIFICATE_ERROR);
+    } finally {
+      pemEncodedCACertsLock.unlock();
     }
   }
 
