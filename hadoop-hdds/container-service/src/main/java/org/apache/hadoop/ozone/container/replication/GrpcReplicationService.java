@@ -65,6 +65,8 @@ public class GrpcReplicationService extends
     OutputStream outputStream = null;
     try {
       outputStream = new CopyContainerResponseStream(
+          // gRPC runtime always provides implementation of CallStreamObserver
+          // that allows flow control.
           (CallStreamObserver<CopyContainerResponseProto>) responseObserver,
           containerID, BUFFER_SIZE);
       source.copyData(containerID, outputStream, compression);
