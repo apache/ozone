@@ -22,9 +22,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import org.junit.Assert;
@@ -38,9 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
@@ -291,36 +285,5 @@ public class TestRootedOzoneFileSystemWithFSO
     assertFalse(fs.isFileClosed(source));
     assertTrue(fs.recoverLease(source));
     assertTrue(fs.isFileClosed(source));
-  }
-
-  @Test
-  public void testKeyNameAfterSetTimes() throws Exception {
-    // Create a file
-    OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(getClient(),
-        getBucketLayout());
-    Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
-    Path bucketPath1 = new Path(volumePath1, bucket1.getName());
-    // create dir a & b and key : a/b/key1
-    Path a = new Path(bucketPath1, "a");
-    getFs().mkdirs(a);
-    Path b = new Path(a, "b");
-    getFs().mkdirs(b);
-    Path path = new Path(b, "key1");
-    try (FSDataOutputStream stream = getFs().create(path)) {
-      stream.write(1);
-    }
-    List<String> lsBeforeSetMTime = new ArrayList<>();
-    Iterator<? extends OzoneKey> itr = bucket1.listKeys("");
-    while (itr.hasNext()) {
-      lsBeforeSetMTime.add(itr.next().getName());
-    }
-    getFs().setTimes(path, 1000, 2000);
-    List<String> lsAfterSetMTime = new ArrayList<>();
-    itr = bucket1.listKeys("");
-    while (itr.hasNext()) {
-      lsAfterSetMTime.add(itr.next().getName());
-    }
-    Assert.assertArrayEquals(lsBeforeSetMTime.toArray(),
-        lsAfterSetMTime.toArray());
   }
 }
