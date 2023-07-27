@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -90,7 +89,8 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
         ozoneManager.getDefaultReplicationConfig());
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isFile());
-    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(tableKey);
     Assert.assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
     Assert.assertEquals(mtime, keyMtime);
