@@ -289,6 +289,7 @@ public class TestContainerPersistence {
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID));
 
+    KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
     container.delete();
     containerSet.removeContainer(testContainerID);
     Assert.assertFalse(containerSet.getContainerMapCopy()
@@ -352,6 +353,9 @@ public class TestContainerPersistence {
     // Block data and metadata tables should have data.
     assertContainerInSchema3DB(containerData, blockID);
 
+    KeyValueContainerUtil.removeContainerDB(
+        container.getContainerData(),
+        container.getContainerData().getVolume().getConf());
     container.delete();
     containerSet.removeContainer(testContainerID);
     Assert.assertFalse(containerSet.getContainerMapCopy()
@@ -475,13 +479,18 @@ public class TestContainerPersistence {
         .collect(Collectors.toSet());
     Assert.assertEquals(2, deleteDirFiles.size());
 
-    File container1Dir = new File(container1Data.getContainerPath());
+    File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container1Data, hddsVolume).toFile();
     Assert.assertTrue(deleteDirFiles.contains(container1Dir));
-    File container2Dir = new File(container2Data.getContainerPath());
+    File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container2Data, hddsVolume).toFile();
     Assert.assertTrue(deleteDirFiles.contains(container2Dir));
 
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
+    KeyValueContainerUtil.removeContainerDB(
+        container1.getContainerData(),
+        container1.getContainerData().getVolume().getConf());
     container1.delete();
     assertContainerNotInSchema3DB(container1Data, container1Block);
     assertContainerInSchema3DB(container2Data, container2Block);
@@ -493,6 +502,9 @@ public class TestContainerPersistence {
     Assert.assertEquals(deleteDirFilesArray[0], container2Dir);
 
     // Delete container2 from the disk.
+    KeyValueContainerUtil.removeContainerDB(
+        container2.getContainerData(),
+        container2.getContainerData().getVolume().getConf());
     container2.delete();
     assertContainerNotInSchema3DB(container1Data, container1Block);
     assertContainerNotInSchema3DB(container2Data, container2Block);

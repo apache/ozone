@@ -40,7 +40,6 @@ import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -58,6 +57,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
@@ -84,7 +84,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BACKUP_KEY_CERT_DIR_NAM
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.BOOTSTRAP_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
@@ -172,7 +171,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
 
     if (shouldStartCertificateRenewerService()) {
-      startRootCaRotationPoller();
+      if (securityConfig.isAutoCARotationEnabled()) {
+        startRootCaRotationPoller();
+      }
       if (certPath != null && executorService == null) {
         startCertificateRenewerService();
       } else {
@@ -191,13 +192,21 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private void startRootCaRotationPoller() {
     if (rootCaRotationPoller == null) {
       rootCaRotationPoller = new RootCaRotationPoller(securityConfig,
-          rootCaCertificates, scmSecurityClient);
+          new HashSet<>(rootCaCertificates), scmSecurityClient);
       rootCaRotationPoller.addRootCARotationProcessor(
           this::getRootCaRotationListener);
       rootCaRotationPoller.run();
     } else {
       getLogger().debug("Root CA certificate rotation poller is already " +
           "started.");
+    }
+  }
+
+  @Override
+  public synchronized void registerRootCARotationListener(
+      Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
+    if (securityConfig.isAutoCARotationEnabled()) {
+      rootCaRotationPoller.addRootCARotationProcessor(listener);
     }
   }
 
@@ -626,10 +635,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *                          successfully from configured location but
    *                          Certificate.
    * 7. ALL                   Keypair as well as certificate is present.
-   * 8. EXPIRED_CERT          The certificate is present, but either it has
-   *                          already expired, or is about to be expired within
-   *                          the grace period provided in the configuration.
-   *
    * */
   protected enum InitCase {
     NONE,
@@ -639,8 +644,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     PRIVATE_KEY,
     PRIVATEKEY_CERT,
     PUBLICKEY_PRIVATEKEY,
-    ALL,
-    EXPIRED_CERT
+    ALL
   }
 
   /**
@@ -650,9 +654,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * 2. Generates and stores a keypair.
    * 3. Try to recover public key if private key and certificate is present
    *    but public key is missing.
-   * 4. Checks if the certificate is about to be expired or have already been
-   *    expired, and if yes removes the key material and the certificate and
-   *    asks for re-initialization in the result.
    *
    * Truth table:
    *  +--------------+-----------------+--------------+----------------+
@@ -683,14 +684,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    *    will be generated and stored at configured location.
    * 2. When keypair (public/private key) is available but certificate is
    *    missing.
-   *
-   * Returns REINIT in following case:
-   *    If it would return SUCCESS, but the certificate expiration date is
-   *    within the configured grace period or if the certificate is already
-   *    expired.
-   *    The grace period is configured by the hdds.x509.renew.grace.duration
-   *    configuration property.
-   *
    */
   @Override
   public synchronized InitResponse init() throws CertificateException {
@@ -706,18 +699,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
     if (certificate != null) {
       initCase = initCase | 1;
-    }
-
-    boolean successCase =
-        initCase == InitCase.ALL.ordinal() ||
-            initCase == InitCase.PRIVATEKEY_CERT.ordinal();
-    boolean shouldRenew =
-        certificate != null &&
-            Instant.now().plus(securityConfig.getRenewalGracePeriod())
-                .isAfter(certificate.getNotAfter().toInstant());
-
-    if (successCase && shouldRenew) {
-      initCase = InitCase.EXPIRED_CERT.ordinal();
     }
 
     getLogger().info("Certificate client init case: {}", initCase);
@@ -785,30 +766,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       } else {
         return FAILURE;
       }
-    case EXPIRED_CERT:
-      getLogger().info("Component certificate is about to expire. Initiating" +
-          "renewal.");
-      removeMaterial();
-      return REINIT;
     default:
       getLogger().error("Unexpected case: {} (private/public/cert)",
           Integer.toBinaryString(init.ordinal()));
 
       return FAILURE;
-    }
-  }
-
-  protected void removeMaterial() throws CertificateException {
-    try {
-      FileUtils.deleteDirectory(
-          securityConfig.getKeyLocation(component).toFile());
-      getLogger().info("Certificate renewal: key material is removed.");
-      FileUtils.deleteDirectory(
-          securityConfig.getCertificateLocation(component).toFile());
-      getLogger().info("Certificate renewal: certificates are removed.");
-    } catch (IOException e) {
-      throw new CertificateException("Certificate renewal failed: remove key" +
-          " material failed.", e);
     }
   }
 
@@ -1322,7 +1284,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       return CompletableFuture.completedFuture(null);
     }
     CertificateRenewerService renewerService =
-        new CertificateRenewerService(true);
+        new CertificateRenewerService(
+            true, rootCaRotationPoller::setCertificateRenewalError);
     return CompletableFuture.runAsync(renewerService, executorService);
   }
 
@@ -1344,7 +1307,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               .setDaemon(true).build());
     }
     this.executorService.scheduleAtFixedRate(
-        new CertificateRenewerService(false),
+        new CertificateRenewerService(false, () -> {
+        }),
         timeBeforeGracePeriod, interval, TimeUnit.MILLISECONDS);
     getLogger().info("CertificateRenewerService for {} is started with " +
             "first delay {} ms and interval {} ms.", component,
@@ -1356,9 +1320,12 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    */
   public class CertificateRenewerService implements Runnable {
     private boolean forceRenewal;
+    private Runnable rotationErrorCallback;
 
-    public CertificateRenewerService(boolean forceRenewal) {
+    public CertificateRenewerService(boolean forceRenewal,
+        Runnable rotationErrorCallback) {
       this.forceRenewal = forceRenewal;
+      this.rotationErrorCallback = rotationErrorCallback;
     }
 
     @Override
@@ -1386,6 +1353,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
               timeLeft, forceRenewal);
           newCertId = renewAndStoreKeyAndCertificate(forceRenewal);
         } catch (CertificateException e) {
+          rotationErrorCallback.run();
           if (e.errorCode() ==
               CertificateException.ErrorCode.ROLLBACK_ERROR) {
             if (shutdownCallback != null) {

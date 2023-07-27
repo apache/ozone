@@ -910,7 +910,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager();
     }
-    rootCARotationManager = new RootCARotationManager(this);
+    if (securityConfig.isAutoCARotationEnabled()) {
+      rootCARotationManager = new RootCARotationManager(this);
+    }
   }
 
   /**
@@ -2178,7 +2180,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
-  @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }

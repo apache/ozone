@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
@@ -40,7 +40,7 @@ public final class ContainerLogger {
 
   @VisibleForTesting
   public static final String LOG_NAME = "ContainerLog";
-  private static final Logger LOG = LoggerFactory.getLogger(LOG_NAME);
+  private static final Logger LOG = LogManager.getLogger(LOG_NAME);
   private static final String FIELD_SEPARATOR = " | ";
 
   private ContainerLogger() { }

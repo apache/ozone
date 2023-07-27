@@ -653,13 +653,14 @@ public abstract class StorageVolume
     // The failure counts can be left as is.
     if (currentIOFailureCount.get() > ioFailureTolerance) {
       LOG.info("Failed IO test for volume {}: the last {} runs " +
-              "encountered {}/{} tolerated failures.", this,
+              "encountered {} out of {} tolerated failures.", this,
           ioTestSlidingWindow.size(), currentIOFailureCount,
           ioFailureTolerance);
       return VolumeCheckResult.FAILED;
     } else if (LOG.isDebugEnabled()) {
       LOG.debug("IO test results for volume {}: the last {} runs encountered " +
-              "{}/{} tolerated failures", this, ioTestSlidingWindow.size(),
+              "{} out of {} tolerated failures", this,
+          ioTestSlidingWindow.size(),
           currentIOFailureCount, ioFailureTolerance);
     }
 

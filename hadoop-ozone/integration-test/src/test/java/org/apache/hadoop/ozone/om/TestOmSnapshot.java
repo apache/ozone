@@ -110,7 +110,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
@@ -1477,17 +1476,6 @@ public class TestOmSnapshot {
             null, 0, false, disableNativeDiff));
 
     assertEquals(KEY_NOT_FOUND, omException.getResult());
-
-    createSnapshot(volume, bucket, snap2);
-
-    omException = assertThrows(OMException.class, () ->
-        store.snapshotDiff(volume, bucket, snap2, snap1, null, 0, false,
-            disableNativeDiff)
-    );
-
-    assertEquals(INTERNAL_ERROR, omException.getResult());
-    assertEquals("fromSnapshot:" + snap2 + " should be older than to " +
-        "toSnapshot:" + snap1, omException.getMessage());
   }
 
   @Test
