@@ -65,12 +65,6 @@ public final class SCMContainerPlacementRackScatter
   // INNER_LOOP is to choose node in each rack
   private static final int INNER_LOOP_MAX_RETRY = 5;
   private final SCMContainerPlacementMetrics metrics;
-  /*
-  If fallback is true, then chooseDatanodesInternal API will try to return the
-  required number of nodes even if placement policy is not satisfied. Still,
-  it'll try to follow the policy as well as possible.
-  */
-  private boolean fallback;
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -84,7 +78,6 @@ public final class SCMContainerPlacementRackScatter
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
     this.metrics = metrics;
-    this.fallback = fallback;
   }
 
   /**
@@ -275,32 +268,9 @@ public final class SCMContainerPlacementRackScatter
     int requiredReplicationFactor = usedNodes.size() + nodesRequired;
     int numberOfRacksRequired = getRequiredRackCount(requiredReplicationFactor);
     int additionalRacksRequired =
-            numberOfRacksRequired - usedRacksCntMap.size();
+        Math.min(nodesRequired, numberOfRacksRequired - usedRacksCntMap.size());
     LOG.debug("Additional nodes required: {}. Additional racks required: {}.",
         nodesRequired, additionalRacksRequired);
-    if (nodesRequired < additionalRacksRequired) {
-      String reason = "Required nodes size: " + nodesRequired
-              + " is less than required number of racks to choose: "
-              + additionalRacksRequired + ".";
-      LOG.warn("Placement policy cannot choose the enough racks. {}"
-                      + "Total number of Required Racks: {} Used Racks Count:" +
-                      " {}, Required Nodes count: {}, fallback: {}.",
-              reason, numberOfRacksRequired, usedRacksCntMap.size(),
-              nodesRequired, fallback);
-
-      /*
-      The number of additional Datanodes ("nodesRequired") that were asked for
-      are less than the additional number of racks ("additionalRacksRequired")
-      that container replicas need to be on. This means that returning
-      nodesRequired number of nodes will not satisfy the rack scatter policy.
-      If fallback is false, throw an exception. Else, continue to find
-      nodesRequired number of nodes.
-       */
-      if (!fallback) {
-        throw new SCMException(reason,
-            FAILED_TO_FIND_SUITABLE_NODE);
-      }
-    }
     int maxReplicasPerRack = getMaxReplicasPerRack(requiredReplicationFactor,
             numberOfRacksRequired);
     LOG.debug("According to required replication factor: {}, and total number" +
@@ -321,37 +291,18 @@ public final class SCMContainerPlacementRackScatter
               + additionalRacksRequired + " do not match.";
       LOG.warn("Placement policy cannot choose the enough racks. {}"
                       + "Total number of Required Racks: {} Used Racks Count:" +
-                      " {}, Required Nodes count: {}, fallback: {}.",
+                      " {}, Required Nodes count: {}",
               reason, numberOfRacksRequired, usedRacksCntMap.size(),
-              nodesRequired, fallback);
-
-      /*
-      The number of racks which aren't already used by existing replicas
-      ("racks") and hence are available for new replicas are less than the
-      additional number of racks that replicas need to be on
-      ("additionalRacksRequired").
-      */
-      if (!fallback) {
-        throw new SCMException(reason,
-            FAILED_TO_FIND_SUITABLE_NODE);
-      }
+              nodesRequired);
+      throw new SCMException(reason,
+              FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-    /*
-    If fallback is false, and we reach here, then nodesRequired is greater
-    than or equal to additionalRacksRequired. So we need to ask for
-    nodesRequired number of nodes. If fallback is true, then nodesRequired
-    could be less than additionalRacksRequired. We still need to ask for
-    nodesRequired number of more nodes, even if that won't satisfy the
-    requirement of being on additionalRacksRequired more racks.
-
-    So, in both cases, we want to ask for nodesRequired number of nodes.
-    */
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>(
         chooseNodesFromRacks(racks, unavailableNodes,
-            mutableFavoredNodes, nodesRequired, metadataSizeRequired,
-            dataSizeRequired, maxReplicasPerRack, usedRacksCntMap,
-            maxReplicasPerRack));
+            mutableFavoredNodes, additionalRacksRequired,
+            metadataSizeRequired, dataSizeRequired, maxReplicasPerRack,
+            usedRacksCntMap, maxReplicasPerRack));
 
     if (chosenNodes.size() < additionalRacksRequired) {
       String reason = "Chosen nodes size from Unique Racks: " + chosenNodes
@@ -361,47 +312,33 @@ public final class SCMContainerPlacementRackScatter
                       "available racks. {} Available racks count: {},"
                       + " Excluded nodes count: {}, UsedNodes count: {}",
               reason, racks.size(), excludedNodesCount, usedNodesCount);
-
-      /*
-      Couldn't choose enough racks to satisfy the rack scatter policy. If
-      fallback is not allowed, then throw an exception.
-      */
-      if (!fallback) {
-        throw new SCMException(reason,
-            SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
-      }
+      throw new SCMException(reason,
+              SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
 
     if (chosenNodes.size() < nodesRequired) {
-      /* If fallback is allowed, adjust maxReplicasToMove such that
-      replication factor number of replicas are allowed per rack.
-      */
-      if (fallback) {
-        maxReplicasPerRack = requiredReplicationFactor;
-      }
       racks.addAll(usedRacksCntMap.keySet());
       racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
       racks.addAll(usedRacksCntMap.keySet());
       LOG.debug("Available racks considering racks with used and exclude " +
               "nodes: {}.", racks);
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
-          mutableFavoredNodes, nodesRequired - chosenNodes.size(),
-          metadataSizeRequired, dataSizeRequired, Integer.MAX_VALUE,
-          usedRacksCntMap, maxReplicasPerRack));
+              mutableFavoredNodes, nodesRequired - chosenNodes.size(),
+              metadataSizeRequired, dataSizeRequired,
+              Integer.MAX_VALUE, usedRacksCntMap, maxReplicasPerRack));
     }
     List<DatanodeDetails> result = new ArrayList<>(chosenNodes);
     if (nodesRequired != chosenNodes.size()) {
       String reason = "Chosen nodes size: " + chosenNodes
               .size() + ", but required nodes to choose: "
               + nodesRequired + " do not match.";
-      LOG.warn("Placement policy could not choose enough nodes."
+      LOG.warn("Placement policy could not choose the enough nodes."
                + " {} Available nodes count: {}, Excluded nodes count: {}, "
-               + "Used nodes count: {}",
+               + " Used nodes count: {}",
               reason, totalNodesCount, excludedNodesCount, usedNodesCount);
       throw new SCMException(reason,
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
     }
-
     List<DatanodeDetails> newPlacement =
         new ArrayList<>(usedNodes.size() + result.size());
     newPlacement.addAll(usedNodes);
@@ -422,8 +359,8 @@ public final class SCMContainerPlacementRackScatter
         throw new SCMException(errorMsg, FAILED_TO_FIND_SUITABLE_NODE);
       }
     }
-    LOG.info("Chosen nodes: {}. isPolicySatisfied: {}. fallback: {}.", result,
-        placementStatus.isPolicySatisfied(), fallback);
+    LOG.info("Chosen nodes: {}. isPolicySatisfied: {}.", result,
+        placementStatus.isPolicySatisfied());
     return result;
   }
 
@@ -550,11 +487,6 @@ public final class SCMContainerPlacementRackScatter
     List<Node> racks = networkTopology.getNodes(rackLevel);
     Collections.shuffle(racks);
     return racks;
-  }
-
-  @VisibleForTesting
-  void setFallback(boolean fallback) {
-    this.fallback = fallback;
   }
 
 }

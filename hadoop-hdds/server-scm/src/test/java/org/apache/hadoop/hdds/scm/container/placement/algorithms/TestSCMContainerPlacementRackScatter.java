@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -45,6 +46,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
+import org.slf4j.event.Level;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -300,18 +302,10 @@ public class TestSCMContainerPlacementRackScatter {
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount >= NODE_PER_RACK);
       if (datanodeCount == 6) {
-        policy.setFallback(false);
         int finalNodeNum = nodeNum;
         SCMException e = assertThrows(SCMException.class,
                 () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
         assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
-
-        // allow fallback, expecting 5 nodes across both racks to get selected
-        policy.setFallback(true);
-        List<DatanodeDetails> chosenNodes =
-            policy.chooseDatanodes(null, null, finalNodeNum, 0, 15);
-        Assertions.assertEquals(5, chosenNodes.size());
-        Assertions.assertTrue(chosenNodes.contains(datanodes.get(5)));
       } else {
         datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
         Assertions.assertEquals(nodeNum, datanodeDetails.size());
@@ -325,18 +319,10 @@ public class TestSCMContainerPlacementRackScatter {
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount > 2 * NODE_PER_RACK);
       if (datanodeCount == 11) {
-        policy.setFallback(false);
         int finalNodeNum = nodeNum;
         SCMException e = assertThrows(SCMException.class,
                 () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
         assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
-
-        // allow fallback, expecting 10 nodes across both racks to be selected
-        policy.setFallback(true);
-        List<DatanodeDetails> chosenNodes =
-            policy.chooseDatanodes(null, null, finalNodeNum, 0, 15);
-        Assertions.assertEquals(10, chosenNodes.size());
-        Assertions.assertTrue(chosenNodes.contains(datanodes.get(10)));
       } else {
         datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
         Assertions.assertEquals(nodeNum, datanodeDetails.size());
@@ -399,19 +385,11 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
     if (datanodeCount == 6) {
-      policy.setFallback(false);
       int finalNodeNum = nodeNum;
       SCMException e = assertThrows(SCMException.class,
               () -> policy.chooseDatanodes(excludedNodes, null,
                       finalNodeNum, 0, 15));
       assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
-
-      // allow fallback, expecting 4 nodes to get selected now
-      policy.setFallback(true);
-      List<DatanodeDetails> chosenNodes =
-          policy.chooseDatanodes(excludedNodes, null, finalNodeNum, 0, 15);
-      Assertions.assertEquals(4, chosenNodes.size());
-      Assertions.assertTrue(chosenNodes.contains(datanodes.get(5)));
     } else {
       datanodeDetails = policy.chooseDatanodes(
               excludedNodes, null, nodeNum, 0, 15);
@@ -442,26 +420,11 @@ public class TestSCMContainerPlacementRackScatter {
       *  met since there are two racks exist, but only one
       * of them is chosen
       * */
-      policy.setFallback(false);
       SCMException e = assertThrows(SCMException.class,
           () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
       String message = e.getMessage();
       assertTrue(message.contains("Chosen nodes size: 2, but required nodes " +
           "to choose: 3 do not match."));
-
-      /*
-      Now, allow fallback. The expectation is that 3 nodes from the first
-      rack should be chosen.
-       */
-      policy.setFallback(true);
-      List<DatanodeDetails> chosenNodes =
-          policy.chooseDatanodes(excludedNodes, null, 3, 0, 15);
-      Assertions.assertEquals(3, chosenNodes.size());
-      for (DatanodeDetails dn : chosenNodes) {
-        Assertions.assertTrue(
-            dn.equals(datanodes.get(1)) || dn.equals(datanodes.get(2)) ||
-                dn.equals(datanodes.get(3)) || dn.equals(datanodes.get(4)));
-      }
     } else {
       datanodeDetails = policy.chooseDatanodes(
           excludedNodes, null, nodeNum, 0, 15);
@@ -697,26 +660,18 @@ public class TestSCMContainerPlacementRackScatter {
             true, 0);
   }
 
+  /**
+   * The expectation is that one datanode should be chosen, even though the
+   * placement policy ideally requires two more racks.
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-9011">...</a>
+   */
   @Test
-  public void testChooseNodesWithUsedNodesWithInsufficientRequiredNodeCount()
+  public void shouldChooseNodeIfNodesRequiredLessThanAdditionalRacksRequired()
       throws SCMException {
     setup(5, 2);
-    policy.setFallback(false);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
-    SCMException exception = Assertions.assertThrows(SCMException.class, () ->
-            policy.chooseDatanodes(usedDns, excludedDns,
-                    null, 1, 0, 5));
-    assertEquals("Required nodes size: 1 is less than " +
-            "required number of racks to choose: 2.", exception.getMessage());
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-            exception.getResult());
 
-    /*
-     Now, allow fallback. The expectation is that one datanode should be
-     chosen, even though the placement policy requires two more racks.
-     */
-    policy.setFallback(true);
     List<DatanodeDetails> chosenNodes =
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 1, 0, 5);
@@ -726,40 +681,6 @@ public class TestSCMContainerPlacementRackScatter {
     choose from racks that don't have used or excluded nodes.
      */
     Assertions.assertEquals(datanodes.get(4), chosenNodes.get(0));
-  }
-
-  /**
-   * Scenario:
-   * rack0 -> node0
-   * rack1 -> node1
-   * rack2 -> node2
-   * rack3 -> node3
-   * rack4 -> node4, node5
-   * <p>
-   * node0, node1, node2, node4 are used nodes. node3 is excluded node.
-   * Expectation is that node5 should be chosen if fallback is allowed.
-   * Else, an SCMException should be thrown because placement policy cannot
-   * be satisfied.
-   */
-  @Test
-  public void shouldChooseRackWithUsedNodeWhenOnlyThatRackIsAvailable()
-      throws SCMException {
-    setupOneDatanodePerRackWithExtraInLastRack(5, 2);
-    policy.setFallback(false);
-    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1, 2,
-        4));
-    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(3));
-    Assertions.assertThrows(SCMException.class,
-        () -> policy.chooseDatanodes(usedDns, excludedDns,
-            null, 1, 0, 5));
-
-    // now, allow fallback
-    policy.setFallback(true);
-    List<DatanodeDetails> chosenNode =
-        policy.chooseDatanodes(usedDns, excludedDns,
-            null, 1, 0, 5);
-    Assertions.assertEquals(1, chosenNode.size());
-    Assertions.assertEquals(datanodes.get(5), chosenNode.get(0));
   }
 
   /**
@@ -781,16 +702,10 @@ public class TestSCMContainerPlacementRackScatter {
   public void shouldChooseNodeWhenOneNodeRequiredAndTwoRacksRequired()
       throws SCMException {
     setupOneDatanodePerRackWithExtraInLastRack(6, 2);
-    policy.setFallback(false);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1, 5,
         5));
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
-    Assertions.assertThrows(SCMException.class,
-        () -> policy.chooseDatanodes(usedDns, excludedDns,
-            null, 1, 0, 5));
 
-    // now, allow fallback
-    policy.setFallback(true);
     List<DatanodeDetails> chosenNode =
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 1, 0, 5);
@@ -823,7 +738,6 @@ public class TestSCMContainerPlacementRackScatter {
   public void chooseNodesOnTheSameRackWhenInSufficientRacks()
       throws SCMException {
     setup(6, 2);
-    policy.setFallback(false);
     List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
     updateStorageInDatanode(4, 99, 1);
     List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(5));
