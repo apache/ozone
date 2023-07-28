@@ -24,7 +24,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
@@ -36,6 +35,8 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,13 +160,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       // Files to be excluded from tarball
       Set<Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation().toString(),
-          ServerUtils.getOzoneMetaDirPath(getConf()).toString());
+          checkpoint.getCheckpointLocation());
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
           excludedList, tmpdir);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
-          completed);
+          completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
       LOG.error("got exception writing to archive " + e);
       throw e;
@@ -175,14 +175,17 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // Format list from follower to match data on leader.
   @VisibleForTesting
   public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
-      String checkpointLocation, String metaDirPath) {
+                                               Path checkpointLocation) {
     Set<Path> paths = new HashSet<>();
-    for (String s: toExcludeList) {
+    for (String s : toExcludeList) {
       if (!s.startsWith(OM_SNAPSHOT_DIR)) {
-        Path fixedPath = Paths.get(checkpointLocation, s);
+        Path fixedPath = Paths.get(checkpointLocation.toString(), s);
         paths.add(fixedPath);
       } else {
-        paths.add(Paths.get(metaDirPath, s));
+        Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
+        paths.add(
+            Paths.get(metaDirPath.toString(),
+                s));
       }
     }
     return paths;
@@ -500,13 +503,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return Boolean.parseBoolean(includeParam);
   }
 
-  private void writeFilesToArchive(Map<Path, Path> copyFiles,
-                                   Map<Path, Path> hardLinkFiles,
-                                   ArchiveOutputStream archiveOutputStream,
-                                   boolean completed)
+  private void writeFilesToArchive(
+      Map<Path, Path> copyFiles,
+      Map<Path, Path> hardLinkFiles,
+      ArchiveOutputStream archiveOutputStream,
+      boolean completed,
+      Path checkpointLocation)
       throws IOException {
-
-    File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
+    Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
     int truncateLength = metaDirPath.toString().length() + 1;
 
     Map<Path, Path> filteredCopyFiles = completed ? copyFiles :
@@ -545,6 +549,23 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
+  }
+
+  @NotNull
+  private static Path getVerifiedCheckPointPath(Path checkpointLocation) {
+    // This check is done to take care of findbug else below getParent()
+    // should not be null.
+    Path locationParent = checkpointLocation.getParent();
+    if (null == locationParent) {
+      throw new RuntimeException(
+          "checkpoint location's immediate parent is null.");
+    }
+    Path parent = locationParent.getParent();
+    if (null == parent) {
+      throw new RuntimeException(
+          "checkpoint location's path is invalid and could not be verified.");
+    }
+    return parent;
   }
 
   private OzoneConfiguration getConf() {

@@ -686,7 +686,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return OmKeyInfo
    */
   @SuppressWarnings("parameterNumber")
-  protected OmKeyInfo createFileInfo(@Nonnull KeyArgs keyArgs,
+  protected OmKeyInfo createFileInfo(
+      @Nonnull KeyArgs keyArgs,
       @Nonnull List<OmKeyLocationInfo> locations,
       @Nonnull ReplicationConfig replicationConfig,
       long size,
@@ -694,22 +695,24 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfoWithFSO omPathInfo,
-      long transactionLogIndex, long objectID) {
+      long transactionLogIndex, long objectID
+  ) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
-            .setBucketName(keyArgs.getBucketName())
-            .setKeyName(keyArgs.getKeyName())
-            .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, locations)))
-            .setCreationTime(keyArgs.getModificationTime())
-            .setModificationTime(keyArgs.getModificationTime())
-            .setDataSize(size)
-            .setReplicationConfig(replicationConfig)
-            .setFileEncryptionInfo(encInfo)
-            .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
-            .addAllMetadata(KeyValueUtil.getFromProtobuf(
-                    keyArgs.getMetadataList()))
-            .setUpdateID(transactionLogIndex);
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, locations)))
+        .setCreationTime(keyArgs.getModificationTime())
+        .setModificationTime(keyArgs.getModificationTime())
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setFileEncryptionInfo(encInfo)
+        .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(
+            keyArgs.getMetadataList()))
+        .setUpdateID(transactionLogIndex)
+        .setFile(true);
     if (omPathInfo != null) {
       // FileTable metadata format
       objectID = omPathInfo.getLeafNodeObjectId();

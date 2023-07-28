@@ -42,12 +42,16 @@ import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.PrivateKey;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
@@ -57,6 +61,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
  */
 public class DefaultApprover extends BaseApprover {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultApprover.class);
   /**
    * Constructs the Default Approver.
    *
@@ -145,6 +151,14 @@ public class DefaultApprover extends BaseApprover {
             x500Name, keyInfo);
 
     Extensions exts = getPkcs9Extensions(certificationRequest);
+    LOG.info("Extensions in CSR: {}",
+        Arrays.stream(exts.getExtensionOIDs())
+            .map(ASN1ObjectIdentifier::getId)
+            .collect(Collectors.joining(", ")));
+    LOG.info("Extensions to add to the certificate if they present in CSR: {}",
+        Arrays.stream(getProfile().getSupportedExtensions())
+            .map(oid -> oid == null ? "null" : oid.getId())
+            .collect(Collectors.joining(", ")));
     for (ASN1ObjectIdentifier extId : getProfile().getSupportedExtensions()) {
       Extension ext = exts.getExtension(extId);
       if (ext != null) {

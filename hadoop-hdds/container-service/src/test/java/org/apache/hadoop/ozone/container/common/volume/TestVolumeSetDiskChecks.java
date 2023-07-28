@@ -154,14 +154,19 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
+    volumeSet.checkAllVolumes();
     Assert.assertEquals(volumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(volumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
+
+    metaVolumeSet.checkAllVolumes();
     Assert.assertEquals(metaVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(metaVolumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
+
+    dbVolumeSet.checkAllVolumes();
     Assert.assertEquals(dbVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
     Assert.assertEquals(dbVolumeSet.getVolumesList().size(),
@@ -197,10 +202,13 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
+    volumeSet.checkAllVolumes();
     assertEquals(volumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(volumeSet.getVolumesList().size(), 0);
+    metaVolumeSet.checkAllVolumes();
     assertEquals(metaVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(metaVolumeSet.getVolumesList().size(), 0);
+    dbVolumeSet.checkAllVolumes();
     assertEquals(dbVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(dbVolumeSet.getVolumesList().size(), 0);
 
