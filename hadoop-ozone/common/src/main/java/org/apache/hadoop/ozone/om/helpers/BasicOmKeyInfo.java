@@ -186,4 +186,16 @@ public class BasicOmKeyInfo {
 
     return builder.build();
   }
+
+  public static BasicOmKeyInfo fromOmKeyInfo(OmKeyInfo omKeyInfo) {
+    return new BasicOmKeyInfo(
+        omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(),
+        omKeyInfo.getDataSize(),
+        omKeyInfo.getCreationTime(),
+        omKeyInfo.getModificationTime(),
+        omKeyInfo.getReplicationConfig(),
+        omKeyInfo.isFile());
+  }
 }

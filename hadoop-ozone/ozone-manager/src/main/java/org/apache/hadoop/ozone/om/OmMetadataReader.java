@@ -42,9 +42,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -346,25 +346,10 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                                             String bucketName,
                                             String startKey, String keyPrefix,
                                             int maxKeys) throws IOException {
-    // Call the existing listKeys method to get the list of OmKeyInfo
     List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix,
-            maxKeys);
-
-    // Convert OmKeyInfo to BasicOmKeyInfo
-    List<BasicOmKeyInfo> result = new ArrayList<>();
-    for (OmKeyInfo key : keys) {
-      result.add(new BasicOmKeyInfo(
-          key.getVolumeName(),
-          key.getBucketName(),
-          key.getKeyName(),
-          key.getDataSize(),
-          key.getCreationTime(),
-          key.getModificationTime(),
-          key.getReplicationConfig(),
-          key.isFile()
-      ));
-    }
-    return result;
+        maxKeys);
+    return keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+        .collect(Collectors.toList());
   }
 
   /**
