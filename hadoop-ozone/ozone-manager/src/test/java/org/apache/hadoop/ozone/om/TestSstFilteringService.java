@@ -317,12 +317,18 @@ public class TestSstFilteringService {
         "/vol1/bucket1/key1",
         "/vol1/bucket1/key1",
         "/vol1/bucket1/"));
-
+    Assert.assertTrue(SstFilteringService.FILTER_FUNCTION.apply(
+        "/vol1/bucket1/key1",
+        "/vol1/bucket5/key1",
+        "/vol1/bucket3/"));
+    Assert.assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
+        "/vol1/bucket1/key1",
+        "/vol1/bucket4/key9",
+        "/vol1/bucket5/"));
     Assert.assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
         "/vol1/bucket1/key1",
         "/vol1/bucket1/key1",
         "/vol1/bucket2/"));
-
     Assert.assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
         "/vol1/bucket1/key1",
         "/vol1/bucket1/key1",

@@ -89,6 +89,9 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
+  // Note: This filter only works till snapshots are readable only.
+  // In the future, if snapshots are changed to writable as well,
+  // this will need to be revisited.
   static final BooleanTriFunction<String, String, String, Boolean>
       FILTER_FUNCTION =
           (first, last, prefix) -> {
