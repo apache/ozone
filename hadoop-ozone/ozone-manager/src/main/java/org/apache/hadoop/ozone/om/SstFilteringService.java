@@ -89,13 +89,14 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
-  private BooleanTriFunction<String, String, String, Boolean> filterFunction =
-      (first, last, prefix) -> {
-        String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
-        String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
-        return RocksDiffUtils
-            .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
-      };
+  static final BooleanTriFunction<String, String, String, Boolean>
+      FILTER_FUNCTION =
+          (first, last, prefix) -> {
+            String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
+            String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
+            return RocksDiffUtils
+                .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
+          };
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -178,7 +179,7 @@ public class SstFilteringService extends BackgroundService
             RocksDatabase db = rdbStore.getDb();
             try (BootstrapStateHandler.Lock lock =
                 getBootstrapStateLock().lock()) {
-              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+              db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
             }
           }
 
