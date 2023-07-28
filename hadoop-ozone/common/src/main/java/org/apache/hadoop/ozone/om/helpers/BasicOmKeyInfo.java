@@ -138,22 +138,22 @@ public class BasicOmKeyInfo {
 
     public BasicOmKeyInfo build() {
       return new BasicOmKeyInfo(volumeName, bucketName, keyName, dataSize,
-              creationTime, modificationTime, replicationConfig, isFile);
+          creationTime, modificationTime, replicationConfig, isFile);
     }
   }
 
   public BasicKeyInfo getProtobuf() {
     BasicKeyInfo.Builder builder = BasicKeyInfo.newBuilder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
-            .setDataSize(dataSize)
-            .setCreationTime(creationTime)
-            .setModificationTime(modificationTime)
-            .setType(replicationConfig.getReplicationType());
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(dataSize)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .setType(replicationConfig.getReplicationType());
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(
-              ((ECReplicationConfig) replicationConfig).toProto());
+          ((ECReplicationConfig) replicationConfig).toProto());
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
@@ -163,22 +163,22 @@ public class BasicOmKeyInfo {
   }
 
   public static BasicOmKeyInfo getFromProtobuf(BasicKeyInfo basicKeyInfo)
-          throws IOException {
+      throws IOException {
     if (basicKeyInfo == null) {
       return null;
     }
 
     Builder builder = new Builder()
-            .setVolumeName(basicKeyInfo.getVolumeName())
-            .setBucketName(basicKeyInfo.getBucketName())
-            .setKeyName(basicKeyInfo.getKeyName())
-            .setDataSize(basicKeyInfo.getDataSize())
-            .setCreationTime(basicKeyInfo.getCreationTime())
-            .setModificationTime(basicKeyInfo.getModificationTime())
-            .setReplicationConfig(ReplicationConfig.fromProto(
-                    basicKeyInfo.getType(),
-                    basicKeyInfo.getFactor(),
-                    basicKeyInfo.getEcReplicationConfig()));
+        .setVolumeName(basicKeyInfo.getVolumeName())
+        .setBucketName(basicKeyInfo.getBucketName())
+        .setKeyName(basicKeyInfo.getKeyName())
+        .setDataSize(basicKeyInfo.getDataSize())
+        .setCreationTime(basicKeyInfo.getCreationTime())
+        .setModificationTime(basicKeyInfo.getModificationTime())
+        .setReplicationConfig(ReplicationConfig.fromProto(
+            basicKeyInfo.getType(),
+            basicKeyInfo.getFactor(),
+            basicKeyInfo.getEcReplicationConfig()));
 
     if (basicKeyInfo.hasIsFile()) {
       builder.setIsFile(basicKeyInfo.getIsFile());
