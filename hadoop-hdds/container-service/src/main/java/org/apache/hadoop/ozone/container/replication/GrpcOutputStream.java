@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +37,9 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOutputStream.class);
+  public static final int READY_WAIT_TIME_IN_MS = 10;
 
-  private final StreamObserver<T> streamObserver;
+  private final CallStreamObserver<T> streamObserver;
 
   private final ByteString.Output buffer;
 
@@ -49,7 +51,7 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   private long writtenBytes;
 
-  GrpcOutputStream(StreamObserver<T> streamObserver,
+  GrpcOutputStream(CallStreamObserver<T> streamObserver,
       long containerId, int bufferSize) {
     this.streamObserver = streamObserver;
     this.containerId = containerId;
@@ -128,6 +130,7 @@ abstract class GrpcOutputStream<T> extends OutputStream {
   }
 
   private void flushBuffer(boolean eof) {
+    waitUntilReady();
     int length = buffer.size();
     if (length > 0) {
       ByteString data = buffer.toByteString();
@@ -136,6 +139,23 @@ abstract class GrpcOutputStream<T> extends OutputStream {
       sendPart(eof, length, data);
       writtenBytes += length;
       buffer.reset();
+    }
+  }
+
+  /**
+   * Handling back pressure of the stream, delay putting more messages to
+   * the stream until it's ready.
+   */
+  private void waitUntilReady() {
+    while (!streamObserver.isReady()) {
+      LOG.debug("Stream is not ready, backoff");
+      try {
+        Thread.sleep(READY_WAIT_TIME_IN_MS);
+      } catch (InterruptedException e) {
+        LOG.error("InterruptedException while waiting for channel ready", e);
+        Thread.currentThread().interrupt();
+        break;
+      }
     }
   }
 

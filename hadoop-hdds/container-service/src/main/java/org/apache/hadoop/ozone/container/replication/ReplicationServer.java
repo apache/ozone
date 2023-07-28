@@ -78,6 +78,8 @@ public class ReplicationServer {
 
     int replicationServerWorkers =
         replicationConfig.getReplicationMaxStreams();
+    LOG.info("Initializing replication server with thread count = {}",
+        replicationConfig.getReplicationMaxStreams());
     this.executor =
         new ThreadPoolExecutor(replicationServerWorkers,
             replicationServerWorkers,
