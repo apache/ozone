@@ -1011,15 +1011,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public List<BasicOmKeyInfo> listKeysLight(String volumeName,
-      String bucketName, String startKey, String prefix,
-      int maxKeys) throws IOException {
+                                            String bucketName, String startKey,
+                                            String prefix,
+                                            int maxKeys) throws IOException {
     List<BasicOmKeyInfo> keys = new ArrayList<>();
     ListKeysRequest.Builder reqBuilder = ListKeysRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setBucketName(bucketName);
     reqBuilder.setCount(maxKeys);
 
-    if (startKey != null) {
+    if (StringUtils.isNotEmpty(startKey)) {
       reqBuilder.setStartKey(startKey);
     }
 
@@ -1030,19 +1031,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     ListKeysRequest req = reqBuilder.build();
 
     OMRequest omRequest = createOMRequest(Type.ListKeysLight)
-            .setListKeysRequest(req)
-            .build();
+        .setListKeysRequest(req)
+        .build();
 
     ListKeysLightResponse resp =
-            handleError(submitRequest(omRequest)).getListKeysLightResponse();
-    List<BasicOmKeyInfo> list = new ArrayList<>();
+        handleError(submitRequest(omRequest)).getListKeysLightResponse();
     for (OzoneManagerProtocolProtos.BasicKeyInfo
-            basicKeyInfo : resp.getBasicKeyInfoList()) {
-      BasicOmKeyInfo fromProtobuf = BasicOmKeyInfo
-              .getFromProtobuf(basicKeyInfo);
-      list.add(fromProtobuf);
+        basicKeyInfo : resp.getBasicKeyInfoList()) {
+      BasicOmKeyInfo fromProtobuf =
+          BasicOmKeyInfo.getFromProtobuf(basicKeyInfo);
+      keys.add(fromProtobuf);
     }
-    keys.addAll(list);
     return keys;
   }
 

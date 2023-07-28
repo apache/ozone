@@ -1363,7 +1363,7 @@ message ListKeysResponse {
 }
 
 message ListKeysLightResponse {
-    repeated BasicKeyInfo basicKeyInfo = 2;
+    repeated BasicKeyInfo basicKeyInfo = 1;
 }
 
 message CommitKeyRequest {
