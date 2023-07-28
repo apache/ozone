@@ -344,6 +344,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   @Override
   public List<BasicOmKeyInfo> listKeysLight(String volumeName,
                                             String bucketName,
+                                            String startKey,
+                                            String keyPrefix,
+                                            int maxKeys) throws IOException {
+
+    List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix,
+        maxKeys);
+
+    return keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+        .collect(Collectors.toList());
+  }
+  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
+                                            String bucketName,
                                             String startKey, String keyPrefix,
                                             int maxKeys) throws IOException {
     // Call the existing listKeys method to get the list of OmKeyInfo
