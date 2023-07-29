@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -65,6 +64,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +113,6 @@ import static org.mockito.Mockito.when;
  */
 public class TestPipelineManagerImpl {
   private OzoneConfiguration conf;
-  private File testDir;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
   private int maxPipelineCount;
@@ -123,13 +122,9 @@ public class TestPipelineManagerImpl {
   private TestClock testClock;
 
   @BeforeEach
-  public void init() throws Exception {
+  void init(@TempDir File testDir) throws Exception {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     scm = HddsTestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     // Mock Node Manager is not able to correctly set up things for the EC
@@ -155,7 +150,6 @@ public class TestPipelineManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-    FileUtil.fullyDelete(testDir);
   }
 
   private PipelineManagerImpl createPipelineManager(boolean isLeader)

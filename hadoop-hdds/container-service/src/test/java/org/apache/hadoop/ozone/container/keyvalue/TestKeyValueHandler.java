@@ -264,7 +264,7 @@ public class TestKeyValueHandler {
 
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
-    File path = GenericTestUtils.getRandomizedTestDir();
+    File path = tempDir.newFolder();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
     conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
@@ -357,9 +357,7 @@ public class TestKeyValueHandler {
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueHandler.class.getSimpleName() +
-            "-" + UUID.randomUUID().toString());
+    final String testDir = tempDir.newFolder().getAbsolutePath();
     try {
       // Case 1 : Regular container delete
       final long containerID = 1L;
