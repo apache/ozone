@@ -84,7 +84,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = Timeout.seconds(300);
+  public final TestRule timeout = Timeout.seconds(300);
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();

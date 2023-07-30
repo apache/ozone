@@ -70,7 +70,6 @@ class TestSCMHAManagerImpl {
   private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
-  private final int waitForClusterToBeReadyTimeout = 10000;
 
   @BeforeEach
   void setup() throws IOException, InterruptedException,
@@ -102,7 +101,7 @@ class TestSCMHAManagerImpl {
       throws TimeoutException,
       InterruptedException {
     GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
-          1000, waitForClusterToBeReadyTimeout);
+          1000, 10000);
   }
 
   @AfterEach
