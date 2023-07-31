@@ -80,7 +80,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -1393,16 +1392,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
             "", scmId, null, null);
     CertificateClient.InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      LOG.info("Re-initialize certificate client.");
-      omStore.unsetOmCertSerialId();
-      omStore.persistCurrentState();
-      IOUtils.close(LOG, certClient);
-      certClient = new OMCertificateClient(
-          new SecurityConfig(conf), scmSecurityClient, omStore, omInfo,
-          "", scmId, null, null);
-      response = certClient.init();
-    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

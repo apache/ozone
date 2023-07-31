@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -566,12 +567,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     try {
       return handler.handleWriteRequest(request,
           trxLogIndex).getOMResponse();
+    } catch (IOException e) {
+      LOG.warn("Failed to write, Exception occurred ", e);
+      return createErrorResponse(request, e);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
     }
     return null;
+  }
+
+  private OMResponse createErrorResponse(
+      OMRequest omRequest, IOException exception) {
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
+        .setSuccess(false);
+    if (exception.getMessage() != null) {
+      omResponse.setMessage(exception.getMessage());
+    }
+    return omResponse.build();
   }
 
   /**

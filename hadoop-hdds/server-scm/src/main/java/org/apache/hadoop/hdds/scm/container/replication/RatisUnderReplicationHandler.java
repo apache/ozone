@@ -215,12 +215,13 @@ public class RatisUnderReplicationHandler
       }
     }
 
-    Predicate<ContainerReplica> predicate;
+    Predicate<ContainerReplica> predicate =
+        replica -> replica.getState() == State.CLOSED ||
+        replica.getState() == State.QUASI_CLOSED;
+
     if (replicaCount.getHealthyReplicaCount() == 0) {
-      predicate = replica -> replica.getState() == State.UNHEALTHY;
-    } else {
-      predicate = replica -> replica.getState() == State.CLOSED ||
-          replica.getState() == State.QUASI_CLOSED;
+      predicate = predicate.or(
+          replica -> replica.getState() == State.UNHEALTHY);
     }
 
     /*

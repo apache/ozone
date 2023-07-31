@@ -24,8 +24,6 @@ import java.lang.reflect.Method;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -102,48 +100,45 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws SCMException {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Invoking method {} on target {}", method, ratisHandler);
+    }
     try {
-      return invokeRatisImpl(method, args);
+      switch (method.getAnnotation(Replicate.class).invocationType()) {
+      case CLIENT:
+        return invokeRatisClient(method, args);
+      case DIRECT:
+      default:
+        return invokeRatisServer(method, args);
+      }
     } catch (Exception e) {
       throw translateException(e);
     }
   }
 
-  private Object invokeRatisImpl(Method method, Object[] args)
+  private Object invokeRatisServer(Method method, Object[] args)
       throws Exception {
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Invoking method {} on target {}", method, ratisHandler);
-    }
-    // TODO: Add metric here to track time taken by Ratis
-    Preconditions.checkNotNull(ratisHandler);
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
         method.getName(), method.getParameterTypes(), args);
-
-    // Scm Cert DB updates should use RaftClient.
-    // As rootCA which is primary SCM only can issue certificates to sub-CA.
-    // In case primary is not leader SCM, still sub-ca cert DB updates should go
-    // via ratis. So, in this special scenario we use RaftClient.
-    // Or rotationPrepareAck which every SCM will send out to confirm that
-    // sub CA rotation preparation is done.
-    final SCMRatisResponse response;
-    if ((method.getName().equals("storeValidCertificate") &&
-        args[args.length - 1].equals(HddsProtos.NodeType.SCM)) ||
-        method.getName().equals("rotationPrepareAck")) {
-      response =
-          HASecurityUtils.submitScmRequestToRatis(
-              ratisHandler.getDivision().getGroup(),
-              ratisHandler.getGrpcTlsConfig(),
-              scmRatisRequest.encode());
-
-    } else {
-      response = ratisHandler.submitRequest(
-          scmRatisRequest);
-    }
-
+    final SCMRatisResponse response = ratisHandler.submitRequest(
+        scmRatisRequest);
     if (response.isSuccess()) {
       return response.getResult();
     }
-    // Should we unwrap and throw proper exception from here?
+    throw response.getException();
+  }
+
+  private Object invokeRatisClient(Method method, Object[] args)
+      throws Exception {
+    final SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
+        method.getName(), method.getParameterTypes(), args);
+    final SCMRatisResponse response = HASecurityUtils.submitScmRequestToRatis(
+        ratisHandler.getDivision().getGroup(),
+        ratisHandler.getGrpcTlsConfig(),
+        scmRatisRequest.encode());
+    if (response.isSuccess()) {
+      return response.getResult();
+    }
     throw response.getException();
   }
 

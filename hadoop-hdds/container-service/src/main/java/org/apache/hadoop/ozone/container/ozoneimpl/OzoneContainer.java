@@ -141,7 +141,7 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.volumeChecker = getVolumeChecker(conf);
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -416,6 +416,18 @@ public class OzoneContainer {
       return;
     }
 
+    // Start background volume checks, which will begin after the configured
+    // delay.
+    volumeChecker.start();
+    // Do an immediate check of all volumes to ensure datanode health before
+    // proceeding.
+    volumeSet.checkAllVolumes();
+    metaVolumeSet.checkAllVolumes();
+    // DB volume set may be null if dedicated DB volumes are not used.
+    if (dbVolumeSet != null) {
+      dbVolumeSet.checkAllVolumes();
+    }
+
     LOG.info("Attempting to start container services.");
     startContainerScrub();
 
@@ -536,11 +548,6 @@ public class OzoneContainer {
 
   public MutableVolumeSet getDbVolumeSet() {
     return dbVolumeSet;
-  }
-
-  @VisibleForTesting
-  StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
-    return new StorageVolumeChecker(conf, new Timer());
   }
 
   public ContainerMetrics getMetrics() {

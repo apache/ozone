@@ -328,7 +328,7 @@ public class TestOmSnapshotManager {
     //  (Normalizing means matches the layout on the leader.)
     Set<Path> normalizedSet =
         OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
-            leaderCheckpointDir.toString(), leaderDir.toString());
+            leaderCheckpointDir.toPath());
     Set<Path> expectedNormalizedSet = new HashSet<>(Arrays.asList(
         Paths.get(leaderSnapDir1.toString(), "s1.sst"),
         Paths.get(leaderSnapDir2.toString(), "noLink.sst"),

@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collection;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +38,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.http.client.utils.URIBuilder;
 
@@ -299,6 +301,22 @@ public class OzoneAddress {
 
   public String getOmHost() {
     return ozoneURI.getHost();
+  }
+
+  public String getOmServiceId(ConfigurationSource conf) {
+    if (!Strings.isNullOrEmpty(getOmHost())) {
+      return getOmHost();
+    } else {
+      Collection<String> serviceIds = conf.getTrimmedStringCollection(
+          OZONE_OM_SERVICE_IDS_KEY);
+      if (serviceIds.size() == 1) {
+        // Only one OM service ID configured, we can use that
+        // If more than 1, it will fail in createClient step itself
+        return serviceIds.iterator().next();
+      } else {
+        return conf.get(OZONE_OM_ADDRESS_KEY);
+      }
+    }
   }
 
   public String getSnapshotNameWithIndicator() {
