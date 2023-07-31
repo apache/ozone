@@ -185,15 +185,6 @@ public class ReconServer extends GenericCli {
         reconStorage, this::saveNewCertId, this::terminateRecon);
 
     CertificateClient.InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      LOG.info("Re-initialize certificate client.");
-      certClient.close();
-      reconStorage.unsetReconCertSerialId();
-      reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(secConf, scmSecurityClient,
-          reconStorage, this::saveNewCertId, this::terminateRecon);
-      response = certClient.init();
-    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

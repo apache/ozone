@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.NavigableSet;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
@@ -95,7 +96,7 @@ public class WritableECContainerProvider
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
-    int openPipelineCount = 0;
+    int openPipelineCount;
     synchronized (this) {
       openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
@@ -118,6 +119,7 @@ public class WritableECContainerProvider
         repConfig, Pipeline.PipelineState.OPEN,
         excludeList.getDatanodes(), excludeList.getPipelineIds());
     final int pipelineCount = existingPipelines.size();
+    LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
@@ -160,13 +162,21 @@ public class WritableECContainerProvider
     // If we get here, all the pipelines we tried were no good. So try to
     // allocate a new one.
     try {
-      synchronized (this) {
-        if (openPipelineCount < maximumPipelines) {
+      if (openPipelineCount >= maximumPipelines) {
+        final int nodeCount = nodeManager.getNodeCount(inServiceHealthy());
+        if (nodeCount > maximumPipelines) {
+          LOG.debug("Increasing pipeline limit {} -> {} for final attempt",
+              maximumPipelines, nodeCount);
+          maximumPipelines = nodeCount;
+        }
+      }
+      if (openPipelineCount < maximumPipelines) {
+        synchronized (this) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-        throw new IOException("Pipeline limit (" + maximumPipelines
-            + ") reached (" + openPipelineCount + "), none closed");
       }
+      throw new IOException("Pipeline limit (" + maximumPipelines
+          + ") reached (" + openPipelineCount + "), none closed");
     } catch (IOException e) {
       LOG.warn("Unable to allocate a container after trying {} existing ones; "
           + "requested size={}, replication={}, owner={}, {}",

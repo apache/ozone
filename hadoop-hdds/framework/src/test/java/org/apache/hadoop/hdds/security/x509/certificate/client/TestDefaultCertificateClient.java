@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -45,8 +44,6 @@ import java.security.Signature;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -68,7 +65,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONN
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.REINIT;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -80,9 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -444,69 +438,6 @@ public class TestDefaultCertificateClient {
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
     assertTrue(dnClientLog.getOutput().contains("Can't recover public key"));
-  }
-
-  @Test
-  public void testCertificateExpirationHandlingInInit() throws Exception {
-    String certId = "1L";
-    String compName = "TEST";
-
-    Logger mockLogger = mock(Logger.class);
-
-    SecurityConfig config = mock(SecurityConfig.class);
-    Path nonexistent = Paths.get("nonexistent");
-    when(config.getCertificateLocation(anyString())).thenReturn(nonexistent);
-    when(config.getKeyLocation(anyString())).thenReturn(nonexistent);
-    when(config.getRenewalGracePeriod()).thenReturn(Duration.ofDays(28));
-
-    Calendar cal = Calendar.getInstance();
-    cal.add(Calendar.DAY_OF_YEAR, 2);
-    Date expiration = cal.getTime();
-    X509Certificate mockCert = mock(X509Certificate.class);
-    when(mockCert.getNotAfter()).thenReturn(expiration);
-
-    try (DefaultCertificateClient client =
-        new DefaultCertificateClient(config, null, mockLogger, certId, compName,
-            null, null) {
-          @Override
-          public PrivateKey getPrivateKey() {
-            return mock(PrivateKey.class);
-          }
-
-          @Override
-          public PublicKey getPublicKey() {
-            return mock(PublicKey.class);
-          }
-
-          @Override
-          public X509Certificate getCertificate() {
-            return mockCert;
-          }
-
-          @Override
-          public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath) {
-            return null;
-          }
-
-          @Override
-          protected SCMGetCertResponseProto getCertificateSignResponse(
-              PKCS10CertificationRequest request) {
-            return null;
-          }
-
-          @Override
-          public String signAndStoreCertificate(
-              PKCS10CertificationRequest request, Path certificatePath,
-              boolean renew) {
-            return null;
-          }
-        }) {
-
-      InitResponse resp = client.init();
-      verify(mockLogger, atLeastOnce()).info(anyString());
-      assertEquals(resp, REINIT);
-    }
   }
 
   @Test
