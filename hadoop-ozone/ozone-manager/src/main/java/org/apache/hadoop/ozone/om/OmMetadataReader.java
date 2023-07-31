@@ -323,8 +323,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             bucket.realVolume(), bucket.realBucket(), keyPrefix);
       }
       metrics.incNumKeyLists();
-      return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
-          startKey, keyPrefix, maxKeys);
+      List<OmKeyInfo> omKeyInfoList =
+          captureLatencyNs(perfMetrics.getListKeysLatencyNs(),
+              () -> keyManager.listKeys(bucket.realVolume(),
+                  bucket.realBucket(), startKey, keyPrefix, maxKeys));
+      return omKeyInfoList;
     } catch (IOException ex) {
       metrics.incNumKeyListFails();
       auditSuccess = false;
