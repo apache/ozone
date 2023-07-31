@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -183,6 +184,28 @@ public class BasicOmKeyInfo {
         .setIsFile(!keyName.endsWith("/"));
 
     return builder.build();
+  }
+
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    BasicOmKeyInfo basicOmKeyInfo = (BasicOmKeyInfo) o;
+    return volumeName.equals(basicOmKeyInfo.volumeName) &&
+        bucketName.equals(basicOmKeyInfo.bucketName) &&
+        keyName.equals(basicOmKeyInfo.keyName) &&
+        dataSize == basicOmKeyInfo.dataSize &&
+        creationTime == basicOmKeyInfo.creationTime &&
+        modificationTime == basicOmKeyInfo.modificationTime &&
+        replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
+        isFile == basicOmKeyInfo.isFile;
+  }
+
+  public int hashCode() {
+    return Objects.hash(volumeName, bucketName, keyName);
   }
 
   public static BasicOmKeyInfo fromOmKeyInfo(OmKeyInfo omKeyInfo) {
