@@ -69,11 +69,11 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
             return { stroke };
           },
           labels: {
-            color: 'white',
+            color: '#FFFFFF',
             fontWeight: 'bold',
             fontSize: 12
           },
-          tileStroke: 'white',
+          tileStroke: '#FFFFFF',
           tileStrokeWidth: 1.5,
           colorDomain: [0.000, 0.050, 0.100, 0.150, 0.200, 0.250, 0.300, 0.350, 0.400, 0.450, 0.500, 0.550, 0.600, 0.650, 0.700, 0.750, 0.800, 0.850, 0.900, 0.950, 1.000],
           colorRange: [...colorScheme],
