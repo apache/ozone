@@ -1075,16 +1075,14 @@ message KeyInfo {
 }
 
 message BasicKeyInfo {
-    required string volumeName = 1;
-    required string bucketName = 2;
-    required string keyName = 3;
-    required uint64 dataSize = 4;
-    required uint64 creationTime = 5;
-    required uint64 modificationTime = 6;
-    required hadoop.hdds.ReplicationType type = 7;
-    optional hadoop.hdds.ReplicationFactor factor = 8;
-    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
-    optional bool isFile = 10;
+    required string keyName = 1;
+    required uint64 dataSize = 2;
+    required uint64 creationTime = 3;
+    required uint64 modificationTime = 4;
+    required hadoop.hdds.ReplicationType type = 5;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
+    optional bool isFile = 8;
 }
 
 message DirectoryInfo {

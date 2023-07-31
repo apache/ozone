@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 
 /**
  * Lightweight OmKeyInfo class.
@@ -144,8 +145,6 @@ public class BasicOmKeyInfo {
 
   public BasicKeyInfo getProtobuf() {
     BasicKeyInfo.Builder builder = BasicKeyInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
@@ -162,15 +161,16 @@ public class BasicOmKeyInfo {
     return builder.build();
   }
 
-  public static BasicOmKeyInfo getFromProtobuf(BasicKeyInfo basicKeyInfo)
+  public static BasicOmKeyInfo getFromProtobuf(BasicKeyInfo basicKeyInfo,
+                                               ListKeysRequest listKeysRequest)
       throws IOException {
-    if (basicKeyInfo == null) {
+    if (basicKeyInfo == null || listKeysRequest == null) {
       return null;
     }
 
     Builder builder = new Builder()
-        .setVolumeName(basicKeyInfo.getVolumeName())
-        .setBucketName(basicKeyInfo.getBucketName())
+        .setVolumeName(listKeysRequest.getVolumeName())
+        .setBucketName(listKeysRequest.getBucketName())
         .setKeyName(basicKeyInfo.getKeyName())
         .setDataSize(basicKeyInfo.getDataSize())
         .setCreationTime(basicKeyInfo.getCreationTime())

@@ -1039,7 +1039,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     for (OzoneManagerProtocolProtos.BasicKeyInfo
         basicKeyInfo : resp.getBasicKeyInfoList()) {
       BasicOmKeyInfo fromProtobuf =
-          BasicOmKeyInfo.getFromProtobuf(basicKeyInfo);
+          BasicOmKeyInfo.getFromProtobuf(basicKeyInfo, req);
       keys.add(fromProtobuf);
     }
     return keys;
