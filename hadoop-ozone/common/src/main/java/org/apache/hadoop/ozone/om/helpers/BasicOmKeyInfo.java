@@ -156,33 +156,31 @@ public class BasicOmKeyInfo {
     } else {
       builder.setFactor(ReplicationConfig.getLegacyFactor(replicationConfig));
     }
-    builder.setIsFile(isFile);
 
     return builder.build();
   }
 
   public static BasicOmKeyInfo getFromProtobuf(BasicKeyInfo basicKeyInfo,
-                                               ListKeysRequest listKeysRequest)
+                                               ListKeysRequest request)
       throws IOException {
-    if (basicKeyInfo == null || listKeysRequest == null) {
+    if (basicKeyInfo == null || request == null) {
       return null;
     }
 
+    String keyName = basicKeyInfo.getKeyName();
+
     Builder builder = new Builder()
-        .setVolumeName(listKeysRequest.getVolumeName())
-        .setBucketName(listKeysRequest.getBucketName())
-        .setKeyName(basicKeyInfo.getKeyName())
+        .setVolumeName(request.getVolumeName())
+        .setBucketName(request.getBucketName())
+        .setKeyName(keyName)
         .setDataSize(basicKeyInfo.getDataSize())
         .setCreationTime(basicKeyInfo.getCreationTime())
         .setModificationTime(basicKeyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig.fromProto(
             basicKeyInfo.getType(),
             basicKeyInfo.getFactor(),
-            basicKeyInfo.getEcReplicationConfig()));
-
-    if (basicKeyInfo.hasIsFile()) {
-      builder.setIsFile(basicKeyInfo.getIsFile());
-    }
+            basicKeyInfo.getEcReplicationConfig()))
+        .setIsFile(!keyName.endsWith("/"));
 
     return builder.build();
   }

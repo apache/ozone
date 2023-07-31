@@ -1082,7 +1082,6 @@ message BasicKeyInfo {
     required hadoop.hdds.ReplicationType type = 5;
     optional hadoop.hdds.ReplicationFactor factor = 6;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
-    optional bool isFile = 8;
 }
 
 message DirectoryInfo {
