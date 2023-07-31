@@ -23,6 +23,7 @@ import moment from 'moment';
 import { showDataFetchError } from 'utils/common';
 import './heatmap.less';
 import HeatMapConfiguration from './heatMapConfiguration';
+import * as CONSTANTS from './constants/heatmapConstants';
 
 type inputPathValidity = "" | "error" | "success" | "warning" | "validating" | undefined
 
@@ -59,29 +60,6 @@ let minSize = Infinity;
 let maxSize = 0;
 
 const colourScheme = {
-  pastel_greens: [
-    '#CCFFD9', //light green start (least accessed)
-    '#B9FBD5',
-    '#A7F7D1',
-    '#94F2CD',
-    '#82EEC9',
-    '#6FEAC5',
-    '#5DE6C2',
-    '#4AE2BE',
-    '#38DEBA',
-    '#25D9B6',
-    '#13D5B2',
-    '#00D1AE', //dark green ends (light to moderate accces)
-    '#FFD28F', //light orange (moderate access)
-    '#FFC58A',
-    '#FFB984',
-    '#FEAC7F',
-    '#FE9F7A',
-    '#FE9274',
-    '#FE866F',
-    '#FD7969',
-    '#FD6C64' //red (most accessed)
-  ],
   amber_alert: [
     '#FFCF88',
     '#FFCA87',
@@ -114,9 +92,9 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       isLoading: false,
       treeResponse: [],
       showPanel: false,
-      entityType: 'key',
-      inputPath: '/',
-      date: '24H',
+      entityType: CONSTANTS.ENTITY_TYPES[0],
+      inputPath: CONSTANTS.ROOT_PATH,
+      date: CONSTANTS.TIME_PERIODS[0],
       treeEndpointFailed: false,
       inputPathValid: undefined,
       helpMessage: ""
@@ -124,7 +102,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   handleCalendarChange = (e: any) => {
-    if (e.key === '24H' || e.key === '7D' || e.key === '90D') {
+    if (CONSTANTS.TIME_PERIODS.includes(e.key)) {
       this.setState((prevState, _newState) => ({
         date: e.key,
         inputPath: prevState.inputPath,
@@ -136,7 +114,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   };
 
   handleMenuChange = (e: any) => {
-    if (e.key === 'volume' || e.key === 'bucket' || e.key === 'key') {
+    if (CONSTANTS.ENTITY_TYPES.includes(e.key)) {
       minSize = Infinity;
       maxSize = 0;
       this.setState((prevState, _newState) => ({
@@ -222,7 +200,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       isLoading: true
     });
     // By default render treemap for default path entity type and date
-    this.updateTreeMap('/', this.state.entityType, this.state.date);
+    this.updateTreeMap(CONSTANTS.ROOT_PATH, this.state.entityType, this.state.date);
   }
 
   onChange = (date: any[]) => {
@@ -240,12 +218,12 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   resetInputpath = (_e: any, path: string) => {
-    if (!path || path === '/') {
+    if (!path || path === CONSTANTS.ROOT_PATH) {
       return;
     }
     else {
       this.setState({
-        inputPath: '/'
+        inputPath: CONSTANTS.ROOT_PATH
       });
     }
   };
@@ -318,13 +296,13 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       <Menu
         defaultSelectedKeys={[date]}
         onClick={e => this.handleCalendarChange(e)}>
-        <Menu.Item key='24H'>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[0]}>
           24 Hour
         </Menu.Item>
-        <Menu.Item key='7D'>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[1]}>
           7 Days
         </Menu.Item>
-        <Menu.Item key='90D'>
+        <Menu.Item key={CONSTANTS.TIME_PERIODS[2]}>
           90 Days
         </Menu.Item>
         <Menu.SubMenu title="Custom Select Last 90 Days">
@@ -343,13 +321,13 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       <Menu
         defaultSelectedKeys={[this.state.entityType]}
         onClick={e => this.handleMenuChange(e)}>
-        <Menu.Item key='volume'>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[2]}>
           Volume
         </Menu.Item>
-        <Menu.Item key='bucket'>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[1]}>
           Bucket
         </Menu.Item>
-        <Menu.Item key='key'>
+        <Menu.Item key={CONSTANTS.ENTITY_TYPES[0]}>
           Key
         </Menu.Item>
       </Menu>
@@ -375,7 +353,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                           <h4 style={{ marginTop: "10px" }}>Path</h4>
                           <form className='input' autoComplete="off" id='input-form' onSubmit={this.handleSubmit}>
                             <Form.Item  className='path-input-element' validateStatus={inputPathValid} help={helpMessage}>
-                              <Input placeholder='/' name="inputPath" value={inputPath} onChange={this.handleChange}/>
+                              <Input placeholder={CONSTANTS.ROOT_PATH} name="inputPath" value={inputPath} onChange={this.handleChange}/>
                             </Form.Item>
                           </form>
                         </div>
