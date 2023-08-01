@@ -238,6 +238,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Map<String, Long> summary = keyInsightInfoResp.getKeysSummary();
     // Assert that the key prefix format is accepted in the global stats
     Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
+    Assertions.assertEquals(300L, summary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(100L, summary.get("totalUnreplicatedDataSize"));
 
     // Delete the previous records and Update the new value for valid key prefix
     statsDao.deleteById("openKeyTable" + "Count",
