@@ -212,32 +212,65 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testKeyCountsForValidAndInvalidKeyPrefix() {
+    Timestamp now = new Timestamp(System.currentTimeMillis());
+    GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
+
+    // Insert valid key count with valid key prefix
+    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "Count", 3L);
+
+    Response openKeyInfoResp =
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
+    KeyInsightInfoResponse keyInsightInfoResp = (KeyInsightInfoResponse)
+        openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Map<String, Long> summary = keyInsightInfoResp.getKeysSummary();
+    // Assert that the key prefix format is accepted in the global stats
+    Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
+
+    // Delete the previous records and Update the new value for valid key count prefix
+    statsDao.deleteById(
+        "openKeyTable" + "Count",
+        "openFileTable" + "Count"
+    );
+
+    // Insert new record for a key with invalid prefix
+    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "InvalidPrefix", 3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "InvalidPrefix", 3L);
+
+    openKeyInfoResp =
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
+    keyInsightInfoResp = (KeyInsightInfoResponse)
+        openKeyInfoResp.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    summary = keyInsightInfoResp.getKeysSummary();
+    // Assert that the key format is not accepted in the global stats
+    Assertions.assertEquals(0L, summary.get("totalOpenKeys"));
+  }
+
+  @Test
   public void testKeysSummaryAttribute() {
     Timestamp now = new Timestamp(System.currentTimeMillis());
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
-    GlobalStats newRecord =
-        new GlobalStats("openFileTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openKeyTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openFileTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openKeyTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-
+    insertGlobalStatsRecords(statsDao, now, "openFileTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTableUnReplicatedDataSize",
+        10L);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableUnReplicatedDataSize",
+        10L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableUnReplicatedDataSize",
+        10L);
 
     // Insert records for table counts
-    newRecord = new GlobalStats("openKeyTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableCount", 3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTableCount", 3L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableCount", 3L);
 
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
@@ -260,6 +293,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(30L, summary.get("totalReplicatedDataSize"));
     Assertions.assertEquals(10L, summary.get("totalUnreplicatedDataSize"));
     Assertions.assertEquals(3L, summary.get("totalDeletedKeys"));
+  }
+
+  private void insertGlobalStatsRecords(GlobalStatsDao statsDao, Timestamp timestamp, String key, long value) {
+    GlobalStats newRecord = new GlobalStats(key, value, timestamp);
+    statsDao.insert(newRecord);
   }
 
   @Test
