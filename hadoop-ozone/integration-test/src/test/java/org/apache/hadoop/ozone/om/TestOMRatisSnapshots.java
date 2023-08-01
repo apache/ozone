@@ -99,6 +99,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1074,6 +1075,16 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
   }
 
+  /**
+   * Goal of this test is to check whether background services work after
+   * leadership transfer.
+   * Services tested:
+   * -- SST filtering
+   * -- key deletion
+   * -- snapshot deletion
+   * -- compaction backup pruning
+   * On top of that there are some simple tests to confirm system integrity.
+   */
   @Test
   @DisplayName("testSnapshotBackgroundServices")
   @SuppressWarnings("methodlength")
@@ -1121,55 +1132,8 @@ public class TestOMRatisSnapshots {
       }
     }
 
-    // Get the latest db checkpoint from the leader OM.
-    TransactionInfo transactionInfo =
-        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
-    TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(transactionInfo.getTerm(),
-            transactionInfo.getTransactionIndex());
-    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
-
-    // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerNodeId);
-
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() ->
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= leaderOMSnapshotIndex - 1, 100, 10000);
-
-
-    // Verify RPC server is running
-    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
-
-    // Read & Write after snapshot installed.
-    List<String> newKeys = writeKeys(1);
-    readKeys(newKeys);
-
-    checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
-
-    // verify that the bootstrap Follower OM can become leader
-    leaderOM.transferLeadership(followerNodeId);
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        followerOM.checkLeaderStatus();
-        return true;
-      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
-        return false;
-      }
-    }, 1000, 10000);
-    OzoneManager newLeaderOM = cluster.getOMLeader();
-    Assertions.assertEquals(followerOM, newLeaderOM);
-    OzoneManager newFollowerOM =
-        cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
-
-    readKeys(newKeys);
-
     // Prepare baseline data for compaction logs
-    String currentCompactionLogPath = newLeaderOM
+    String currentCompactionLogPath = leaderOM
         .getMetadataManager()
         .getStore()
         .getRocksDBCheckpointDiffer()
@@ -1192,6 +1156,52 @@ public class TestOMRatisSnapshots {
         numberOfLogFiles++;
       }
     }
+
+    // Get the latest db checkpoint from the leader OM.
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerNodeId);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 10s
+    GenericTestUtils.waitFor(() ->
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= leaderOMSnapshotIndex - 1, 100, 10000);
+
+    // Verify RPC server is running
+    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
+
+    // Read & Write after snapshot installed.
+    List<String> newKeys = writeKeys(1);
+    readKeys(newKeys);
+
+    checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+
+    // verify that the bootstrap Follower OM can become leader
+    leaderOM.transferLeadership(followerNodeId);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        followerOM.checkLeaderStatus();
+        return true;
+      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+        return false;
+      }
+    }, 100, 10000);
+    OzoneManager newLeaderOM = cluster.getOMLeader();
+    Assertions.assertEquals(followerOM, newLeaderOM);
+    OzoneManager newFollowerOM =
+        cluster.getOzoneManager(leaderOM.getOMNodeId());
+    Assertions.assertEquals(leaderOM, newFollowerOM);
+
+    readKeys(newKeys);
 
     // Check whether newly created snapshot gets processed by SFS
     writeKeys(1);
@@ -1346,7 +1356,7 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
 
-    // Check whether compaction logs get appeneded to by forcning compaction
+    // Check whether compaction logs get appended to by forcing compaction
     newLeaderOM.getMetadataManager()
         .getStore()
         .compactDB();
@@ -1396,23 +1406,24 @@ public class TestOMRatisSnapshots {
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
-      String bucket,
-      String fromSnapshot,
-      String toSnapshot)
+                                                    String bucket,
+                                                    String fromSnapshot,
+                                                    String toSnapshot)
       throws InterruptedException, TimeoutException {
     AtomicReference<SnapshotDiffResponse> response = new AtomicReference<>();
-
+    AtomicLong responseInMillis = new AtomicLong(100L);
     GenericTestUtils.waitFor(() -> {
       try {
         response.set(client.getObjectStore()
             .snapshotDiff(
                 volume, bucket, fromSnapshot, toSnapshot, null, 0, false,
                 false));
+        responseInMillis.set(response.get().getWaitTimeInMs());
         return response.get().getJobStatus() == DONE;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 1000, 10000);
+    }, responseInMillis.intValue(), 10000);
 
     return response.get().getSnapshotDiffReport();
   }
