@@ -17,6 +17,7 @@
  */
 package org.apache.ozone.fs.http.server;
 
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.util.StringUtils.startupShutdownMessage;
 
 import java.io.IOException;
@@ -34,6 +35,7 @@ import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.SSLFactory;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +72,8 @@ public class HttpFSServerWebServer {
 
   private final HttpServer2 httpServer;
   private final String scheme;
+
+  private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
   HttpFSServerWebServer(Configuration conf, Configuration sslConf) throws
       Exception {
@@ -150,6 +154,7 @@ public class HttpFSServerWebServer {
   }
 
   public void start() throws IOException {
+    jvmPauseMonitor.start();
     httpServer.start();
   }
 
@@ -159,6 +164,7 @@ public class HttpFSServerWebServer {
 
   public void stop() throws Exception {
     httpServer.stop();
+    jvmPauseMonitor.stop();
   }
 
   public URL getUrl() {
