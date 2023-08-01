@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class TestSstFilteringService {
   @TempDir
-  public File folder;
+  private File folder;
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private OzoneConfiguration conf;
@@ -285,7 +285,7 @@ public class TestSstFilteringService {
             .build());
   }
 
-  private void createKey(OzoneManagerProtocol writeClient,
+  private void createKey(OzoneManagerProtocol managerProtocol,
                          String volumeName,
                          String bucketName,
                          String keyName)
@@ -302,10 +302,10 @@ public class TestSstFilteringService {
             .setLocationInfoList(new ArrayList<>())
             .build();
     //Open and Commit the Key in the Key Manager.
-    OpenKeySession session = writeClient.openKey(keyArg);
-    keyArg.addLocationInfo(writeClient.allocateBlock(keyArg, session.getId(),
-        new ExcludeList()));
-    writeClient.commitKey(keyArg, session.getId());
+    OpenKeySession session = managerProtocol.openKey(keyArg);
+    keyArg.addLocationInfo(managerProtocol.allocateBlock(keyArg,
+        session.getId(), new ExcludeList()));
+    managerProtocol.commitKey(keyArg, session.getId());
   }
 
   @Test
