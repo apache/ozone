@@ -73,7 +73,8 @@ public class HttpFSServerWebServer {
   private final HttpServer2 httpServer;
   private final String scheme;
 
-  private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
+  private final JvmPauseMonitor jvmPauseMonitor =
+      newJvmPauseMonitor("HTTPFSGW");
 
   HttpFSServerWebServer(Configuration conf, Configuration sslConf) throws
       Exception {
