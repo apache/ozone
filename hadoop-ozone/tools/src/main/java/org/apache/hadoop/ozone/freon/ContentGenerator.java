@@ -23,6 +23,9 @@ import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.fs.impl.StoreImplementationUtils;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 
 /**
@@ -51,6 +54,14 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
+  private String flushOrSync;
+
+  enum SyncOptions {
+    NONE,
+    HFLUSH,
+    HSYNC
+  }
+
   ContentGenerator(long keySize, int bufferSize) {
     this(keySize, bufferSize, bufferSize);
   }
@@ -63,6 +74,12 @@ public class ContentGenerator {
         .getBytes(StandardCharsets.UTF_8);
   }
 
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize, String
+      flushOrSync) {
+    this(keySize, bufferSize, copyBufferSize);
+    this.flushOrSync = flushOrSync.toUpperCase();
+  }
+
   /**
    * Write the required bytes to the output stream.
    */
@@ -73,13 +90,42 @@ public class ContentGenerator {
       if (copyBufferSize == 1) {
         for (int i = 0; i < curSize; i++) {
           outputStream.write(buffer[i]);
+          doFlushOrSync(outputStream);
         }
       } else {
         for (int i = 0; i < curSize; i += copyBufferSize) {
           outputStream.write(buffer, i,
               Math.min(copyBufferSize, curSize - i));
+          doFlushOrSync(outputStream);
         }
       }
+    }
+  }
+
+  private void doFlushOrSync(OutputStream outputStream) throws IOException {
+    SyncOptions option = SyncOptions.NONE;
+    if (flushOrSync != null) {
+      option = SyncOptions.valueOf(flushOrSync);
+    }
+
+    switch (option) {
+    case NONE:
+      // noop
+      break;
+    case HFLUSH:
+      if (StoreImplementationUtils.hasCapability(
+          outputStream, StreamCapabilities.HSYNC)) {
+        ((Syncable)outputStream).hflush();
+      }
+      break;
+    case HSYNC:
+      if (StoreImplementationUtils.hasCapability(
+          outputStream, StreamCapabilities.HSYNC)) {
+        ((Syncable)outputStream).hsync();
+      }
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported sync option" + option);
     }
   }
 
