@@ -93,16 +93,17 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
 
   private void getOmServerRolesAsJson(List<ServiceInfo> serviceList)
       throws IOException {
-    List<Map<String, String>> omServiceList = new ArrayList<>();
+    List<Map<String, Map<String, String>>> omServiceList = new ArrayList<>();
     for (ServiceInfo serviceInfo : serviceList) {
       OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
       if (omRoleInfo != null &&
           serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
-        Map<String, String> omService = new HashMap<>();
-        omService.put("nodeId", serviceInfo.getOmRoleInfo().getNodeId());
-        omService.put("serverRole",
-            serviceInfo.getOmRoleInfo().getServerRole());
-        omService.put("hostname", serviceInfo.getHostname());
+        Map<String, Map<String, String>> omService = new HashMap<>();
+        omService.put(serviceInfo.getOmRoleInfo().getNodeId(),
+            new HashMap<String, String>() {{
+              put("serverRole", serviceInfo.getOmRoleInfo().getServerRole());
+              put("hostname", serviceInfo.getHostname());
+        }});
         omServiceList.add(omService);
       }
     }
