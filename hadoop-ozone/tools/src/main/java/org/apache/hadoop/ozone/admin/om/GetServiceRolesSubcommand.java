@@ -103,7 +103,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
             new HashMap<String, String>() {{
               put("serverRole", serviceInfo.getOmRoleInfo().getServerRole());
               put("hostname", serviceInfo.getHostname());
-        }});
+            }});
         omServiceList.add(omService);
       }
     }
