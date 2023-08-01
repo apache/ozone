@@ -217,8 +217,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
 
     // Insert valid key count with valid key prefix
-    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "Count", 3L);
-    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "ReplicatedDataSize", 150L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "ReplicatedDataSize", 150L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "UnReplicatedDataSize", 50L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "UnReplicatedDataSize", 50L);
 
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
@@ -229,15 +239,19 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Assert that the key prefix format is accepted in the global stats
     Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
 
-    // Delete the previous records and Update the new value for valid key count prefix
-    statsDao.deleteById(
-        "openKeyTable" + "Count",
-        "openFileTable" + "Count"
-    );
+    // Delete the previous records and Update the new value for valid key prefix
+    statsDao.deleteById("openKeyTable" + "Count",
+        "openFileTable" + "Count",
+        "openKeyTable" + "ReplicatedDataSize",
+        "openFileTable" + "ReplicatedDataSize",
+        "openKeyTable" + "UnReplicatedDataSize",
+        "openFileTable" + "UnReplicatedDataSize");
 
     // Insert new record for a key with invalid prefix
-    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "InvalidPrefix", 3L);
-    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "InvalidPrefix", 3L);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "InvalidPrefix",
+        3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "InvalidPrefix",
+        3L);
 
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
@@ -247,6 +261,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     summary = keyInsightInfoResp.getKeysSummary();
     // Assert that the key format is not accepted in the global stats
     Assertions.assertEquals(0L, summary.get("totalOpenKeys"));
+    Assertions.assertEquals(0L, summary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(0L, summary.get("totalUnreplicatedDataSize"));
   }
 
   @Test
@@ -295,7 +311,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(3L, summary.get("totalDeletedKeys"));
   }
 
-  private void insertGlobalStatsRecords(GlobalStatsDao statsDao, Timestamp timestamp, String key, long value) {
+  private void insertGlobalStatsRecords(GlobalStatsDao statsDao,
+                                        Timestamp timestamp, String key,
+                                        long value) {
     GlobalStats newRecord = new GlobalStats(key, value, timestamp);
     statsDao.insert(newRecord);
   }
