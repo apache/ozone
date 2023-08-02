@@ -20,7 +20,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -93,7 +92,7 @@ public class TestRootCARotationManager {
       CertificateException {
     ozoneConfig = new OzoneConfiguration();
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestRootCARotationManager.class.getSimpleName() + UUID.randomUUID());
     ozoneConfig
         .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     ozoneConfig

@@ -84,7 +84,7 @@ import static org.mockito.Mockito.times;
 public class TestKeyValueHandler {
 
   @Rule
-  public TestRule timeout = Timeout.seconds(300);
+  public final TestRule timeout = Timeout.seconds(300);
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
@@ -264,7 +264,7 @@ public class TestKeyValueHandler {
 
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception {
-    File path = GenericTestUtils.getRandomizedTestDir();
+    File path = tempDir.newFolder();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
     conf.set(OZONE_METADATA_DIRS, path.getAbsolutePath());
@@ -357,9 +357,7 @@ public class TestKeyValueHandler {
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testDeleteContainer() throws IOException {
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueHandler.class.getSimpleName() +
-            "-" + UUID.randomUUID().toString());
+    final String testDir = tempDir.newFolder().getAbsolutePath();
     try {
       // Case 1 : Regular container delete
       final long containerID = 1L;
