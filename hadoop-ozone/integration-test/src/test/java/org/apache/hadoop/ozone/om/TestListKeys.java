@@ -165,6 +165,7 @@ public class TestListKeys {
 
         // Case-2: StartKey is empty, return all immediate node.
         of("a1/b2/", "", newLinkedList(Arrays.asList(
+            "a1/b2/",
             "a1/b2/d1/",
             "a1/b2/d2/",
             "a1/b2/d3/"
@@ -172,6 +173,7 @@ public class TestListKeys {
 
         // Case-3: StartKey is same as prefixKey, return all immediate nodes.
         of("a1/b2/", "a1/b2", newLinkedList(Arrays.asList(
+            "a1/b2/",
             "a1/b2/d1/",
             "a1/b2/d2/",
             "a1/b2/d3/"

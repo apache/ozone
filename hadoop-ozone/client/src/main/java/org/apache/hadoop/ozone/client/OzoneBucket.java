@@ -1194,7 +1194,9 @@ public class OzoneBucket extends WithMetadata {
      */
     protected List<OzoneKey> getNextShallowListOfKeys(String prevKey)
         throws IOException {
+      List<OzoneKey> resultList = new ArrayList<>();
       String startKey = prevKey;
+
       // handle for first round
       if (!addedKeyPrefix) {
         // prepare startKey
@@ -1203,18 +1205,18 @@ public class OzoneBucket extends WithMetadata {
         if (nextOneKeys.isEmpty()) {
           return nextOneKeys;
         }
-        // startKey is guaranteed to be sorted after keyPrefix
+        // startKey is guaranteed to be sorted after or equal keyPrefix.
+        // If the result includes keyPrefix, itself needs to be added to the
+        // result. For example, keyPrefix='test/', prevKey="", then 'test/'
+        // will be in the list result.
         startKey = nextOneKeys.get(0).getName();
-
+        if (startKey.equals(getKeyPrefix())) {
+          resultList.add(nextOneKeys.get(0));
+        }
         // prepare delimiterKeyPrefix
         delimiterKeyPrefix = getKeyPrefix();
         if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
-          int lastIndex = getKeyPrefix().lastIndexOf(OZONE_URI_DELIMITER);
-          if (lastIndex != -1) {
-            delimiterKeyPrefix = getKeyPrefix().substring(0, lastIndex);
-          } else {
-            delimiterKeyPrefix = "";
-          }
+          delimiterKeyPrefix = OzoneFSUtils.getParentDir(getKeyPrefix());
         }
       }
 
@@ -1232,7 +1234,7 @@ public class OzoneBucket extends WithMetadata {
 
       // If statuses is empty after filtering, indicating that
       // already no result matching the keyPrefix.
-      return statuses.stream()
+      List<OzoneKey> ozoneKeys = statuses.stream()
           .map(status -> {
             OmKeyInfo keyInfo = status.getKeyInfo();
             String keyName = keyInfo.getKeyName();
@@ -1248,6 +1250,9 @@ public class OzoneBucket extends WithMetadata {
           })
           .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
+
+      resultList.addAll(ozoneKeys);
+      return resultList;
     }
   }
 
