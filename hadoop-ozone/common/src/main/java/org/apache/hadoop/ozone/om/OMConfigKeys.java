@@ -383,6 +383,11 @@ public final class OMConfigKeys {
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
 
+  public static final String OZONE_SNAPSHOT_DIR_CHECK_POLL_TIMEOUT =
+      "ozone.snapshot.dir.check.poll.timeout";
+
+  public static final String OZONE_SNAPSHOT_DIR_CHECK_POLL_TIMEOUT_DEFAULT =
+      "5s";
 
   public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
       "ozone.om.grpc.maximum.response.length";

@@ -3369,6 +3369,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.dir.check.poll.timeout</name>
+    <value>5s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+    </description>
+  </property>
+  <property>
     <name>ozone.sst.filtering.service.timeout</name>
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>

@@ -45,13 +45,14 @@ public final class RDBCheckpointUtils {
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
    * poll interval.
    * @param file Checkpoint directory.
+   * @param pollMaxDuration max duration for polling
    * @return true if found.
    */
-  public static boolean waitForCheckpointDirectoryExist(File file)
-      throws IOException {
+  public static boolean waitForCheckpointDirectoryExist(File file,
+         Duration pollMaxDuration) {
     Instant start = Instant.now();
     try {
-      with().atMost(POLL_MAX_DURATION)
+      with().atMost(pollMaxDuration)
           .pollDelay(POLL_DELAY_DURATION)
           .pollInterval(POLL_INTERVAL_DURATION)
           .await()
@@ -66,5 +67,16 @@ public final class RDBCheckpointUtils {
           file.getAbsolutePath());
       return false;
     }
+  }
+
+  /**
+   * Wait for checkpoint directory to be created for 5 secs with 100 millis
+   * poll interval.
+   * @param file Checkpoint directory.
+   * @return true if found.
+   */
+  public static boolean waitForCheckpointDirectoryExist(File file)
+      throws IOException {
+    return waitForCheckpointDirectoryExist(file, POLL_MAX_DURATION);
   }
 }
