@@ -1343,7 +1343,7 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 120000);
 
-    // Check whether newly created snapshot data is reclaimed
+    // Confirm entry for deleted snapshot removed from info table
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
     GenericTestUtils.waitFor(() -> {
@@ -1373,11 +1373,11 @@ public class TestOMRatisSnapshots {
         newNumberOfLogFiles++;
       }
     }
-    Assertions.assertTrue(numberOfLogFiles != newNumberOfLogFiles
-        || contentLength != newContentLength);
+    Assertions.assertTrue(numberOfLogFiles < newNumberOfLogFiles
+        || contentLength < newContentLength);
 
     // Check whether compaction backup files were pruned
-    final int finalNumberOfSstFiles = numberOfSstFiles;
+    final int initialNumberOfSstFiles = numberOfSstFiles;
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = 0;
       try (DirectoryStream<Path> files =
@@ -1388,10 +1388,10 @@ public class TestOMRatisSnapshots {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-      return finalNumberOfSstFiles > newNumberOfSstFiles;
+      return initialNumberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 10000);
 
-    // Snap diff
+    // Confirm snap diff by creating 2 snapshots differing by a single key
     String firstSnapshot = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
     String diffKey = writeKeys(1).get(0);
