@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
@@ -29,12 +28,13 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -56,10 +56,8 @@ public class TestSCMBlockProtocolServer {
   private static final int NODE_COUNT = 10;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    config = new OzoneConfiguration();
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+  void setUp(@TempDir File dir) throws Exception {
+    config = SCMTestUtils.getConf(dir);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
