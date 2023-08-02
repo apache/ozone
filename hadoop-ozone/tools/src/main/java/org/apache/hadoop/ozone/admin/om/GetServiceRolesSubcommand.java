@@ -84,8 +84,8 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       if (omRoleInfo != null &&
           serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
         System.out.println(
-            serviceInfo.getOmRoleInfo().getNodeId() + " : " +
-                serviceInfo.getOmRoleInfo().getServerRole() + " (" +
+            omRoleInfo.getNodeId() + " : " +
+                omRoleInfo.getServerRole() + " (" +
                 serviceInfo.getHostname() + ")");
       }
     }
@@ -99,9 +99,9 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       if (omRoleInfo != null &&
           serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
         Map<String, Map<String, String>> omService = new HashMap<>();
-        omService.put(serviceInfo.getOmRoleInfo().getNodeId(),
+        omService.put(omRoleInfo.getNodeId(),
             new HashMap<String, String>() {{
-              put("serverRole", serviceInfo.getOmRoleInfo().getServerRole());
+              put("serverRole", omRoleInfo.getServerRole());
               put("hostname", serviceInfo.getHostname());
             }});
         omServiceList.add(omService);
