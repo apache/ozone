@@ -180,7 +180,7 @@ public class TestOMRatisSnapshots {
           30, TimeUnit.SECONDS);
       conf.setTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-          5, TimeUnit.SECONDS);
+          30, TimeUnit.SECONDS);
     }
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
