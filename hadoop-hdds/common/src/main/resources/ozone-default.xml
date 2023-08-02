@@ -3369,10 +3369,12 @@
     </description>
   </property>
   <property>
-    <name>ozone.snapshot.dir.check.poll.timeout</name>
-    <value>5s</value>
+    <name>ozone.om.snapshot.checkpoint.dir.creation.poll.timeout</name>
+    <value>20s</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
-    <description>Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+    <description>
+      Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+      Unit defaults to millisecond if a unit is not specified.
     </description>
   </property>
   <property>

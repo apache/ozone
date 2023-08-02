@@ -94,7 +94,7 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Throws OMException FILE_NOT_FOUND if snapshot directory does not exist.
+   * Throws OMException TIMEOUT if snapshot directory does not exist.
    * @param checkpoint Snapshot checkpoint directory
    */
   public static void checkSnapshotDirExist(File checkpoint)
@@ -102,7 +102,8 @@ public final class SnapshotUtils {
     if (!checkpoint.exists()) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot checkpoint directory '" + checkpoint.getAbsolutePath() +
-          "' does not exists.", TIMEOUT);
+          "' does not exists. Please wait a few more seconds before retrying",
+          TIMEOUT);
     }
   }
 

@@ -42,14 +42,14 @@ public final class RDBCheckpointUtils {
   private RDBCheckpointUtils() { }
 
   /**
-   * Wait for checkpoint directory to be created for 5 secs with 100 millis
+   * Wait for checkpoint directory to be created with 100 millis
    * poll interval.
    * @param file Checkpoint directory.
    * @param pollMaxDuration max duration for polling
    * @return true if found.
    */
   public static boolean waitForCheckpointDirectoryExist(File file,
-         Duration pollMaxDuration) {
+      Duration pollMaxDuration) {
     Instant start = Instant.now();
     try {
       with().atMost(pollMaxDuration)
@@ -63,8 +63,8 @@ public final class RDBCheckpointUtils {
           file.getAbsoluteFile());
       return true;
     } catch (ConditionTimeoutException exception) {
-      LOG.info("Checkpoint directory: {} didn't get created in 5 secs.",
-          file.getAbsolutePath());
+      LOG.info("Checkpoint directory: {} didn't get created in {} secs.",
+          pollMaxDuration.getSeconds(), file.getAbsolutePath());
       return false;
     }
   }
