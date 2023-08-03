@@ -175,7 +175,7 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
   private String reconstructionLastSnapshotID;
 
   private final Scheduler scheduler;
-  private boolean closed = true;
+  private boolean closed = false;
   private final long maxAllowedTimeInDag;
   private final long pruneCompactionDagDaemonRunIntervalInMs;
   private final BootstrapStateHandler.Lock lock
