@@ -222,9 +222,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       }
       if (rotationManager.isPostRotationInProgress()) {
         SecurityConfig securityConfig = new SecurityConfig(config);
-        throw new SCMException("This action is prohibited for " +
-            securityConfig.getRootCaCertificatePollingInterval() +
-            " due to root CA and sub CA rotation have just finished. " +
+        throw new SCMException("This action is prohibited due to root CA " +
+            "and sub CA rotation have just finished. " +
+            "The prohibition state will last at most " +
+            securityConfig.getRootCaCertificatePollingInterval() + ". " +
             "Please try the operation later again.",
             ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
       }
