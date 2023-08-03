@@ -1516,32 +1516,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return compactionNodeMap;
   }
 
-  /**
-   * Holder for RocksDBCheckpointDiffer instance.
-   * This is to protect from creating more than one instance of
-   * RocksDBCheckpointDiffer per RocksDB dir and use the single instance per dir
-   * throughout the whole OM process.
-   */
-  public static class RocksDBCheckpointDifferHolder {
-    private static final ConcurrentMap<String, RocksDBCheckpointDiffer>
-        INSTANCE_MAP = new ConcurrentHashMap<>();
-
-    public static RocksDBCheckpointDiffer getInstance(
-        String metadataDirName,
-        String sstBackupDirName,
-        String compactionLogDirName,
-        String activeDBLocationName,
-        ConfigurationSource configuration
-    ) {
-      return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
-          new RocksDBCheckpointDiffer(metadataDirName,
-              sstBackupDirName,
-              compactionLogDirName,
-              activeDBLocationName,
-              configuration));
-    }
-  }
-
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
