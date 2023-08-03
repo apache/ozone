@@ -102,8 +102,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_CO
  * It is important to note that compaction log is per-DB instance. Since
  * each OM DB instance might trigger compactions at different timings.
  */
-public class RocksDBCheckpointDiffer implements AutoCloseable,
-    BootstrapStateHandler {
+public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
@@ -176,13 +175,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private String reconstructionLastSnapshotID;
 
   private final Scheduler scheduler;
-  private boolean closed;
+  private boolean closed = true;
   private final long maxAllowedTimeInDag;
+  private final long pruneCompactionDagDaemonRunIntervalInMs;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private final AtomicInteger tarballRequestCount;
+  private final String dagPruningServiceName = "CompactionDagPruningService";
 
   /**
    * This is a package private constructor and should not be used other than
@@ -197,11 +198,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param activeDBLocationName Active RocksDB directory's location.
    * @param configuration ConfigurationSource.
    */
-  public RocksDBCheckpointDiffer(String metadataDirName,
-                                 String sstBackupDirName,
-                                 String compactionLogDirName,
-                                 String activeDBLocationName,
-                                 ConfigurationSource configuration) {
+  @VisibleForTesting
+  RocksDBCheckpointDiffer(String metadataDirName,
+                          String sstBackupDirName,
+                          String compactionLogDirName,
+                          String activeDBLocationName,
+                          ConfigurationSource configuration) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
     Preconditions.checkNotNull(compactionLogDirName);
@@ -220,33 +222,41 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    long pruneCompactionDagDaemonRunIntervalInMs =
+    this.pruneCompactionDagDaemonRunIntervalInMs =
         configuration.getTimeDuration(
             OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
-      this.scheduler = new Scheduler("CompactionDagPruningService",
+      this.scheduler = new Scheduler(dagPruningServiceName,
           true, 1);
-      this.scheduler.scheduleWithFixedDelay(
-          this::pruneOlderSnapshotsWithCompactionHistory,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS);
-
-      this.scheduler.scheduleWithFixedDelay(
-          this::pruneSstFiles,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          pruneCompactionDagDaemonRunIntervalInMs,
-          TimeUnit.MILLISECONDS
-      );
+      submitPruneJobs();
     } else {
       this.scheduler = null;
     }
     this.tarballRequestCount = new AtomicInteger(0);
   }
 
+  private void submitPruneJobs() {
+    if (scheduler == null) {
+      LOG.info("{} is not running.", dagPruningServiceName);
+      return;
+    }
+
+    this.scheduler.scheduleWithFixedDelay(
+        this::pruneOlderSnapshotsWithCompactionHistory,
+        pruneCompactionDagDaemonRunIntervalInMs,
+        pruneCompactionDagDaemonRunIntervalInMs,
+        TimeUnit.MILLISECONDS);
+
+    this.scheduler.scheduleWithFixedDelay(
+        this::pruneSstFiles,
+        pruneCompactionDagDaemonRunIntervalInMs,
+        pruneCompactionDagDaemonRunIntervalInMs,
+        TimeUnit.MILLISECONDS
+    );
+  }
   private String createCompactionLogDir(String metadataDirName,
                                         String compactionLogDirName) {
 
@@ -325,8 +335,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     appendToCurrentCompactionLog("");
   }
 
-  @Override
-  public void close() {
+  public void stop() {
     synchronized (this) {
       if (!closed) {
         closed = true;
@@ -334,6 +343,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           LOG.info("Shutting down CompactionDagPruningService.");
           scheduler.close();
         }
+      }
+    }
+  }
+
+  public void start() {
+    synchronized (this) {
+      if (closed) {
+        closed = false;
+        submitPruneJobs();
       }
     }
   }
@@ -1514,6 +1532,32 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
+  }
+
+  /**
+   * Holder for RocksDBCheckpointDiffer instance.
+   * This is to protect from creating more than one instance of
+   * RocksDBCheckpointDiffer per RocksDB dir and use the single instance per dir
+   * throughout the whole OM process.
+   */
+  public static class RocksDBCheckpointDifferHolder {
+    private static final ConcurrentMap<String, RocksDBCheckpointDiffer>
+        INSTANCE_MAP = new ConcurrentHashMap<>();
+
+    public static RocksDBCheckpointDiffer getInstance(
+        String metadataDirName,
+        String sstBackupDirName,
+        String compactionLogDirName,
+        String activeDBLocationName,
+        ConfigurationSource configuration
+    ) {
+      return INSTANCE_MAP.computeIfAbsent(metadataDirName, (key) ->
+          new RocksDBCheckpointDiffer(metadataDirName,
+              sstBackupDirName,
+              compactionLogDirName,
+              activeDBLocationName,
+              configuration));
+    }
   }
 
   @Override

@@ -3865,6 +3865,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Restart required services
     metadataManager.start(configuration);
+    metadataManager.getStore().getRocksDBCheckpointDiffer().start();
     keyManager.start(configuration);
     startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
