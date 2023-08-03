@@ -175,7 +175,7 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
   private String reconstructionLastSnapshotID;
 
   private final Scheduler scheduler;
-  private boolean closed = false;
+  private volatile boolean closed = true;
   private final long maxAllowedTimeInDag;
   private final long pruneCompactionDagDaemonRunIntervalInMs;
   private final BootstrapStateHandler.Lock lock
@@ -231,11 +231,11 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.scheduler = new Scheduler(dagPruningServiceName,
           true, 1);
-      submitPruneJobs();
     } else {
       this.scheduler = null;
     }
     this.tarballRequestCount = new AtomicInteger(0);
+    this.start();
   }
 
   private void submitPruneJobs() {
@@ -336,22 +336,26 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
   }
 
   public void stop() {
-    synchronized (this) {
-      if (!closed) {
-        closed = true;
-        if (scheduler != null) {
-          LOG.info("Shutting down CompactionDagPruningService.");
-          scheduler.close();
+    if (!closed) {
+      synchronized (this) {
+        if (!closed) {
+          closed = true;
+          if (scheduler != null) {
+            LOG.info("Shutting down {}.", dagPruningServiceName);
+            scheduler.close();
+          }
         }
       }
     }
   }
 
   public void start() {
-    synchronized (this) {
-      if (closed) {
-        closed = false;
-        submitPruneJobs();
+    if (closed) {
+      synchronized (this) {
+        if (closed) {
+          closed = false;
+          submitPruneJobs();
+        }
       }
     }
   }
