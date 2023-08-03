@@ -81,7 +81,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -1116,22 +1115,6 @@ public class TestOMRatisSnapshots {
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
     }
 
-    // Prepare baseline data for compaction backup pruning
-    String sstBackupDir = leaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDir);
-    Path sstBackupDirPath = Paths.get(sstBackupDir);
-    int numberOfSstFiles = 0;
-    try (DirectoryStream<Path> files =
-             Files.newDirectoryStream(sstBackupDirPath)) {
-      for (Path ignored : files) {
-        numberOfSstFiles++;
-      }
-    }
-
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -1177,6 +1160,17 @@ public class TestOMRatisSnapshots {
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
     readKeys(newKeys);
+
+    // Prepare baseline data for compaction backup pruning
+    String sstBackupDirPath = newLeaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getSSTBackupDir();
+    Assertions.assertNotNull(sstBackupDirPath);
+    File sstBackupDir = new File(sstBackupDirPath);
+    Assertions.assertNotNull(sstBackupDir);
+    int numberOfSstFiles = sstBackupDir.listFiles().length;
 
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
@@ -1369,18 +1363,9 @@ public class TestOMRatisSnapshots {
         || contentLength < newContentLength);
 
     // Check whether compaction backup files were pruned
-    final int initialNumberOfSstFiles = numberOfSstFiles;
     GenericTestUtils.waitFor(() -> {
-      int newNumberOfSstFiles = 0;
-      try (DirectoryStream<Path> files =
-               Files.newDirectoryStream(sstBackupDirPath)) {
-        for (Path ignored : files) {
-          newNumberOfSstFiles++;
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      return initialNumberOfSstFiles > newNumberOfSstFiles;
+      int newNumberOfSstFiles = sstBackupDir.listFiles().length;
+      return numberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 10000);
 
     // Confirm snap diff by creating 2 snapshots differing by a single key
