@@ -42,7 +42,11 @@ public final class RDBCheckpointUtils {
   private RDBCheckpointUtils() { }
 
   /**
-   * Wait for checkpoint directory to be created with 100 millis
+   * Wait for checkpoint directory to be created for the given duration with 100 millis
+   * poll interval.
+   * @param file Checkpoint directory.
+   * @param maxWaitTimeout wait at most before request timeout and returns false.
+   * @return true if found within given timeout.
    * poll interval.
    * @param file Checkpoint directory.
    * @param pollMaxDuration max duration for polling
