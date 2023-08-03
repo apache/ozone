@@ -27,8 +27,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -176,7 +175,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private long reconstructionSnapshotGeneration;
   private String reconstructionLastSnapshotID;
 
-  private final ScheduledExecutorService executor;
+  private final Scheduler scheduler;
   private boolean closed;
   private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock
@@ -198,12 +197,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @param activeDBLocationName Active RocksDB directory's location.
    * @param configuration ConfigurationSource.
    */
-  @VisibleForTesting
-  RocksDBCheckpointDiffer(String metadataDirName,
-                          String sstBackupDirName,
-                          String compactionLogDirName,
-                          String activeDBLocationName,
-                          ConfigurationSource configuration) {
+  public RocksDBCheckpointDiffer(String metadataDirName,
+                                 String sstBackupDirName,
+                                 String compactionLogDirName,
+                                 String activeDBLocationName,
+                                 ConfigurationSource configuration) {
     Preconditions.checkNotNull(metadataDirName);
     Preconditions.checkNotNull(sstBackupDirName);
     Preconditions.checkNotNull(compactionLogDirName);
@@ -229,21 +227,22 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             TimeUnit.MILLISECONDS);
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
-      this.executor = Executors.newSingleThreadScheduledExecutor();
-      this.executor.scheduleWithFixedDelay(
+      this.scheduler = new Scheduler("CompactionDagPruningService",
+          true, 1);
+      this.scheduler.scheduleWithFixedDelay(
           this::pruneOlderSnapshotsWithCompactionHistory,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS);
 
-      this.executor.scheduleWithFixedDelay(
+      this.scheduler.scheduleWithFixedDelay(
           this::pruneSstFiles,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS
       );
     } else {
-      this.executor = null;
+      this.scheduler = null;
     }
     this.tarballRequestCount = new AtomicInteger(0);
   }
@@ -331,8 +330,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       if (!closed) {
         closed = true;
-        if (executor != null) {
-          executor.shutdown();
+        if (scheduler != null) {
+          LOG.info("Shutting down CompactionDagPruningService.");
+          scheduler.close();
         }
       }
     }

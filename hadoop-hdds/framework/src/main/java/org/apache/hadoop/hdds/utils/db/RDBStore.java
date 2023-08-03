@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.base.Preconditions;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
 
 import org.rocksdb.TransactionLogIterator.BatchResult;
@@ -98,10 +97,12 @@ public class RDBStore implements DBStore {
 
     try {
       if (enableCompactionDag) {
-        rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
+        rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(
             getSnapshotMetadataDir(),
-            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(), configuration);
+            DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
+            configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
