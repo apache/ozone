@@ -37,21 +37,22 @@ public final class RDBCheckpointUtils {
       LoggerFactory.getLogger(RDBCheckpointUtils.class);
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
-  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(20);
 
   private RDBCheckpointUtils() { }
 
   /**
-   * Wait for checkpoint directory to be created for 5 secs with 100 millis
-   * poll interval.
+   * Wait for checkpoint directory to be created for the given duration with
+   * 100 millis poll interval.
    * @param file Checkpoint directory.
-   * @return true if found.
+   * @param maxWaitTimeout wait at most before request timeout.
+   * @return true if found within given timeout else false.
    */
-  public static boolean waitForCheckpointDirectoryExist(File file)
-      throws IOException {
+  public static boolean waitForCheckpointDirectoryExist(File file,
+      Duration maxWaitTimeout) {
     Instant start = Instant.now();
     try {
-      with().atMost(POLL_MAX_DURATION)
+      with().atMost(maxWaitTimeout)
           .pollDelay(POLL_DELAY_DURATION)
           .pollInterval(POLL_INTERVAL_DURATION)
           .await()
@@ -62,9 +63,20 @@ public final class RDBCheckpointUtils {
           file.getAbsoluteFile());
       return true;
     } catch (ConditionTimeoutException exception) {
-      LOG.info("Checkpoint directory: {} didn't get created in 5 secs.",
-          file.getAbsolutePath());
+      LOG.info("Checkpoint directory: {} didn't get created in {} secs.",
+          maxWaitTimeout.getSeconds(), file.getAbsolutePath());
       return false;
     }
+  }
+
+  /**
+   * Wait for checkpoint directory to be created for 5 secs with 100 millis
+   * poll interval.
+   * @param file Checkpoint directory.
+   * @return true if found.
+   */
+  public static boolean waitForCheckpointDirectoryExist(File file)
+      throws IOException {
+    return waitForCheckpointDirectoryExist(file, POLL_MAX_DURATION);
   }
 }
