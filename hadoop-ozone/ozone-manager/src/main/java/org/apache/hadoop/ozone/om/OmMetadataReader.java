@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -307,8 +309,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
+  public ListKeysResult listKeys(String volumeName, String bucketName,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
 
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(
         Pair.of(volumeName, bucketName));
@@ -342,14 +345,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   }
 
   @Override
-  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
+  public ListKeysLightResult listKeysLight(String volumeName,
                                             String bucketName,
                                             String startKey, String keyPrefix,
                                             int maxKeys) throws IOException {
-    List<OmKeyInfo> keys = listKeys(volumeName, bucketName, startKey, keyPrefix,
-        maxKeys);
-    return keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
-        .collect(Collectors.toList());
+    ListKeysResult listKeysResult =
+        listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    List<OmKeyInfo> keys = listKeysResult.getKeys();
+    List<BasicOmKeyInfo> basicKeysList =
+        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+            .collect(Collectors.toList());
+
+    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
   /**

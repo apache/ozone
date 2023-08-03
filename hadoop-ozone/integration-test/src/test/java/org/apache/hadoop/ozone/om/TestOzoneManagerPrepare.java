@@ -407,7 +407,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       // Wait for a potentially slow follower to apply all key writes.
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000, () -> {
         List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-            BUCKET, null, KEY_PREFIX, 100);
+            BUCKET, null, KEY_PREFIX, 100).getKeys();
 
         boolean allKeysFound = (expectedKeys.size() == keys.size());
         if (!allKeysFound) {

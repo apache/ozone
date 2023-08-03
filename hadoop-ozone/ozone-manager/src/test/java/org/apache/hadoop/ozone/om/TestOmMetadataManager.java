@@ -388,7 +388,7 @@ public class TestOmMetadataManager {
     // List all keys which have prefix "key-a"
     List<OmKeyInfo> omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            null, prefixKeyA, 100);
+            null, prefixKeyA, 100).getKeys();
 
     assertEquals(omKeyInfoList.size(),  50);
 
@@ -401,7 +401,7 @@ public class TestOmMetadataManager {
     String startKey = prefixKeyA + 10;
     omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            startKey, prefixKeyA, 100);
+            startKey, prefixKeyA, 100).getKeys();
 
     assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
@@ -409,7 +409,7 @@ public class TestOmMetadataManager {
     startKey = prefixKeyA + 38;
     omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            startKey, prefixKeyA, 100);
+            startKey, prefixKeyA, 100).getKeys();
 
     assertEquals(keysASet.tailSet(
         startKey).size() - 1, omKeyInfoList.size());
@@ -424,7 +424,7 @@ public class TestOmMetadataManager {
 
 
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-        null, prefixKeyB, 100);
+        null, prefixKeyB, 100).getKeys();
 
     assertEquals(omKeyInfoList.size(),  50);
 
@@ -440,7 +440,7 @@ public class TestOmMetadataManager {
     for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-          startKey, prefixKeyB, 10);
+          startKey, prefixKeyB, 10).getKeys();
 
       assertEquals(10, omKeyInfoList.size());
 
@@ -458,13 +458,13 @@ public class TestOmMetadataManager {
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omKeyInfoList = omMetadataManager.listKeys(volumeNameB, hadoopBucket,
-        startKey, prefixKeyB, 10);
+        startKey, prefixKeyB, 10).getKeys();
 
     assertEquals(omKeyInfoList.size(), 0);
 
     // List all keys with empty prefix
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-        null, null, 100);
+        null, null, 100).getKeys();
     assertEquals(50, omKeyInfoList.size());
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       assertTrue(omKeyInfo.getKeyName().startsWith(
@@ -507,7 +507,7 @@ public class TestOmMetadataManager {
     // Now list keys which match with prefixKeyA.
     List<OmKeyInfo> omKeyInfoList =
         omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-            null, prefixKeyA, 100);
+            null, prefixKeyA, 100).getKeys();
 
     // As in total 100, 50 are marked for delete. It should list only 50 keys.
     assertEquals(50, omKeyInfoList.size());
@@ -528,7 +528,7 @@ public class TestOmMetadataManager {
     for (int i = 0; i < 5; i++) {
 
       omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-          startKey, prefixKeyA, 10);
+          startKey, prefixKeyA, 10).getKeys();
 
       System.out.println(i);
       assertEquals(10, omKeyInfoList.size());
@@ -547,7 +547,7 @@ public class TestOmMetadataManager {
     // As now we have iterated all 50 buckets, calling next time should
     // return empty list.
     omKeyInfoList = omMetadataManager.listKeys(volumeNameA, ozoneBucket,
-        startKey, prefixKeyA, 10);
+        startKey, prefixKeyA, 10).getKeys();
 
     assertEquals(omKeyInfoList.size(), 0);
 

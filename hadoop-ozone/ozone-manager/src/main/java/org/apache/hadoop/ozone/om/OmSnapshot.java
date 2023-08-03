@@ -24,6 +24,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -134,23 +136,29 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String vname, String bname,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
-    List<OmKeyInfo> l = omMetadataReader.listKeys(vname, bname,
+  public ListKeysResult listKeys(String vname, String bname,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
+    ListKeysResult listKeysResult = omMetadataReader.listKeys(vname, bname,
         normalizeKeyName(startKey), normalizeKeyName(keyPrefix), maxKeys);
-    return l.stream().map(this::denormalizeOmKeyInfo)
-        .collect(Collectors.toList());
+    return new ListKeysResult(
+        listKeysResult.getKeys().stream().map(this::denormalizeOmKeyInfo)
+            .collect(Collectors.toList()), listKeysResult.isTruncated());
   }
 
   @Override
-  public List<BasicOmKeyInfo> listKeysLight(String volName,
+  public ListKeysLightResult listKeysLight(String volName,
                                             String buckName,
                                             String startKey, String keyPrefix,
                                             int maxKeys) throws IOException {
-    List<OmKeyInfo> keys = listKeys(volName, buckName, startKey, keyPrefix,
-        maxKeys);
-    return keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
-        .collect(Collectors.toList());
+    ListKeysResult listKeysResult =
+        listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    List<OmKeyInfo> keys = listKeysResult.getKeys();
+    List<BasicOmKeyInfo> basicKeysList =
+        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+            .collect(Collectors.toList());
+
+    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
   @Override

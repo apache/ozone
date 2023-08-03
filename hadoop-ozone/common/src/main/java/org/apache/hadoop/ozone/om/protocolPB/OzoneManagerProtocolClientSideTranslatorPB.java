@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -972,7 +974,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * List keys in a bucket.
    */
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
+  public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String prefix, int maxKeys) throws IOException {
     List<OmKeyInfo> keys = new ArrayList<>();
     ListKeysRequest.Builder reqBuilder = ListKeysRequest.newBuilder();
@@ -1002,7 +1004,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       list.add(fromProtobuf);
     }
     keys.addAll(list);
-    return keys;
+    return new ListKeysResult(keys, resp.getIsTruncated());
 
   }
 
@@ -1010,10 +1012,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * Lightweight listKeys implementation.
    */
   @Override
-  public List<BasicOmKeyInfo> listKeysLight(String volumeName,
-                                            String bucketName, String startKey,
-                                            String prefix,
-                                            int maxKeys) throws IOException {
+  public ListKeysLightResult listKeysLight(String volumeName,
+                                           String bucketName, String startKey,
+                                           String prefix,
+                                           int maxKeys) throws IOException {
     List<BasicOmKeyInfo> keys = new ArrayList<>();
     ListKeysRequest.Builder reqBuilder = ListKeysRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
@@ -1042,7 +1044,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           BasicOmKeyInfo.getFromProtobuf(basicKeyInfo, req);
       keys.add(fromProtobuf);
     }
-    return keys;
+    return new ListKeysLightResult(keys, resp.getIsTruncated());
   }
 
   @Override

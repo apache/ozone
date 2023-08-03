@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -556,7 +557,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
+  public ListKeysResult listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix,
       int maxKeys) throws IOException {
     Preconditions.checkNotNull(volumeName);
@@ -572,15 +573,17 @@ public class KeyManagerImpl implements KeyManager {
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
 
-    List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
-        startKey, keyPrefix, maxKeys);
+    ListKeysResult listKeysResult =
+        metadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix,
+            maxKeys);
+    List<OmKeyInfo> keyList = listKeysResult.getKeys();
 
     // For listKeys, we return the latest Key Location by default
     for (OmKeyInfo omKeyInfo : keyList) {
       slimLocationVersion(omKeyInfo);
     }
 
-    return keyList;
+    return listKeysResult;
   }
 
   @Override

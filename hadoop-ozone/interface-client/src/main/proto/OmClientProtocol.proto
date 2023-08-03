@@ -1357,10 +1357,12 @@ message ListKeysRequest {
 
 message ListKeysResponse {
     repeated KeyInfo keyInfo = 2;
+    optional bool isTruncated = 3;
 }
 
 message ListKeysLightResponse {
     repeated BasicKeyInfo basicKeyInfo = 1;
+    optional bool isTruncated = 2;
 }
 
 message CommitKeyRequest {

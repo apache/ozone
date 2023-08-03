@@ -22,7 +22,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
@@ -110,8 +111,8 @@ public interface IOmMetadataReader {
    *   the size of the result will not exceed this limit.
    * @return a list of keys.
    */
-  List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-                           String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName, String bucketName,
+                          String startKey, String keyPrefix, int maxKeys)
       throws IOException;
 
   /**
@@ -133,7 +134,7 @@ public interface IOmMetadataReader {
    * @return a list of keys.
    * @throws IOException
    */
-  List<BasicOmKeyInfo> listKeysLight(String volumeName, String bucketName,
+  ListKeysLightResult listKeysLight(String volumeName, String bucketName,
                                      String startKey, String keyPrefix,
                                      int maxKeys)
       throws IOException;
