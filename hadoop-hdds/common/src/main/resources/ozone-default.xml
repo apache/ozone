@@ -2295,7 +2295,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.x509.expired.certificate.removal.interval</name>
+    <name>hdds.x509.expired.certificate.check.interval</name>
     <value>P1D</value>
     <description>Interval to use for removing expired certificates. A background
       task to remove expired certificates from the scm metadata store is

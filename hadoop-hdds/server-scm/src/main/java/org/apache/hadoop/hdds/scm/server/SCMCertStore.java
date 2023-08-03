@@ -223,7 +223,7 @@ public final class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  public void removeAllExpiredCertificates() {
+  public void removeAllExpiredCertificates() throws IOException {
     lock.lock();
     try (BatchOperation batchOperation =
              scmMetadataStore.getBatchHandler().initBatchOperation()) {
@@ -232,8 +232,6 @@ public final class SCMCertStore implements CertificateStore {
       addExpiredCertsToBeRemoved(batchOperation,
           scmMetadataStore.getValidSCMCertsTable());
       scmMetadataStore.getStore().commitBatchOperation(batchOperation);
-    } catch (IOException e) {
-      LOG.error("Error while trying to remove expired certificate.", e);
     } finally {
       lock.unlock();
     }
@@ -241,14 +239,15 @@ public final class SCMCertStore implements CertificateStore {
 
   private void addExpiredCertsToBeRemoved(BatchOperation batchOperation,
       Table<BigInteger, X509Certificate> certTable) throws IOException {
-    TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
-        X509Certificate>> certsIterator = certTable.iterator();
-    while (certsIterator.hasNext()) {
-      Table.KeyValue<BigInteger, X509Certificate> certEntry =
-          certsIterator.next();
-      if (certEntry.getValue().getNotAfter().toInstant().isBefore(
-          Instant.now())) {
-        certTable.deleteWithBatch(batchOperation, certEntry.getKey());
+    try (TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
+        X509Certificate>> certsIterator = certTable.iterator()) {
+      Instant now = Instant.now();
+      while (certsIterator.hasNext()) {
+        Table.KeyValue<BigInteger, X509Certificate> certEntry =
+            certsIterator.next();
+        if (certEntry.getValue().getNotAfter().toInstant().isBefore(now)) {
+          certTable.deleteWithBatch(batchOperation, certEntry.getKey());
+        }
       }
     }
   }

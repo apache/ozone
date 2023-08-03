@@ -52,8 +52,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_REMOVAL_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_REMOVAL_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
@@ -139,7 +139,7 @@ public class SecurityConfig {
   private final SslProvider grpcSSLProvider;
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
-  private final Duration expiredCertificateRemovalInterval;
+  private final Duration expiredCertificateCheckInterval;
 
   /**
    * Constructs a SecurityConfig.
@@ -246,12 +246,12 @@ public class SecurityConfig {
     this.rootCaCertificatePollingInterval =
         Duration.parse(rootCaCertificatePollingIntervalString);
 
-    String expiredCertificateRemovalIntervalString = configuration.get(
-        HDDS_X509_EXPIRED_CERTIFICATE_REMOVAL_INTERVAL,
-        HDDS_X509_EXPIRED_CERTIFICATE_REMOVAL_INTERVAL_DEFAULT);
+    String expiredCertificateCheckIntervalString = configuration.get(
+        HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL,
+        HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL_DEFAULT);
 
-    this.expiredCertificateRemovalInterval =
-        Duration.parse(expiredCertificateRemovalIntervalString);
+    this.expiredCertificateCheckInterval =
+        Duration.parse(expiredCertificateCheckIntervalString);
 
     this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
@@ -585,8 +585,8 @@ public class SecurityConfig {
     return autoCARotationEnabled;
   }
 
-  public Duration getExpiredCertificateRemovalInterval() {
-    return expiredCertificateRemovalInterval;
+  public Duration getExpiredCertificateCheckInterval() {
+    return expiredCertificateCheckInterval;
   }
 
   /**

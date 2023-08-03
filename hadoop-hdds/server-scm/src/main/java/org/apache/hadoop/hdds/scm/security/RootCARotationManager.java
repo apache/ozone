@@ -220,15 +220,22 @@ public class RootCARotationManager implements SCMService {
         "interval {}.", scmCertClient.getCACertificate().getSerialNumber(),
         checkInterval);
     executorService.scheduleAtFixedRate(this::removeExpiredCertTask, 0,
-        secConf.getExpiredCertificateRemovalInterval().toMillis(),
+        secConf.getExpiredCertificateCheckInterval().toMillis(),
         TimeUnit.MILLISECONDS);
     LOG.info("Scheduling expired certificate removal with interval {}s",
-        secConf.getExpiredCertificateRemovalInterval().getSeconds());
+        secConf.getExpiredCertificateCheckInterval().getSeconds());
   }
 
   private void removeExpiredCertTask() {
+    if (!isRunning.get()) {
+      return;
+    }
     if (scm.getCertificateStore() != null) {
-      scm.getCertificateStore().removeAllExpiredCertificates();
+      try {
+        scm.getCertificateStore().removeAllExpiredCertificates();
+      } catch (IOException e) {
+        LOG.error("Failed to remove some expired certificates", e);
+      }
     }
   }
 
