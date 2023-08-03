@@ -102,7 +102,7 @@ public final class SnapshotUtils {
     if (!checkpoint.exists()) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot checkpoint directory '" + checkpoint.getAbsolutePath() +
-          "' does not exists. Please wait a few more seconds before retrying",
+          "' does not exist yet. Please wait a few more seconds before retrying",
           TIMEOUT);
     }
   }
