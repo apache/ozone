@@ -1132,31 +1132,6 @@ public class TestOMRatisSnapshots {
       }
     }
 
-    // Prepare baseline data for compaction logs
-    String currentCompactionLogPath = leaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getCurrentCompactionLogPath();
-    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
-    String compactionLogsPath = currentCompactionLogPath
-        .substring(0, lastIndex);
-    int numberOfLogFiles = 0;
-    long contentLength;
-    Path compactionLogPath = Paths.get(compactionLogsPath);
-    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
-    try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog);
-         DirectoryStream<Path> files =
-             Files.newDirectoryStream(compactionLogPath)) {
-      contentLength = bufferedReader.lines()
-          .mapToLong(String::length)
-          .reduce(0L, Long::sum);
-      for (Path ignored : files) {
-        numberOfLogFiles++;
-      }
-    }
-
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
         TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
@@ -1202,6 +1177,28 @@ public class TestOMRatisSnapshots {
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
     readKeys(newKeys);
+
+    // Prepare baseline data for compaction logs
+    String currentCompactionLogPath = newLeaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getCurrentCompactionLogPath();
+    Assertions.assertNotNull(currentCompactionLogPath);
+    int lastIndex = currentCompactionLogPath.lastIndexOf(OM_KEY_PREFIX);
+    String compactionLogsPath = currentCompactionLogPath
+        .substring(0, lastIndex);
+    File compactionLogsDir = new File(compactionLogsPath);
+    Assertions.assertNotNull(compactionLogsDir);
+    int numberOfLogFiles = compactionLogsDir.listFiles().length;
+    long contentLength;
+    Path currentCompactionLog = Paths.get(currentCompactionLogPath);
+    try (BufferedReader bufferedReader =
+             Files.newBufferedReader(currentCompactionLog)) {
+      contentLength = bufferedReader.lines()
+          .mapToLong(String::length)
+          .reduce(0L, Long::sum);
+    }
 
     // Check whether newly created snapshot gets processed by SFS
     writeKeys(1);
@@ -1360,18 +1357,13 @@ public class TestOMRatisSnapshots {
     newLeaderOM.getMetadataManager()
         .getStore()
         .compactDB();
-    int newNumberOfLogFiles = 0;
+    int newNumberOfLogFiles = compactionLogsDir.listFiles().length;
     long newContentLength;
     try (BufferedReader bufferedReader =
-             Files.newBufferedReader(currentCompactionLog);
-         DirectoryStream<Path> files =
-             Files.newDirectoryStream(compactionLogPath)) {
+             Files.newBufferedReader(currentCompactionLog)) {
       newContentLength = bufferedReader.lines()
           .mapToLong(String::length)
           .reduce(0L, Long::sum);
-      for (Path ignored : files) {
-        newNumberOfLogFiles++;
-      }
     }
     Assertions.assertTrue(numberOfLogFiles < newNumberOfLogFiles
         || contentLength < newContentLength);
