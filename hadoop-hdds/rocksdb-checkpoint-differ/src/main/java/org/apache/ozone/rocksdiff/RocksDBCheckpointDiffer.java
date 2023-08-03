@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -102,7 +103,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_CO
  * It is important to note that compaction log is per-DB instance. Since
  * each OM DB instance might trigger compactions at different timings.
  */
-public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
+public class RocksDBCheckpointDiffer implements AutoCloseable,
+    BootstrapStateHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RocksDBCheckpointDiffer.class);
@@ -175,9 +177,8 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
   private String reconstructionLastSnapshotID;
 
   private final Scheduler scheduler;
-  private volatile boolean closed = true;
+  private volatile boolean closed;
   private final long maxAllowedTimeInDag;
-  private final long pruneCompactionDagDaemonRunIntervalInMs;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
 
@@ -222,7 +223,7 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS);
 
-    this.pruneCompactionDagDaemonRunIntervalInMs =
+    long pruneCompactionDagDaemonRunIntervalInMs =
         configuration.getTimeDuration(
             OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
@@ -231,32 +232,25 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.scheduler = new Scheduler(dagPruningServiceName,
           true, 1);
+
+      this.scheduler.scheduleWithFixedDelay(
+          this::pruneOlderSnapshotsWithCompactionHistory,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS);
+
+      this.scheduler.scheduleWithFixedDelay(
+          this::pruneSstFiles,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          pruneCompactionDagDaemonRunIntervalInMs,
+          TimeUnit.MILLISECONDS
+      );
     } else {
       this.scheduler = null;
     }
     this.tarballRequestCount = new AtomicInteger(0);
-    this.start();
   }
 
-  private void submitPruneJobs() {
-    if (scheduler == null) {
-      LOG.info("{} is not running.", dagPruningServiceName);
-      return;
-    }
-
-    this.scheduler.scheduleWithFixedDelay(
-        this::pruneOlderSnapshotsWithCompactionHistory,
-        pruneCompactionDagDaemonRunIntervalInMs,
-        pruneCompactionDagDaemonRunIntervalInMs,
-        TimeUnit.MILLISECONDS);
-
-    this.scheduler.scheduleWithFixedDelay(
-        this::pruneSstFiles,
-        pruneCompactionDagDaemonRunIntervalInMs,
-        pruneCompactionDagDaemonRunIntervalInMs,
-        TimeUnit.MILLISECONDS
-    );
-  }
   private String createCompactionLogDir(String metadataDirName,
                                         String compactionLogDirName) {
 
@@ -335,7 +329,9 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
     appendToCurrentCompactionLog("");
   }
 
-  public void stop() {
+
+  @Override
+  public void close() throws Exception {
     if (!closed) {
       synchronized (this) {
         if (!closed) {
@@ -344,17 +340,6 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
             LOG.info("Shutting down {}.", dagPruningServiceName);
             scheduler.close();
           }
-        }
-      }
-    }
-  }
-
-  public void start() {
-    if (closed) {
-      synchronized (this) {
-        if (closed) {
-          closed = false;
-          submitPruneJobs();
         }
       }
     }
@@ -1561,6 +1546,16 @@ public class RocksDBCheckpointDiffer implements BootstrapStateHandler {
               compactionLogDirName,
               activeDBLocationName,
               configuration));
+    }
+
+    /**
+     * Close RocksDBCheckpointDiffer object if value is present for the key.
+     * @param cacheKey cacheKey is metadataDirName path which is used as key
+     *                for cache.
+     */
+    public static void invalidateCacheEntry(String cacheKey) {
+      IOUtils.closeQuietly(INSTANCE_MAP.get(cacheKey));
+      INSTANCE_MAP.remove(cacheKey);
     }
   }
 

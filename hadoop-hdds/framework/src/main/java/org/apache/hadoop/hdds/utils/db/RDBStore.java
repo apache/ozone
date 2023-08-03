@@ -220,7 +220,8 @@ public class RDBStore implements DBStore {
     RDBMetrics.unRegister();
     IOUtils.closeQuietly(checkPointManager);
     if (rocksDBCheckpointDiffer != null) {
-      rocksDBCheckpointDiffer.stop();
+      RocksDBCheckpointDifferHolder
+          .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
     }
     IOUtils.closeQuietly(db);
   }
