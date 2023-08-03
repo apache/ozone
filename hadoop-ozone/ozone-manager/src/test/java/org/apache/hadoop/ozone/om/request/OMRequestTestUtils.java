@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -306,8 +307,7 @@ public final class OMRequestTestUtils {
                                    OmKeyInfo omKeyInfo,  long clientID,
                                    long trxnLogIndex,
                                    OMMetadataManager omMetadataManager)
-          throws Exception {
-
+      throws Exception {
     String volumeName = omKeyInfo.getVolumeName();
     String bucketName = omKeyInfo.getBucketName();
     String keyName = omKeyInfo.getKeyName();
@@ -333,6 +333,50 @@ public final class OMRequestTestUtils {
       omMetadataManager.getKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
     }
+  }
+
+  /**
+   * Add open multipart key to openKeyTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addMultipartKeyToOpenKeyTable(boolean addToCache,
+      OmKeyInfo omKeyInfo, String uploadId, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws IOException {
+
+    String multipartKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(), uploadId);
+
+    if (addToCache) {
+      omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
+          .addCacheEntry(new CacheKey<>(multipartKey),
+              CacheValue.get(trxnLogIndex, omKeyInfo));
+    }
+    omMetadataManager.getOpenKeyTable(BucketLayout.DEFAULT)
+        .put(multipartKey, omKeyInfo);
+  }
+
+  /**
+   * Add multipart info entry to the multipartInfoTable.
+   * @throws Exception
+   */
+  public static void addMultipartInfoToTable(boolean addToCache,
+      OmKeyInfo omKeyInfo, OmMultipartKeyInfo omMultipartKeyInfo,
+      long trxnLogIndex, OMMetadataManager omMetadataManager)
+      throws IOException {
+    String ozoneDBKey = omMetadataManager.getMultipartKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName(), omMultipartKeyInfo.getUploadID());
+
+    if (addToCache) {
+      omMetadataManager.getMultipartInfoTable()
+          .addCacheEntry(new CacheKey<>(ozoneDBKey),
+              CacheValue.get(trxnLogIndex, omMultipartKeyInfo));
+    }
+
+    omMetadataManager.getMultipartInfoTable().put(ozoneDBKey,
+        omMultipartKeyInfo);
   }
 
   /**
@@ -496,6 +540,18 @@ public final class OMRequestTestUtils {
    * Create OmKeyInfo.
    */
   @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long creationTime, boolean isMultipartKey) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+        replicationFactor, objectID, creationTime, 0L, isMultipartKey);
+  }
+
+  /**
+   * Create OmKeyInfo for LEGACY/OBS bucket.
+   */
+  @SuppressWarnings("parameterNumber")
   private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
@@ -514,6 +570,24 @@ public final class OMRequestTestUtils {
         .setReplicationConfig(
             ReplicationConfig
                 .fromProtoTypeAndFactor(replicationType, replicationFactor))
+        .setObjectID(objectID)
+        .setUpdateID(objectID)
+        .build();
+  }
+
+  /**
+   * Create OmMultipartKeyInfo for OBS/LEGACY bucket.
+   */
+  public static OmMultipartKeyInfo createOmMultipartKeyInfo(String uploadId,
+        long creationTime, HddsProtos.ReplicationType replicationType,
+        HddsProtos.ReplicationFactor replicationFactor, long objectID) {
+    return new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadId)
+        .setCreationTime(creationTime)
+        .setReplicationConfig(
+            ReplicationConfig
+                .fromProtoTypeAndFactor(replicationType, replicationFactor))
+        .setPartKeyInfoList(Collections.emptySortedMap())
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
@@ -1304,7 +1378,7 @@ public final class OMRequestTestUtils {
   }
 
   /**
-   * Create OmKeyInfo.
+   * Create OmKeyInfo for FSO bucket.
    */
   @SuppressWarnings("parameterNumber")
   private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
@@ -1376,6 +1450,30 @@ public final class OMRequestTestUtils {
           .put(ozoneDBKey, omKeyInfo);
     }
     return ozoneDBKey;
+  }
+
+  /**
+   * Add open multipart key to openFileTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addMultipartKeyToOpenFileTable(boolean addToCache,
+      String fileName, OmKeyInfo omKeyInfo, String uploadId, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws IOException {
+    final long volumeId = omMetadataManager.getVolumeId(
+        omKeyInfo.getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
+        omKeyInfo.getParentObjectID(), fileName, uploadId);
+
+    if (addToCache) {
+      omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .addCacheEntry(new CacheKey<>(multipartKey),
+              CacheValue.get(trxnLogIndex, omKeyInfo));
+    }
+    omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put(multipartKey, omKeyInfo);
   }
 
   /**
