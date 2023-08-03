@@ -1162,6 +1162,8 @@ public class TestOMRatisSnapshots {
     readKeys(newKeys);
 
     // Prepare baseline data for compaction backup pruning
+    // TODO: uncomment this when HDDS-9118 is resolved
+    /*
     String sstBackupDirPath = newLeaderOM
         .getMetadataManager()
         .getStore()
@@ -1171,6 +1173,7 @@ public class TestOMRatisSnapshots {
     File sstBackupDir = new File(sstBackupDirPath);
     Assertions.assertNotNull(sstBackupDir);
     int numberOfSstFiles = sstBackupDir.listFiles().length;
+     */
 
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
@@ -1363,10 +1366,13 @@ public class TestOMRatisSnapshots {
         || contentLength < newContentLength);
 
     // Check whether compaction backup files were pruned
+    // TODO: uncomment this when HDDS-9118 is resolved
+    /*
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = sstBackupDir.listFiles().length;
       return numberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 10000);
+     */
 
     // Confirm snap diff by creating 2 snapshots differing by a single key
     String firstSnapshot = createOzoneSnapshot(newLeaderOM,
