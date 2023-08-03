@@ -1218,7 +1218,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // Get maxKeys from DB if it has.
 
-    boolean isTruncated = false;
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
       KeyValue< String, OmKeyInfo > kv;
@@ -1245,7 +1244,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    isTruncated = cacheKeyMap.size() > maxKeys;
+    boolean isTruncated = cacheKeyMap.size() > maxKeys;
 
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
