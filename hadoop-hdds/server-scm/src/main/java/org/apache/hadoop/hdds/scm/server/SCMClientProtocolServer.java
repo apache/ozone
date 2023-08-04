@@ -691,7 +691,11 @@ public class SCMClientProtocolServer implements
       auditMap.put("replicationFactor", factor.toString());
     }
     if (nodePool != null) {
-      auditMap.put("nodePool", nodePool.getNodesList().toString());
+      List<String> nodeIpAddresses = new ArrayList<>();
+      for (HddsProtos.Node node : nodePool.getNodesList()) {
+        nodeIpAddresses.add(node.getNodeID().getIpAddress());
+      }
+      auditMap.put("nodePool",String.join(", ", nodeIpAddresses));
     }
     try {
       Pipeline result = scm.getPipelineManager().createPipeline(
