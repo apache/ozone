@@ -91,7 +91,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private final XceiverClientMetrics metrics;
   private final Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
-  private final long timeout;
+  private long timeout;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private final List<X509Certificate> caCerts;
@@ -114,9 +114,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
-    timeout = config.getTimeDuration(OzoneConfigKeys.
+    setTimeout(config.getTimeDuration(OzoneConfigKeys.
         OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -614,5 +614,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @VisibleForTesting
   public static Logger getLogger() {
     return LOG;
+  }
+
+  public void setTimeout(long timeout) {
+    this.timeout = timeout;
   }
 }
