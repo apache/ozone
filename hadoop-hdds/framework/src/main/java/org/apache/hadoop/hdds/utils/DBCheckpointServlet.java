@@ -21,10 +21,12 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -74,6 +76,7 @@ public class DBCheckpointServlet extends HttpServlet
   private boolean isSpnegoEnabled;
   private transient OzoneAdmins admins;
   private transient BootstrapStateHandler.Lock lock;
+  private transient File bootstrapTempData;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -93,6 +96,12 @@ public class DBCheckpointServlet extends HttpServlet
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
     lock = new Lock();
+    bootstrapTempData = Paths.get(dbStore.getDbLocation().getParent(),
+        "temp-bootstrap-data").toFile();
+    if (!bootstrapTempData.exists() &&
+        !bootstrapTempData.mkdirs()) {
+      throw new ServletException("Failed to make:" + bootstrapTempData);
+    }
   }
 
   private boolean hasPermission(UserGroupInformation user) {
@@ -175,7 +184,8 @@ public class DBCheckpointServlet extends HttpServlet
 
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-      tmpdir = Files.createTempDirectory("om-bootstrap-data-");
+      tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
+          "bootstrap-data-");
       checkpoint = getCheckpoint(tmpdir, flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
