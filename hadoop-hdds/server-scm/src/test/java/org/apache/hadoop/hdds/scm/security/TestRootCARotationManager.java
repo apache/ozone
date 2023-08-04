@@ -58,6 +58,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.junit.Assert.assertEquals;
@@ -195,6 +196,7 @@ public class TestRootCARotationManager {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
     ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
+    ozoneConfig.set(HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL, "PT15S");
     Date date = Calendar.getInstance().getTime();
     date.setSeconds(date.getSeconds() + 10);
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY,
