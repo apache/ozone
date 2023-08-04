@@ -43,7 +43,7 @@ public class DatanodeConfiguration {
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
   public static final String DISK_CHECK_FILE_SIZE_KEY =
-      "hdds.datanode.disk.check.file.size";
+      "hdds.datanode.disk.check.io.file.size";
   public static final String DISK_CHECK_IO_TEST_COUNT_KEY =
       "hdds.datanode.disk.check.io.test.count";
   public static final String DISK_CHECK_IO_FAILURES_TOLERATED_KEY =
@@ -301,7 +301,7 @@ public class DatanodeConfiguration {
   private int volumeIOFailureTolerance =
       DISK_CHECK_IO_FAILURES_TOLERATED_DEFAULT;
 
-  @Config(key = "disk.check.file.size",
+  @Config(key = "disk.check.io.file.size",
       defaultValue = "100B",
       type = ConfigType.SIZE,
       tags = { DATANODE },

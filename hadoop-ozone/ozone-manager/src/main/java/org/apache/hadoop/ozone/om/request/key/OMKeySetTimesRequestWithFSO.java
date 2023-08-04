@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -96,6 +97,8 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
+      // setting Key name back to Ozone Key before updating cache value.
+      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(key));
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,

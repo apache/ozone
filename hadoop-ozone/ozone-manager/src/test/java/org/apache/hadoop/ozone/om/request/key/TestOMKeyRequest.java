@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
@@ -168,6 +169,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
+    when(ozoneManager.getAccessAuthorizer())
+        .thenReturn(new OzoneNativeAuthorizer());
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
         mock(ReferenceCounted.class);

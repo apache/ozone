@@ -521,18 +521,23 @@ public class LegacyReplicationManager {
          * Check if the container is over replicated and take appropriate
          * action.
          */
-        if (replicaSet.isOverReplicated()) {
-          handleOverReplicatedHealthy(container, replicaSet, report);
+        if (replicaSet.getReplicas().size() >
+            container.getReplicationConfig().getRequiredNodes()) {
+          if (replicaSet.isHealthy()) {
+            handleOverReplicatedHealthy(container, replicaSet, report);
+          } else {
+            handleOverReplicatedExcessUnhealthy(container, replicaSet, report);
+          }
           return;
         }
 
       /*
-       If we get here, the container is not over replicated or under replicated
-       but it may be "unhealthy", which means it has one or more replica which
-       are not in the same state as the container itself.
+       * If we get here, the container is not over replicated or under
+       * replicated, but it may be "unhealthy", which means it has one or
+       * more replica which are not in the same state as the container itself.
        */
         if (!replicaSet.isHealthy()) {
-          handleOverReplicatedExcessUnhealthy(container, replicaSet, report);
+          handleContainerWithUnhealthyReplica(container, replicaSet);
         }
       }
     } catch (ContainerNotFoundException ex) {
@@ -1265,6 +1270,41 @@ public class LegacyReplicationManager {
         deleteExcessWithNonUniqueOriginNodeIDs(container,
             replicaSet.getReplicas(), unhealthyReplicas, excessReplicaCount);
       }
+    }
+  }
+
+  /**
+   * This method handles container with unhealthy replica by over-replicating
+   * the healthy replica. Once the container becomes over-replicated,
+   * we delete the unhealthy replica in the next cycle of replication manager
+   * in handleOverReplicatedExcessUnhealthy method.
+   */
+  private void handleContainerWithUnhealthyReplica(
+      final ContainerInfo container,
+      final RatisContainerReplicaCount replicaSet) {
+    /*
+     * When there is an Unhealthy or Quasi Closed replica with incorrect
+     * sequence id for a Closed container, it should be deleted and one of
+     * the healthy replica has to be re-replicated.
+     *
+     * We first do the re-replication and over replicate the container,
+     * in the next cycle of replication manager the excess unhealthy replica
+     * is deleted.
+     */
+
+    if (container.getState() == LifeCycleState.CLOSED) {
+      final List<ContainerReplica> replicas = replicaSet.getReplicas();
+      final List<ContainerReplica> replicationSources = getReplicationSources(
+          container, replicaSet.getReplicas(), State.CLOSED);
+      if (replicationSources.isEmpty()) {
+        LOG.warn("No healthy CLOSED replica for replication.");
+        return;
+      }
+      final ContainerPlacementStatus placementStatus = getPlacementStatus(
+          new HashSet<>(replicationSources),
+          container.getReplicationConfig().getRequiredNodes());
+      replicateAnyWithTopology(container, replicationSources,
+          placementStatus, replicas.size() - replicationSources.size());
     }
   }
 

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 
 /**
  * Output stream adapter for SendContainerResponse.
@@ -29,7 +29,7 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
   private final CopyContainerCompression compression;
 
   SendContainerOutputStream(
-      StreamObserver<SendContainerRequest> streamObserver,
+      CallStreamObserver<SendContainerRequest> streamObserver,
       long containerId, int bufferSize, CopyContainerCompression compression) {
     super(streamObserver, containerId, bufferSize);
     this.compression = compression;

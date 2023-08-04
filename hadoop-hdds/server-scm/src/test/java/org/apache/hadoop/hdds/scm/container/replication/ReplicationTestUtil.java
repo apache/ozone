@@ -199,6 +199,17 @@ public final class ReplicationTestUtil {
 
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long sequenceID) {
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setSequenceId(sequenceID)
+        .build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
     return TestContainerInfo.newBuilderForTest()
         .setContainerID(containerID)

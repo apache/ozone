@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -55,8 +54,6 @@ public class TestLeaderChoosePolicy {
 
   public void init(int numDatanodes, int datanodePipelineLimit)
       throws Exception {
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

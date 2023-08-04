@@ -127,7 +127,8 @@ public class TestIncrementalContainerReportHandler {
             scmContext, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestIncrementalContainerReportHandler.class.getSimpleName()
+            + UUID.randomUUID());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
 

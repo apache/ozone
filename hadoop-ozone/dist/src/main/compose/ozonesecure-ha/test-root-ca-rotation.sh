@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:cert-rotation
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -23,7 +23,7 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
-export COMPOSE_FILE=docker-compose.yaml:root-ca-rotation.yaml
+export COMPOSE_FILE=docker-compose.yaml:scm-decommission.yaml:root-ca-rotation.yaml
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
