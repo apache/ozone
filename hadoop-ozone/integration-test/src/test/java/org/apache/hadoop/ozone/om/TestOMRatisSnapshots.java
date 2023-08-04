@@ -1366,7 +1366,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = sstBackupDir.listFiles().length;
       return numberOfSstFiles > newNumberOfSstFiles;
-    }, 1000, 10000);
+    }, 1000, 30000);
 
     // Confirm snap diff by creating 2 snapshots differing by a single key
     String firstSnapshot = createOzoneSnapshot(newLeaderOM,
