@@ -293,7 +293,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   @Override
   public void refreshRootCACertificates() throws IOException {
-    if (scm.getScmContext().isLeader()) {
+    if (scm.getScmContext().isLeader() ||
+        scm.getScmCertificateClient() == null) {
       return;
     }
     // In case root CA certificate is rotated during this SCM is offline
