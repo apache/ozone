@@ -107,6 +107,26 @@ public final class CertificateTestUtils {
    */
   public static X509Certificate createSelfSignedCert(KeyPair keys,
       String commonName, Duration expiresIn) throws Exception {
+    return createSelfSignedCert(keys, commonName, expiresIn,
+        BigInteger.valueOf(keys.getPublic().hashCode()));
+  }
+
+  /**
+   * Creates a self-signed certificate and returns it as an X509Certificate.
+   * The given keys and common name are being used in the certificate.
+   * The certificate will expire after the specified duration and its id
+   * will be the specified id.
+   *
+   * @param keys       the keypair to use for the certificate
+   * @param commonName the common name used in the certificate
+   * @param expiresIn  the lifespan of the certificate
+   * @param certId     the id of the generated certificate
+   * @return the X509Certificate representing a self-signed certificate
+   * @throws Exception in case any error occurs during the certificate creation
+   */
+  public static X509Certificate createSelfSignedCert(KeyPair keys,
+      String commonName, Duration expiresIn, BigInteger certId)
+      throws Exception {
     final Instant now = Instant.now();
     final Date notBefore = Date.from(now);
     final Date notAfter = Date.from(now.plus(expiresIn));
@@ -121,7 +141,7 @@ public final class CertificateTestUtils {
     final X509v3CertificateBuilder certificateBuilder =
         new JcaX509v3CertificateBuilder(
             x500Name,
-            BigInteger.valueOf(keys.getPublic().hashCode()),
+            certId,
             notBefore,
             notAfter,
             x500Name,

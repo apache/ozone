@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -66,11 +65,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.util.Time;
 
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
@@ -79,6 +75,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.mock;
@@ -91,6 +88,7 @@ public class TestEndPoint {
   private static InetSocketAddress serverAddress;
   private static RPC.Server scmServer;
   private static ScmTestMock scmServerImpl;
+  @TempDir
   private static File testDir;
 
   @AfterAll
@@ -98,16 +96,14 @@ public class TestEndPoint {
     if (scmServer != null) {
       scmServer.stop();
     }
-    FileUtil.fullyDelete(testDir);
   }
 
   @BeforeAll
-  public static void setUp() throws Exception {
+  static void setUp() throws Exception {
     serverAddress = SCMTestUtils.getReuseableAddress();
     scmServerImpl = new ScmTestMock();
     scmServer = SCMTestUtils.startScmRpcServer(SCMTestUtils.getConf(),
         scmServerImpl, serverAddress, 10);
-    testDir = PathUtils.getTestDir(TestEndPoint.class);
   }
 
   /**
@@ -529,8 +525,6 @@ public class TestEndPoint {
       int rpcTimeout
   ) throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.set(DFS_DATANODE_DATA_DIR_KEY, testDir.getAbsolutePath());
-    conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     // Mini Ozone cluster will not come up if the port is not true, since
     // Ratis will exit if the server port cannot be bound. We can remove this
     // hard coding once we fix the Ratis default behaviour.
