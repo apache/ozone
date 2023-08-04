@@ -113,6 +113,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
@@ -803,21 +804,8 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
 
-    if (scm.getRootCARotationManager() != null) {
-      if (scm.getRootCARotationManager().isRotationInProgress()) {
-        throw new SCMException("Root CA and Sub CA rotation is in-progress." +
-            " Please try the operation later again.",
-            ResultCodes.CA_ROTATION_IN_PROGRESS);
-      }
-      if (scm.getRootCARotationManager().isPostRotationInProgress()) {
-        SecurityConfig securityConfig = new SecurityConfig(config);
-        throw new SCMException("This action is prohibited for " +
-            securityConfig.getRootCaCertificatePollingInterval() +
-            " due to root CA and sub CA rotation have just finished. " +
-            "Please try the operation later again.",
-            ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
-      }
-    }
+    checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
+        false, config, "transferLeadership");
 
     boolean auditSuccess = true;
     final Map<String, String> auditMap = Maps.newHashMap();

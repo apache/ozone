@@ -85,6 +85,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_INITIALIZED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
@@ -194,7 +195,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
-    checkIsCertSignRequestAllowed(false);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getDataNodeCertificate");
     return getEncodedCertToString(certSignReq, NodeType.DATANODE);
   }
 
@@ -206,30 +209,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         nodeDetails.getNodeType(), nodeDetails.getHostName(),
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
-    checkIsCertSignRequestAllowed(false);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getCertificate");
     return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
-  }
-
-  private void checkIsCertSignRequestAllowed(boolean isScmCertRenew)
-      throws SCMException {
-    RootCARotationManager rotationManager =
-        storageContainerManager.getRootCARotationManager();
-    if (rotationManager != null) {
-      if (rotationManager.isRotationInProgress() && !isScmCertRenew) {
-        throw new SCMException("Root CA and Sub CA rotation is in-progress." +
-            " Please try the operation later again.",
-            ResultCodes.CA_ROTATION_IN_PROGRESS);
-      }
-      if (rotationManager.isPostRotationInProgress()) {
-        SecurityConfig securityConfig = new SecurityConfig(config);
-        throw new SCMException("This action is prohibited due to root CA " +
-            "and sub CA rotation have just finished. " +
-            "The prohibition state will last at most " +
-            securityConfig.getRootCaCertificatePollingInterval() + ". " +
-            "Please try the operation later again.",
-            ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
-      }
-    }
   }
 
   @Override
@@ -303,7 +286,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
-    checkIsCertSignRequestAllowed(false);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), false, config,
+        "getOMCertificate");
     return getEncodedCertToString(certSignReq, NodeType.OM);
   }
 
@@ -340,7 +325,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
           + storageContainerManager.getClusterId());
     }
 
-    checkIsCertSignRequestAllowed(isRenew);
+    checkIfCertSignRequestAllowed(
+        storageContainerManager.getRootCARotationManager(), isRenew, config,
+        "getSCMCertificate");
 
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
