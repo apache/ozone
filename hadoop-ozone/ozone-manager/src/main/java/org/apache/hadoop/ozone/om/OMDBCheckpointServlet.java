@@ -262,7 +262,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                                   Map<Path, Path> hardLinkFiles,
                                   Set<Path> toExcludeFiles,
                                   boolean includeSnapshotData,
-                                  List<String> excluded, Path tmpdir)
+                                  List<String> excluded,
+                                  Path tmpdir)
       throws IOException {
 
     maxTotalSstSize = getConf().getLong(
@@ -362,7 +363,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
                           Set<Path> toExcludeFiles,
                           Set<Path> snapshotPaths,
                           List<String> excluded,
-                          AtomicLong copySize, Path destDir)
+                          AtomicLong copySize,
+                          Path destDir)
       throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
@@ -436,7 +438,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   public static long processFile(Path file, Map<Path, Path> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
                                  Set<Path> toExcludeFiles,
-                                 List<String> excluded, Path destDir)
+                                 List<String> excluded,
+                                 Path destDir)
       throws IOException {
     long fileSize = 0;
     Path destFile = file;
