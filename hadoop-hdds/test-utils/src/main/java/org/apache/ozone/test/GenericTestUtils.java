@@ -31,7 +31,6 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
@@ -46,6 +45,8 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -142,7 +143,8 @@ public abstract class GenericTestUtils {
    */
   @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
-    return getTempPath(RandomStringUtils.randomAlphanumeric(10));
+    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
+        + "-" + randomAlphanumeric(10));
   }
 
   /**
