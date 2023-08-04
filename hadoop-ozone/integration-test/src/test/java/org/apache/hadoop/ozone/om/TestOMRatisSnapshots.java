@@ -1161,17 +1161,6 @@ public class TestOMRatisSnapshots {
 
     readKeys(newKeys);
 
-    // Prepare baseline data for compaction backup pruning
-    String sstBackupDirPath = newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDirPath);
-    File sstBackupDir = new File(sstBackupDirPath);
-    Assertions.assertNotNull(sstBackupDir);
-    int numberOfSstFiles = sstBackupDir.listFiles().length;
-
     // Prepare baseline data for compaction logs
     String currentCompactionLogPath = newLeaderOM
         .getMetadataManager()
@@ -1290,6 +1279,17 @@ public class TestOMRatisSnapshots {
     // create snapshot d
     SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
+
+    // Prepare baseline data for compaction backup pruning
+    String sstBackupDirPath = newLeaderOM
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getSSTBackupDir();
+    Assertions.assertNotNull(sstBackupDirPath);
+    File sstBackupDir = new File(sstBackupDirPath);
+    Assertions.assertNotNull(sstBackupDir);
+    int numberOfSstFiles = sstBackupDir.listFiles().length;
 
     // delete snapshot c
     client.getObjectStore()
