@@ -238,7 +238,7 @@ public interface CertificateClient extends Closeable {
    * Notify all certificate renewal receivers that the certificate is renewed.
    *
    */
-   void notifyNotificationReceivers(String oldCaCertId, String newCaCertId);
+  void notifyNotificationReceivers(String oldCaCertId, String newCaCertId);
 
   /**
    * Registers a listener that will be notified if the CA certificates are
