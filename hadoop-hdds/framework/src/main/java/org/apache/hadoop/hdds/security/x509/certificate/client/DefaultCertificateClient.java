@@ -613,10 +613,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
       }
 
-      codec.writeCertificate(certName,
-          pemEncodedCert);
+      codec.writeCertificate(certName, pemEncodedCert);
       if (addToCertMap) {
         certificateMap.put(cert.getSerialNumber().toString(), certificatePath);
+        if (caType == CAType.SUBORDINATE) {
+          caCertificates.add(cert);
+        }
+        if (caType == CAType.ROOT) {
+          rootCaCertificates.add(cert);
+        }
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -972,6 +977,19 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
+  /**
+   * Notify all certificate renewal receivers that the certificate is renewed.
+   *
+   */
+  @Override
+  public void notifyNotificationReceivers(String oldCaCertId,
+      String newCaCertId) {
+    synchronized (notificationReceivers) {
+      notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+          this, oldCaCertId, newCaCertId));
+    }
+  }
+
   @Override
   public synchronized void close() throws IOException {
     if (executorService != null) {
@@ -1212,9 +1230,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Reset and reloaded key and all certificates for new " +
         "certificate {}.", newCertId);
 
-    // notify notification receivers
-    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-        this, oldCaCertId, newCertId));
+    notifyNotificationReceivers(oldCaCertId, newCertId);
   }
 
   public SecurityConfig getSecurityConfig() {

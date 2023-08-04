@@ -18,9 +18,13 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+
+import java.security.cert.X509Certificate;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
@@ -31,6 +35,9 @@ import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.HAUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -282,6 +289,44 @@ public class SCMHAManagerImpl implements SCMHAManager {
         checkpointTrxnInfo);
 
     return installCheckpoint(checkpointLocation, checkpointTrxnInfo);
+  }
+
+  @Override
+  public void refreshRootCACertificates() throws IOException {
+    if (scm.getScmContext().isLeader()) {
+      return;
+    }
+    // In case root CA certificate is rotated during this SCM is offline
+    // period, fetch the new root CA list from leader SCM and refresh ratis
+    // server's tlsConfig.
+    SCMCertificateClient scmCertClient =
+        (SCMCertificateClient) scm.getScmCertificateClient();
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        scmCertClient.getScmSecureClient();
+    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
+
+    // SCM certificate client sets root CA as CA cert instead of root CA cert
+    Set<X509Certificate> certList = scmCertClient.getAllRootCaCerts();
+    certList = certList.isEmpty() ? scmCertClient.getAllCaCerts() : certList;
+
+    List<X509Certificate> rootCAsFromLeaderSCM =
+        OzoneSecurityUtil.convertToX509(rootCAPems);
+    rootCAsFromLeaderSCM.removeAll(certList);
+
+    if (rootCAsFromLeaderSCM.isEmpty()) {
+      return;
+    }
+
+    for (X509Certificate cert : rootCAsFromLeaderSCM) {
+      LOG.info("Fetched new root CA certificate {} from leader SCM",
+          cert.getSerialNumber().toString());
+      scmCertClient.storeCertificate(
+          CertificateCodec.getPEMEncodedString(cert), CAType.SUBORDINATE);
+    }
+
+    String scmCertId =
+        scmCertClient.getCertificate().getSerialNumber().toString();
+    scmCertClient.notifyNotificationReceivers(scmCertId, scmCertId);
   }
 
   public TermIndex installCheckpoint(Path checkpointLocation,

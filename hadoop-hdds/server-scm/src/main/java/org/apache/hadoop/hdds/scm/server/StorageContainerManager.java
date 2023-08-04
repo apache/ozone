@@ -1542,6 +1542,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // At this point leader is not known
     scmHAMetricsUpdate(null);
+
+    scmHAManager.refreshRootCACertificates();
   }
 
   /**
