@@ -1139,26 +1139,13 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-
     checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
 
-    // verify that the bootstrap Follower OM can become leader
-    leaderOM.transferLeadership(followerNodeId);
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        followerOM.checkLeaderStatus();
-        return true;
-      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
-        return false;
-      }
-    }, 100, 10000);
-    OzoneManager newLeaderOM = cluster.getOMLeader();
-    Assertions.assertEquals(followerOM, newLeaderOM);
+    OzoneManager newLeaderOM =
+        getNewLeader(leaderOM, followerNodeId, followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     Assertions.assertEquals(leaderOM, newFollowerOM);
-
     readKeys(newKeys);
 
     // Prepare baseline data for compaction logs
@@ -1183,28 +1170,8 @@ public class TestOMRatisSnapshots {
           .reduce(0L, Long::sum);
     }
 
-    // Check whether newly created snapshot gets processed by SFS
-    writeKeys(1);
-    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
-        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(newSnapshot);
-    File omMetadataDir =
-        OMStorage.getOmDbDir(newLeaderOM.getConfiguration());
-    String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    Path filePath =
-        Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
-    Assertions.assertTrue(Files.exists(filePath));
-    GenericTestUtils.waitFor(() -> {
-      List<String> processedSnapshotIds;
-      try {
-        processedSnapshotIds = Files.readAllLines(filePath);
-      } catch (IOException e) {
-        Assertions.fail();
-        return false;
-      }
-      return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
-          .toString());
-    }, 1000, 30000);
+    SnapshotInfo newSnapshot =
+        getSnapshotProcessedBySfs(snapshotNamePrefix, newLeaderOM);
 
     /*
       Check whether newly created key data is reclaimed
@@ -1280,15 +1247,7 @@ public class TestOMRatisSnapshots {
     SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
 
-    // Prepare baseline data for compaction backup pruning
-    String sstBackupDirPath = newLeaderOM
-        .getMetadataManager()
-        .getStore()
-        .getRocksDBCheckpointDiffer()
-        .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDirPath);
-    File sstBackupDir = new File(sstBackupDirPath);
-    Assertions.assertNotNull(sstBackupDir);
+    File sstBackupDir = getSstBackupDir(newLeaderOM);
     int numberOfSstFiles = sstBackupDir.listFiles().length;
 
     // delete snapshot c
@@ -1347,8 +1306,46 @@ public class TestOMRatisSnapshots {
       }
     }, 1000, 10000);
 
-    // Check whether compaction logs get appended to by forcing compaction
-    newLeaderOM.getMetadataManager()
+    checkIfCompactionLogsGetAppendedByForcingCompaction(newLeaderOM,
+        compactionLogsDir, numberOfLogFiles, contentLength,
+        currentCompactionLog);
+
+    checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
+
+    confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(snapshotNamePrefix,
+        newLeaderOM);
+  }
+
+  private void confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
+      String snapshotNamePrefix, OzoneManager ozoneManager)
+      throws IOException, InterruptedException, TimeoutException {
+    String firstSnapshot = createOzoneSnapshot(ozoneManager,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
+    String diffKey = writeKeys(1).get(0);
+    String secondSnapshot = createOzoneSnapshot(ozoneManager,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
+    SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
+        firstSnapshot, secondSnapshot);
+    Assertions.assertEquals(Collections.singletonList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
+        diff.getDiffList());
+  }
+
+  private static void checkIfCompactionBackupFilesWerePruned(File sstBackupDir,
+      int numberOfSstFiles) throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      int newNumberOfSstFiles = sstBackupDir.listFiles().length;
+      return numberOfSstFiles > newNumberOfSstFiles;
+    }, 1000, 30000);
+  }
+
+  private static void checkIfCompactionLogsGetAppendedByForcingCompaction(
+      OzoneManager ozoneManager,
+      File compactionLogsDir, int numberOfLogFiles,
+      long contentLength, Path currentCompactionLog)
+      throws IOException {
+    ozoneManager.getMetadataManager()
         .getStore()
         .compactDB();
     int newNumberOfLogFiles = compactionLogsDir.listFiles().length;
@@ -1361,25 +1358,71 @@ public class TestOMRatisSnapshots {
     }
     Assertions.assertTrue(numberOfLogFiles < newNumberOfLogFiles
         || contentLength < newContentLength);
+  }
 
-    // Check whether compaction backup files were pruned
+  private static File getSstBackupDir(OzoneManager ozoneManager) {
+    String sstBackupDirPath = ozoneManager
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .getSSTBackupDir();
+    Assertions.assertNotNull(sstBackupDirPath);
+    File sstBackupDir = new File(sstBackupDirPath);
+    Assertions.assertNotNull(sstBackupDir);
+    return sstBackupDir;
+  }
+
+  private SnapshotInfo getSnapshotProcessedBySfs(String snapshotNamePrefix,
+                                                 OzoneManager ozoneManager)
+      throws IOException, TimeoutException, InterruptedException {
+    writeKeys(1);
+    SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager,
+        snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
+    Assertions.assertNotNull(newSnapshot);
+    File omMetadataDir =
+        OMStorage.getOmDbDir(ozoneManager.getConfiguration());
+    String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
+    Path filePath =
+        Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
+    Assertions.assertTrue(Files.exists(filePath));
     GenericTestUtils.waitFor(() -> {
-      int newNumberOfSstFiles = sstBackupDir.listFiles().length;
-      return numberOfSstFiles > newNumberOfSstFiles;
+      List<String> processedSnapshotIds;
+      try {
+        processedSnapshotIds = Files.readAllLines(filePath);
+      } catch (IOException e) {
+        Assertions.fail();
+        return false;
+      }
+      return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
+          .toString());
     }, 1000, 30000);
+    return newSnapshot;
+  }
 
-    // Confirm snap diff by creating 2 snapshots differing by a single key
-    String firstSnapshot = createOzoneSnapshot(newLeaderOM,
-        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
-    String diffKey = writeKeys(1).get(0);
-    String secondSnapshot = createOzoneSnapshot(newLeaderOM,
-        snapshotNamePrefix + RandomStringUtils.randomNumeric(10)).getName();
-    SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
-        firstSnapshot, secondSnapshot);
-    Assertions.assertEquals(Collections.singletonList(
-            SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
-        diff.getDiffList());
+  private OzoneManager getNewLeader(OzoneManager leaderOM,
+                                    String followerNodeId,
+                                    OzoneManager followerOM)
+      throws IOException, TimeoutException, InterruptedException {
+    verifyLeadershipTransfer(leaderOM, followerNodeId, followerOM);
+    OzoneManager newLeaderOM = cluster.getOMLeader();
+    Assertions.assertEquals(followerOM, newLeaderOM);
+    return newLeaderOM;
+  }
+
+  private static void verifyLeadershipTransfer(OzoneManager leaderOM,
+                                               String followerNodeId,
+                                               OzoneManager followerOM)
+      throws IOException, TimeoutException, InterruptedException {
+    leaderOM.transferLeadership(followerNodeId);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        followerOM.checkLeaderStatus();
+        return true;
+      } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
+        return false;
+      }
+    }, 100, 10000);
   }
 
   private SnapshotDiffReportOzone getSnapDiffReport(String volume,
