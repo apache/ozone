@@ -230,6 +230,11 @@ public final class HddsConfigKeys {
       "hdds.x509.ca.rotation.enabled";
   public static final boolean HDDS_X509_CA_ROTATION_ENABLED_DEFAULT = false;
 
+  public static final String HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL =
+      "hdds.x509.expired.certificate.check.interval";
+  public static final String
+      HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL_DEFAULT = "P1D";
+
   public static final String HDDS_CONTAINER_REPLICATION_COMPRESSION =
       "hdds.container.replication.compression";
   public static final String HDDS_X509_ROOTCA_CERTIFICATE_FILE =
