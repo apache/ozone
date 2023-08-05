@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import React from 'react';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker, Form } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import moment from 'moment';
@@ -84,6 +84,8 @@ const colourScheme = {
     '#FF423B'
   ]
 };
+
+let cancelHeatmapToken: CancelTokenSource;
 
 export class Heatmap extends React.Component<Record<string, object>, ITreeState> {
   constructor(props = {}) {
@@ -155,9 +157,13 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       treeEndpointFailed: false
     });
 
+    // Cancel any previous pending requests
+    cancelHeatmapToken && cancelHeatmapToken.cancel("Cancelling request because TreeMap updated");
+    cancelHeatmapToken = axios.CancelToken.source();
+
     if (date && path && entityType) {
       const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
-      axios.get(treeEndpoint).then(response => {
+      axios.get(treeEndpoint, { cancelToken: cancelHeatmapToken.token }).then(response => {
         minSize = this.minmax(response.data)[0];
         maxSize = this.minmax(response.data)[1];
         let treeResponse: ITreeResponse = this.updateSize(response.data);
@@ -201,6 +207,10 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     });
     // By default render treemap for default path entity type and date
     this.updateTreeMap(CONSTANTS.ROOT_PATH, this.state.entityType, this.state.date);
+  }
+
+  componentWillUnmount(): void {
+    cancelHeatmapToken && cancelHeatmapToken.cancel("Request cancelled because HeatMap view changed")
   }
 
   onChange = (date: any[]) => {

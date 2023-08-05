@@ -19,7 +19,7 @@
 import React from 'react';
 import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/overviewCard/overviewCard';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import {IStorageReport} from 'types/datanode.types';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
@@ -70,6 +70,9 @@ interface IOverviewState {
   deletePendingSummarytotalDeletedKeys: number,
 }
 
+let cancelOverviewToken: CancelTokenSource;
+let cancelOMDBSyncToken: CancelTokenSource;
+
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
   interval = 0;
   autoReload: AutoReloadHelper;
@@ -111,11 +114,18 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     this.setState({
       loading: true
     });
+
+    //cancel any previous pending requests
+    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("OM-DB Sync request cancelled because data was updated");
+    cancelOverviewToken && cancelOverviewToken.cancel("Overview request cancelled because data was updated");
+
+    cancelOverviewToken = axios.CancelToken.source();
+
     axios.all([
-      axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/task/status'),
-      axios.get('/api/v1/keys/open?limit=0'),
-      axios.get('/api/v1/keys/deletePending?limit=1'),
+      axios.get('/api/v1/clusterState', { cancelToken: cancelOverviewToken.token }),
+      axios.get('/api/v1/task/status', { cancelToken: cancelOverviewToken.token }),
+      axios.get('/api/v1/keys/open?limit=0', { cancelToken: cancelOverviewToken.token }),
+      axios.get('/api/v1/keys/deletePending?limit=1', { cancelToken: cancelOverviewToken.token }),
     ]).then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
@@ -161,7 +171,11 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       loading: true
     });
 
-    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+    //cancel any previous pending requests
+    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("OM-DB Sync request cancelled because data was updated");
+    cancelOMDBSyncToken = axios.CancelToken.source();
+
+    axios.get('/api/v1/triggerdbsync/om', { cancelToken: cancelOMDBSyncToken.token }).then( omstatusResponse => {    
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -182,6 +196,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("Request cancelled because Overview view changed");
+    cancelOverviewToken && cancelOverviewToken.cancel("Request cancelled because Overview view changed");
   }
 
   render() {

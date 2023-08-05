@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
@@ -58,6 +58,11 @@ interface IDUState {
   displayLimit: number;
 }
 
+let cancelPieToken: CancelTokenSource;
+let cancelSummaryToken: CancelTokenSource;
+let cancelQuotaToken: CancelTokenSource;
+let cancelKeyMetadataToken: CancelTokenSource;
+
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
     super(props);
@@ -94,6 +99,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   handleSubmit = _e => {
     // Avoid empty request trigger 400 response
+    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel("Cancelling metadata request because new path entered");
+    cancelQuotaToken && cancelQuotaToken.cancel("Cancelling metadata request because new path entered");
+    cancelSummaryToken && cancelSummaryToken.cancel("Cancelling metadata request because new path entered");
+    cancelPieToken && cancelPieToken.cancel("Cancelling metadata request because new path entered");
+
     if (!this.state.inputPath) {
       this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
       return;
@@ -105,6 +115,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   // The returned path is passed in, which should have been
   // normalized by the backend
   goBack = (e, path) => {
+    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
+    cancelQuotaToken && cancelQuotaToken.cancel();
+    cancelSummaryToken && cancelSummaryToken.cancel();
+    cancelPieToken && cancelPieToken.cancel();
+
     if (!path || path === '/') {
       return;
     }
@@ -124,8 +139,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
+
+    //There might be an existing request being sent for PieChart
+    cancelPieToken && cancelPieToken.cancel("Cancelling current path DiskUsage request because new path data requested");
+
+    cancelPieToken = axios.CancelToken.source();  // generate a new token for the new request
     const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
-    axios.get(duEndpoint).then(response => {
+    axios.get(duEndpoint, { cancelToken: cancelPieToken.token }).then(response => {
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
@@ -221,6 +241,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
   }
 
+  componentWillUnmount(): void {
+    cancelPieToken && cancelPieToken.cancel("Request cancelled because DiskUsage view changed");
+    cancelSummaryToken && cancelSummaryToken.cancel();
+    cancelQuotaToken && cancelQuotaToken.cancel();
+    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
+  }
+
   clickPieSection(e, curPath: string): void {
     const subPath: string = e.points[0].label;
     if (subPath === OTHER_PATH_NAME) {
@@ -234,6 +261,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   refreshCurPath(e, path: string): void {
+    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
+    cancelQuotaToken && cancelQuotaToken.cancel();
+    cancelSummaryToken && cancelSummaryToken.cancel();
+
     if (!path) {
       return;
     }
@@ -257,14 +288,21 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     const summaryEndpoint = `/api/v1/namespace/summary?path=${path}`;
     const keys = [];
     const values = [];
-    axios.get(summaryEndpoint).then(response => {
+
+    // We do not perform any action inside the metadata button click, so no need to cancel
+    // update the references with new tokens for the new requests
+    cancelSummaryToken = axios.CancelToken.source();
+    cancelQuotaToken = axios.CancelToken.source();
+    cancelKeyMetadataToken = axios.CancelToken.source();
+
+    axios.get(summaryEndpoint, { cancelToken: cancelSummaryToken.token }).then(response => {
       const summaryResponse = response.data;
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
       if (summaryResponse.countStats.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
-        axios.get(keyEndpoint).then(response => {
+        axios.get(keyEndpoint, { cancelToken: cancelKeyMetadataToken.token }).then(response => {
           keys.push('File Size');
           values.push(this.byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
@@ -436,7 +474,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
-    axios.get(quotaEndpoint).then(response => {
+    axios.get(quotaEndpoint, { cancelToken: cancelQuotaToken.token }).then(response => {
       const quotaResponse = response.data;
 
       if (quotaResponse.status === 'PATH_NOT_FOUND') {
@@ -531,18 +569,22 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{height: 800}}>
+                  <div style={{height: 1000}}>
                     <Plot
                       data={plotData}
                       layout={
                         {
-                          width: 800,
+                          width: 1200,
                           height: 750,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15
                           },
                           showlegend: true,
+                          legend: {
+                            "x": 1.2,
+                            "xanchor": "right"
+                          },
                           title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
                         }
                       }

@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import {Icon, Row, Col, Tabs} from 'antd';
 import filesize from 'filesize';
 import {showDataFetchError} from 'utils/common';
@@ -65,6 +65,8 @@ const allBucketsOption: IOption = {
   label: 'All Buckets',
   value: '*'
 };
+
+let cancelInsightToken: CancelTokenSource;
 
 export class Insights extends React.Component<Record<string, object>, IInsightsState> {
   constructor(props = {}) {
@@ -215,9 +217,11 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       isLoading: true
     });
 
+    cancelInsightToken = axios.CancelToken.source();
+
     axios.all([
-      axios.get('/api/v1/utilization/fileCount'),
-      axios.get('/api/v1/utilization/containerCount')
+      axios.get('/api/v1/utilization/fileCount', { cancelToken: cancelInsightToken.token }),
+      axios.get('/api/v1/utilization/containerCount', { cancelToken: cancelInsightToken.token })
     ]).then(axios.spread((fileCountresponse, containerCountresponse) => {
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
       const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
@@ -260,6 +264,10 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
       showDataFetchError(error.toString());
     });
+  }
+
+  componentWillUnmount(): void {
+    cancelInsightToken && cancelInsightToken.cancel("Request cancelled because Insights view changed"); 
   }
 
   render() {

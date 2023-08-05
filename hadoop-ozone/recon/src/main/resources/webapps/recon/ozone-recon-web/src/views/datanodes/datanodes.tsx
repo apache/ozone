@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import {Table, Icon, Tooltip} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
@@ -303,6 +303,8 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+let cancelToken: CancelTokenSource;
+
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
 
@@ -339,7 +341,14 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-    axios.get('/api/v1/datanodes').then(response => {
+
+    if (typeof cancelToken != typeof undefined){
+      //Some existing request might be there so we will cancel that before sending new request
+      cancelToken.cancel("Cancelling old datanode request");
+    }
+
+    cancelToken = axios.CancelToken.source(); // Generate token for new request
+    axios.get('/api/v1/datanodes', { cancelToken: cancelToken.token }).then(response => {
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
@@ -387,6 +396,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelToken && cancelToken.cancel("Request cancelled because Datanode view changed");
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios from 'axios';
+import axios, { CancelTokenSource } from 'axios';
 import {Icon, Table, Tooltip, Tabs} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import filesize from 'filesize';
@@ -211,6 +211,9 @@ interface IMissingContainersState {
   expandedRowData: IExpandedRow;
 }
 
+let cancelContainerToken: CancelTokenSource;
+let cancelRowExpandToken: CancelTokenSource;
+
 export class MissingContainers extends React.Component<Record<string, object>, IMissingContainersState> {
   constructor(props = {}) {
     super(props);
@@ -230,7 +233,9 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       loading: true
     });
 
-    axios.get('/api/v1/containers/unhealthy').then(allContainersResponse => {
+    cancelContainerToken = axios.CancelToken.source();
+
+    axios.get('/api/v1/containers/unhealthy', { cancelToken: cancelContainerToken.token }).then(allContainersResponse => {
 
       const allContainersResponseData: IUnhealthyContainersResponse = allContainersResponse.data;
       const allContainers: IContainerResponse[] = allContainersResponseData.containers;
@@ -262,6 +267,10 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     });
   }
 
+  componentWillUnmount(): void {
+    cancelContainerToken && cancelContainerToken.cancel("Request cancelled because Container view was changed");
+  }
+
   onShowSizeChange = (current: number, pageSize: number) => {
     console.log(current, pageSize);
   };
@@ -276,7 +285,12 @@ export class MissingContainers extends React.Component<Record<string, object>, I
           expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
         };
       });
-      axios.get(`/api/v1/containers/${record.containerID}/keys`).then(response => {
+
+      //Cancel any pending request
+      cancelRowExpandToken && cancelRowExpandToken.cancel();
+      cancelRowExpandToken = axios.CancelToken.source();
+
+      axios.get(`/api/v1/containers/${record.containerID}/keys`, { cancelToken: cancelRowExpandToken.token }).then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
         this.setState(({expandedRowData}) => {
           const expandedRowState: IExpandedRowState =
