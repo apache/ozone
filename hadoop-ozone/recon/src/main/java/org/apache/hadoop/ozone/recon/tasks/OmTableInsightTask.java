@@ -489,7 +489,7 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   public static String getTableCountKeyFromTable(String tableName) {
-    return tableName + "TableCount";
+    return tableName + "Count";
   }
 
   public static String getReplicatedSizeKeyFromTable(String tableName) {

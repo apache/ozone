@@ -146,15 +146,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
       }
 
-      OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
-      bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
-          .setBucketName(dbBucketInfo.getBucketName())
-          .setObjectID(dbBucketInfo.getObjectID())
-          .setBucketLayout(dbBucketInfo.getBucketLayout())
-          .setBucketEncryptionKey(dbBucketInfo.getEncryptionKeyInfo())
-          .setUpdateID(transactionLogIndex);
+      OmBucketInfo.Builder bucketInfoBuilder = dbBucketInfo.toBuilder();
+      bucketInfoBuilder.setUpdateID(transactionLogIndex);
       bucketInfoBuilder.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketArgs.getMetadataList()));
+      bucketInfoBuilder.setModificationTime(
+          setBucketPropertyRequest.getModificationTime());
 
       //Check StorageType to update
       StorageType storageType = omBucketArgs.getStorageType();
@@ -162,8 +159,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setStorageType(storageType);
         LOG.debug("Updating bucket storage type for bucket: {} in volume: {}",
             bucketName, volumeName);
-      } else {
-        bucketInfoBuilder.setStorageType(dbBucketInfo.getStorageType());
       }
 
       //Check Versioning to update
@@ -172,9 +167,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setIsVersionEnabled(versioning);
         LOG.debug("Updating bucket versioning for bucket: {} in volume: {}",
             bucketName, volumeName);
-      } else {
-        bucketInfoBuilder
-            .setIsVersionEnabled(dbBucketInfo.getIsVersionEnabled());
       }
 
       //Check quotaInBytes and quotaInNamespace to update
@@ -184,15 +176,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
           dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
-      } else {
-        bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
       if (checkQuotaNamespaceValid(omVolumeArgs, omBucketArgs, dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInNamespace(
             omBucketArgs.getQuotaInNamespace());
-      } else {
-        bucketInfoBuilder.setQuotaInNamespace(
-            dbBucketInfo.getQuotaInNamespace());
       }
 
       DefaultReplicationConfig defaultReplicationConfig =
@@ -200,30 +187,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
-      } else if (dbBucketInfo.getDefaultReplicationConfig() != null) {
-        // Retaining existing default replication config
-        bucketInfoBuilder.setDefaultReplicationConfig(
-                  dbBucketInfo.getDefaultReplicationConfig());
       }
-
-      bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
-      bucketInfoBuilder.setModificationTime(
-          setBucketPropertyRequest.getModificationTime());
-      // Set acls from dbBucketInfo if it has any.
-      if (dbBucketInfo.getAcls() != null) {
-        bucketInfoBuilder.setAcls(dbBucketInfo.getAcls());
-      }
-
-      // Set the objectID to dbBucketInfo objectID, if present
-      if (dbBucketInfo.getObjectID() != 0) {
-        bucketInfoBuilder.setObjectID(dbBucketInfo.getObjectID());
-      }
-
-      // Set the updateID to current transaction log index
-      bucketInfoBuilder.setUpdateID(transactionLogIndex);
-      // Quota used remains unchanged
-      bucketInfoBuilder.setUsedBytes(dbBucketInfo.getUsedBytes());
-      bucketInfoBuilder.setUsedNamespace(dbBucketInfo.getUsedNamespace());
 
       omBucketInfo = bucketInfoBuilder.build();
 
