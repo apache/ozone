@@ -64,9 +64,9 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     try {
       ozoneManagerClient =  parent.createOmClient(omServiceId);
       if (json) {
-        getOmServerRolesAsJson(ozoneManagerClient.getServiceList());
+        printOmServerRolesAsJson(ozoneManagerClient.getServiceList());
       } else {
-        getOmServerRoles(ozoneManagerClient.getServiceList());
+        printOmServerRoles(ozoneManagerClient.getServiceList());
       }
     } catch (OzoneClientException ex) {
       System.out.printf("Error: %s", ex.getMessage());
@@ -78,7 +78,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     return null;
   }
 
-  private void getOmServerRoles(List<ServiceInfo> serviceList) {
+  private void printOmServerRoles(List<ServiceInfo> serviceList) {
     for (ServiceInfo serviceInfo : serviceList) {
       OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
       if (omRoleInfo != null &&
@@ -91,7 +91,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     }
   }
 
-  private void getOmServerRolesAsJson(List<ServiceInfo> serviceList)
+  private void printOmServerRolesAsJson(List<ServiceInfo> serviceList)
       throws IOException {
     List<Map<String, Map<String, String>>> omServiceList = new ArrayList<>();
     for (ServiceInfo serviceInfo : serviceList) {
