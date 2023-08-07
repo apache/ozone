@@ -41,6 +41,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -192,7 +193,9 @@ public class TestSstFilteringService {
     List<LiveFileMetaData> allFiles = activeDbStore.getDb().getSstFileList();
     String snapshotName1 = "snapshot1";
     writeClient.createSnapshot(volumeName, bucketName2, snapshotName1);
-
+    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
+    assertFalse(snapshotInfo.isSstFiltered());
     with().atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(1))
         .await()
@@ -206,10 +209,9 @@ public class TestSstFilteringService {
         getKeysFromSnapshot(volumeName, bucketName2, snapshotName1);
     assertEquals(keysFromActiveDb, keysFromSnapshot);
 
-    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
+    snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
 
-    String dbSnapshots = rocksDbDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     String snapshotDirName =
         OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
@@ -224,10 +226,7 @@ public class TestSstFilteringService {
       }
     }
 
-    List<String> processedSnapshotIds = Files
-        .readAllLines(Paths.get(dbSnapshots, OzoneConsts.FILTERED_SNAPSHOTS));
-    assertTrue(
-        processedSnapshotIds.contains(snapshotInfo.getSnapshotId().toString()));
+    assertTrue(snapshotInfo.isSstFiltered());
 
     String snapshotName2 = "snapshot2";
     long count;

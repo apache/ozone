@@ -137,8 +137,7 @@ public class SstFilteringService extends BackgroundService
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
 
 
-      try (
-          TableIterator<String, ? extends Table.KeyValue
+      try (TableIterator<String, ? extends Table.KeyValue
               <String, SnapshotInfo>> iterator = snapshotInfoTable
               .iterator()) {
         iterator.seekToFirst();
@@ -159,12 +158,8 @@ public class SstFilteringService extends BackgroundService
 
           // If entry for the snapshotID is present in this file,
           // it has already undergone filtering.
-          if (Files.exists(filePath)) {
-            List<String> processedSnapshotIds = Files.readAllLines(filePath);
-            if (snapshotId != null &&
-                processedSnapshotIds.contains(snapshotId.toString())) {
-              continue;
-            }
+          if (snapshotInfo.isSstFiltered()) {
+            continue;
           }
 
           LOG.debug("Processing snapshot {} to filter relevant SST Files",
@@ -187,9 +182,8 @@ public class SstFilteringService extends BackgroundService
           }
 
           // mark the snapshot as filtered by writing to the file
-          String content = snapshotInfo.getSnapshotId() + "\n";
-          Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
-              StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+          snapshotInfo.setSstFiltered(true);
+          snapshotInfoTable.put(snapShotTableKey, snapshotInfo);
           snapshotLimit--;
           snapshotFilteredCount.getAndIncrement();
         }
