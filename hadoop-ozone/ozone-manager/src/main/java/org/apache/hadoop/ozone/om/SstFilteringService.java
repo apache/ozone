@@ -51,7 +51,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
@@ -150,8 +149,6 @@ public class SstFilteringService extends BackgroundService
           File omMetadataDir =
               OMStorage.getOmDbDir(ozoneManager.getConfiguration());
           String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-          Path filePath =
-              Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
 
           // If entry for the snapshotID is present in this file,
           // it has already undergone filtering.
