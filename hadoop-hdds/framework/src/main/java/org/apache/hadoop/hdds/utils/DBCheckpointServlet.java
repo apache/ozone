@@ -97,6 +97,8 @@ public class DBCheckpointServlet extends HttpServlet
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
     lock = new Lock();
+
+    // Create a directory for temp bootstrap data
     File dbLocation = dbStore.getDbLocation();
     if (dbLocation == null) {
       throw new NullPointerException("dblocation null");
