@@ -90,6 +90,7 @@ public class DBCheckpointServlet extends HttpServlet
     if (dbStore == null) {
       LOG.error(
           "Unable to set metadata snapshot request. DB Store is null");
+      throw new ServletException("DB Store is null");
     }
 
     this.aclEnabled = omAclEnabled;
