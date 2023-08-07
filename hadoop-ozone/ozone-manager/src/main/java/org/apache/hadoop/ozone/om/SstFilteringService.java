@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -200,6 +201,14 @@ public class SstFilteringService extends BackgroundService
                   BootstrapStateHandler.Lock lock = getBootstrapStateLock()
                       .lock()) {
                 db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+              }
+            } catch (OMException ome) {
+              // FILE_NOT_FOUND is obtained when the snapshot is deleted
+              // In this case, invalidate the snapshot entry from the cache so
+              // that on next iteration it computes and gets the updated value.
+              if (ome.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+                snapshotCache.get().invalidate(snapShotTableKey);
+                throw ome;
               }
             }
 
