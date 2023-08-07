@@ -98,12 +98,10 @@ public class DBCheckpointServlet extends HttpServlet
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
     lock = new Lock();
     File dbLocation = dbStore.getDbLocation();
-    // find bugs nonsense
     if (dbLocation == null) {
       throw new NullPointerException("dblocation null");
     }
     String tempData = dbLocation.getParent();
-    // find bugs nonsense
     if (tempData == null) {
       throw new NullPointerException("tempData dir is null");
     }
