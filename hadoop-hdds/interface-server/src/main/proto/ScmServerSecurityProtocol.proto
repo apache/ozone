@@ -58,6 +58,8 @@ message SCMSecurityRequest {
     optional SCMGetCertRequestProto getCertRequest = 13;
     optional SCMGetAllRootCaCertificatesRequestProto
         getAllRootCaCertificatesRequestProto = 14;
+    optional SCMClearExpiredCertificatesRequestProto
+        clearExpiredCertificatesRequestProto = 15;
 }
 
 message SCMSecurityResponse {
@@ -84,6 +86,8 @@ message SCMSecurityResponse {
     optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
 
     optional SCMGetAllRootCaCertificatesResponseProto allRootCaCertificatesResponseProto = 11;
+
+    optional SCMClearExpiredCertificatesResponseProto clearExpiredCertificatesResponseProto = 12;
 }
 
 enum Type {
@@ -100,6 +104,7 @@ enum Type {
     RevokeCertificates = 11;
     GetCert = 12;
     GetAllRootCaCertificates = 13;
+    ClearExpiredCertificates = 14;
 }
 
 enum Status {
@@ -205,6 +210,10 @@ message SCMGetAllRootCaCertificatesResponseProto {
     repeated string allX509RootCaCertificates = 1;
 }
 
+message SCMClearExpiredCertificatesResponseProto {
+    repeated string removedExpiredCertificates = 1;
+}
+
 message SCMGetRootCACertificateRequestProto {
 }
 
@@ -256,6 +265,9 @@ message SCMGetAllRootCaCertificatesRequestProto {
 
 message SCMRevokeCertificatesResponseProto {
     optional int64 crlId = 1;
+}
+
+message SCMClearExpiredCertificatesRequestProto {
 }
 
 service SCMSecurityProtocolService {

@@ -190,4 +190,5 @@ public interface SCMSecurityProtocol {
    */
   List<String> getAllRootCaCertificates() throws IOException;
 
+  List<String> clearExpiredCertificates() throws IOException;
 }

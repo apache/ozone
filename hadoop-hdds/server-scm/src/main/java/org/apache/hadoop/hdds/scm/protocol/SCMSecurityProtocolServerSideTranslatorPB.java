@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCe
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMClearExpiredCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -152,6 +153,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       case GetAllRootCaCertificates:
         return scmSecurityResponse
             .setAllRootCaCertificatesResponseProto(getAllRootCa())
+            .build();
+      case ClearExpiredCertificates:
+        return scmSecurityResponse
+            .setClearExpiredCertificatesResponseProto(
+                clearExpiredCertificates())
             .build();
 
       default:
@@ -414,4 +420,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     }
   }
 
+  public SCMClearExpiredCertificatesResponseProto clearExpiredCertificates()
+      throws IOException {
+    return SCMClearExpiredCertificatesResponseProto.newBuilder()
+        .addAllRemovedExpiredCertificates(impl.clearExpiredCertificates())
+        .build();
+  }
 }

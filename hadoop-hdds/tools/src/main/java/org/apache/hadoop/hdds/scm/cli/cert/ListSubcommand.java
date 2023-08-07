@@ -132,16 +132,7 @@ public class ListSubcommand extends ScmCertSubcommand {
 
     LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
         type.toUpperCase(), count, certPemList.size());
-    LOG.info(String.format(OUTPUT_FORMAT, "SerialNumber", "Valid From",
-        "Expiry", "Subject", "Issuer"));
-    for (String certPemStr : certPemList) {
-      try {
-        X509Certificate cert = CertificateCodec.getX509Certificate(certPemStr);
-        printCert(cert);
-      } catch (CertificateException ex) {
-        LOG.error("Failed to parse certificate.");
-      }
-    }
+    CertificatePrintUtils.printCertList(LOG, certPemList);
   }
 
   private static class BigIntJsonSerializer extends JsonSerializer<BigInteger> {

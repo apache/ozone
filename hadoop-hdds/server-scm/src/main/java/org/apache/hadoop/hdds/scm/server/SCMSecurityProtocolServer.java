@@ -508,6 +508,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     }
   }
 
+  @Override
+  public List<String> clearExpiredCertificates() throws IOException {
+    List<String> pemEncodedCerts = new ArrayList<>();
+    for (X509Certificate cert : storageContainerManager.getCertificateStore()
+        .removeAllExpiredCertificates()) {
+      pemEncodedCerts.add(CertificateCodec.getPEMEncodedString(cert));
+    }
+    return pemEncodedCerts;
+  }
+
   public SCMUpdateServiceGrpcServer getGrpcUpdateServer() {
     return grpcUpdateServer;
   }
