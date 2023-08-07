@@ -225,8 +225,8 @@ public final class SCMCertStore implements CertificateStore {
   @Override
   public List<X509Certificate> removeAllExpiredCertificates()
       throws IOException {
-    lock.lock();
     List<X509Certificate> removedCerts = new ArrayList<>();
+    lock.lock();
     try (BatchOperation batchOperation =
              scmMetadataStore.getBatchHandler().initBatchOperation()) {
       removedCerts.addAll(addExpiredCertsToBeRemoved(batchOperation,
