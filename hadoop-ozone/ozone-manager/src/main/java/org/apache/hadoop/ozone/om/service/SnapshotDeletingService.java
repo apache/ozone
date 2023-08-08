@@ -74,8 +74,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -101,7 +99,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final AtomicLong successRunCount;
   private final long snapshotDeletionPerTask;
   private final int keyLimitPerSnapshot;
-  private final boolean isSstFilteringSvcEnabled;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
@@ -123,12 +120,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.keyLimitPerSnapshot = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-    long serviceInterval = ozoneManager.getConfiguration()
-        .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-            OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
-    this.isSstFilteringSvcEnabled =
-        serviceInterval != KeyManagerImpl.DISABLE_VALUE;
   }
 
   private class SnapshotDeletingTask implements BackgroundTask {
@@ -160,10 +151,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           SnapshotInfo.SnapshotStatus snapshotStatus =
               snapInfo.getSnapshotStatus();
 
+          boolean isSstFilteringServiceEnabled =
+              ((KeyManagerImpl) ozoneManager.getKeyManager())
+                  .isSstFilteringSvcEnabled();
+
           // Only Iterate in deleted snapshot
           if (!snapshotStatus.equals(
               SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) ||
-              (isSstFilteringSvcEnabled && snapInfo.isSstFiltered())) {
+              (isSstFilteringServiceEnabled && snapInfo.isSstFiltered())) {
             continue;
           }
 
