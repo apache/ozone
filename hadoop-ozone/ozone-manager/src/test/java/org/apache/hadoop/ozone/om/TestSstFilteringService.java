@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -49,8 +48,6 @@ import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,7 +62,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.awaitility.Awaitility.with;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -142,7 +138,6 @@ public class TestSstFilteringService {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     SstFilteringService filteringService =
         keyManager.getSnapshotSstFilteringService();
-    String rocksDbDir = om.getRocksDbDirectory();
 
     final int keyCount = 100;
     String volumeName = "vol1";
@@ -192,7 +187,9 @@ public class TestSstFilteringService {
     List<LiveFileMetaData> allFiles = activeDbStore.getDb().getSstFileList();
     String snapshotName1 = "snapshot1";
     writeClient.createSnapshot(volumeName, bucketName2, snapshotName1);
-
+    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
+    assertFalse(snapshotInfo.isSstFiltered());
     with().atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(1))
         .await()
@@ -206,10 +203,9 @@ public class TestSstFilteringService {
         getKeysFromSnapshot(volumeName, bucketName2, snapshotName1);
     assertEquals(keysFromActiveDb, keysFromSnapshot);
 
-    SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
+    snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
 
-    String dbSnapshots = rocksDbDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
     String snapshotDirName =
         OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
 
@@ -224,10 +220,7 @@ public class TestSstFilteringService {
       }
     }
 
-    List<String> processedSnapshotIds = Files
-        .readAllLines(Paths.get(dbSnapshots, OzoneConsts.FILTERED_SNAPSHOTS));
-    assertTrue(
-        processedSnapshotIds.contains(snapshotInfo.getSnapshotId().toString()));
+    assertTrue(snapshotInfo.isSstFiltered());
 
     String snapshotName2 = "snapshot2";
     long count;
