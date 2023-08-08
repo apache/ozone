@@ -38,6 +38,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOutputStream.class);
   public static final int READY_WAIT_TIME_IN_MS = 10;
+  // retry count 6000 for wait of 1 minute
+  public static final int READY_RETRY_COUNT = 6000;
 
   private final CallStreamObserver<T> streamObserver;
 
@@ -147,10 +149,12 @@ abstract class GrpcOutputStream<T> extends OutputStream {
    * the stream until it's ready.
    */
   private void waitUntilReady() {
-    while (!streamObserver.isReady()) {
+    int count = 0;
+    while (!streamObserver.isReady() && count < READY_RETRY_COUNT) {
       LOG.debug("Stream is not ready, backoff");
       try {
         Thread.sleep(READY_WAIT_TIME_IN_MS);
+        count++;
       } catch (InterruptedException e) {
         LOG.error("InterruptedException while waiting for channel ready", e);
         Thread.currentThread().interrupt();
