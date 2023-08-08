@@ -97,7 +97,8 @@ public class TestEndpointBase {
 
     try {
       endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
-      Assert.fail("getCustomMetadataFromHeaders should fail. Expected OS3Exception not thrown");
+      Assert.fail("getCustomMetadataFromHeaders should fail. " +
+          "Expected OS3Exception not thrown");
     } catch (OS3Exception ex) {
       Assert.assertTrue(ex.getCode().contains("MetadataTooLarge"));
     }
