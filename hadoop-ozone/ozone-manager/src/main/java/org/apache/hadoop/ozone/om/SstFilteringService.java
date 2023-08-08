@@ -119,28 +119,27 @@ public class SstFilteringService extends BackgroundService
 
     /**
      * Marks the SSTFiltered flag corresponding to the snapshot.
-     * @param snapshotInfoTable reference to snapshotInfo table
      * @param volume Volume name of the snapshot
      * @param bucket Bucket name of the snapshot
      * @param snapshotName Snapshot name
      * @throws IOException
      */
-    private void markSSTFilteredFlagForSnapshot(
-        Table<String, SnapshotInfo> snapshotInfoTable, String volume,
-        String bucket, String snapshotName) throws IOException {
+    private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
+        String snapshotName) throws IOException {
       boolean acquiredSnapshotLock = ozoneManager.getMetadataManager().getLock()
-              .acquireWriteLock(SNAPSHOT_LOCK,
-                  volume, bucket, snapshotName);
-      try {
-        // mark the snapshot as filtered by writing to the file
-        String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
-            snapshotName);
-        SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
+              .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+      if (acquiredSnapshotLock) {
+        Table<String, SnapshotInfo> snapshotInfoTable =
+            ozoneManager.getMetadataManager().getSnapshotInfoTable();
+        try {
+          // mark the snapshot as filtered by writing to the file
+          String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
+              snapshotName);
+          SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
 
-        snapshotInfo.setSstFiltered(true);
-        snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
-      } finally {
-        if (acquiredSnapshotLock) {
+          snapshotInfo.setSstFiltered(true);
+          snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
+        } finally {
           ozoneManager.getMetadataManager().getLock()
               .releaseWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
         }
@@ -196,9 +195,8 @@ public class SstFilteringService extends BackgroundService
               db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
             }
           }
-          markSSTFilteredFlagForSnapshot(snapshotInfoTable,
-              snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(),
-              snapshotInfo.getName());
+          markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(), snapshotInfo.getName());
           snapshotLimit--;
           snapshotFilteredCount.getAndIncrement();
         }
