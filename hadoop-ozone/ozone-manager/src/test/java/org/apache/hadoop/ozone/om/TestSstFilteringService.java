@@ -253,7 +253,7 @@ public class TestSstFilteringService {
   }
 
   @Test
-  public void testActiveSnapshotCleanup() throws IOException {
+  public void testActiveAndDeletedSnapshotCleanup() throws IOException {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume1";
     List<String> bucketNames = Arrays.asList("bucket1", "bucket2");
@@ -308,14 +308,15 @@ public class TestSstFilteringService {
     // Filtering service will only act on snap2 as it is an active snaphot
     with().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofSeconds(1))
         .await()
-        .until(() -> sstFilteringService.getSnapshotFilteredCount().get() >= 1);
+        .until(() -> sstFilteringService.getSnapshotFilteredCount().get() >= 2);
     long snap1SstFileCountAfterFilter = Arrays.stream(snapshot1Dir.listFiles())
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
     long snap2SstFileCountAfterFilter = Arrays.stream(snapshot2Dir.listFiles())
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
-    assertEquals(1, sstFilteringService.getSnapshotFilteredCount().get());
-    assertEquals(snap1SstFileCountAfterFilter, snap1SstFileCountBeforeFilter);
-    // one sst will be filtered in the active (non-deleted) snapshot
+    assertEquals(2, sstFilteringService.getSnapshotFilteredCount().get());
+    // one sst will be filtered in both active & deleted snapshot
+    assertEquals(snap1SstFileCountBeforeFilter - 1,
+        snap1SstFileCountAfterFilter);
     assertEquals(snap2SstFileCountBeforeFilter - 1,
         snap2SstFileCountAfterFilter);
   }

@@ -182,38 +182,35 @@ public class SstFilteringService extends BackgroundService
           Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
-          if (snapshotInfo.getSnapshotStatus()
-              .equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
 
-            if (snapshotInfo.isSstFiltered()) {
-              continue;
-            }
-
-            LOG.debug("Processing snapshot {} to filter relevant SST Files",
-                snapShotTableKey);
-
-            List<Pair<String, String>> prefixPairs =
-                constructPrefixPairs(snapshotInfo);
-
-            try (
-                ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                    snapshotMetadataReader = snapshotCache.get().get(
-                    snapshotInfo.getTableKey(), true)) {
-              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
-              RDBStore rdbStore =
-                  (RDBStore) omSnapshot.getMetadataManager().getStore();
-              RocksDatabase db = rdbStore.getDb();
-              try (
-                  BootstrapStateHandler.Lock lock = getBootstrapStateLock()
-                      .lock()) {
-                db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
-              }
-            }
-            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(), snapshotInfo.getName());
-            snapshotLimit--;
-            snapshotFilteredCount.getAndIncrement();
+          if (snapshotInfo.isSstFiltered()) {
+            continue;
           }
+
+          LOG.debug("Processing snapshot {} to filter relevant SST Files",
+              snapShotTableKey);
+
+          List<Pair<String, String>> prefixPairs =
+              constructPrefixPairs(snapshotInfo);
+
+          try (
+              ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                  snapshotMetadataReader = snapshotCache.get()
+                  .get(snapshotInfo.getTableKey(), true)) {
+            OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+            RDBStore rdbStore =
+                (RDBStore) omSnapshot.getMetadataManager().getStore();
+            RocksDatabase db = rdbStore.getDb();
+            try (
+                BootstrapStateHandler.Lock lock = getBootstrapStateLock()
+                    .lock()) {
+              db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+            }
+          }
+          markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
+              snapshotInfo.getBucketName(), snapshotInfo.getName());
+          snapshotLimit--;
+          snapshotFilteredCount.getAndIncrement();
         }
       } catch (RocksDBException | IOException e) {
         LOG.error("Error during Snapshot sst filtering ", e);
