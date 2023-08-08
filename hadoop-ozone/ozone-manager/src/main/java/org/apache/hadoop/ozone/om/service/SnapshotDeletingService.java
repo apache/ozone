@@ -156,8 +156,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                   .isSstFilteringSvcEnabled();
 
           // Only Iterate in deleted snapshot
-          if (shouldIgnoreSnapshot(snapInfo, snapshotStatus,
-              isSstFilteringServiceEnabled)) {
+          if (shouldIgnoreSnapshot(snapInfo, isSstFilteringServiceEnabled)) {
             continue;
           }
 
@@ -570,10 +569,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   }
 
   public static boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo,
-      SnapshotInfo.SnapshotStatus snapshotStatus,
       boolean isSstFilteringServiceEnabled) {
-    return !snapshotStatus.equals(
-        SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
+    SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
+    return !(snapshotStatus == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
         || (isSstFilteringServiceEnabled && !snapInfo.isSstFiltered());
   }
 

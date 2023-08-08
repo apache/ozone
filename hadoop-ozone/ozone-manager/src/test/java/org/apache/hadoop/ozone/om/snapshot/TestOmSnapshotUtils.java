@@ -117,7 +117,7 @@ public class TestOmSnapshotUtils {
       SnapshotInfo.SnapshotStatus status, boolean isSstFilteringSvcEnabled,
       boolean expectedOutcome) {
     assertEquals(expectedOutcome,
-        SnapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo, status,
+        SnapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo,
             isSstFilteringSvcEnabled));
   }
 
