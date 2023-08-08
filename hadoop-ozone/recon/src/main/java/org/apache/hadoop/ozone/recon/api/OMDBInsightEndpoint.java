@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -28,9 +29,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -88,15 +91,22 @@ public class OMDBInsightEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
   private final GlobalStatsDao globalStatsDao;
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+  private Table<Long, NSSummary> nsSummaryTable;
+
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
                              ReconOMMetadataManager omMetadataManager,
-                             GlobalStatsDao globalStatsDao) {
+                             GlobalStatsDao globalStatsDao,
+                             ReconNamespaceSummaryManagerImpl
+                                 reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
     this.globalStatsDao = globalStatsDao;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.nsSummaryTable = reconNamespaceSummaryManager.getNSSummaryTable();
   }
 
   /**
@@ -494,7 +504,7 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(key);
         keyEntityInfo.setPath(omKeyInfo.getKeyName());
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(omKeyInfo.getDataSize());
+        keyEntityInfo.setSize(fetchSizeForDeletedDirectory(key));
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
@@ -519,6 +529,48 @@ public class OMDBInsightEndpoint {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
+
+  /**
+   * Fetches the size of a deleted directory identified by the given path.
+   * The size is obtained from the NSSummary table using the directory objectID.
+   * The path is expected to be in the format :-
+   * "volumeId/bucketId/parentId/dirName/dirObjectId".
+   *
+   * @param path The path of the deleted directory.
+   * @return The size of the deleted directory.
+   * @throws IOException If an I/O error occurs while retrieving the size.
+   */
+  public long fetchSizeForDeletedDirectory(String path)
+      throws IOException {
+    if (Strings.isNullOrEmpty(path)) {
+      LOG.error("Invalid path: Path is null or empty");
+      return 0L;
+    }
+
+    String[] parts = path.split("/");
+    if (parts.length < 6) {
+      LOG.error("Invalid path format: {}", path);
+      return 0L;
+    }
+    /* DB key in DeletedDirectoryTable =>
+                      "volumeId/bucketId/parentId/dirName/dirObjectId" */
+    String directoryObjectId = parts[5];
+
+    try {
+      long convertedValue = Long.parseLong(directoryObjectId);
+      NSSummary nsSummary = nsSummaryTable.get(convertedValue);
+      if (nsSummary != null) {
+        return nsSummary.getSizeOfFiles();
+      } else {
+        LOG.error("NSSummary not found for directory: {}", path);
+      }
+    } catch (NumberFormatException e) {
+      // Handle parsing error if the last string is not a valid long value
+      LOG.error("Invalid last string format: {}", directoryObjectId);
+    }
+    return 0L;
+  }
+
 
   /** This method retrieves set of directories pending for deletion.
    *
@@ -602,4 +654,8 @@ public class OMDBInsightEndpoint {
     return this.globalStatsDao;
   }
 
+  @VisibleForTesting
+  public Table<Long, NSSummary> getNsSummaryTable() {
+    return this.nsSummaryTable;
+  }
 }
