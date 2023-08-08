@@ -2968,7 +2968,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
   @Test
   public void testMultipartPartNumberExceedingAllowedRange() throws Exception {
-    // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();

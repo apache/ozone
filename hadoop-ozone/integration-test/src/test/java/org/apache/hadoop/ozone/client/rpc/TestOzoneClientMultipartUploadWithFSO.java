@@ -408,8 +408,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
   @Test
   public void testMultipartPartNumberExceedingAllowedRange() throws Exception {
-    // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
-    keyName = UUID.randomUUID().toString();
     String uploadID = initiateMultipartUpload(bucket, keyName,
         RATIS, ONE);
     byte[] data = "data".getBytes(UTF_8);
