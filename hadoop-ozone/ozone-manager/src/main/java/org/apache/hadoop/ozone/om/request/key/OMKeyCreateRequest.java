@@ -148,7 +148,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMId(),
+              ozoneManager.getOMServiceId(),
               ozoneManager.getMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
