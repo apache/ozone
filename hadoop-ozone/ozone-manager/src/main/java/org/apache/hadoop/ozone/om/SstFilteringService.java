@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -226,7 +227,7 @@ public class SstFilteringService extends BackgroundService
                 snapshotInfo.getBucketName(), snapshotInfo.getName());
             snapshotLimit--;
             snapshotFilteredCount.getAndIncrement();
-          } catch (Exception e) {
+          } catch (RocksDBException | IOException e) {
             LOG.error("Exception encountered while filtering a snapshot", e);
           }
         }
