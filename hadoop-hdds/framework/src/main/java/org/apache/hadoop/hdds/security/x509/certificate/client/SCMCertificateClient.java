@@ -246,6 +246,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     executorService.execute(new RefreshCACertificates(getScmSecureClient()));
   }
 
+  /**
+   * Task to refresh root CA certificates for SCM.
+   */
   public class RefreshCACertificates implements Runnable {
     private final SCMSecurityProtocolClientSideTranslatorPB scmSecureClient;
 
