@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -86,6 +88,7 @@ import static org.junit.Assert.assertTrue;
 public class TestOzoneNativeAuthorizer {
 
   private static final List<String> ADMIN_USERNAMES = singletonList("om");
+  private static File testDir;
   private final String vol;
   private final String buck;
   private String key;
@@ -140,8 +143,8 @@ public class TestOzoneNativeAuthorizer {
     OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
+    testDir = GenericTestUtils.getRandomizedTestDir();
+    ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
     OmTestManagers omTestManagers =
@@ -158,6 +161,11 @@ public class TestOzoneNativeAuthorizer {
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
         new String[]{"test"});
+  }
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    FileUtils.deleteDirectory(testDir);
   }
 
   private void createKey(String volume,

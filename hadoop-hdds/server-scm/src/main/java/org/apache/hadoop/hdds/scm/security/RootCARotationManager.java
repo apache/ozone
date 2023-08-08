@@ -24,14 +24,16 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CertInfoProto;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.StatefulService;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -56,6 +58,7 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -75,7 +78,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 /**
  * Root CA Rotation Service is a service in SCM to control the CA rotation.
  */
-public class RootCARotationManager implements SCMService {
+public class RootCARotationManager extends StatefulService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(RootCARotationManager.class);
@@ -89,11 +92,13 @@ public class RootCARotationManager implements SCMService {
   private final Duration renewalGracePeriod;
   private final Date timeOfDay;
   private final Duration ackTimeout;
+  private final Duration rootCertPollInterval;
   private final SCMCertificateClient scmCertClient;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
   private final AtomicBoolean isProcessing = new AtomicBoolean(false);
   private final AtomicReference<Long> processStartTime =
       new AtomicReference<>();
+  private final AtomicBoolean isPostProcessing = new AtomicBoolean(false);
   private final String threadName = this.getClass().getSimpleName();
   private final String newCAComponent = SCM_ROOT_CA_COMPONENT_NAME +
       HDDS_NEW_KEY_CERT_DIR_NAME_SUFFIX +
@@ -105,6 +110,7 @@ public class RootCARotationManager implements SCMService {
   private ScheduledFuture waitAckTask;
   private ScheduledFuture waitAckTimeoutTask;
   private final RootCARotationMetrics metrics;
+  private ScheduledFuture clearPostProcessingTask;
 
   /**
    * Constructs RootCARotationManager with the specified arguments.
@@ -131,6 +137,7 @@ public class RootCARotationManager implements SCMService {
    *   (4) Rotation Committed
    */
   public RootCARotationManager(StorageContainerManager scm) {
+    super(scm.getStatefulServiceStateManager());
     this.scm = scm;
     this.ozoneConf = scm.getConfiguration();
     this.secConf = new SecurityConfig(ozoneConf);
@@ -141,6 +148,7 @@ public class RootCARotationManager implements SCMService {
     renewalGracePeriod = secConf.getRenewalGracePeriod();
     timeOfDay = Date.from(LocalDateTime.parse(secConf.getCaRotationTimeOfDay())
         .atZone(ZoneId.systemDefault()).toInstant());
+    rootCertPollInterval = secConf.getRootCaCertificatePollingInterval();
 
     executorService = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadName)
@@ -178,14 +186,25 @@ public class RootCARotationManager implements SCMService {
         if (waitAckTimeoutTask != null) {
           waitAckTask.cancel(true);
         }
+        if (clearPostProcessingTask != null) {
+          clearPostProcessingTask.cancel(true);
+        }
         isProcessing.set(false);
         processStartTime.set(null);
+        isPostProcessing.set(false);
       }
       return;
     }
 
     if (isRunning.compareAndSet(false, true)) {
       LOG.info("notifyStatusChanged: enable monitor task");
+      // enable post rotation task if needed.
+      try {
+        checkAndHandlePostProcessing();
+      } catch (IOException | CertificateException e) {
+        throw new RuntimeException(
+            "Error while checking post-processing state.", e);
+      }
     }
     return;
   }
@@ -219,6 +238,24 @@ public class RootCARotationManager implements SCMService {
     LOG.info("Monitor task for root certificate {} is started with " +
         "interval {}.", scmCertClient.getCACertificate().getSerialNumber(),
         checkInterval);
+    executorService.scheduleAtFixedRate(this::removeExpiredCertTask, 0,
+        secConf.getExpiredCertificateCheckInterval().toMillis(),
+        TimeUnit.MILLISECONDS);
+    LOG.info("Scheduling expired certificate removal with interval {}s",
+        secConf.getExpiredCertificateCheckInterval().getSeconds());
+  }
+
+  private void removeExpiredCertTask() {
+    if (!isRunning.get()) {
+      return;
+    }
+    if (scm.getCertificateStore() != null) {
+      try {
+        scm.getCertificateStore().removeAllExpiredCertificates();
+      } catch (IOException e) {
+        LOG.error("Failed to remove some expired certificates", e);
+      }
+    }
   }
 
   public boolean isRunning() {
@@ -232,6 +269,10 @@ public class RootCARotationManager implements SCMService {
 
   public boolean isRotationInProgress() {
     return isProcessing.get();
+  }
+
+  public boolean isPostRotationInProgress() {
+    return isPostProcessing.get();
   }
 
   /**
@@ -644,14 +685,16 @@ public class RootCARotationManager implements SCMService {
             processStartTime.set(null);
 
             // save root certificate to certStore
+            X509Certificate rootCACert = null;
             try {
               if (scm.getCertificateStore().getCertificateByID(
                   rootCACertHolder.getSerialNumber(), VALID_CERTS) == null) {
                 LOG.info("Persist root certificate {} to cert store",
                     rootCACertId);
+                rootCACert =
+                    CertificateCodec.getX509Certificate(rootCACertHolder);
                 scm.getCertificateStore().storeValidCertificate(
-                    rootCACertHolder.getSerialNumber(),
-                    CertificateCodec.getX509Certificate(rootCACertHolder),
+                    rootCACertHolder.getSerialNumber(), rootCACert,
                     HddsProtos.NodeType.SCM);
               }
             } catch (CertificateException | IOException e) {
@@ -665,6 +708,17 @@ public class RootCARotationManager implements SCMService {
             String msg = "Root certificate " + rootCACertId +
                 " rotation is finished successfully after " + timeTaken + " ns";
             cleanupAndStop(msg);
+
+            // set the isPostProcessing to true, which will block the CSR
+            // signing in this period.
+            enterPostProcessing(rootCertPollInterval.toMillis());
+            // save the new root certificate to rocksdb through ratis
+            if (rootCACert != null) {
+              saveConfiguration(new CertInfo.Builder()
+                  .setX509Certificate(rootCACert)
+                  .setTimestamp(rootCACert.getNotBefore().getTime())
+                  .build().getProtobuf());
+            }
           } catch (Throwable e) {
             LOG.error("Execution error", e);
             handler.resetRotationPrepareAcks();
@@ -675,6 +729,21 @@ public class RootCARotationManager implements SCMService {
         }
       }
     }
+  }
+
+  private void enterPostProcessing(long delay) {
+    isPostProcessing.set(true);
+    LOG.info("isPostProcessing is true for {} ms", delay);
+    clearPostProcessingTask = executorService.schedule(() -> {
+      isPostProcessing.set(false);
+      LOG.info("isPostProcessing is false");
+      try {
+        deleteConfiguration();
+        LOG.info("Stateful configuration is deleted");
+      } catch (IOException e) {
+        LOG.error("Failed to delete stateful configuration", e);
+      }
+    }, delay, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -709,5 +778,53 @@ public class RootCARotationManager implements SCMService {
       return true;
     }
     return false;
+  }
+
+  private void checkAndHandlePostProcessing() throws IOException,
+      CertificateException {
+    CertInfoProto proto = readConfiguration(CertInfoProto.class);
+    if (proto == null) {
+      LOG.info("No {} configuration found in stateful storage",
+          getServiceName());
+      return;
+    }
+
+    X509Certificate cert =
+        CertificateCodec.getX509Certificate(proto.getX509Certificate());
+
+    List<X509Certificate> scmCertChain = scmCertClient.getTrustChain();
+    Preconditions.checkArgument(scmCertChain.size() > 1);
+    X509Certificate rootCert = scmCertChain.get(scmCertChain.size() - 1);
+
+    int result = rootCert.getSerialNumber().compareTo(cert.getSerialNumber());
+    if (result > 0) {
+      // this could happen if the previous stateful configuration is not deleted
+      LOG.warn("Root CA certificate ID {} in stateful storage is smaller than" +
+              " current scm's root certificate ID {}", cert.getSerialNumber(),
+          rootCert.getSerialNumber());
+
+      deleteConfiguration();
+      LOG.warn("Stateful configuration is deleted");
+      return;
+    } else if (result < 0) {
+      // this should not happen
+      throw new RuntimeException("Root CA certificate ID " +
+          cert.getSerialNumber() + " in stateful storage is bigger than " +
+          "current scm's root CA certificate ID " + rootCert.getSerialNumber());
+    }
+
+    Date issueTime = rootCert.getNotBefore();
+    Date now = Calendar.getInstance().getTime();
+    Duration gap = Duration.between(issueTime.toInstant(), now.toInstant());
+    gap = gap.minus(rootCertPollInterval);
+    if (gap.isNegative()) {
+      long delay = -gap.toMillis();
+      enterPostProcessing(delay);
+    } else {
+      // this could happen if the service stopped for a long and restarts
+      LOG.info("Root CA certificate ID {} in stateful storage has already " +
+          "come out of post-processing state", cert.getSerialNumber());
+      deleteConfiguration();
+    }
   }
 }

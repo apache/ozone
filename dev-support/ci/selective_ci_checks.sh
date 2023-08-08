@@ -230,6 +230,7 @@ function get_count_compose_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/k8s"
+        "^hadoop-ozone/dist/src/main/license"
         "\.md$"
     )
     filter_changed_files true
@@ -286,6 +287,7 @@ function get_count_kubernetes_files() {
     )
     local ignore_array=(
         "^hadoop-ozone/dist/src/main/compose"
+        "^hadoop-ozone/dist/src/main/license"
         "\.md$"
     )
     filter_changed_files true
@@ -488,6 +490,7 @@ function get_count_misc_files() {
         "\.txt$"
         "\.md$"
         "findbugsExcludeFile.xml"
+        "/NOTICE$"
     )
     local ignore_array=(
         "^.github/workflows/post-commit.yml"

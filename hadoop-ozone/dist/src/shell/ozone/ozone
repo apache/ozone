@@ -77,10 +77,7 @@ function ozonecmd_case
   # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
   # This parameter significantly reduces GC pressure for Datanode.
   # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
-  # TODO: Fix the problem related to netty resource leak detector throwing
-  # exception as mentioned in HDDS-3812
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
-  RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled ${RATIS_OPTS}"
   # Add JVM parameter for Java 17
   OZONE_MODULE_ACCESS_ARGS=""
 

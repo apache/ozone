@@ -368,3 +368,27 @@ load bats-assert/load.bash
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
 }
+
+@test "LICENSE" {
+  run dev-support/ci/selective_ci_checks.sh a9bb08889c
+
+  assert_output -p 'basic-checks=["rat"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=false
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "dependency helper" {
+  run dev-support/ci/selective_ci_checks.sh 47a5671cc5
+
+  assert_output -p 'basic-checks=["rat","bats"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-dependency-check=true
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}

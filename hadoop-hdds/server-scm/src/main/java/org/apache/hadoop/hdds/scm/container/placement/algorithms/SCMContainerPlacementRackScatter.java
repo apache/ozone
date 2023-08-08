@@ -257,6 +257,7 @@ public final class SCMContainerPlacementRackScatter
       usedNodes = Collections.emptyList();
     }
     List<Node> racks = getAllRacks();
+    // usedRacksCntMap maps a rack to the number of usedNodes it contains
     Map<Node, Integer> usedRacksCntMap = new HashMap<>();
     for (Node node : usedNodes) {
       Node rack = networkTopology.getAncestor(node, RACK_LEVEL);
@@ -267,21 +268,14 @@ public final class SCMContainerPlacementRackScatter
     int requiredReplicationFactor = usedNodes.size() + nodesRequired;
     int numberOfRacksRequired = getRequiredRackCount(requiredReplicationFactor);
     int additionalRacksRequired =
-            numberOfRacksRequired - usedRacksCntMap.size();
-    if (nodesRequired < additionalRacksRequired) {
-      String reason = "Required nodes size: " + nodesRequired
-              + " is less than required number of racks to choose: "
-              + additionalRacksRequired + ".";
-      LOG.warn("Placement policy cannot choose the enough racks. {}"
-                      + "Total number of Required Racks: {} Used Racks Count:" +
-                      " {}, Required Nodes count: {}",
-              reason, numberOfRacksRequired, usedRacksCntMap.size(),
-              nodesRequired);
-      throw new SCMException(reason,
-              FAILED_TO_FIND_SUITABLE_NODE);
-    }
+        Math.min(nodesRequired, numberOfRacksRequired - usedRacksCntMap.size());
+    LOG.debug("Additional nodes required: {}. Additional racks required: {}.",
+        nodesRequired, additionalRacksRequired);
     int maxReplicasPerRack = getMaxReplicasPerRack(requiredReplicationFactor,
             numberOfRacksRequired);
+    LOG.debug("According to required replication factor: {}, and total number" +
+            " of racks required: {}, max replicas per rack is {}.",
+        requiredReplicationFactor, numberOfRacksRequired, maxReplicasPerRack);
     // For excluded nodes, we sort their racks at rear
     racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
 
@@ -290,6 +284,7 @@ public final class SCMContainerPlacementRackScatter
       unavailableNodes.addAll(excludedNodes);
     }
 
+    LOG.debug("Available racks excluding racks with used nodes: {}.", racks);
     if (racks.size() < additionalRacksRequired) {
       String reason = "Number of existing racks: " + racks.size()
               + "is less than additional required number of racks to choose: "
@@ -306,7 +301,7 @@ public final class SCMContainerPlacementRackScatter
     Set<DatanodeDetails> chosenNodes = new LinkedHashSet<>(
         chooseNodesFromRacks(racks, unavailableNodes,
             mutableFavoredNodes, additionalRacksRequired,
-            metadataSizeRequired, dataSizeRequired, 1,
+            metadataSizeRequired, dataSizeRequired, maxReplicasPerRack,
             usedRacksCntMap, maxReplicasPerRack));
 
     if (chosenNodes.size() < additionalRacksRequired) {
@@ -325,6 +320,8 @@ public final class SCMContainerPlacementRackScatter
       racks.addAll(usedRacksCntMap.keySet());
       racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
       racks.addAll(usedRacksCntMap.keySet());
+      LOG.debug("Available racks considering racks with used and exclude " +
+              "nodes: {}.", racks);
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,
               mutableFavoredNodes, nodesRequired - chosenNodes.size(),
               metadataSizeRequired, dataSizeRequired,
@@ -362,6 +359,8 @@ public final class SCMContainerPlacementRackScatter
         throw new SCMException(errorMsg, FAILED_TO_FIND_SUITABLE_NODE);
       }
     }
+    LOG.info("Chosen nodes: {}. isPolicySatisfied: {}.", result,
+        placementStatus.isPolicySatisfied());
     return result;
   }
 
@@ -455,7 +454,8 @@ public final class SCMContainerPlacementRackScatter
    * @param racks
    * @param excludedNodes
    * @param usedRacks
-   * @return
+   * @return racks that are present in the specified racks, excluding racks
+   * that are present in the specified usedRacks
    */
   private List<Node> sortRackWithExcludedNodes(List<Node> racks,
           List<DatanodeDetails> excludedNodes, Map<Node, Integer> usedRacks) {

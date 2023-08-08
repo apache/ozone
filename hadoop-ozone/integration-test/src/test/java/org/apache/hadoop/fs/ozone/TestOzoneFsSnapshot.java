@@ -304,13 +304,44 @@ public class TestOzoneFsSnapshot {
         200, 10000);
   }
 
-  @Test
-  public void testSnapshotDeleteFailure() throws Exception {
-    // Delete snapshot that doesn't exist
-    String deleteSnapshotOut = execShellCommandAndGetOutput(1,
-        new String[]{"-deleteSnapshot", BUCKET_PATH, "testsnap"});
-    Assertions.assertTrue(deleteSnapshotOut
-        .contains("Snapshot does not exist"));
+  private static Stream<Arguments> deleteSnapshotFailureScenarios() {
+    String invalidBucketPath = "/invalid/uri";
+    return Stream.of(
+            Arguments.of("1st case: invalid snapshot name",
+                    BUCKET_PATH,
+                    "testsnap",
+                    "Snapshot does not exist",
+                    1),
+            Arguments.of("2nd case: invalid bucekt path",
+                    invalidBucketPath,
+                    "testsnap",
+                    "No such file or directory",
+                    1),
+            Arguments.of("3rd case: snapshot name not passed",
+                    BUCKET_PATH,
+                    "",
+                    "snapshot name can't be null or empty",
+                    -1),
+            Arguments.of("4th case: all parameters are missing",
+                    "",
+                    "",
+                    "Can not create a Path from an empty string",
+                    -1)
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("deleteSnapshotFailureScenarios")
+  public void testSnapshotDeleteFailure(String description,
+                                        String paramBucketPath,
+                                        String snapshotName,
+                                        String expectedMessage,
+                                        int expectedResponse) throws Exception {
+    String errorMessage = execShellCommandAndGetOutput(expectedResponse,
+            new String[]{"-deleteSnapshot", paramBucketPath, snapshotName});
+
+    Assertions.assertTrue(errorMessage
+            .contains(expectedMessage), errorMessage);
   }
 
   /**

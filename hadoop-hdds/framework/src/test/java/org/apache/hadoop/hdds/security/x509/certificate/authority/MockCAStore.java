@@ -72,6 +72,10 @@ public class MockCAStore implements CertificateStore {
   }
 
   @Override
+  public void removeAllExpiredCertificates() {
+  }
+
+  @Override
   public X509Certificate getCertificateByID(BigInteger serialID,
                                             CertType certType)
       throws IOException {

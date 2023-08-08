@@ -819,6 +819,7 @@ message SnapshotInfo {
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
+  optional bool sstFiltered = 14;
  }
 
 message SnapshotDiffJobProto {
