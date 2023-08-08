@@ -184,31 +184,33 @@ public class SstFilteringService extends BackgroundService
           SnapshotInfo snapshotInfo = keyValue.getValue();
           if (snapshotInfo.getSnapshotStatus()
               .equals(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)) {
-            UUID snapshotId = snapshotInfo.getSnapshotId();
 
-          if (snapshotInfo.isSstFiltered()) {
-            continue;
-          }
-
-          LOG.debug("Processing snapshot {} to filter relevant SST Files",
-              snapShotTableKey);
-
-          List<Pair<String, String>> prefixPairs = constructPrefixPairs(snapshotInfo);
-
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                   snapshotMetadataReader = snapshotCache.get()
-              .get(snapshotInfo.getTableKey())) {
-            OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
-            RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
-                .getStore();
-            RocksDatabase db = rdbStore.getDb();
-            try (BootstrapStateHandler.Lock lock =
-                getBootstrapStateLock().lock()) {
-              db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+            if (snapshotInfo.isSstFiltered()) {
+              continue;
             }
-          }
-          markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
-              snapshotInfo.getBucketName(), snapshotInfo.getName());
+
+            LOG.debug("Processing snapshot {} to filter relevant SST Files",
+                snapShotTableKey);
+
+            List<Pair<String, String>> prefixPairs =
+                constructPrefixPairs(snapshotInfo);
+
+            try (
+                ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                    snapshotMetadataReader = snapshotCache.get().get(
+                        snapshotInfo.getTableKey(),true)) {
+              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+              RDBStore rdbStore =
+                  (RDBStore) omSnapshot.getMetadataManager().getStore();
+              RocksDatabase db = rdbStore.getDb();
+              try (
+                  BootstrapStateHandler.Lock lock = getBootstrapStateLock()
+                      .lock()) {
+                db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+              }
+            }
+            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName(), snapshotInfo.getName());
             snapshotLimit--;
             snapshotFilteredCount.getAndIncrement();
           }
