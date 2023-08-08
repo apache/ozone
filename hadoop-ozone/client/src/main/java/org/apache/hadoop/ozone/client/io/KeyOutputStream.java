@@ -65,7 +65,8 @@ import org.slf4j.LoggerFactory;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyOutputStream extends OutputStream implements Syncable {
+public class KeyOutputStream extends OutputStream
+    implements Syncable, KeyMetadataAware {
 
   private OzoneClientConfig config;
   private final ReplicationConfig replication;
@@ -568,6 +569,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockOutputStreamEntryPool.getExcludeList();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockOutputStreamEntryPool.getMetadata();
   }
 
   /**

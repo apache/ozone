@@ -23,13 +23,15 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
  */
-public class OzoneOutputStream extends ByteArrayStreamOutput {
+public class OzoneOutputStream extends ByteArrayStreamOutput
+    implements KeyMetadataAware {
 
   private final OutputStream outputStream;
   private final Syncable syncable;
@@ -136,5 +138,17 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   public OutputStream getOutputStream() {
     return outputStream;
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (outputStream instanceof CryptoOutputStream) {
+      return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
+          .getWrappedStream()).getMetadata();
+    } else if (outputStream instanceof CipherOutputStream) {
+      return ((KeyMetadataAware)((CipherOutputStream) outputStream)
+          .getWrappedStream()).getMetadata();
+    }
+    return ((KeyMetadataAware) outputStream).getMetadata();
   }
 }
