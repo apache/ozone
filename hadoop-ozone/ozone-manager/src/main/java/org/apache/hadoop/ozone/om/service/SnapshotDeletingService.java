@@ -162,8 +162,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
           // Only Iterate in deleted snapshot
           if (!snapshotStatus.equals(
-              SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) &&
-              !(isSstFilteringSvcEnabled && snapInfo.isSstFiltered())) {
+              SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) ||
+              (isSstFilteringSvcEnabled && snapInfo.isSstFiltered()) ) {
             continue;
           }
 
