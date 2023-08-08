@@ -171,8 +171,6 @@ public class SstFilteringService extends BackgroundService
           String snapShotTableKey = keyValue.getKey();
           SnapshotInfo snapshotInfo = keyValue.getValue();
 
-          // If entry for the snapshotID is present in this file,
-          // it has already undergone filtering.
           if (snapshotInfo.isSstFiltered()) {
             continue;
           }
