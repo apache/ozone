@@ -111,9 +111,4 @@ public interface SCMHAManager extends AutoCloseable {
    * Re-initialize the SCM state via this checkpoint.
    */
   TermIndex installCheckpoint(DBCheckpoint dbCheckpoint) throws Exception;
-
-  /**
-   * Refresh Root CA certificate.
-   */
-  void refreshRootCACertificates() throws IOException;
 }

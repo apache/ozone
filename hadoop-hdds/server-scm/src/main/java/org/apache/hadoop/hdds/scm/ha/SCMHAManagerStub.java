@@ -165,10 +165,6 @@ public final class SCMHAManagerStub implements SCMHAManager {
     return null;
   }
 
-  @Override
-  public void refreshRootCACertificates() throws IOException {
-  }
-
   private class RatisServerStub implements SCMRatisServer {
 
     private Map<RequestType, Object> handlers =

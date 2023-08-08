@@ -389,15 +389,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public void notifyNotificationReceivers(String oldCaCertId,
-      String newCaCertId) {
-    synchronized (notificationReceivers) {
-      notificationReceivers.forEach(
-          n -> n.notifyCertificateRenewed(this, oldCaCertId, newCaCertId));
-    }
-  }
-
-  @Override
   public void registerRootCARotationListener(
       Function<List<X509Certificate>, CompletableFuture<Void>> listener) {
     // we do not have tests that rely on rootCA rotation atm, leaving this

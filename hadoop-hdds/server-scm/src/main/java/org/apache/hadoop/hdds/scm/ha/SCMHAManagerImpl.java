@@ -291,45 +291,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return installCheckpoint(checkpointLocation, checkpointTrxnInfo);
   }
 
-  @Override
-  public void refreshRootCACertificates() throws IOException {
-    if (scm.getScmContext().isLeader() ||
-        scm.getScmCertificateClient() == null) {
-      return;
-    }
-    // In case root CA certificate is rotated during this SCM is offline
-    // period, fetch the new root CA list from leader SCM and refresh ratis
-    // server's tlsConfig.
-    SCMCertificateClient scmCertClient =
-        (SCMCertificateClient) scm.getScmCertificateClient();
-    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-        scmCertClient.getScmSecureClient();
-    List<String> rootCAPems = scmSecurityClient.getAllRootCaCertificates();
-
-    // SCM certificate client sets root CA as CA cert instead of root CA cert
-    Set<X509Certificate> certList = scmCertClient.getAllRootCaCerts();
-    certList = certList.isEmpty() ? scmCertClient.getAllCaCerts() : certList;
-
-    List<X509Certificate> rootCAsFromLeaderSCM =
-        OzoneSecurityUtil.convertToX509(rootCAPems);
-    rootCAsFromLeaderSCM.removeAll(certList);
-
-    if (rootCAsFromLeaderSCM.isEmpty()) {
-      return;
-    }
-
-    for (X509Certificate cert : rootCAsFromLeaderSCM) {
-      LOG.info("Fetched new root CA certificate {} from leader SCM",
-          cert.getSerialNumber().toString());
-      scmCertClient.storeCertificate(
-          CertificateCodec.getPEMEncodedString(cert), CAType.SUBORDINATE);
-    }
-
-    String scmCertId =
-        scmCertClient.getCertificate().getSerialNumber().toString();
-    scmCertClient.notifyNotificationReceivers(scmCertId, scmCertId);
-  }
-
   public TermIndex installCheckpoint(Path checkpointLocation,
       TransactionInfo checkpointTxnInfo) throws Exception {
     // we have passed verification of the termIndex of checkpoint

@@ -981,8 +981,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
    * Notify all certificate renewal receivers that the certificate is renewed.
    *
    */
-  @Override
-  public void notifyNotificationReceivers(String oldCaCertId,
+  protected void notifyNotificationReceivers(String oldCaCertId,
       String newCaCertId) {
     synchronized (notificationReceivers) {
       notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
