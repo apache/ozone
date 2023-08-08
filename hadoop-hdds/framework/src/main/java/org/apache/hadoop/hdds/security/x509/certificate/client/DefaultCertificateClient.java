@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -408,7 +409,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       chain.add(lastInsertedCert);
       List<X509Certificate> caCertList =
           OzoneSecurityUtil.convertToX509(listCA());
-      while (!getAllRootCaCerts().contains(lastInsertedCert)) {
+      Set<X509Certificate> rootCaCertList = getAllRootCaCerts();
+      while (!rootCaCertList.isEmpty() &&
+          !rootCaCertList.contains(lastInsertedCert)) {
         Optional<X509Certificate> issuerOpt =
             getIssuerForCert(lastInsertedCert, caCertList);
         if (issuerOpt.isPresent()) {
@@ -1403,8 +1406,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized void setCACertificate(X509Certificate cert)
       throws Exception {
     caCertId = cert.getSerialNumber().toString();
+    String pemCert = CertificateCodec.getPEMEncodedString(cert);
     certificateMap.put(caCertId,
-        CertificateCodec.getCertPathFromPemEncodedString(
-            CertificateCodec.getPEMEncodedString(cert)));
+        CertificateCodec.getCertPathFromPemEncodedString(pemCert));
+    pemEncodedCACerts = Arrays.asList(pemCert);
   }
 }

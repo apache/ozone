@@ -20,17 +20,19 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.server.SCMSecurityProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
@@ -59,10 +61,15 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TI
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.slf4j.event.Level.INFO;
 
@@ -83,6 +90,7 @@ public class TestRootCARotationManager {
   private SCMStorageConfig scmStorageConfig;
   private SCMSecurityProtocolServer scmSecurityProtocolServer;
   private RootCARotationHandlerImpl handler;
+  private StatefulServiceStateManager statefulServiceStateManager;
   private File testDir;
   private String cID = UUID.randomUUID().toString();
   private String scmID = UUID.randomUUID().toString();
@@ -93,7 +101,7 @@ public class TestRootCARotationManager {
       CertificateException {
     ozoneConfig = new OzoneConfiguration();
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestRootCARotationManager.class.getSimpleName() + UUID.randomUUID());
     ozoneConfig
         .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     ozoneConfig
@@ -112,6 +120,8 @@ public class TestRootCARotationManager {
     scmStorageConfig.setClusterId(cID);
     scmSecurityProtocolServer = Mockito.mock(SCMSecurityProtocolServer.class);
     handler = Mockito.mock(RootCARotationHandlerImpl.class);
+    statefulServiceStateManager =
+        Mockito.mock(StatefulServiceStateManager.class);
     when(scmContext.isLeader()).thenReturn(true);
     when(scm.getConfiguration()).thenReturn(ozoneConfig);
     when(scm.getScmCertificateClient()).thenReturn(scmCertClient);
@@ -127,6 +137,10 @@ public class TestRootCARotationManager {
     Mockito.doNothing().when(scmSecurityProtocolServer)
         .setRootCertificateServer(Mockito.anyObject());
     Mockito.doNothing().when(handler).rotationPrepare(Mockito.anyString());
+    when(scm.getStatefulServiceStateManager())
+        .thenReturn(statefulServiceStateManager);
+    when(statefulServiceStateManager.readConfiguration(Mockito.anyString()))
+        .thenReturn(null);
   }
 
   @AfterEach
@@ -196,6 +210,7 @@ public class TestRootCARotationManager {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
     ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
     ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
+    ozoneConfig.set(HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL, "PT15S");
     Date date = Calendar.getInstance().getTime();
     date.setSeconds(date.getSeconds() + 10);
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY,
@@ -253,6 +268,75 @@ public class TestRootCARotationManager {
         logs.getOutput().contains("Root certificate " +
             cert.getSerialNumber().toString() + " rotation is started."),
         100, 10000);
+  }
+
+  @Test
+  public void testPostProcessingCheck() throws Exception {
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
+    ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
+    ozoneConfig.set(HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL, "PT10S");
+    Date date = Calendar.getInstance().getTime();
+    date.setMinutes(date.getMinutes() + 5);
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY,
+        String.format("%02d", date.getHours()) + ":" +
+            String.format("%02d", date.getMinutes()) + ":" +
+            String.format("%02d", date.getSeconds()));
+
+    X509Certificate cert = generateX509Cert(ozoneConfig,
+        LocalDateTime.now(), Duration.ofSeconds(60));
+    scmCertClient.setCACertificate(cert);
+    CertificateCodec certCodec = new CertificateCodec(securityConfig,
+        "scm/sub-ca");
+    certCodec.writeCertificate(CertificateCodec.getCertificateHolder(cert));
+    rootCARotationManager = new RootCARotationManager(scm);
+    rootCARotationManager.setRootCARotationHandler(handler);
+    GenericTestUtils.LogCapturer logs =
+        GenericTestUtils.LogCapturer.captureLogs(RootCARotationManager.LOG);
+    GenericTestUtils.setLogLevel(RootCARotationManager.LOG, INFO);
+    rootCARotationManager.start();
+    rootCARotationManager.notifyStatusChanged();
+
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("No RootCARotationManager " +
+                "configuration found in stateful storage"),
+        100, 10000);
+
+    when(statefulServiceStateManager.readConfiguration(Mockito.anyString()))
+        .thenReturn(new CertInfo.Builder().setX509Certificate(cert)
+            .setTimestamp(cert.getNotBefore().getTime())
+            .build().getProtobuf().toByteString());
+
+    logs.clearOutput();
+    when(scmContext.isLeader()).thenReturn(false);
+    rootCARotationManager.notifyStatusChanged();
+    when(scmContext.isLeader()).thenReturn(true);
+    rootCARotationManager.notifyStatusChanged();
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("isPostProcessing is true for"),
+        100, 10000);
+
+    logs.clearOutput();
+    when(scmContext.isLeader()).thenReturn(false);
+    rootCARotationManager.notifyStatusChanged();
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("disable monitor task"),
+        100, 10000);
+
+    logs.clearOutput();
+    when(scmContext.isLeader()).thenReturn(true);
+    rootCARotationManager.notifyStatusChanged();
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("isPostProcessing is true for"),
+        100, 10000);
+
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("isPostProcessing is false"),
+        100, 10000);
+    doNothing().when(statefulServiceStateManager)
+        .deleteConfiguration(Mockito.anyString());
+    verify(statefulServiceStateManager, times(1))
+        .deleteConfiguration(Mockito.anyString());
   }
 
   private X509Certificate generateX509Cert(
