@@ -646,7 +646,7 @@ public class KeyManagerImpl implements KeyManager {
         .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
             OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    return serviceInterval != KeyManagerImpl.DISABLE_VALUE;
+    return serviceInterval != DISABLE_VALUE;
   }
 
 
