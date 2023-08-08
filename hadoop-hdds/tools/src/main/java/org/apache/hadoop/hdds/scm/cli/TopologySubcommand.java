@@ -206,18 +206,19 @@ public class TopologySubcommand extends ScmSubcommand
   //     networkLocation
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes,
                                       String state) throws IOException {
-    if (json && fullInfo) {
-      List<NodeTopologyFull> nodesJson = new ArrayList<>();
-      nodes.forEach(node -> {
-        NodeTopologyFull nodeJson =
-            new NodeTopologyFull(
-                DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
-        nodesJson.add(nodeJson);
-      });
-      System.out.println(
-          JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
-      return;
-    } else if (json) {
+    if (json) {
+      if (fullInfo) {
+        List<NodeTopologyFull> nodesJson = new ArrayList<>();
+        nodes.forEach(node -> {
+          NodeTopologyFull nodeJson =
+              new NodeTopologyFull(
+                  DatanodeDetails.getFromProtoBuf(node.getNodeID()), state);
+          nodesJson.add(nodeJson);
+        });
+        System.out.println(
+            JsonUtils.toJsonStringWithDefaultPrettyPrinter(nodesJson));
+        return;
+      }
       List<NodeTopologyDefault> nodesJson = new ArrayList<>();
       nodes.forEach(node -> {
         NodeTopologyDefault nodeJson = new NodeTopologyDefault(
