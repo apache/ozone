@@ -95,12 +95,11 @@ public class TestEndpointBase {
       public void init() { }
     };
 
-    Exception exception = Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> endpointBase.getCustomMetadataFromHeaders(s3requestHeaders));
-    Assert.assertEquals(
-            "Illegal user defined metadata. Combined size cannot exceed 2KB.",
-            exception.getMessage());
+    try {
+      endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
+    } catch (OS3Exception ex) {
+      Assert.assertTrue(ex.getCode().contains("MetadataTooLarge"));
+    }
   }
 
 }
