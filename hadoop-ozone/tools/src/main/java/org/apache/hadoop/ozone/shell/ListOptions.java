@@ -24,11 +24,21 @@ import picocli.CommandLine;
  */
 public class ListOptions {
 
-  @CommandLine.Option(names = {"--length", "-l"},
-      description = "Maximum number of items to list",
-      defaultValue = "100",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private int limit;
+  @CommandLine.ArgGroup(exclusive = true)
+  private ExclusiveLimit exclusiveLimit = new ExclusiveLimit();
+  
+  static class ExclusiveLimit {
+    @CommandLine.Option(names = {"--length", "-l"},
+        description = "Maximum number of items to list",
+        defaultValue = "100",
+        showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+    private int limit;
+
+    @CommandLine.Option(names = {"--all", "-a"},
+        description = "List all results",
+        defaultValue = "false")
+    private boolean all;
+  }
 
   @CommandLine.Option(names = {"--start", "-s"},
       description = "The item to start the listing from.\n" +
@@ -40,12 +50,19 @@ public class ListOptions {
   private String prefix;
 
   public int getLimit() {
-    if (limit < 1) {
+    if (exclusiveLimit.all) {
+      return Integer.MAX_VALUE;
+    }
+    if (exclusiveLimit.limit < 1) {
       throw new IllegalArgumentException(
           "List length should be a positive number");
     }
 
-    return limit;
+    return exclusiveLimit.limit;
+  }
+
+  public boolean isAll() {
+    return exclusiveLimit.all;
   }
 
   public String getStartItem() {

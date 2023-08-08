@@ -116,7 +116,6 @@
       <groupId>org.apache.curator</groupId>
       <artifactId>curator-framework</artifactId>
       <scope>runtime</scope>
-      <version>4.2.0</version>
       <!-- These were excluded as non of them is used in the HttpFS module, but all of them would be a new unnecessary
        dependency to the Ozone project, we would also need to update the jar-report.txt with that. -->
       <exclusions>
@@ -153,7 +152,10 @@
     <dependency>
       <groupId>javax.xml.bind</groupId>
       <artifactId>jaxb-api</artifactId>
-      <version>2.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
     </dependency>
   </dependencies>
 
@@ -247,7 +249,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>1.8</version>
+        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
             <id>create-web-xmls</id>

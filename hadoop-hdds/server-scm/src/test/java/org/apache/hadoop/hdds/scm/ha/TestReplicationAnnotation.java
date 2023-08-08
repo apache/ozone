@@ -22,8 +22,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
@@ -33,8 +31,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
-import java.math.BigInteger;
-import java.security.KeyPair;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -130,32 +126,9 @@ public class TestReplicationAnnotation {
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
       Assertions.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assertions.assertNotNull(ignore.getMessage() != null);
-      Assertions.assertEquals("submitRequest is called.",
-          ignore.getMessage());
+    } catch (IOException e) {
+      Assertions.assertNotNull(e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
     }
-
-    scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CERT_STORE, null, scmRatisServer);
-
-    CertificateStore certificateStore =
-        (CertificateStore) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{CertificateStore.class},
-            scmhaInvocationHandler);
-
-    KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    try {
-      certificateStore.storeValidCertificate(BigInteger.valueOf(100L),
-          KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
-          "SHA256withRSA"), HddsProtos.NodeType.DATANODE);
-      Assertions.fail("Cannot reach here: should have seen a IOException");
-    } catch (IOException ignore) {
-      Assertions.assertNotNull(ignore.getMessage() != null);
-      Assertions.assertEquals("submitRequest is called.",
-          ignore.getMessage());
-    }
-
   }
 }

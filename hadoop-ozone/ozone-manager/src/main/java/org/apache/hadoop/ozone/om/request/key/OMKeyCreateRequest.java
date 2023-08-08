@@ -199,7 +199,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
     OmKeyInfo omKeyInfo = null;
-    OmBucketInfo omBucketInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
 
     boolean acquireLock = false;
@@ -232,8 +231,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
 
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      OmBucketInfo bucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       List< OzoneAcl > inheritAcls;
@@ -291,7 +290,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .collect(Collectors.toList());
       omKeyInfo.appendNewBlocks(newLocationList, false);
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // Here we refer to the implementation of HDFS:
       // If the key size is 600MB, when createKey, keyLocationInfo in
       // keyLocationList is 3, and  the every pre-allocated block length is
@@ -303,16 +301,16 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
-      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+      checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
-      omBucketInfo.incrUsedNamespace(numMissingParents);
+      checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      bucketInfo.incrUsedNamespace(numMissingParents);
 
       if (numMissingParents > 0) {
         // Add cache entries for the prefix directories.
         // Skip adding for the file key itself, until Key Commit.
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-            bucketName, omBucketInfo.getBucketLayout(),
+            bucketName, bucketInfo.getBucketLayout(),
             null, missingParentInfos, trxnLogIndex);
       }
 
@@ -330,7 +328,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
+          omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

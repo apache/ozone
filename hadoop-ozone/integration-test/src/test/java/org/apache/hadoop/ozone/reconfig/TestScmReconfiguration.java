@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -29,6 +30,7 @@ import java.util.Set;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -46,7 +48,10 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   void reconfigurableProperties() {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(OZONE_ADMINISTRATORS)
+        .add(OZONE_READONLY_ADMINISTRATORS)
         .addAll(new ReplicationManagerConfiguration()
+            .reconfigurableProperties())
+        .addAll(new WritableECContainerProviderConfig()
             .reconfigurableProperties())
         .build();
 
@@ -62,6 +67,19 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
         getCluster().getStorageContainerManager().getScmAdminUsernames());
+  }
+
+  @Test
+  void readOnlyAdminUsernames() throws ReconfigurationException {
+    final String newValue = randomAlphabetic(10);
+
+    getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
+        newValue);
+
+    assertEquals(
+        ImmutableSet.of(newValue),
+        getCluster().getStorageContainerManager()
+            .getScmReadOnlyAdminUsernames());
   }
 
   @Test

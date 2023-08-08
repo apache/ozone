@@ -29,8 +29,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.OmUtils;
@@ -121,15 +122,19 @@ public class TestOzoneManagerRatisServer {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     initialTermIndex = TermIndex.valueOf(0, 0);
     RatisSnapshotInfo omRatisSnapshotInfo = new RatisSnapshotInfo();
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     secConfig = new SecurityConfig(conf);
+    HddsProtos.OzoneManagerDetailsProto omInfo =
+        OzoneManager.getOmDetailsProto(conf, omID);
     certClient =
-        new OMCertificateClient(secConfig, omStorage, null, null, null);
+        new OMCertificateClient(
+            secConfig, null, omStorage, omInfo, "", null, null, null);
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyMap(), secConfig, certClient, false);
     omRatisServer.start();

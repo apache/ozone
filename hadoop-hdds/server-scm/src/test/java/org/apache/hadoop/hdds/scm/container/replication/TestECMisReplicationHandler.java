@@ -45,6 +45,7 @@ import java.util.Set;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -216,6 +217,8 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
     assertThrows(InsufficientDatanodesException.class,
         () -> testMisReplication(availableReplicas, Collections.emptyList(),
             0, 2, 1));
+    assertEquals(1,
+        getMetrics().getEcPartialReplicationForMisReplicationTotal());
   }
 
   @Override

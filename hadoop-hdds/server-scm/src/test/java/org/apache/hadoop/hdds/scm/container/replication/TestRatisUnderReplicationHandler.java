@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,6 +77,7 @@ public class TestRatisUnderReplicationHandler {
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private ReplicationManagerMetrics metrics;
 
   @Before
   public void setup() throws NodeNotFoundException,
@@ -93,6 +95,8 @@ public class TestRatisUnderReplicationHandler {
     Mockito.when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManagerConfiguration.class));
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
@@ -220,6 +224,7 @@ public class TestRatisUnderReplicationHandler {
     Assert.assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(0, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -239,6 +244,7 @@ public class TestRatisUnderReplicationHandler {
     // One command should be sent to the replication manager as we could only
     // fine one node rather than two.
     Assert.assertEquals(1, commandsSent.size());
+    Assert.assertEquals(1, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -377,6 +383,54 @@ public class TestRatisUnderReplicationHandler {
     Assertions.assertTrue(excludedNodes.contains(
         decommissioning.getDatanodeDetails()));
     Assertions.assertTrue(excludedNodes.contains(pendingRemove));
+  }
+
+  @Test
+  public void testUnderReplicationDueToQuasiClosedReplicaWithWrongSequenceID()
+      throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertNotEquals(
+            quasiClosedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
+  @Test
+  public void testOnlyQuasiClosedReplicaWithWrongSequenceIdIsAvailable()
+      throws IOException {
+    final long sequenceID = 20;
+    container = createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(1);
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertEquals(
+            quasiClosedReplica.getDatanodeDetails(),
+            command.getKey()));
   }
 
 

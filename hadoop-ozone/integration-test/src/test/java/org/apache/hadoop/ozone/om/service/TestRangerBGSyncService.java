@@ -196,7 +196,7 @@ public class TestRangerBGSyncService {
         folder.newFolder().getAbsolutePath());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);

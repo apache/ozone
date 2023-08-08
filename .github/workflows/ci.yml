@@ -256,6 +256,7 @@ jobs:
           - HA-unsecure
           - MR
           - misc
+          - cert-rotation
       fail-fast: false
     steps:
       - name: Checkout project
@@ -327,11 +328,13 @@ jobs:
       matrix:
         profile:
           - client
+          - contract
           - filesystem
           - hdds
           - om
           - ozone
           - scm
+          - shell
           - flaky
       fail-fast: false
     steps:

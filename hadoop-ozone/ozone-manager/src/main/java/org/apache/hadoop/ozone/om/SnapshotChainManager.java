@@ -425,4 +425,9 @@ public class SnapshotChainManager {
   public String getTableKey(UUID snapshotId) {
     return snapshotIdToTableKey.get(snapshotId);
   }
+
+  public LinkedHashMap<UUID, SnapshotChainInfo> getSnapshotChainPath(
+      String path) {
+    return snapshotChainByPath.get(path);
+  }
 }

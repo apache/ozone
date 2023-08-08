@@ -24,10 +24,27 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * TODO: Add javadoc.
+ * Indicates that a method will be called via Ratis.
+ * If a method is annotated with this annotation type the call made to this
+ * method will go via Ratis.
+ * <ul><li>
+ * If the InvocationMethod is DIRECT, the call will be directly submitted
+ * to Ratis Server. The current instance has to be the leader for this call to
+ * work.
+ * </li><li>
+ * If the InvocationMethod is CLIENT, the call will be submitted to
+ * Ratis Server via Ratis Client. The current instance need not be the leader.
+ * </li></ul>
  */
 @Inherited
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Replicate {
+  /**
+   * For DIRECT, the call will be directly submitted to Ratis Server.
+   * <br>
+   * For CLIENT, the call will be submitted to Ratis Server via Ratis Client.
+   */
+  enum InvocationType { DIRECT, CLIENT }
+  InvocationType invocationType() default InvocationType.DIRECT;
 }

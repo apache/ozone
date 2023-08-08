@@ -23,9 +23,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,9 +58,12 @@ public class GrpcContainerUploader implements ContainerUploader {
       throws IOException {
     GrpcReplicationClient client = createReplicationClient(target, compression);
     try {
-      StreamObserver<SendContainerRequest> requestStream = client.upload(
-          new SendContainerResponseStreamObserver(containerId, target,
-              callback));
+      // gRPC runtime always provides implementation of CallStreamObserver
+      // that allows flow control.
+      CallStreamObserver<SendContainerRequest> requestStream =
+          (CallStreamObserver<SendContainerRequest>) client.upload(
+              new SendContainerResponseStreamObserver(containerId, target,
+                  callback));
       return new SendContainerOutputStream(requestStream, containerId,
           GrpcReplicationService.BUFFER_SIZE, compression) {
         @Override

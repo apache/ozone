@@ -28,8 +28,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -39,6 +41,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -69,7 +72,8 @@ public class TestOMTenantCreateRequest {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
@@ -101,6 +105,102 @@ public class TestOMTenantCreateRequest {
     Mockito.framework().clearInlineMocks();
   }
 
+  @Test
+  public void testValidateAndUpdateCache() throws IOException {
+    // Happy path
+
+    final String tenantId = UUID.randomUUID().toString();
+
+    OMRequest originalRequest =
+        OMRequestTestUtils.createTenantRequest(tenantId, false);
+    OMTenantCreateRequest omTenantCreateRequest =
+        Mockito.spy(new OMTenantCreateRequest(originalRequest));
+    Mockito.doReturn("username").when(omTenantCreateRequest).getUserName();
+
+    // First creation should be successful
+    OMRequest modifiedRequest = omTenantCreateRequest.preExecute(ozoneManager);
+    omTenantCreateRequest = new OMTenantCreateRequest(modifiedRequest);
+
+    long txLogIndex = 1L;
+    OMClientResponse omClientResponse =
+        omTenantCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
+            ozoneManagerDoubleBufferHelper);
+    OMResponse omResponse = omClientResponse.getOMResponse();
+
+    Assert.assertNotNull(omResponse.getCreateTenantResponse());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
+    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
+        omMetadataManager.getVolumeKey(tenantId)));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWhenVolumeExists() throws Exception {
+    // Check that forceCreationWhenVolumeExists flag behaves as expected
+
+    final String tenantId = UUID.randomUUID().toString();
+    final String ownerName = "username";
+
+    // Deliberately put volume entry in VolumeTable, to simulate the case where
+    //  the volume already exists.
+    OMRequestTestUtils.addVolumeToDB(tenantId, ownerName, omMetadataManager);
+
+    // First with forceCreationWhenVolumeExists = false
+    OMRequest originalRequest =
+        OMRequestTestUtils.createTenantRequest(tenantId, false);
+    OMTenantCreateRequest omTenantCreateRequest1 =
+        Mockito.spy(new OMTenantCreateRequest(originalRequest));
+    Mockito.doReturn(ownerName).when(omTenantCreateRequest1).getUserName();
+
+    // Should throw in preExecute
+    LambdaTestUtils.intercept(OMException.class, "VOLUME_ALREADY_EXISTS",
+        () -> omTenantCreateRequest1.preExecute(ozoneManager));
+
+    // Now with forceCreationWhenVolumeExists = true
+    originalRequest =
+        OMRequestTestUtils.createTenantRequest(tenantId, true);
+    OMTenantCreateRequest omTenantCreateRequest2 =
+        Mockito.spy(new OMTenantCreateRequest(originalRequest));
+    Mockito.doReturn(ownerName).when(omTenantCreateRequest2).getUserName();
+
+    // Should not throw now that forceCreationWhenVolumeExists = true
+    OMRequest modifiedRequest = omTenantCreateRequest2.preExecute(ozoneManager);
+    omTenantCreateRequest2 = new OMTenantCreateRequest(modifiedRequest);
+
+    // Craft a request that sets forceCreationWhenVolumeExists to false to test
+    //  validateAndUpdateCache.
+    CreateTenantRequest reqPostPreExecute =
+        omTenantCreateRequest2.getOmRequest().getCreateTenantRequest();
+    OMRequest modReqPostPreExecute =
+        omTenantCreateRequest2.getOmRequest().toBuilder()
+            .setCreateTenantRequest(
+                CreateTenantRequest.newBuilder()
+                    .setTenantId(tenantId)
+                    .setVolumeName(reqPostPreExecute.getVolumeName())
+                    .setUserRoleName(reqPostPreExecute.getUserRoleName())
+                    .setAdminRoleName(reqPostPreExecute.getAdminRoleName())
+                    .setForceCreationWhenVolumeExists(false)).build();
+    OMTenantCreateRequest modTenantCreateRequest =
+        new OMTenantCreateRequest(modReqPostPreExecute);
+    // OMResponse should have status VOLUME_ALREADY_EXISTS in this crafted case
+    OMClientResponse modOMClientResponse =
+        modTenantCreateRequest.validateAndUpdateCache(ozoneManager, 2L,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(Status.VOLUME_ALREADY_EXISTS,
+        modOMClientResponse.getOMResponse().getStatus());
+    Assert.assertEquals("Volume already exists",
+        modOMClientResponse.getOMResponse().getMessage());
+
+    // validateAndUpdateCache with forceCreationWhenVolumeExists = true
+    OMClientResponse omClientResponse =
+        omTenantCreateRequest2.validateAndUpdateCache(ozoneManager, 2L,
+            ozoneManagerDoubleBufferHelper);
+    OMResponse omResponse = omClientResponse.getOMResponse();
+
+    Assert.assertNotNull(omResponse.getCreateTenantResponse());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
+    Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
+        omMetadataManager.getVolumeKey(tenantId)));
+  }
 
   @Test
   public void
@@ -139,7 +239,7 @@ public class TestOMTenantCreateRequest {
   private void acceptTenantIdCreationHelper(String tenantId)
       throws Exception {
     OMRequest originalRequest =
-        OMRequestTestUtils.createTenantRequest(tenantId);
+        OMRequestTestUtils.createTenantRequest(tenantId, false);
     OMTenantCreateRequest omTenantCreateRequest =
         Mockito.spy(new OMTenantCreateRequest(originalRequest));
     Mockito.doReturn("username").when(omTenantCreateRequest).getUserName();
@@ -150,12 +250,10 @@ public class TestOMTenantCreateRequest {
     OMClientResponse omClientResponse =
         omTenantCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
             ozoneManagerDoubleBufferHelper);
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        omClientResponse.getOMResponse();
+    OMResponse omResponse = omClientResponse.getOMResponse();
 
     Assert.assertNotNull(omResponse.getCreateTenantResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omResponse.getStatus());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
     Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(tenantId)));
   }
@@ -170,7 +268,7 @@ public class TestOMTenantCreateRequest {
 
   private void doPreExecute(String tenantId) throws Exception {
     OMRequest originalRequest =
-        OMRequestTestUtils.createTenantRequest(tenantId);
+        OMRequestTestUtils.createTenantRequest(tenantId, false);
 
     OMTenantCreateRequest omTenantCreateRequest =
         Mockito.spy(new OMTenantCreateRequest(originalRequest));

@@ -108,9 +108,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      OzoneFileStatus keyStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
-                      bucketName, keyName, 0);
+      OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, keyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       if (keyStatus == null) {
         throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);

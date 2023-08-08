@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -30,10 +31,14 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -52,11 +57,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 
 /**
  * Abstracts common code from KeyDeletingService and DirectoryDeletingService
@@ -435,6 +443,92 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           Time.monotonicNow() - startTime, getRunCount());
     }
     return remainNum;
+  }
+
+  protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
+      SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
+      throws IOException {
+    SnapshotInfo currSnapInfo = snapInfo;
+    while (chainManager.hasPreviousPathSnapshot(
+        currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId())) {
+
+      UUID prevPathSnapshot = chainManager.previousPathSnapshot(
+          currSnapInfo.getSnapshotPath(), currSnapInfo.getSnapshotId());
+      String tableKey = chainManager.getTableKey(prevPathSnapshot);
+      SnapshotInfo prevSnapInfo = omSnapshotManager.getSnapshotInfo(tableKey);
+      if (prevSnapInfo.getSnapshotStatus() ==
+          SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
+        return prevSnapInfo;
+      }
+      currSnapInfo = prevSnapInfo;
+    }
+    return null;
+  }
+
+  protected boolean isKeyReclaimable(
+      Table<String, OmKeyInfo> previousKeyTable,
+      Table<String, String> renamedTable,
+      OmKeyInfo deletedKeyInfo, OmBucketInfo bucketInfo,
+      long volumeId, HddsProtos.KeyValue.Builder renamedKeyBuilder)
+      throws IOException {
+
+    String dbKey;
+    // Handle case when the deleted snapshot is the first snapshot.
+    if (previousKeyTable == null) {
+      return true;
+    }
+
+    // These are uncommitted blocks wrapped into a pseudo KeyInfo
+    if (deletedKeyInfo.getObjectID() == OBJECT_ID_RECLAIM_BLOCKS) {
+      return true;
+    }
+
+    // Construct keyTable or fileTable DB key depending on the bucket type
+    if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      dbKey = ozoneManager.getMetadataManager().getOzonePathKey(
+          volumeId,
+          bucketInfo.getObjectID(),
+          deletedKeyInfo.getParentObjectID(),
+          deletedKeyInfo.getKeyName());
+    } else {
+      dbKey = ozoneManager.getMetadataManager().getOzoneKey(
+          deletedKeyInfo.getVolumeName(),
+          deletedKeyInfo.getBucketName(),
+          deletedKeyInfo.getKeyName());
+    }
+
+    /*
+     snapshotRenamedTable:
+     1) /volumeName/bucketName/objectID ->
+                 /volumeId/bucketId/parentId/fileName (FSO)
+     2) /volumeName/bucketName/objectID ->
+                /volumeName/bucketName/keyName (non-FSO)
+    */
+    String dbRenameKey = ozoneManager.getMetadataManager().getRenameKey(
+        deletedKeyInfo.getVolumeName(), deletedKeyInfo.getBucketName(),
+        deletedKeyInfo.getObjectID());
+
+    // Condition: key should not exist in snapshotRenamedTable
+    // of the current snapshot and keyTable of the previous snapshot.
+    // Check key exists in renamedTable of the Snapshot
+    String renamedKey = renamedTable.getIfExist(dbRenameKey);
+
+    if (renamedKey != null && renamedKeyBuilder != null) {
+      renamedKeyBuilder.setKey(dbRenameKey).setValue(renamedKey);
+    }
+    // previousKeyTable is fileTable if the bucket is FSO,
+    // otherwise it is the keyTable.
+    OmKeyInfo prevKeyInfo = renamedKey != null ? previousKeyTable
+        .get(renamedKey) : previousKeyTable.get(dbKey);
+
+    if (prevKeyInfo == null ||
+        prevKeyInfo.getObjectID() != deletedKeyInfo.getObjectID()) {
+      return true;
+    }
+
+    // For key overwrite the objectID will remain the same, In this
+    // case we need to check if OmKeyLocationInfo is also same.
+    return !isBlockLocationInfoSame(prevKeyInfo, deletedKeyInfo);
   }
 
   public boolean isRatisEnabled() {
