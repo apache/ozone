@@ -148,9 +148,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
-          SnapshotInfo.SnapshotStatus snapshotStatus =
-              snapInfo.getSnapshotStatus();
-
           boolean isSstFilteringServiceEnabled =
               ((KeyManagerImpl) ozoneManager.getKeyManager())
                   .isSstFilteringSvcEnabled();
