@@ -313,10 +313,11 @@ public class TestSstFilteringService {
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
     long snap2SstFileCountAfterFilter = Arrays.stream(snapshot2Dir.listFiles())
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
+    // one sst will be filtered in both active but not in  deleted snapshot
+    // as sstFiltering svc won't run on already deleted snapshots but will mark
+    // it as filtered.
     assertEquals(2, sstFilteringService.getSnapshotFilteredCount().get());
-    // one sst will be filtered in both active & deleted snapshot
-    assertEquals(snap1SstFileCountBeforeFilter - 1,
-        snap1SstFileCountAfterFilter);
+    assertEquals(snap1SstFileCountBeforeFilter, snap1SstFileCountAfterFilter);
     assertEquals(snap2SstFileCountBeforeFilter - 1,
         snap2SstFileCountAfterFilter);
   }
