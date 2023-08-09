@@ -34,14 +34,15 @@ import java.util.List;
     description = "Clean expired certificates from the SCM metadata.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class CleanExpired extends ScmCertSubcommand {
+public class CleanExpiredCertsSubcommand extends ScmCertSubcommand {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CleanExpired.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(CleanExpiredCertsSubcommand.class);
 
   @Override
   protected void execute(SCMSecurityProtocol client) throws IOException {
-    List<String> pemEncodedCerts = client.clearExpiredCertificates();
+    List<String> pemEncodedCerts = client.removeExpiredCertificates();
     LOG.info("List of removed expired certificates:");
-    CertificatePrintUtils.printCertList(LOG, pemEncodedCerts);
+    printCertList(LOG, pemEncodedCerts);
   }
 }

@@ -35,9 +35,9 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMClearExpiredCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
@@ -154,10 +154,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         return scmSecurityResponse
             .setAllRootCaCertificatesResponseProto(getAllRootCa())
             .build();
-      case ClearExpiredCertificates:
+      case RemoveExpiredCertificates:
         return scmSecurityResponse
-            .setClearExpiredCertificatesResponseProto(
-                clearExpiredCertificates())
+            .setRemoveExpiredCertificatesResponseProto(
+                removeExpiredCertificates())
             .build();
 
       default:
@@ -420,10 +420,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     }
   }
 
-  public SCMClearExpiredCertificatesResponseProto clearExpiredCertificates()
+  public SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificates()
       throws IOException {
-    return SCMClearExpiredCertificatesResponseProto.newBuilder()
-        .addAllRemovedExpiredCertificates(impl.clearExpiredCertificates())
+    return SCMRemoveExpiredCertificatesResponseProto.newBuilder()
+        .addAllRemovedExpiredCertificates(impl.removeExpiredCertificates())
         .build();
   }
 }

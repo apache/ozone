@@ -25,7 +25,6 @@ import java.math.BigInteger;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
 import java.util.ArrayList;
 
 import java.util.List;
@@ -246,12 +245,12 @@ public final class SCMCertStore implements CertificateStore {
     List<X509Certificate> removedCerts = new ArrayList<>();
     try (TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
         X509Certificate>> certsIterator = certTable.iterator()) {
-      Instant now = Instant.now();
+      Date now = new Date();
       while (certsIterator.hasNext()) {
         Table.KeyValue<BigInteger, X509Certificate> certEntry =
             certsIterator.next();
         X509Certificate cert = certEntry.getValue();
-        if (cert.getNotAfter().toInstant().isBefore(now)) {
+        if (cert.getNotAfter().before(now)) {
           removedCerts.add(cert);
           certTable.deleteWithBatch(batchOperation, certEntry.getKey());
         }

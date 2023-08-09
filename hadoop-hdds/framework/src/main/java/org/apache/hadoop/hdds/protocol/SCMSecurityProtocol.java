@@ -190,5 +190,11 @@ public interface SCMSecurityProtocol {
    */
   List<String> getAllRootCaCertificates() throws IOException;
 
-  List<String> clearExpiredCertificates() throws IOException;
+  /**
+   * Remove all expired certificates from the SCM metadata store.
+   *
+   * @return list of the removed certificates
+   * @throws IOException
+   */
+  List<String> removeExpiredCertificates() throws IOException;
 }

@@ -509,7 +509,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public List<String> clearExpiredCertificates() throws IOException {
+  public List<String> removeExpiredCertificates() throws IOException {
+    storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
     List<String> pemEncodedCerts = new ArrayList<>();
     for (X509Certificate cert : storageContainerManager.getCertificateStore()
         .removeAllExpiredCertificates()) {

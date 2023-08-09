@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevoke
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMClearExpiredCertificatesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -439,12 +439,12 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   }
 
   @Override
-  public List<String> clearExpiredCertificates() throws IOException {
-    SCMClearExpiredCertificatesRequestProto protoIns =
-        SCMClearExpiredCertificatesRequestProto.getDefaultInstance();
-    return submitRequest(Type.ClearExpiredCertificates,
-        builder -> builder.setClearExpiredCertificatesRequestProto(protoIns))
-        .getClearExpiredCertificatesResponseProto()
+  public List<String> removeExpiredCertificates() throws IOException {
+    SCMRemoveExpiredCertificatesRequestProto protoIns =
+        SCMRemoveExpiredCertificatesRequestProto.getDefaultInstance();
+    return submitRequest(Type.RemoveExpiredCertificates,
+        builder -> builder.setRemoveExpiredCertificatesRequestProto(protoIns))
+        .getRemoveExpiredCertificatesResponseProto()
         .getRemovedExpiredCertificatesList();
   }
 }

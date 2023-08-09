@@ -132,7 +132,7 @@ public class ListSubcommand extends ScmCertSubcommand {
 
     LOG.info("Certificate list:(Type={}, BatchSize={}, CertCount={})",
         type.toUpperCase(), count, certPemList.size());
-    CertificatePrintUtils.printCertList(LOG, certPemList);
+    printCertList(LOG, certPemList);
   }
 
   private static class BigIntJsonSerializer extends JsonSerializer<BigInteger> {
