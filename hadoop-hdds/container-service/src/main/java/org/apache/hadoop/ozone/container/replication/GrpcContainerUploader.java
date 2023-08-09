@@ -160,8 +160,7 @@ public class GrpcContainerUploader implements ContainerUploader {
     @Override
     public boolean isReady() {
       if (responseObserver.isError()) {
-        observer.onError(responseObserver.getError());
-        return true;
+        throw new RuntimeException(responseObserver.getError());
       }
       return observer.isReady();
     }
