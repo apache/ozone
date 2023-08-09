@@ -192,6 +192,11 @@ public class GrpcContainerUploader implements ContainerUploader {
 
     @Override
     public void onError(Throwable throwable) {
+      if (!responseObserver.isError()) {
+        // set up error to response observer, so that
+        // callback can be set with error in response observer
+        responseObserver.onError(throwable);
+      }
       observer.onError(throwable);
     }
 
