@@ -43,8 +43,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 /**
@@ -64,6 +66,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String cId;
   private String scmHostname;
   private ExecutorService executorService;
+  private AtomicReference<String> certSerialId = new AtomicReference<>();
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
@@ -110,11 +113,23 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
+    certSerialId.set(getNextCertificateId());
+    return getCSRBuilder(certSerialId.get());
+  }
+
+  /**
+   * Returns a CSR builder that can be used to creates a Certificate signing
+   * request.
+   *
+   * @return CertificateSignRequest.Builder
+   */
+  public CertificateSignRequest.Builder getCSRBuilder(String certSerialId)
+      throws CertificateException {
+    String subject = String.format(SCM_SUB_CA_PREFIX, certSerialId)
         + scmHostname;
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", scmHostname, scmId, cId, subject);
+        "subject:{}", scmHostname, scmId, cId, subject);
 
     return super.getCSRBuilder()
         .setSubject(subject)
@@ -123,6 +138,16 @@ public class SCMCertificateClient extends DefaultCertificateClient {
         // Set CA to true, as this will be used to sign certs for OM/DN.
         .setCA(true)
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
+  }
+
+  protected String getNextCertificateId() throws CertificateException {
+    try {
+      return getScmSecureClient().getNextCertificateId();
+    } catch (IOException e) {
+      getLogger().error("Failed to get next CA certificate ID", e);
+      throw new CertificateException("Failed to get next CA certificate ID.",
+          e, CSR_ERROR);
+    }
   }
 
   @Override
@@ -155,7 +180,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response =
           getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
-              getEncodedString(request), true);
+              getEncodedString(request), certSerialId.get(), true);
+      certSerialId.set(null);
 
       CertificateCodec certCodec = new CertificateCodec(
           getSecurityConfig(), certPath);

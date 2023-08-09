@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetLat
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto.Reason;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetNextCertificateIdRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
@@ -188,13 +189,14 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    *
    * @param scmNodeDetails  - SCM Node Details.
    * @param certSignReq     - Certificate signing request.
+   * @param certSerialId    - Certificate Id
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq) throws IOException {
-    return getSCMCertChain(scmNodeDetails, certSignReq, false)
+      String certSignReq, String certSerialId) throws IOException {
+    return getSCMCertChain(scmNodeDetails, certSignReq, certSerialId, false)
         .getX509Certificate();
   }
 
@@ -203,13 +205,16 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    *
    * @param scmNodeDetails  - SCM Node Details.
    * @param certSignReq     - Certificate signing request.
+   * @param certSerialId    - Certificate Id
    * @param renew           - Whether SCM is trying to renew its certificate
    * @return String         - pem encoded SCM signed
    *                          certificate.
    */
+  @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq, boolean renew) throws IOException {
-    return getSCMCertChain(scmNodeDetails, certSignReq, renew)
+      String certSignReq, String certSerialId, boolean renew)
+      throws IOException {
+    return getSCMCertChain(scmNodeDetails, certSignReq, certSerialId, renew)
         .getX509Certificate();
   }
 
@@ -222,13 +227,14 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
    * signed certificate and root CA certificate.
    */
   public SCMGetCertResponseProto getSCMCertChain(
-      ScmNodeDetailsProto scmNodeDetails, String certSignReq, boolean isRenew)
-      throws IOException {
+      ScmNodeDetailsProto scmNodeDetails, String certSignReq,
+      String certSerialId, boolean isRenew) throws IOException {
     SCMGetSCMCertRequestProto request =
         SCMGetSCMCertRequestProto.newBuilder()
             .setCSR(certSignReq)
             .setScmDetails(scmNodeDetails)
             .setRenew(isRenew)
+            .setCertSerialId(certSerialId)
             .build();
     return submitRequest(Type.GetSCMCertificate,
         builder -> builder.setGetSCMCertificateRequest(request))
@@ -446,5 +452,15 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         builder -> builder.setRemoveExpiredCertificatesRequestProto(protoIns))
         .getRemoveExpiredCertificatesResponseProto()
         .getRemovedExpiredCertificatesList();
+  }
+
+  @Override
+  public String getNextCertificateId() throws IOException {
+    SCMGetNextCertificateIdRequestProto protoIns =
+        SCMGetNextCertificateIdRequestProto.getDefaultInstance();
+    return submitRequest(Type.GetNextCertificateId,
+        builder -> builder.setGetNextCertificateIdRequestProto(protoIns))
+        .getGetNextCertificateIdResponseProto()
+        .getCertSerialId();
   }
 }

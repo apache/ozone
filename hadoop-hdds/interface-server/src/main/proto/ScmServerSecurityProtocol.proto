@@ -60,6 +60,8 @@ message SCMSecurityRequest {
         getAllRootCaCertificatesRequestProto = 14;
     optional SCMRemoveExpiredCertificatesRequestProto
         removeExpiredCertificatesRequestProto = 15;
+    optional SCMGetNextCertificateIdRequestProto
+        getNextCertificateIdRequestProto = 16;
 }
 
 message SCMSecurityResponse {
@@ -88,6 +90,8 @@ message SCMSecurityResponse {
     optional SCMGetAllRootCaCertificatesResponseProto allRootCaCertificatesResponseProto = 11;
 
     optional SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificatesResponseProto = 12;
+
+    optional SCMGetNextCertificateIdResponseProto getNextCertificateIdResponseProto = 13;
 }
 
 enum Type {
@@ -105,6 +109,7 @@ enum Type {
     GetCert = 12;
     GetAllRootCaCertificates = 13;
     RemoveExpiredCertificates = 14;
+    GetNextCertificateId = 15;
 }
 
 enum Status {
@@ -153,6 +158,7 @@ message SCMGetSCMCertRequestProto {
     required ScmNodeDetailsProto scmDetails = 1;
     required string CSR = 2;
     optional bool renew = 3[default = false];
+    optional string certSerialId = 4;
 }
 
 /**
@@ -261,6 +267,13 @@ message SCMRevokeCertificatesRequestProto {
 }
 
 message SCMGetAllRootCaCertificatesRequestProto {
+}
+
+message SCMGetNextCertificateIdRequestProto {
+}
+
+message SCMGetNextCertificateIdResponseProto {
+    required string certSerialId = 1;
 }
 
 message SCMRevokeCertificatesResponseProto {

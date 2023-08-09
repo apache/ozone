@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.protobuf.BlockingService;
 
 import java.io.IOException;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.protocol.SecretKeyProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.update.server.SCMUpdateServiceGrpcServer;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
@@ -78,12 +80,14 @@ import org.apache.hadoop.security.KerberosInfo;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.bouncycastle.asn1.x509.CRLReason;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
+import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.CERTIFICATE_ID;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_INITIALIZED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
@@ -91,6 +95,7 @@ import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.Err
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
 
 /**
  * The protocol used to perform security related operations with SCM.
@@ -113,6 +118,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   private final StorageContainerManager storageContainerManager;
   private final CertificateClient scmCertificateClient;
   private final OzoneConfiguration config;
+  private final SequenceIdGenerator sequenceIdGen;
 
   // SecretKey may not be enabled when neither block token nor container
   // token is enabled.
@@ -130,6 +136,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     this.scmCertificateServer = scmCertificateServer;
     this.scmCertificateClient = scmCertClient;
     this.config = conf;
+    this.sequenceIdGen = scm.getSequenceIdGen();
     this.secretKeyManager = secretKeyManager;
     final int handlerCount =
         conf.getInt(ScmConfigKeys.OZONE_SCM_SECURITY_HANDLER_COUNT_KEY,
@@ -193,10 +200,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for dn {}, UUID: {}", dnDetails.getHostName(),
         dnDetails.getUuid());
     Objects.requireNonNull(dnDetails);
+
     checkIfCertSignRequestAllowed(
         storageContainerManager.getRootCARotationManager(), false, config,
         "getDataNodeCertificate");
-    return getEncodedCertToString(certSignReq, NodeType.DATANODE);
+
+    return getEncodedCertToString(certSignReq, NodeType.DATANODE,
+        getNextCertificateId());
   }
 
   @Override
@@ -207,10 +217,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         nodeDetails.getNodeType(), nodeDetails.getHostName(),
         nodeDetails.getUuid());
     Objects.requireNonNull(nodeDetails);
+
     checkIfCertSignRequestAllowed(
         storageContainerManager.getRootCARotationManager(), false, config,
         "getCertificate");
-    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
+
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType(),
+        getNextCertificateId());
   }
 
   @Override
@@ -284,10 +297,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for om {}, UUID: {}", omDetails.getHostName(),
         omDetails.getUuid());
     Objects.requireNonNull(omDetails);
+
     checkIfCertSignRequestAllowed(
         storageContainerManager.getRootCARotationManager(), false, config,
         "getOMCertificate");
-    return getEncodedCertToString(certSignReq, NodeType.OM);
+
+    return getEncodedCertToString(certSignReq, NodeType.OM,
+        getNextCertificateId());
   }
 
   /**
@@ -295,12 +311,13 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    *
    * @param scmNodeDetails   - SCM Node Details.
    * @param certSignReq      - Certificate signing request.
+   * @param certSerialId    - Certificate Id
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq) throws IOException {
-    return getSCMCertificate(scmNodeDetails, certSignReq, false);
+      String certSignReq, String certSerialId) throws IOException {
+    return getSCMCertificate(scmNodeDetails, certSignReq, certSerialId, false);
   }
 
   /**
@@ -308,12 +325,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    *
    * @param scmNodeDetails   - SCM Node Details.
    * @param certSignReq      - Certificate signing request.
+   * @param certSerialId    - Certificate Id
    * @param isRenew          - if SCM is renewing certificate or not.
    * @return String          - SCM signed pem encoded certificate.
    */
   @Override
   public String getSCMCertificate(ScmNodeDetailsProto scmNodeDetails,
-      String certSignReq, boolean isRenew) throws IOException {
+      String certSignReq, String certSerialId, boolean isRenew)
+      throws IOException {
     Objects.requireNonNull(scmNodeDetails);
     // Check clusterID
     if (!storageContainerManager.getClusterId().equals(
@@ -327,10 +346,16 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), isRenew, config,
         "getSCMCertificate");
 
+    if (Strings.isNullOrEmpty(certSerialId)) {
+      certSerialId = getNextCertificateId();
+      LOGGER.warn("SCM certificate serial ID is null. Set it to {}" +
+          certSerialId);
+    }
+
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM);
+    return getEncodedCertToString(certSignReq, NodeType.SCM, certSerialId);
   }
 
   /**
@@ -341,14 +366,15 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    * @throws IOException
    */
   private synchronized String getEncodedCertToString(String certSignReq,
-      NodeType nodeType) throws IOException {
+      NodeType nodeType, String certSerialId) throws IOException {
     Future<CertPath> future;
+    PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
-      future = rootCertificateServer.requestCertificate(certSignReq,
-          KERBEROS_TRUSTED, nodeType);
+      future = rootCertificateServer.requestCertificate(csr,
+          KERBEROS_TRUSTED, nodeType, certSerialId);
     } else {
-      future = scmCertificateServer.requestCertificate(certSignReq,
-          KERBEROS_TRUSTED, nodeType);
+      future = scmCertificateServer.requestCertificate(csr,
+          KERBEROS_TRUSTED, nodeType, certSerialId);
     }
     try {
       return getPEMEncodedString(future.get());
@@ -517,6 +543,11 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       pemEncodedCerts.add(CertificateCodec.getPEMEncodedString(cert));
     }
     return pemEncodedCerts;
+  }
+
+  @Override
+  public String getNextCertificateId() throws IOException{
+    return String.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
   }
 
   public SCMUpdateServiceGrpcServer getGrpcUpdateServer() {

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevoke
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetNextCertificateIdResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
@@ -159,7 +160,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .setRemoveExpiredCertificatesResponseProto(
                 removeExpiredCertificates())
             .build();
-
+      case GetNextCertificateId:
+        return scmSecurityResponse.setGetNextCertificateIdResponseProto(
+            getNextCertificateId()).build();
       default:
         throw new IllegalArgumentException(
             "Unknown request type: " + request.getCmdType());
@@ -259,7 +262,9 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       throw createNotHAException();
     }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
-        request.getCSR(), request.hasRenew() && request.getRenew());
+        request.getCSR(),
+        request.hasCertSerialId() ? request.getCertSerialId() : null,
+        request.hasRenew() && request.getRenew());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
@@ -399,6 +404,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .addAllCertificates(certs);
     return builder.build();
 
+  }
+
+  public SCMGetNextCertificateIdResponseProto getNextCertificateId()
+      throws IOException {
+    return SCMGetNextCertificateIdResponseProto.newBuilder()
+        .setCertSerialId(impl.getNextCertificateId())
+        .build();
   }
 
   private SCMSecurityException createNotHAException() {

@@ -100,7 +100,7 @@ public final class HASecurityUtils {
     SecurityConfig securityConfig = new SecurityConfig(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
         getScmSecurityClientWithMaxRetry(conf, getCurrentUser());
-    try (CertificateClient certClient =
+    try (SCMCertificateClient certClient =
         new SCMCertificateClient(securityConfig, scmSecurityClient,
             scmStorageConfig.getScmId(), scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmCertSerialId(), scmHostname)) {
@@ -137,13 +137,19 @@ public final class HASecurityUtils {
    * client.
    */
   private static void getRootCASignedSCMCert(
-      OzoneConfiguration configuration, CertificateClient client,
+      OzoneConfiguration configuration, SCMCertificateClient client,
       SecurityConfig securityConfig,
       SCMStorageConfig scmStorageConfig, String scmHostname) {
     try {
+      // Create SCM security client.
+      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
+          getScmSecurityClientWithFixedDuration(configuration);
+
+      // Fetch SCM certificate ID
+      String certId = secureScmClient.getNextCertificateId();
       // Generate CSR.
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          securityConfig, scmHostname);
+          securityConfig, scmHostname, certId);
 
       ScmNodeDetailsProto scmNodeDetailsProto =
           ScmNodeDetailsProto.newBuilder()
@@ -151,13 +157,10 @@ public final class HASecurityUtils {
               .setHostName(scmHostname)
               .setScmNodeId(scmStorageConfig.getScmId()).build();
 
-      // Create SCM security client.
-      SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          getScmSecurityClientWithFixedDuration(configuration);
-
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response = secureScmClient.
-          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
+          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr),
+              certId, false);
       String pemEncodedCert = response.getX509Certificate();
 
       // Store SCM sub CA and root CA certificate.
@@ -189,21 +192,22 @@ public final class HASecurityUtils {
    * For primary SCM get sub-ca signed certificate and root CA certificate by
    * root CA certificate server and store it using certificate client.
    */
-  private static void getPrimarySCMSelfSignedCert(CertificateClient client,
+  private static void getPrimarySCMSelfSignedCert(SCMCertificateClient client,
       SecurityConfig config, SCMStorageConfig scmStorageConfig,
       String scmHostname) {
-
     try {
-
       CertificateServer rootCAServer =
           initializeRootCertificateServer(config, null, scmStorageConfig,
               new DefaultCAProfile());
 
+      // First SCM sub CA certificate ID 2
+      String certId = BigInteger.ONE.add(BigInteger.ONE).toString();
+
       PKCS10CertificationRequest csr = generateCSR(client, scmStorageConfig,
-          config, scmHostname);
+          config, scmHostname, certId);
 
       CertPath subSCMCertHolderList = rootCAServer.
-          requestCertificate(csr, KERBEROS_TRUSTED, SCM).get();
+          requestCertificate(csr, KERBEROS_TRUSTED, SCM, certId).get();
 
       CertPath rootCACertificatePath =
           rootCAServer.getCaCertPath();
@@ -287,13 +291,13 @@ public final class HASecurityUtils {
    * Generate CSR to obtain SCM sub CA certificate.
    */
   private static PKCS10CertificationRequest generateCSR(
-      CertificateClient client, SCMStorageConfig scmStorageConfig,
-      SecurityConfig config, String scmHostname)
+      SCMCertificateClient client, SCMStorageConfig scmStorageConfig,
+      SecurityConfig config, String scmHostname, String certSerialId)
       throws IOException {
-    CertificateSignRequest.Builder builder = client.getCSRBuilder();
+    CertificateSignRequest.Builder builder = client.getCSRBuilder(certSerialId);
 
     // Get host name.
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
+    String subject = String.format(SCM_SUB_CA_PREFIX, certSerialId)
         + scmHostname;
 
     builder.setConfiguration(config)

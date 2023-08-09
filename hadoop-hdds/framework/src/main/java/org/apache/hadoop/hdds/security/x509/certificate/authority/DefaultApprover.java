@@ -84,6 +84,7 @@ public class DefaultApprover extends BaseApprover {
    * @param certificationRequest - Certification Request.
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
+   * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
@@ -98,7 +99,8 @@ public class DefaultApprover extends BaseApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId) throws IOException,
+      String clusterId,
+      String certSerialId) throws IOException,
       OperatorCreationException {
 
     AlgorithmIdentifier sigAlgId = new
@@ -144,8 +146,7 @@ public class DefaultApprover extends BaseApprover {
     X509v3CertificateBuilder certificateGenerator =
         new X509v3CertificateBuilder(
             caCertificate.getSubject(),
-            // Serial is not sequential but it is monotonically increasing.
-            BigInteger.valueOf(generateSerialId()),
+            new BigInteger(certSerialId),
             validFrom,
             validTill,
             x500Name, keyInfo);
@@ -171,12 +172,6 @@ public class DefaultApprover extends BaseApprover {
 
     return certificateGenerator.build(sigGen);
 
-  }
-
-  public long generateSerialId() {
-    // TODO: to make generation of serialId distributed.
-    // This issue will be fixed in HDDS-4999.
-    return Time.monotonicNowNanos();
   }
 
   @Override
