@@ -25,17 +25,13 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .StorageTypeProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -45,6 +41,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 
@@ -61,12 +58,12 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   }
 
   @Test
-  public void preExecuteRejectsInvalidBucketName() throws Exception {
+  public void preExecuteRejectsInvalidBucketName() {
     // Verify invalid bucket name throws exception
-    LambdaTestUtils.intercept(OMException.class, "Invalid bucket name: b1",
+    OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("volume1", "b1"));
+    assertEquals("Invalid bucket name: b1", omException.getMessage());
   }
-
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {

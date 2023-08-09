@@ -53,6 +53,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.run
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -112,10 +113,12 @@ public class TestReconAsPassiveScm {
     });
 
     // Verify we can never create a pipeline in Recon.
-    LambdaTestUtils.intercept(UnsupportedOperationException.class,
-        "Trying to create pipeline in Recon, which is prohibited!",
+    UnsupportedOperationException exception = assertThrows(
+        UnsupportedOperationException.class,
         () -> reconPipelineManager
             .createPipeline(RatisReplicationConfig.getInstance(ONE)));
+    assertTrue(exception.getMessage()
+        .contains("Trying to create pipeline in Recon, which is prohibited!"));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainers().isEmpty());
