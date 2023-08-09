@@ -127,8 +127,9 @@ public final class S3ErrorTable {
       "Conflict", "Cannot overwrite file with directory", HTTP_CONFLICT);
 
   public static final OS3Exception METADATA_TOO_LARGE = new OS3Exception(
-      "MetadataTooLarge", "Your metadata headers exceed the maximum allowed " +
-      "metadata size.", HTTP_BAD_REQUEST);
+      "MetadataTooLarge", "Illegal user defined metadata. Combined size " +
+      "exceeds the maximum allowed metadata size of 2KB",
+      HTTP_BAD_REQUEST);
 
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
