@@ -116,6 +116,7 @@ public class TestOmSnapshotUtils {
   public void testProcessSnapshotLogicInSDS(SnapshotInfo snapshotInfo,
       SnapshotInfo.SnapshotStatus status, boolean isSstFilteringSvcEnabled,
       boolean expectedOutcome) {
+    snapshotInfo.setSnapshotStatus(status);
     assertEquals(expectedOutcome,
         SnapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo,
             isSstFilteringSvcEnabled));
