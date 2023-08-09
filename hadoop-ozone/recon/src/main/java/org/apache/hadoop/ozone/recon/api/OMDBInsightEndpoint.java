@@ -534,7 +534,7 @@ public class OMDBInsightEndpoint {
    * Fetches the size of a deleted directory identified by the given path.
    * The size is obtained from the NSSummary table using the directory objectID.
    * The path is expected to be in the format :-
-   * "volumeId/bucketId/parentId/dirName/dirObjectId".
+   * "/volumeId/bucketId/parentId/dirName/dirObjectId".
    *
    * @param path The path of the deleted directory.
    * @return The size of the deleted directory.
@@ -548,12 +548,12 @@ public class OMDBInsightEndpoint {
     }
 
     String[] parts = path.split("/");
-    if (parts.length < 6) {
+    if (parts.length != 6) {
       LOG.error("Invalid path format: {}", path);
       return 0L;
     }
     /* DB key in DeletedDirectoryTable =>
-                      "volumeId/bucketId/parentId/dirName/dirObjectId" */
+                      "/volumeId/bucketId/parentId/dirName/dirObjectId" */
     String directoryObjectId = parts[5];
 
     try {

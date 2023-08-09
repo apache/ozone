@@ -708,11 +708,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Add 3 entries to deleted dir table for directory dir1, dir2 and dir3
     // having object id 1, 2 and 3 respectively
     reconOMMetadataManager.getDeletedDirTable()
-        .put("/18/28/22/dir1/1", omKeyInfo1);
+        .put("/18/21/21/dir1/1", omKeyInfo1);
     reconOMMetadataManager.getDeletedDirTable()
-        .put("/18/26/23/dir2/2", omKeyInfo2);
+        .put("/18/26/26/dir2/2", omKeyInfo2);
     reconOMMetadataManager.getDeletedDirTable()
-        .put("/18/21/25/dir3/3", omKeyInfo3);
+        .put("/18/28/28/dir3/3", omKeyInfo3);
 
     // Prepare NS summary data and populate the table
     Table<Long, NSSummary> table = omdbInsightEndpoint.getNsSummaryTable();
@@ -729,15 +729,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertNotNull(keyInsightInfoResp);
     Assertions.assertEquals(3,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    // Assert the total size under directory dir3 is 7L
-    Assertions.assertEquals(7L,
+    // Assert the total size under directory dir1 is 5L
+    Assertions.assertEquals(5L,
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getSize());
     // Assert the total size under directory dir2 is 6L
     Assertions.assertEquals(6L,
         keyInsightInfoResp.getDeletedDirInfoList().get(1).getSize());
-    // Assert the total size under directory dir1 is 5L
-    Assertions.assertEquals(5L,
+    // Assert the total size under directory dir3 is 7L
+    Assertions.assertEquals(7L,
         keyInsightInfoResp.getDeletedDirInfoList().get(2).getSize());
+
     // Assert the total of all the deleted directories is 18L
     Assertions.assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
   }
