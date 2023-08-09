@@ -264,7 +264,7 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
           TimeUnit.MILLISECONDS);
-      if (serviceInterval != DISABLE_VALUE) {
+      if (isSstFilteringSvcEnabled()) {
         snapshotSstFilteringService =
             new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
                 serviceTimeout, ozoneManager, configuration);
@@ -640,6 +640,15 @@ public class KeyManagerImpl implements KeyManager {
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
   }
+
+  public boolean isSstFilteringSvcEnabled() {
+    long serviceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+            OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    return serviceInterval != DISABLE_VALUE;
+  }
+
 
   @Override
   public OmMultipartUploadList listMultipartUploads(String volumeName,
