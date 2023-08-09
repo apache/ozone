@@ -1130,11 +1130,17 @@ public class SnapshotDiffManager implements AutoCloseable {
         fsTable.getName().equals(DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
-
+    char[] upperBoundCharArray = tablePrefix.toCharArray();
+    upperBoundCharArray[upperBoundCharArray.length -1] += 1;
+    Optional<String> sstFileReaderLowerBound = Optional.of(tablePrefix);
+    Optional<String> sstFileReaderUpperBound =
+        Optional.of(String.valueOf(upperBoundCharArray));
     try (Stream<String> keysToCheck =
              nativeRocksToolsLoaded && sstDumpTool.isPresent()
-                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get())
-                 : sstFileReader.getKeyStream()) {
+                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get(),
+                 sstFileReaderLowerBound, sstFileReaderUpperBound)
+                 : sstFileReader.getKeyStream(sstFileReaderLowerBound,
+                 sstFileReaderUpperBound)) {
       keysToCheck.forEach(key -> {
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);

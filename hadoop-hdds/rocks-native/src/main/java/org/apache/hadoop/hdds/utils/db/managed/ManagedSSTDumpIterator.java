@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.collect.Maps;
 import com.google.common.primitives.UnsignedLong;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.StringUtils;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,9 +60,16 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   private AtomicBoolean open;
   private StackTraceElement[] stackTrace;
 
+  public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
+      String sstFilePath, ManagedOptions options)
+      throws NativeLibraryNotLoadedException, IOException {
+    this(sstDumpTool, sstFilePath, options, Optional.empty(), Optional.empty());
+  }
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
-                                String sstFilePath, ManagedOptions options)
+                                String sstFilePath, ManagedOptions options,
+                                Optional<String> lowerKeyBound,
+                                Optional<String> upperKeyBound)
       throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
@@ -71,7 +80,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       throw new IOException(String.format("Path given: %s is not a file",
           sstFile.getAbsolutePath()));
     }
-    init(sstDumpTool, sstFile, options);
+    init(sstDumpTool, sstFile, options, lowerKeyBound, upperKeyBound);
     this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
@@ -126,11 +135,16 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-                    ManagedOptions options)
+                    ManagedOptions options, Optional<String> lowerKeyBound,
+                    Optional<String> upperKeyBound)
       throws NativeLibraryNotLoadedException {
-    String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan",
-        "--silent"};
-    this.sstDumpToolTask = sstDumpTool.run(args, options);
+    Map<String, String> argMap = Maps.newHashMap();
+    argMap.put("file", sstFile.getAbsolutePath());
+    argMap.put("silent", null);
+    argMap.put("command", "scan");
+    lowerKeyBound.ifPresent(s -> argMap.put("from", s));
+    upperKeyBound.ifPresent(s -> argMap.put("to", s));
+    this.sstDumpToolTask = sstDumpTool.run(argMap, options);
     processOutput = sstDumpToolTask.getPipedOutput();
     intBuffer = new byte[4];
     open = new AtomicBoolean(true);

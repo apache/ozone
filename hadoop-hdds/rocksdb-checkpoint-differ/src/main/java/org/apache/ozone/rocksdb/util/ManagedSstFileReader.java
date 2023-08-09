@@ -19,6 +19,7 @@
 package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -89,6 +90,11 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStream() throws RocksDBException {
+    return getKeyStream(Optional.empty(), Optional.empty());
+  }
+
+  public Stream<String> getKeyStream(Optional<String> lowerBound,
+      Optional<String> upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
@@ -99,6 +105,12 @@ public class ManagedSstFileReader {
           protected void init() {
             this.options = new ManagedOptions();
             this.readOptions = new ManagedReadOptions();
+            lowerBound.ifPresent(
+                s -> readOptions.setIterateLowerBound(new ManagedSlice(
+                    StringUtils.string2Bytes(s))));
+            upperBound.ifPresent(
+                s -> readOptions.setIterateUpperBound(new ManagedSlice(
+                    StringUtils.string2Bytes(s))));
           }
 
           @Override
@@ -125,6 +137,13 @@ public class ManagedSstFileReader {
 
   public Stream<String> getKeyStreamWithTombstone(
       ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
+    return getKeyStreamWithTombstone(sstDumpTool,
+        Optional.empty(), Optional.empty());
+  }
+
+  public Stream<String> getKeyStreamWithTombstone(
+      ManagedSSTDumpTool sstDumpTool, Optional<String> lowerBound,
+      Optional<String> upperBound) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
@@ -139,7 +158,7 @@ public class ManagedSstFileReader {
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                options) {
+                options, lowerBound, upperBound) {
               @Override
               protected String getTransformedValue(Optional<KeyValue> value) {
                 return value.map(v -> StringUtils.bytes2String(v.getKey()))

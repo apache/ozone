@@ -648,9 +648,9 @@ public class TestSnapshotDiffManager {
     try (MockedConstruction<ManagedSstFileReader> mockedSSTFileReader =
              Mockito.mockConstruction(ManagedSstFileReader.class,
                  (mock, context) -> {
-                   when(mock.getKeyStreamWithTombstone(any()))
+                   when(mock.getKeyStreamWithTombstone(any(), any(), any()))
                        .thenReturn(keysIncludingTombstones.stream());
-                   when(mock.getKeyStream())
+                   when(mock.getKeyStream(any(), any()))
                        .thenReturn(keysExcludingTombstones.stream());
                  });
          MockedConstruction<ManagedSSTDumpTool> mockedSSTDumpTool =
