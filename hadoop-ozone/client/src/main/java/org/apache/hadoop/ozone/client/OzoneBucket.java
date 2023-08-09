@@ -1205,14 +1205,18 @@ public class OzoneBucket extends WithMetadata {
         if (nextOneKeys.isEmpty()) {
           return nextOneKeys;
         }
-        // startKey is guaranteed to be sorted after or equal keyPrefix.
-        // If the result includes keyPrefix, itself needs to be added to the
-        // result. For example, keyPrefix='test/', prevKey="", then 'test/'
-        // will be in the list result.
+        // Special case: ListKey expects keyPrefix element should present in
+        // the resultList if startKey is blank or equals to keyPrefix.
+        // The nextOneKey needs be added to the result because it will not be
+        // present when using the 'listStatus' method.
+        // Consider the case, keyPrefix="test/", prevKey="" or 'test1/',
+        // then 'test/' will be added to the list result.
         startKey = nextOneKeys.get(0).getName();
-        if (startKey.equals(getKeyPrefix())) {
+        if (getKeyPrefix().endsWith(OZONE_URI_DELIMITER) &&
+            startKey.equals(getKeyPrefix())) {
           resultList.add(nextOneKeys.get(0));
         }
+
         // prepare delimiterKeyPrefix
         delimiterKeyPrefix = getKeyPrefix();
         if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
@@ -1232,9 +1236,18 @@ public class OzoneBucket extends WithMetadata {
         setAddedKeyPrefix(true);
       }
 
-      // If statuses is empty after filtering, indicating that
-      // already no result matching the keyPrefix.
-      List<OzoneKey> ozoneKeys = statuses.stream()
+      List<OzoneKey> ozoneKeys = buildOzoneKeysFromFileStatus(statuses)
+          .stream()
+          .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
+          .collect(Collectors.toList());
+
+      resultList.addAll(ozoneKeys);
+      return resultList;
+    }
+
+    private List<OzoneKey> buildOzoneKeysFromFileStatus(
+        List<OzoneFileStatus> statuses) {
+      return statuses.stream()
           .map(status -> {
             OmKeyInfo keyInfo = status.getKeyInfo();
             String keyName = keyInfo.getKeyName();
@@ -1248,12 +1261,9 @@ public class OzoneBucket extends WithMetadata {
                 keyInfo.getModificationTime(),
                 keyInfo.getReplicationConfig(), keyInfo.isFile());
           })
-          .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
           .collect(Collectors.toList());
-
-      resultList.addAll(ozoneKeys);
-      return resultList;
     }
+
   }
 
 
