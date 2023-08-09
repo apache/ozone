@@ -98,10 +98,16 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     Result result;
     boolean isHSync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();
+
     if (isHSync) {
       omMetrics.incNumKeyHSyncs();
     } else {
       omMetrics.incNumKeyCommits();
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+          isHSync, volumeName, bucketName, keyName);
     }
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();

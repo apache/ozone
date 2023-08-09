@@ -184,15 +184,11 @@ public class OmKeyLocationInfoGroup {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("version:").append(version).append(" ");
-    sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
-    for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
-      for (OmKeyLocationInfo kli: kliList) {
-        sb.append(kli.getLocalID()).append(" || ");
-      }
-    }
-    return sb.toString();
+    return "OmKeyLocationInfoGroup{" +
+        "version=" + version +
+        ", locationVersionMap=" + locationVersionMap +
+        ", isMultipartKey=" + isMultipartKey +
+        '}';
   }
 
   @Override

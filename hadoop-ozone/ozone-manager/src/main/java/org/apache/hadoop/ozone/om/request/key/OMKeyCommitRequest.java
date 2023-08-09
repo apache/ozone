@@ -143,6 +143,12 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     boolean isHSync = commitKeyRequest.hasHsync() &&
             commitKeyRequest.getHsync();
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+          isHSync, volumeName, bucketName, keyName);
+    }
+
     try {
       commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
       volumeName = commitKeyArgs.getVolumeName();
