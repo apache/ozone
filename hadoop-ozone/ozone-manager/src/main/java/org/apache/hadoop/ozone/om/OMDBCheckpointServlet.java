@@ -18,20 +18,21 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,16 +48,23 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeFile;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.createHardLinkList;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
@@ -71,7 +79,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
- * If Kerberos is not enabled, simply append the login user name to
+ * If Kerberos is not enabled, simply append the login username to
  * `ozone.administrator`, e.g. `scm`
  */
 public class OMDBCheckpointServlet extends DBCheckpointServlet {
@@ -79,7 +87,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
-
+  private transient BootstrapStateHandler.Lock lock;
+  private long maxTotalSstSize = 0;
   @Override
   public void init() throws ServletException {
 
@@ -110,48 +119,94 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+
+    lock = new Lock(om);
   }
 
   @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
-                                  OutputStream destination)
+                                  OutputStream destination,
+                                  List<String> toExcludeList,
+                                  List<String> excludedList)
       throws IOException, InterruptedException {
-    // Map of inodes to path.
-    Map<Object, Path> copyFiles = new HashMap<>();
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
+
+    // Files to be added to tarball
+    Set<Path> copyFiles = new HashSet<>();
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    getFilesForArchive(checkpoint, copyFiles, hardLinkFiles,
-        includeSnapshotData(request));
-
     try (TarArchiveOutputStream archiveOutputStream =
-            new TarArchiveOutputStream(destination)) {
+             new TarArchiveOutputStream(destination)) {
       archiveOutputStream
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream);
+      archiveOutputStream
+          .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+      // Files to be excluded from tarball
+      Set<Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
+          checkpoint.getCheckpointLocation());
+      boolean completed = getFilesForArchive(checkpoint, copyFiles,
+          hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
+          excludedList);
+      writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
+          completed, checkpoint.getCheckpointLocation());
+    } catch (Exception e) {
+      LOG.error("got exception writing to archive " + e);
+      throw e;
     }
   }
 
-  private void getFilesForArchive(DBCheckpoint checkpoint,
-                                  Map<Object, Path> copyFiles,
+  // Format list from follower to match data on leader.
+  @VisibleForTesting
+  public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
+                                               Path checkpointLocation) {
+    Set<Path> paths = new HashSet<>();
+    for (String s : toExcludeList) {
+      if (!s.startsWith(OM_SNAPSHOT_DIR)) {
+        Path fixedPath = Paths.get(checkpointLocation.toString(), s);
+        paths.add(fixedPath);
+      } else {
+        Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
+        paths.add(
+            Paths.get(metaDirPath.toString(),
+                s));
+      }
+    }
+    return paths;
+  }
+
+  private boolean getFilesForArchive(DBCheckpoint checkpoint,
+                                  Set<Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
-                                  boolean includeSnapshotData)
+                                  Set<Path> toExcludeFiles,
+                                  boolean includeSnapshotData,
+                                  List<String> excluded)
       throws IOException {
 
+    maxTotalSstSize = getConf().getLong(
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY,
+        OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT);
+
+    AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    processDir(dir, copyFiles, hardLinkFiles, new HashSet<>());
+    if (!processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
+        new HashSet<>(), excluded, copySize)) {
+      return false;
+    }
 
     if (!includeSnapshotData) {
-      return;
+      return true;
     }
 
     // Get the snapshot files.
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
-    processDir(snapshotDir, copyFiles, hardLinkFiles, snapshotPaths);
+    return processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
+        snapshotPaths, excluded, copySize);
   }
 
   /**
@@ -182,6 +237,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         waitForDirToExist(path);
         snapshotPaths.add(path);
       }
+    } finally {
+      checkpointMetadataManager.stop();
     }
     return snapshotPaths;
   }
@@ -192,9 +249,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  private void processDir(Path dir, Map<Object, Path> copyFiles,
+  private boolean processDir(Path dir, Set<Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
-                          Set<Path> snapshotPaths)
+                          Set<Path> toExcludeFiles,
+                          Set<Path> snapshotPaths,
+                          List<String> excluded,
+                          AtomicLong copySize)
       throws IOException {
     try (Stream<Path> files = Files.list(dir)) {
       for (Path file : files.collect(Collectors.toList())) {
@@ -207,24 +267,82 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             LOG.debug("Skipping unneeded file: " + file);
             continue;
           }
-          processDir(file, copyFiles, hardLinkFiles, snapshotPaths);
+          if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
+                          snapshotPaths, excluded, copySize)) {
+            return false;
+          }
         } else {
-          processFile(file, copyFiles, hardLinkFiles);
+          long fileSize = processFile(file, copyFiles, hardLinkFiles,
+              toExcludeFiles, excluded);
+          if (copySize.get() + fileSize > maxTotalSstSize) {
+            return false;
+          } else {
+            copySize.addAndGet(fileSize);
+          }
         }
       }
     }
+    return true;
   }
 
-  private void processFile(Path file, Map<Object, Path> copyFiles,
-                           Map<Path, Path> hardLinkFiles) throws IOException {
-    // Get the inode.
-    Object key = OmSnapshotUtils.getINode(file);
-    // If we already have the inode, store as hard link.
-    if (copyFiles.containsKey(key)) {
-      hardLinkFiles.put(file, copyFiles.get(key));
+  /**
+   * Takes a db file and determines whether it should be included in
+   * the tarball, or added as a link, or excluded altogether.
+   * Uses the toExcludeFiles list to know what already
+   * exists on the follower.
+   * @param file The db file to be processed.
+   * @param copyFiles The db files to be added to tarball.
+   * @param hardLinkFiles The db files to be added as hard links.
+   * @param toExcludeFiles The db files to be excluded from tarball.
+   * @param excluded The list of db files that actually were excluded.
+   */
+  @VisibleForTesting
+  public static long processFile(Path file, Set<Path> copyFiles,
+                                 Map<Path, Path> hardLinkFiles,
+                                 Set<Path> toExcludeFiles,
+                                 List<String> excluded) throws IOException {
+    long fileSize = 0;
+    if (toExcludeFiles.contains(file)) {
+      excluded.add(file.toString());
     } else {
-      copyFiles.put(key, file);
+      Path fileNamePath = file.getFileName();
+      if (fileNamePath == null) {
+        throw new NullPointerException("Bad file: " + file);
+      }
+      String fileName = fileNamePath.toString();
+      if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
+        // If same as existing excluded file, add a link for it.
+        Path linkPath = findLinkPath(toExcludeFiles, fileName);
+        if (linkPath != null) {
+          hardLinkFiles.put(file, linkPath);
+        } else {
+          // If already in tarball add a link for it.
+          linkPath = findLinkPath(copyFiles, fileName);
+          if (linkPath != null) {
+            hardLinkFiles.put(file, linkPath);
+          } else {
+            // Add to tarball.
+            copyFiles.add(file);
+            fileSize = Files.size(file);
+          }
+        }
+      } else {
+        // Not sst file.
+        copyFiles.add(file);
+      }
     }
+    return fileSize;
+  }
+
+  // If fileName exists in "files" parameter,
+  // it should be linked to path in files.
+  private static Path findLinkPath(Set<Path> files, String fileName) {
+    for (Path p: files) {
+      if (p.toString().endsWith(fileName)) {
+        return p;
+      }
+    }
+    return null;
   }
 
   // Returns value of http request parameter.
@@ -234,16 +352,27 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return Boolean.parseBoolean(includeParam);
   }
 
-  private void writeFilesToArchive(Map<Object, Path> copyFiles,
-                         Map<Path, Path> hardLinkFiles,
-                         ArchiveOutputStream archiveOutputStream)
+  private void writeFilesToArchive(
+      Set<Path> copyFiles,
+      Map<Path, Path> hardLinkFiles,
+      ArchiveOutputStream archiveOutputStream,
+      boolean completed,
+      Path checkpointLocation)
       throws IOException {
-
-    File metaDirPath = ServerUtils.getOzoneMetaDirPath(getConf());
+    Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
     int truncateLength = metaDirPath.toString().length() + 1;
 
+    Set<Path> filteredCopyFiles = completed ? copyFiles :
+        copyFiles.stream().filter(path ->
+          path.getFileName().toString().toLowerCase().endsWith(".sst")).
+          collect(Collectors.toSet());
+
     // Go through each of the files to be copied and add to archive.
-    for (Path file : copyFiles.values()) {
+    for (Path file : filteredCopyFiles) {
+      if (!file.toString().startsWith(metaDirPath.toString())) {
+        throw new RuntimeException("tarball file not in metadata dir: "
+            + file + ": " + metaDirPath);
+      }
       String fixedFile = truncateFileName(truncateLength, file);
       if (fixedFile.startsWith(OM_CHECKPOINT_DIR)) {
         // checkpoint files go to root of tarball
@@ -255,17 +384,82 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       includeFile(file.toFile(), fixedFile, archiveOutputStream);
     }
 
-    // Create list of hard links.
-    if (!hardLinkFiles.isEmpty()) {
-      Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-      includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
-          archiveOutputStream);
+    if (completed) {
+      // Only create the hard link list for the last tarball.
+      if (!hardLinkFiles.isEmpty()) {
+        Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
+        includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
+            archiveOutputStream);
+      }
+      // Mark tarball completed.
+      includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
+  }
+
+  @NotNull
+  private static Path getVerifiedCheckPointPath(Path checkpointLocation) {
+    // This check is done to take care of findbug else below getParent()
+    // should not be null.
+    Path locationParent = checkpointLocation.getParent();
+    if (null == locationParent) {
+      throw new RuntimeException(
+          "checkpoint location's immediate parent is null.");
+    }
+    Path parent = locationParent.getParent();
+    if (null == parent) {
+      throw new RuntimeException(
+          "checkpoint location's path is invalid and could not be verified.");
+    }
+    return parent;
   }
 
   private OzoneConfiguration getConf() {
     return ((OzoneManager) getServletContext()
         .getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE))
         .getConfiguration();
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
+
+  static class Lock extends BootstrapStateHandler.Lock {
+    private final BootstrapStateHandler keyDeletingService;
+    private final BootstrapStateHandler sstFilteringService;
+    private final BootstrapStateHandler rocksDbCheckpointDiffer;
+    private final BootstrapStateHandler snapshotDeletingService;
+    private final OzoneManager om;
+
+    Lock(OzoneManager om) {
+      this.om = om;
+      keyDeletingService = om.getKeyManager().getDeletingService();
+      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
+      rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
+          .getRocksDBCheckpointDiffer();
+      snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+    }
+
+    @Override
+    public BootstrapStateHandler.Lock lock()
+        throws InterruptedException {
+      // First lock all the handlers.
+      keyDeletingService.getBootstrapStateLock().lock();
+      sstFilteringService.getBootstrapStateLock().lock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
+      snapshotDeletingService.getBootstrapStateLock().lock();
+
+      // Then wait for the double buffer to be flushed.
+      om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      return this;
+    }
+
+    @Override
+    public void unlock() {
+      snapshotDeletingService.getBootstrapStateLock().unlock();
+      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
+      sstFilteringService.getBootstrapStateLock().unlock();
+      keyDeletingService.getBootstrapStateLock().unlock();
+    }
   }
 }

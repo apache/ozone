@@ -27,11 +27,35 @@
     <dependencies>
         <dependency>
             <groupId>org.apache.ozone</groupId>
+            <artifactId>hdds-test-utils</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ozone</groupId>
             <artifactId>hdds-managed-rocksdb</artifactId>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-io</artifactId>
+        </dependency>
+      <dependency>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-annotations</artifactId>
+        <scope>compile</scope>
+      </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <properties>
@@ -168,19 +192,20 @@
                     </plugin>
                     <plugin>
                         <artifactId>maven-antrun-plugin</artifactId>
+                        <version>${maven-antrun-plugin.version}</version>
                         <executions>
                             <execution>
                                 <id>unzip-artifact</id>
                                 <phase>generate-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
                                         <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
                                         <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
                                         <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
                                         <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
                                         <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -190,14 +215,14 @@
                                 <id>build-zlib</id>
                                 <phase>process-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
                                         <exec executable="./configure" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
                                             <arg line="--static"/>
                                             <env key="CFLAGS" value="-fPIC"/>
                                         </exec>
                                         <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -207,11 +232,11 @@
                                 <id>build-bzip2</id>
                                 <phase>process-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
                                             <arg line="CFLAGS='-fPIC'"/>
                                         </exec>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -221,11 +246,11 @@
                                 <id>build-lz4</id>
                                 <phase>process-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
                                             <arg line="CFLAGS='-fPIC'"/>
                                         </exec>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -235,11 +260,11 @@
                                 <id>build-zstd</id>
                                 <phase>process-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
                                             <arg line="CFLAGS='-fPIC'"/>
                                         </exec>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -249,7 +274,7 @@
                                 <id>build-snappy</id>
                                 <phase>process-sources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <mkdir dir="${project.build.directory}/snappy/lib"/>
                                         <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
                                             <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
@@ -257,7 +282,7 @@
                                             <env key="CXXFLAGS" value="-fPIC"/>
                                         </exec>
                                         <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -265,9 +290,9 @@
                             </execution>
                             <execution>
                                 <id>build-rocksjava</id>
-                                <phase>process-resources</phase>
+                                <phase>generate-resources</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <exec executable="chmod" failonerror="true">
                                             <arg line="-R"/>
                                             <arg line="775"/>
@@ -280,7 +305,7 @@
                                             <arg line="-j${system.numCores}"/>
                                             <arg line="tools"/>
                                         </exec>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -290,7 +315,7 @@
                                 <id>build-rocks-tools</id>
                                 <phase>process-classes</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <mkdir dir="${project.build.directory}/native/rocksdb"/>
                                         <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
                                             <env key="CFLAGS" value="-fPIC"/>
@@ -309,7 +334,7 @@
                                             <arg line="-DZSTD_LIB=${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
                                         </exec>
                                         <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -317,13 +342,13 @@
                             </execution>
                             <execution>
                                 <id>copy-lib-file</id>
-                                <phase>prepare-package</phase>
+                                <phase>process-classes</phase>
                                 <configuration>
-                                    <tasks>
+                                    <target>
                                         <copy toDir="${project.build.outputDirectory}">
                                             <fileset dir="${project.build.directory}/native/rocksdb" includes="**/lib*.*" />
                                         </copy>
-                                    </tasks>
+                                    </target>
                                 </configuration>
                                 <goals>
                                     <goal>run</goal>
@@ -343,6 +368,14 @@
                                 <include>**/lib*.jnilib</include>
                                 <include>**/lib*.dll</include>
                             </includes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <groups>native</groups>
+                            <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -384,13 +417,31 @@
         <profile>
             <id>java-11</id>
             <activation>
-                <jdk>11</jdk>
+                <jdk>[11,]</jdk>
                 <property>
                     <name>rocks_tools_native</name>
                 </property>
             </activation>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-jars</id>
+                                <phase>process-sources</phase>
+                                <goals>
+                                    <goal>copy-dependencies</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                                    <includeScope>runtime</includeScope>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
@@ -404,8 +455,8 @@
                                 <configuration>
                                     <executable>${env.JAVA_HOME}/bin/javac</executable>
                                     <arguments>
-                                        <argument>-classpath</argument>
-                                        <argument>${project.build.outputDirectory}</argument>
+                                        <argument>-cp</argument>
+                                        <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
                                         <argument>-h</argument>
                                         <argument>${project.build.directory}/native/javah</argument>
                                         <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>

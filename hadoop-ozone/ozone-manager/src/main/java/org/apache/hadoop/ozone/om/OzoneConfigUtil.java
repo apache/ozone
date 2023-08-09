@@ -44,20 +44,6 @@ public final class OzoneConfigUtil {
   }
 
   /**
-   * Return list of OzoneAdministrators from config.
-   * The service startup user will default to an admin.
-   */
-  static Collection<String> getOzoneAdminsFromConfig(OzoneConfiguration conf,
-      String starterUser) {
-    Collection<String> ozAdmins = conf.getTrimmedStringCollection(
-        OZONE_ADMINISTRATORS);
-    if (!ozAdmins.contains(starterUser)) {
-      ozAdmins.add(starterUser);
-    }
-    return ozAdmins;
-  }
-
-  /**
    * Return list of s3 administrators prop from config.
    *
    * If ozone.s3.administrators value is empty string or unset,
@@ -75,11 +61,6 @@ public final class OzoneConfigUtil {
       ozAdmins.add(omSPN);
     }
     return ozAdmins;
-  }
-
-  static Collection<String> getOzoneAdminsGroupsFromConfig(
-      OzoneConfiguration conf) {
-    return conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS_GROUPS);
   }
 
   static Collection<String> getS3AdminsGroupsFromConfig(

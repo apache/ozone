@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -91,7 +90,8 @@ public class OMSetSecretRequest extends OMClientRequest {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final UserGroupInformation ugi =
+        S3SecretRequestHelper.getOrCreateUgi(accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
@@ -126,7 +126,7 @@ public class OMSetSecretRequest extends OMClientRequest {
               newS3SecretValue = new S3SecretValue(accessId, secretKey);
 
               s3SecretManager
-                  .updateCache(accessId, newS3SecretValue, transactionLogIndex);
+                  .updateCache(accessId, newS3SecretValue);
             } else {
               // If S3SecretTable is not updated,
               // throw ACCESS_ID_NOT_FOUND exception.
@@ -164,8 +164,7 @@ public class OMSetSecretRequest extends OMClientRequest {
     if (exception == null) {
       LOG.debug("Success: SetSecret for accessKey '{}'", accessId);
     } else {
-      LOG.error("Failed to SetSecret for accessKey '{}': {}",
-          accessId, exception);
+      LOG.error("Failed to SetSecret for accessKey '{}'", accessId, exception);
     }
     return omClientResponse;
   }

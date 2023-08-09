@@ -41,6 +41,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -50,7 +51,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
@@ -74,6 +76,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
@@ -88,6 +92,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -809,19 +814,24 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private List<FileStatusAdapter> listStatusBucketSnapshot(
       String volumeName, String bucketName, URI uri) throws IOException {
-    List<OzoneSnapshot> snapshotList =
-        objectStore.listSnapshot(volumeName, bucketName);
 
     OzoneBucket ozoneBucket = getBucket(volumeName, bucketName, false);
     UserGroupInformation ugi =
         UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
     String owner = ugi.getShortUserName();
     String group = getGroupName(ugi);
+    List<FileStatusAdapter> res = new ArrayList<>();
 
-    return snapshotList.stream()
-        .map(ozoneSnapshot -> getFileStatusAdapterForBucketSnapshot(
-            ozoneBucket, ozoneSnapshot, uri, owner, group))
-        .collect(Collectors.toList());
+    Iterator<? extends OzoneSnapshot> snapshotIter =
+        objectStore.listSnapshot(volumeName, bucketName, null, null);
+
+    while (snapshotIter.hasNext()) {
+      OzoneSnapshot ozoneSnapshot = snapshotIter.next();
+      res.add(getFileStatusAdapterForBucketSnapshot(
+          ozoneBucket, ozoneSnapshot, uri, owner, group));
+    }
+
+    return res;
   }
 
   /**
@@ -888,8 +898,16 @@ public class BasicRootedOzoneClientAdapterImpl
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      List<OzoneFileStatus> statuses = bucket
-          .listStatus(keyName, recursive, startKey, numEntries);
+      List<OzoneFileStatus> statuses;
+      if (bucket.isSourcePathExist()) {
+        statuses = bucket
+            .listStatus(keyName, recursive, startKey, numEntries);
+      } else {
+        LOG.warn("Source Bucket does not exist, link bucket {} is orphan " +
+            "and returning empty list of files inside it", bucket.getName());
+        statuses = Collections.emptyList();
+      }
+      
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
       String ofsPathPrefix = ofsPath.getNonKeyPath();
@@ -1283,12 +1301,132 @@ public class BasicRootedOzoneClientAdapterImpl
             snapshotName);
   }
 
-  public boolean recoverLease(final Path f) throws IOException {
-    OFSPath ofsPath = new OFSPath(f, config);
+  @Override
+  public void deleteSnapshot(String pathStr, String snapshotName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    proxy.deleteSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotName);
+  }
+
+  @Override
+  public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException {
+    boolean takeTemporaryToSnapshot = false;
+    boolean takeTemporaryFromSnapshot = false;
+    if (toSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the fromSnapshot &
+      // current state.
+      takeTemporaryToSnapshot = true;
+      toSnapshot = createSnapshot(snapshotDir.toString(),
+          OzoneFSUtils.generateUniqueTempSnapshotName());
+    }
+    if (fromSnapshot.isEmpty()) {
+      // empty fromSnapshot implies diff b/w the current state
+      // & the toSnapshot
+      takeTemporaryFromSnapshot = true;
+      fromSnapshot = createSnapshot(snapshotDir.toString(),
+          OzoneFSUtils.generateUniqueTempSnapshotName());
+    }
+    OFSPath ofsPath = new OFSPath(snapshotDir, config);
+    String volume = ofsPath.getVolumeName();
+    String bucket = ofsPath.getBucketName();
+    try {
+      SnapshotDiffReportOzone aggregated;
+      SnapshotDiffReportOzone report =
+          getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+              bucket, "");
+      aggregated = report;
+      while (!report.getToken().isEmpty()) {
+        LOG.info(
+            "Total Snapshot Diff length between snapshot {} and {} exceeds"
+                + " max page size, Performing another" +
+                " snapdiff with index at {}",
+            fromSnapshot, toSnapshot, report.getToken());
+        report =
+            getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
+                bucket, report.getToken());
+        aggregated.aggregate(report);
+      }
+      return aggregated;
+    } finally {
+      // delete the temp snapshot
+      if (takeTemporaryToSnapshot) {
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), toSnapshot);
+      }
+      if (takeTemporaryFromSnapshot) {
+        objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+            ofsPath.getBucketName(), fromSnapshot);
+      }
+    }
+  }
+
+  private SnapshotDiffReportOzone getSnapshotDiffReportOnceComplete(
+      String fromSnapshot, String toSnapshot, String volume, String bucket,
+      String token) throws IOException, InterruptedException {
+    SnapshotDiffResponse snapshotDiffResponse;
+    while (true) {
+      snapshotDiffResponse =
+          objectStore.snapshotDiff(volume, bucket, fromSnapshot, toSnapshot,
+              token, -1, false, false);
+      if (snapshotDiffResponse.getJobStatus() == DONE) {
+        break;
+      }
+      Thread.sleep(snapshotDiffResponse.getWaitTimeInMs());
+    }
+    return snapshotDiffResponse.getSnapshotDiffReport();
+  }
+
+  @Override
+  public boolean isFileClosed(String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    String key = ofsPath.getKeyName();
+    if (ofsPath.isRoot() || ofsPath.isVolume()) {
+      throw new IOException("not a file");
+    } else {
+      OzoneBucket bucket = getBucket(ofsPath, false);
+      if (ofsPath.isSnapshotPath()) {
+        throw new IOException("file is in a snapshot.");
+      } else {
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        if (!status.isFile()) {
+          throw new IOException("not a file");
+        }
+        return !status.getKeyInfo().isHsync();
+      }
+    }
+  }
+
+  @Override
+  public boolean recoverLease(final String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
+  }
+
+  @Override
+  public void setTimes(String key, long mtime, long atime) throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
+    OFSPath ofsPath = new OFSPath(key, config);
+
+    OzoneBucket bucket = getBucket(ofsPath, false);
+    bucket.setTimes(ofsPath.getKeyName(), mtime, atime);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_SAFE_MODE, 1);
+
+    return ozoneClient.getProxy().getOzoneManagerClient().setSafeMode(
+        action, isChecked);
   }
 }

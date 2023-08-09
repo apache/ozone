@@ -30,14 +30,16 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -52,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,12 +94,12 @@ public final class OzoneManagerDoubleBuffer {
   // daemon thread, we complete the futures in readyFutureQueue and clear them.
   private volatile Queue<CompletableFuture<Void>> readyFutureQueue;
 
-  private Daemon daemon;
+  private final Daemon daemon;
   private final OMMetadataManager omMetadataManager;
   private final AtomicLong flushedTransactionCount = new AtomicLong(0);
   private final AtomicLong flushIterations = new AtomicLong(0);
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
-  private OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
+  private final OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
   private long maxFlushedTransactionsInOneIteration;
 
   private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
@@ -104,11 +107,12 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
+  private final FlushNotifier flushNotifier;
 
   /**
    * function which will get term associated with the transaction index.
    */
-  private Function<Long, Long> indexToTerm;
+  private final Function<Long, Long> indexToTerm;
 
   /**
    *  Builder for creating OzoneManagerDoubleBuffer.
@@ -120,6 +124,7 @@ public final class OzoneManagerDoubleBuffer {
     private boolean isTracingEnabled = false;
     private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
+    private FlushNotifier flushNotifier;
 
     public Builder setOmMetadataManager(OMMetadataManager omm) {
       this.mm = omm;
@@ -152,6 +157,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setFlushNotifier(FlushNotifier flushNotifier) {
+      this.flushNotifier = flushNotifier;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
@@ -162,15 +172,21 @@ public final class OzoneManagerDoubleBuffer {
             "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
       }
+      if (flushNotifier == null) {
+        flushNotifier = new FlushNotifier();
+      }
+
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount);
+          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
+          flushNotifier);
     }
   }
 
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions) {
+      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
+      FlushNotifier flushNotifier) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
@@ -185,6 +201,7 @@ public final class OzoneManagerDoubleBuffer {
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
     this.indexToTerm = indexToTerm;
+    this.flushNotifier = flushNotifier;
 
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
@@ -214,47 +231,50 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add to write batch with trace span if tracing is enabled.
    */
-  private Void addToBatchWithTrace(OMResponse omResponse,
-      SupplierWithIOException<Void> supplier) throws IOException {
+  private void addToBatchWithTrace(OMResponse omResponse,
+      CheckedRunnable<IOException> runnable) throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-addToWriteBatch" + "-" +
-        omResponse.getCmdType().toString();
-    return TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(),
-        supplier);
+        omResponse.getCmdType();
+    TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(), runnable);
   }
 
   /**
    * Flush write batch with trace span if tracing is enabled.
    */
-  private Void flushBatchWithTrace(String parentName, int batchSize,
-      SupplierWithIOException<Void> supplier) throws IOException {
+  private void flushBatchWithTrace(String parentName, int batchSize,
+      CheckedRunnable<IOException> runnable) throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-commitWriteBatch-Size-" + batchSize;
-    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
   }
 
   /**
    * Add to writeBatch {@link TransactionInfo}.
    */
-  private Void addToBatchTransactionInfoWithTrace(String parentName,
-      long transactionIndex, SupplierWithIOException<Void> supplier)
+  private void addToBatchTransactionInfoWithTrace(String parentName,
+      long transactionIndex, CheckedRunnable<IOException> runnable)
       throws IOException {
     if (!isTracingEnabled) {
-      return supplier.get();
+      runnable.run();
+      return;
     }
     String spanName = "DB-addWriteBatch-transactioninfo-" + transactionIndex;
-    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+    TracingUtil.executeAsChildSpan(spanName, parentName, runnable);
   }
 
   /**
    * Runs in a background thread and batches the transaction in currentBuffer
    * and commit to DB.
    */
-  private void flushTransactions() {
+  @VisibleForTesting
+  void flushTransactions() {
     while (isRunning.get() && canFlush()) {
       flushCurrentBuffer();
     }
@@ -295,6 +315,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       clearReadyBuffer();
+      flushNotifier.notifyFlush();
     } catch (IOException ex) {
       terminate(ex, 1);
     } catch (Throwable t) {
@@ -330,23 +351,17 @@ public final class OzoneManagerDoubleBuffer {
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
           lastRatisTransactionIndex,
-          () -> {
-            omMetadataManager.getTransactionInfoTable().putWithBatch(
-                batchOperation, TRANSACTION_INFO_KEY,
-                new TransactionInfo.Builder()
-                    .setTransactionIndex(lastRatisTransactionIndex)
-                    .setCurrentTerm(term)
-                    .build());
-            return null;
-          });
+          () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
+              batchOperation, TRANSACTION_INFO_KEY,
+              new TransactionInfo.Builder()
+                  .setTransactionIndex(lastRatisTransactionIndex)
+                  .setCurrentTerm(term)
+                  .build()));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
-          () -> {
-            omMetadataManager.getStore()
-                .commitBatchOperation(batchOperation);
-            return null;
-          });
+          () -> omMetadataManager.getStore()
+              .commitBatchOperation(batchOperation));
 
       ozoneManagerDoubleBufferMetrics.updateFlushTime(
           Time.monotonicNow() - startTime);
@@ -391,10 +406,7 @@ public final class OzoneManagerDoubleBuffer {
 
       try {
         addToBatchWithTrace(omResponse,
-            () -> {
-              response.checkAndUpdateDB(omMetadataManager, batchOperation);
-              return null;
-            });
+            () -> response.checkAndUpdateDB(omMetadataManager, batchOperation));
       } catch (IOException ex) {
         // During Adding to RocksDB batch entry got an exception.
         // We should terminate the OM.
@@ -460,14 +472,14 @@ public final class OzoneManagerDoubleBuffer {
     CleanupTableInfo cleanupTableInfo =
         responseClass.getAnnotation(CleanupTableInfo.class);
     if (cleanupTableInfo != null) {
-      String[] cleanupTables;
+      final List<String> cleanupTables;
       if (cleanupTableInfo.cleanupAll()) {
-        cleanupTables = Arrays
-            .stream(new OMDBDefinition().getColumnFamilies())
-            .map(DBColumnFamilyDefinition::getTableName)
-            .toArray(String[]::new);
+        cleanupTables = new OMDBDefinition().getColumnFamilies()
+            .stream()
+            .map(DBColumnFamilyDefinition::getName)
+            .collect(Collectors.toList());
       } else {
-        cleanupTables = cleanupTableInfo.cleanupTables();
+        cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
@@ -504,7 +516,6 @@ public final class OzoneManagerDoubleBuffer {
   }
   /**
    * Update OzoneManagerDoubleBuffer metrics values.
-   * @param flushedTransactionsSize
    */
   private void updateMetrics(int flushedTransactionsSize) {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
@@ -582,8 +593,6 @@ public final class OzoneManagerDoubleBuffer {
 
   /**
    * Add OmResponseBufferEntry to buffer.
-   * @param response
-   * @param transactionIndex
    */
   public synchronized CompletableFuture<Void> add(OMClientResponse response,
       long transactionIndex) {
@@ -611,10 +620,14 @@ public final class OzoneManagerDoubleBuffer {
   private synchronized boolean canFlush() {
     try {
       while (currentBuffer.size() == 0) {
-        wait(Long.MAX_VALUE);
+        // canFlush() only gets called when the readyBuffer is empty.
+        // Since both buffers are empty, notify once for each.
+        flushNotifier.notifyFlush();
+        flushNotifier.notifyFlush();
+        wait(1000L);
       }
       return true;
-    }  catch (InterruptedException ex) {
+    } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       if (isRunning.get()) {
         final String message = "OMDoubleBuffer flush thread " +
@@ -648,5 +661,46 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public OzoneManagerDoubleBufferMetrics getOzoneManagerDoubleBufferMetrics() {
     return ozoneManagerDoubleBufferMetrics;
+  }
+
+  @VisibleForTesting
+  int getCurrentBufferSize() {
+    return currentBuffer.size();
+  }
+
+  @VisibleForTesting
+  int getReadyBufferSize() {
+    return readyBuffer.size();
+  }
+
+  @VisibleForTesting
+  void resume() {
+    isRunning.set(true);
+  }
+
+  void awaitFlush() throws InterruptedException {
+    flushNotifier.await();
+  }
+
+  static class FlushNotifier {
+    private final Set<CountDownLatch> flushLatches =
+        ConcurrentHashMap.newKeySet();
+
+    void await() throws InterruptedException {
+
+      // Wait until both the current and ready buffers are flushed.
+      CountDownLatch latch = new CountDownLatch(2);
+      flushLatches.add(latch);
+      latch.await();
+      flushLatches.remove(latch);
+    }
+
+    int notifyFlush() {
+      int retval = flushLatches.size();
+      for (CountDownLatch l : flushLatches) {
+        l.countDown();
+      }
+      return retval;
+    }
   }
 }

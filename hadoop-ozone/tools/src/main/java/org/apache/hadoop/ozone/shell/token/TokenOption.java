@@ -36,9 +36,8 @@ import java.io.IOException;
 public class TokenOption {
 
   @CommandLine.Option(names = {"--token", "-t"},
-      description = "file containing encoded token",
-      defaultValue = "/tmp/ozone.token",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+      required = true,
+      description = "file containing encoded token")
   private File tokenFile;
 
   public boolean exists() {
@@ -76,5 +75,9 @@ public class TokenOption {
             " successfully!");
       }
     }
+  }
+
+  public String getTokenFilePath() {
+    return tokenFile.getAbsolutePath();
   }
 }

@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -83,6 +84,10 @@ public class OzoneClientProducer {
       if (signatureInfo.getVersion() == Version.V4) {
         stringToSign =
             StringToSignProducer.createSignatureBase(signatureInfo, context);
+      } else {
+        LOG.debug("Unsupported AWS signature version: {}",
+                signatureInfo.getVersion());
+        throw S3_AUTHINFO_CREATION_ERROR;
       }
 
       String awsAccessId = signatureInfo.getAwsAccessId();

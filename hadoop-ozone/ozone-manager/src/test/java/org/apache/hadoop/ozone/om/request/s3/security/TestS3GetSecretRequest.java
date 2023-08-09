@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantAssignUserAccessIdResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantCreateResponse;
+import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -129,13 +131,18 @@ public class TestS3GetSecretRequest {
         folder.newFolder().getAbsolutePath());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
-    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(conf);
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(conf,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     S3SecretLockedManager secretManager = new S3SecretLockedManager(
-        new S3SecretManagerImpl(omMetadataManager, omMetadataManager),
-        omMetadataManager.getLock());
+            new S3SecretManagerImpl(
+                    omMetadataManager,
+                    S3SecretCacheProvider.IN_MEMORY.get(conf)
+            ),
+            omMetadataManager.getLock()
+    );
     when(ozoneManager.getS3SecretManager()).thenReturn(secretManager);
 
     auditLogger = mock(AuditLogger.class);

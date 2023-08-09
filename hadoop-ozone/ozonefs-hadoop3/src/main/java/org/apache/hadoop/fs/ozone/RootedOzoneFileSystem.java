@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -30,7 +33,6 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 
 /**
@@ -44,7 +46,7 @@ import java.net.URI;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
-    implements KeyProviderTokenIssuer {
+    implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
 
@@ -102,7 +104,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   }
 
   @Override
-  protected OutputStream createFSOutputStream(
+  protected OzoneFSOutputStream createFSOutputStream(
       OzoneFSOutputStream outputStream) {
     return new CapableOzoneFSOutputStream(outputStream, isHsyncEnabled());
   }
@@ -118,5 +120,38 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
       return cap;
     }
     return super.hasPathCapability(p, capability);
+  }
+
+  /**
+   * Start the lease recovery of a file.
+   *
+   * @param f a file
+   * @return true if the file is already closed
+   * @throws IOException if an error occurs
+   */
+  @Override
+  public boolean recoverLease(final Path f) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+    statistics.incrementWriteOps(1);
+    LOG.trace("recoverLease() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().recoverLease(key);
+  }
+
+  @Override
+  public boolean isFileClosed(Path f) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
+    statistics.incrementReadOps(1);
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().isFileClosed(key);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    return setSafeModeUtil(action, isChecked);
   }
 }

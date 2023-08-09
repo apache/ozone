@@ -17,7 +17,11 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantUserPrincipalInfo;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -29,6 +33,15 @@ import java.util.Set;
  * principal.
  */
 public final class OmDBUserPrincipalInfo {
+  private static final Codec<OmDBUserPrincipalInfo> CODEC
+      = new DelegatedCodec<>(
+          Proto2Codec.get(TenantUserPrincipalInfo.class),
+          OmDBUserPrincipalInfo::getFromProtobuf,
+          OmDBUserPrincipalInfo::getProtobuf);
+
+  public static Codec<OmDBUserPrincipalInfo> getCodec() {
+    return CODEC;
+  }
 
   /**
    * A set of accessIds.

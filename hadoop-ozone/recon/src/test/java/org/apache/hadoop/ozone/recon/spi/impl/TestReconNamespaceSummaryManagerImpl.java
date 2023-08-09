@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -35,6 +36,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+
 /**
  * Test for NSSummary manager.
  */
@@ -42,15 +46,20 @@ public class TestReconNamespaceSummaryManagerImpl {
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
   private static int[] testBucket;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeClass
   public static void setupOnce() throws Exception {
+    reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(TEMP_FOLDER.newFolder()),
+        TEMP_FOLDER.newFolder());
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(TEMP_FOLDER)
                     .withReconSqlDb()
+                    .withReconOm(reconOMMetadataManager)
                     .withContainerDB()
                     .build();
     reconNamespaceSummaryManager = reconTestInjector.getInstance(

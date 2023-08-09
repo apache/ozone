@@ -25,8 +25,8 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -183,8 +182,6 @@ public final class OzoneManagerRatisUtils {
       return new OMRenewDelegationTokenRequest(omRequest);
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
-    case RecoverTrash:
-      return new OMTrashRecoverRequest(omRequest);
     case FinalizeUpgrade:
       return new OMFinalizeUpgradeRequest(omRequest);
     case Prepare:
@@ -317,9 +314,14 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetTimes:
+      keyArgs = omRequest.getSetTimesRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
     default:
-      throw new IllegalStateException("Unrecognized write command " +
-          "type request" + cmdType);
+      throw new OMException("Unrecognized write command type request "
+          + cmdType, OMException.ResultCodes.INVALID_REQUEST);
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
@@ -476,11 +478,11 @@ public final class OzoneManagerRatisUtils {
   }
 
   public static GrpcTlsConfig createServerTlsConfig(SecurityConfig conf,
-      CertificateClient caClient, boolean mutualTls) throws IOException {
+      CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       KeyStoresFactory serverKeyFactory = caClient.getServerKeyStoresFactory();
       return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
-          serverKeyFactory.getTrustManagers()[0], mutualTls);
+          serverKeyFactory.getTrustManagers()[0], true);
     }
 
     return null;

@@ -142,7 +142,7 @@ public class TestContainerPlacementFactory {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
 
@@ -184,7 +184,7 @@ public class TestContainerPlacementFactory {
    * A dummy container placement implementation for test.
    */
   public static class DummyImpl implements
-          PlacementPolicy<ContainerReplica> {
+          PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,

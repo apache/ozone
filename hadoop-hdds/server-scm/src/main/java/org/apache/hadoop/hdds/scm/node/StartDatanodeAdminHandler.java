@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Handler which is fired when a datanode starts admin (decommission or
@@ -60,7 +59,7 @@ public class StartDatanodeAdminHandler
       try {
         Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
         pipelineManager.closePipeline(pipeline, false);
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
         LOG.info("Could not finalize pipeline={} for dn={}", pipelineID,
             datanodeDetails);
       }

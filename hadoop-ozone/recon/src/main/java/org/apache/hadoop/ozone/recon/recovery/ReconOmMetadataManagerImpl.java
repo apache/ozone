@@ -103,8 +103,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           .setName(dbFile.getName())
           .setPath(dbFile.toPath().getParent());
       addOMTablesAndCodecs(dbStoreBuilder);
-      DBStore newStore = dbStoreBuilder.build();
-      setStore(newStore);
+      setStore(dbStoreBuilder.build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
@@ -143,7 +142,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (null == rocksDBStore) {
       return 0;
     } else {
-      return rocksDBStore.getDb().getLatestSequenceNumber();
+      try {
+        return rocksDBStore.getDb().getLatestSequenceNumber();
+      } catch (IOException e) {
+        return 0;
+      }
     }
   }
 

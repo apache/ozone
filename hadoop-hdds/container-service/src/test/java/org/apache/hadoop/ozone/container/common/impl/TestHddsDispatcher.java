@@ -22,8 +22,12 @@ import com.google.common.collect.Maps;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
@@ -36,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -50,12 +55,14 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
 
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -68,8 +75,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+
+import java.time.Duration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
+import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.junit.Assert.assertTrue;
@@ -156,6 +168,86 @@ public class TestHddsDispatcher {
       FileUtils.deleteDirectory(new File(testDir));
     }
 
+  }
+
+  @Test
+  public void testContainerCloseActionWhenVolumeFull() throws Exception {
+    String testDir = GenericTestUtils.getTempPath(
+        TestHddsDispatcher.class.getSimpleName());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
+        100.0, StorageUnit.BYTES);
+    DatanodeDetails dd = randomDatanodeDetails();
+
+    HddsVolume.Builder volumeBuilder =
+        new HddsVolume.Builder(testDir).datanodeUuid(dd.getUuidString())
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+    // state of cluster : available (140) > 100  ,datanode volume
+    // utilisation threshold not yet reached. container creates are successful.
+    SpaceUsageSource spaceUsage = fixed(500, 140, 360);
+
+    SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
+        spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
+    volumeBuilder.usageCheckFactory(factory);
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    try {
+      UUID scmId = UUID.randomUUID();
+      ContainerSet containerSet = new ContainerSet(1000);
+
+      DatanodeStateMachine stateMachine = Mockito.mock(
+          DatanodeStateMachine.class);
+      StateContext context = Mockito.mock(StateContext.class);
+      Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
+      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      // create a 50 byte container
+      KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          layout,
+           50, UUID.randomUUID().toString(),
+          dd.getUuidString());
+      Container container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
+          scmId.toString());
+      containerSet.addContainer(container);
+      ContainerMetrics metrics = ContainerMetrics.create(conf);
+      Map<ContainerType, Handler> handlers = Maps.newHashMap();
+      for (ContainerType containerType : ContainerType.values()) {
+        handlers.put(containerType,
+            Handler.getHandlerForContainerType(containerType, conf,
+                context.getParent().getDatanodeDetails().getUuidString(),
+                containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
+      }
+      HddsDispatcher hddsDispatcher = new HddsDispatcher(
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
+      hddsDispatcher.setClusterId(scmId.toString());
+      containerData.getVolume().getVolumeInfo()
+          .ifPresent(volumeInfo -> volumeInfo.incrementUsedSpace(50));
+      ContainerCommandResponseProto response = hddsDispatcher
+          .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
+      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+          response.getResult());
+      verify(context, times(1))
+          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
+
+      // try creating another container now as the volume used has crossed
+      // threshold
+
+      KeyValueContainerData containerData2 = new KeyValueContainerData(1L,
+          layout,
+          50, UUID.randomUUID().toString(),
+          dd.getUuidString());
+      Container container2 = new KeyValueContainer(containerData2, conf);
+      LambdaTestUtils.intercept(StorageContainerException.class,
+          "Container creation failed, due to disk out of space",
+          () -> container2.create(volumeSet,
+              new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
+
+    } finally {
+      volumeSet.shutdown();
+      ContainerMetrics.remove();
+      FileUtils.deleteDirectory(new File(testDir));
+    }
   }
 
   @Test

@@ -142,16 +142,17 @@ public class TestReconWithOzoneManagerHA {
 
     ReconContainerMetadataManager reconContainerMetadataManager =
         cluster.getReconServer().getReconContainerMetadataManager();
-    TableIterator iterator =
-        reconContainerMetadataManager.getContainerTableIterator();
-    String reconKeyPrefix = null;
-    while (iterator.hasNext()) {
-      Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
-          (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
-      reconKeyPrefix = keyValue.getKey().getKeyPrefix();
+    try (TableIterator iterator =
+        reconContainerMetadataManager.getContainerTableIterator()) {
+      String reconKeyPrefix = null;
+      while (iterator.hasNext()) {
+        Table.KeyValue<ContainerKeyPrefix, Integer> keyValue =
+            (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
+        reconKeyPrefix = keyValue.getKey().getKeyPrefix();
+      }
+      Assert.assertEquals("Container data should be synced to recon.",
+          String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
+          reconKeyPrefix);
     }
-    Assert.assertEquals("Container data should be synced to recon.",
-        String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
-        reconKeyPrefix);
   }
 }

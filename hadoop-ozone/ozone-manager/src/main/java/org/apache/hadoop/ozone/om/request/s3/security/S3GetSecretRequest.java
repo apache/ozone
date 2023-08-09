@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -72,7 +71,8 @@ public class S3GetSecretRequest extends OMClientRequest {
     // protolock check.
     final String accessId = s3GetSecretRequest.getKerberosID();
 
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final UserGroupInformation ugi =
+        S3SecretRequestHelper.getOrCreateUgi(accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
@@ -162,8 +162,7 @@ public class S3GetSecretRequest extends OMClientRequest {
                     new S3SecretValue(accessId, awsSecret.get());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
-                    assignS3SecretValue,
-                    transactionLogIndex);
+                    assignS3SecretValue);
               } else {
                 assignS3SecretValue = null;
               }

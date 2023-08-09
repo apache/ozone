@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestStorageContainerManagerHelper;
+import org.apache.hadoop.ozone.scm.TestStorageContainerManagerHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -58,7 +58,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
@@ -252,8 +251,7 @@ public class TestScmSafeMode {
             HddsProtos.LifeCycleEvent.FINALIZE);
         mapping.updateContainerState(c.containerID(),
             LifeCycleEvent.CLOSE);
-      } catch (IOException | InvalidStateTransitionException |
-               TimeoutException e) {
+      } catch (IOException | InvalidStateTransitionException e) {
         LOG.info("Failed to change state of open containers.", e);
       }
     });

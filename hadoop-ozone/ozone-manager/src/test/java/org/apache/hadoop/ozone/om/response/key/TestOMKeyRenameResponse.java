@@ -63,7 +63,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         .isExist(dbFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    Assert.assertTrue(omMetadataManager.getSnapshotRenamedTable().isEmpty());
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assert.assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
@@ -86,9 +86,9 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     String renameDbKey = omMetadataManager.getRenameKey(
         fromKeyInfo.getVolumeName(), fromKeyInfo.getBucketName(),
         fromKeyInfo.getObjectID());
-    // snapshotRenamedKeyTable shouldn't contain those keys which
+    // snapshotRenamedTable shouldn't contain those keys which
     // is not part of snapshot bucket.
-    Assert.assertFalse(omMetadataManager.getSnapshotRenamedKeyTable()
+    Assert.assertFalse(omMetadataManager.getSnapshotRenamedTable()
         .isExist(renameDbKey));
 
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {

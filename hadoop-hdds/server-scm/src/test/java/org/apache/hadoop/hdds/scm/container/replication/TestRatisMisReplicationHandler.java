@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -39,6 +40,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
@@ -194,6 +196,13 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
           PlacementPolicy placementPolicy, OzoneConfiguration conf,
           ReplicationManager replicationManager) {
     return new RatisMisReplicationHandler(placementPolicy, conf,
-        replicationManager, true);
+        replicationManager);
+  }
+
+  @Override
+  protected void assertReplicaIndex(
+      Map<DatanodeDetails, Integer> expectedReplicaIndexes,
+      DatanodeDetails sourceDatanode, int actualReplicaIndex) {
+    Assertions.assertEquals(0, actualReplicaIndex);
   }
 }

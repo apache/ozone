@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.io.PrintStream;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 /**
  * Creates and runs a ProgressBar in new Thread which gets printed on
@@ -44,6 +45,7 @@ public class ProgressBar {
    * True if the progress bar is used from an interactive environment (shell).
    */
   private boolean interactive;
+  private Supplier<String> supplier;
 
   /**
    * Creates a new ProgressBar instance which prints the progress on the given
@@ -55,7 +57,7 @@ public class ProgressBar {
    */
   public ProgressBar(final PrintStream stream, final long maxValue,
                      final LongSupplier currentValue) {
-    this(stream, maxValue, currentValue, System.console() != null);
+    this(stream, maxValue, currentValue, System.console() != null, () -> "");
   }
 
   /**
@@ -64,15 +66,18 @@ public class ProgressBar {
    *
    * @param stream       to display the progress
    * @param maxValue     Maximum value of the progress
-   * @param currentValue Supplier that provides the current value
+   * @param currentValue Supplier that provides the current progressbar value
    * @param interactive  Print progressbar for interactive environments.
+   * @param supplier     Supplier that provides the real time message
    */
   public ProgressBar(final PrintStream stream, final long maxValue,
-      final LongSupplier currentValue, boolean interactive) {
+      final LongSupplier currentValue, boolean interactive,
+      final Supplier<String> supplier) {
     this.maxValue = maxValue;
     this.currentValue = currentValue;
     this.thread = new Thread(getProgressBar(stream));
     this.interactive = interactive;
+    this.supplier = supplier;
   }
 
   /**
@@ -133,7 +138,7 @@ public class ProgressBar {
           Thread.currentThread().interrupt();
         }
       }
-      print(stream, maxValue);
+      print(stream, currentValue.getAsLong());
       println(stream);
       running = false;
     };
@@ -168,12 +173,16 @@ public class ProgressBar {
     stream.print('\r');
     double percent = 100.0 * value / maxValue;
     StringBuilder sb = new StringBuilder();
+    String realTimeMessage = supplier.get();
+    int shrinkTimes = 1;
+    if (realTimeMessage.length() != 0) {
+      shrinkTimes = 3;
+    }
     sb.append(" ").append(String.format("%.2f", percent)).append("% |");
-
-    for (int i = 0; i <= percent; i++) {
+    for (int i = 0; i <= percent / shrinkTimes; i++) {
       sb.append('█');
     }
-    for (int j = 0; j < 100 - percent; j++) {
+    for (int j = 0; j < (100 - percent) / shrinkTimes; j++) {
       sb.append(' ');
     }
     sb.append("|  ");
@@ -183,6 +192,8 @@ public class ProgressBar {
     String timeToPrint = String.format("%d:%02d:%02d", timeInSec / 3600,
         (timeInSec % 3600) / 60, timeInSec % 60);
     sb.append(" Time: ").append(timeToPrint);
+    sb.append("|  ");
+    sb.append(realTimeMessage);
     stream.print(sb.toString());
   }
 }

@@ -440,8 +440,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     Assert.assertNotNull(omMultipartCommitUploadPartInfo);
 
     byte[] fileContent = new byte[data.length];
-    OzoneInputStream inputStream = bucket.readKey(keyName);
-    inputStream.read(fileContent);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      inputStream.read(fileContent);
+    }
     StringBuilder sb = new StringBuilder(data.length);
 
     // Combine all parts data, and check is it matching with get key data.
@@ -601,11 +602,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
         metadataMgr.getMultipartInfoTable().get(multipartKey);
     Assert.assertNotNull(omMultipartKeyInfo);
 
-    TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
-        omMultipartKeyInfo.getPartKeyInfoMap();
-    for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
-        partKeyInfoMap.entrySet()) {
-      OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo = entry.getValue();
+    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+        omMultipartKeyInfo.getPartKeyInfoMap()) {
       String partKeyName = partKeyInfo.getPartName();
 
       // reconstruct full part name with volume, bucket, partKeyName
@@ -844,11 +842,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
         omKeyInfo.getKeyName());
     Assert.assertEquals(uploadID, omMultipartKeyInfo.getUploadID());
 
-    TreeMap<Integer, OzoneManagerProtocolProtos.PartKeyInfo> partKeyInfoMap =
-        omMultipartKeyInfo.getPartKeyInfoMap();
-    for (Map.Entry<Integer, OzoneManagerProtocolProtos.PartKeyInfo> entry :
-        partKeyInfoMap.entrySet()) {
-      OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo = entry.getValue();
+    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo :
+        omMultipartKeyInfo.getPartKeyInfoMap()) {
       OmKeyInfo currentKeyPartInfo =
           OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 

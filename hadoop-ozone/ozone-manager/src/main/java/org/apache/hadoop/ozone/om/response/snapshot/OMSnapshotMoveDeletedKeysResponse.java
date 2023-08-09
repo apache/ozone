@@ -20,13 +20,19 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -36,6 +42,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
@@ -43,22 +50,23 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TAB
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
 
-  private OmSnapshot fromSnapshot;
-  private OmSnapshot nextSnapshot;
+  private SnapshotInfo fromSnapshot;
+  private SnapshotInfo nextSnapshot;
   private List<SnapshotMoveKeyInfos> nextDBKeysList;
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
   private List<HddsProtos.KeyValue> renamedKeysList;
   private List<String> movedDirs;
 
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-       @Nonnull OmSnapshot omFromSnapshot, OmSnapshot omNextSnapshot,
-       List<SnapshotMoveKeyInfos> nextDBKeysList,
-       List<SnapshotMoveKeyInfos> reclaimKeysList,
-       List<HddsProtos.KeyValue> renamedKeysList,
-       List<String> movedDirs) {
+      @Nonnull SnapshotInfo fromSnapshot,
+      SnapshotInfo nextSnapshot,
+      List<SnapshotMoveKeyInfos> nextDBKeysList,
+      List<SnapshotMoveKeyInfos> reclaimKeysList,
+      List<HddsProtos.KeyValue> renamedKeysList,
+      List<String> movedDirs) {
     super(omResponse);
-    this.fromSnapshot = omFromSnapshot;
-    this.nextSnapshot = omNextSnapshot;
+    this.fromSnapshot = fromSnapshot;
+    this.nextSnapshot = nextSnapshot;
     this.nextDBKeysList = nextDBKeysList;
     this.reclaimKeysList = reclaimKeysList;
     this.renamedKeysList = renamedKeysList;
@@ -78,62 +86,127 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (nextSnapshot != null) {
-      DBStore nextSnapshotStore = nextSnapshot.getMetadataManager().getStore();
-      // Init Batch Operation for snapshot db.
-      try (BatchOperation writeBatch = nextSnapshotStore.initBatchOperation()) {
-        processKeys(writeBatch, nextSnapshot.getMetadataManager(),
-            nextDBKeysList, true);
-        processDirs(writeBatch, nextSnapshot.getMetadataManager());
-        nextSnapshotStore.commitBatchOperation(writeBatch);
+    // Note: a trick to get
+    // To do this properly, refactor OzoneManagerDoubleBuffer#addToBatch and
+    // add OmSnapshotManager as a parameter.
+    OmSnapshotManager omSnapshotManager =
+        ((OmMetadataManagerImpl) omMetadataManager)
+            .getOzoneManager().getOmSnapshotManager();
+
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
+        omSnapshotManager.checkForSnapshot(
+            fromSnapshot.getVolumeName(),
+            fromSnapshot.getBucketName(),
+            getSnapshotPrefix(fromSnapshot.getName()),
+            true)) {
+
+      OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
+
+      if (nextSnapshot != null) {
+        try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+            rcOmNextSnapshot = omSnapshotManager.checkForSnapshot(
+                nextSnapshot.getVolumeName(),
+                nextSnapshot.getBucketName(),
+                getSnapshotPrefix(nextSnapshot.getName()),
+                true)) {
+
+          OmSnapshot nextOmSnapshot = (OmSnapshot) rcOmNextSnapshot.get();
+          RDBStore nextSnapshotStore =
+              (RDBStore) nextOmSnapshot.getMetadataManager().getStore();
+          // Init Batch Operation for snapshot db.
+          try (BatchOperation writeBatch =
+              nextSnapshotStore.initBatchOperation()) {
+            processKeys(writeBatch, nextOmSnapshot.getMetadataManager());
+            processDirs(writeBatch, nextOmSnapshot.getMetadataManager(),
+                fromOmSnapshot);
+            nextSnapshotStore.commitBatchOperation(writeBatch);
+            nextSnapshotStore.getDb().flushWal(true);
+            nextSnapshotStore.getDb().flush();
+          }
+        }
+      } else {
+        // Handle the case where there is no next Snapshot.
+        processKeys(batchOperation, omMetadataManager);
+        processDirs(batchOperation, omMetadataManager, fromOmSnapshot);
       }
-    } else {
-      // Handle the case where there is no next Snapshot.
-      processKeys(batchOperation, omMetadataManager, nextDBKeysList, true);
-      processDirs(batchOperation, omMetadataManager);
+
+      // Update From Snapshot Deleted Table.
+      RDBStore fromSnapshotStore =
+          (RDBStore) fromOmSnapshot.getMetadataManager().getStore();
+      try (BatchOperation fromSnapshotBatchOp =
+          fromSnapshotStore.initBatchOperation()) {
+        processReclaimKeys(fromSnapshotBatchOp,
+            fromOmSnapshot.getMetadataManager());
+        deleteDirsFromSnapshot(fromSnapshotBatchOp, fromOmSnapshot);
+        fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
+        fromSnapshotStore.getDb().flushWal(true);
+        fromSnapshotStore.getDb().flush();
+      }
     }
 
-    // Update From Snapshot Deleted Table.
-    DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
-    try (BatchOperation fromSnapshotBatchOp =
-             fromSnapshotStore.initBatchOperation()) {
-      processKeys(fromSnapshotBatchOp, fromSnapshot.getMetadataManager(),
-          reclaimKeysList, false);
-      fromSnapshotStore.commitBatchOperation(fromSnapshotBatchOp);
-    }
   }
 
-  private void processDirs(BatchOperation batchOp,
-                           OMMetadataManager omMetadataManager)
+  private void deleteDirsFromSnapshot(BatchOperation batchOp,
+      OmSnapshot fromOmSnapshot)
       throws IOException {
     for (String movedDirsKey : movedDirs) {
-      OmKeyInfo keyInfo = fromSnapshot.getMetadataManager().getDeletedDirTable()
-          .get(movedDirsKey);
-      // Move deleted dirs to next snapshot or active DB
-      omMetadataManager.getDeletedDirTable().putWithBatch(
-          batchOp, movedDirsKey, keyInfo);
       // Delete dirs from current snapshot that are moved to next snapshot.
-      fromSnapshot.getMetadataManager().getDeletedDirTable()
+      fromOmSnapshot
+          .getMetadataManager()
+          .getDeletedDirTable()
           .deleteWithBatch(batchOp, movedDirsKey);
     }
   }
 
-  private void processKeys(BatchOperation batchOp,
-      OMMetadataManager metadataManager,
-      List<SnapshotMoveKeyInfos> keyList,
-      boolean isNextDB) throws IOException {
-
-    // Move renamed keys to only the next snapshot or active DB.
-    if (isNextDB) {
-      for (HddsProtos.KeyValue renamedKey: renamedKeysList) {
-        metadataManager.getSnapshotRenamedKeyTable()
-            .putWithBatch(batchOp, renamedKey.getKey(), renamedKey.getValue());
-      }
-    }
-
-    for (SnapshotMoveKeyInfos dBKey : keyList) {
+  private void processReclaimKeys(BatchOperation batchOp,
+                                  OMMetadataManager metadataManager)
+      throws IOException {
+    for (SnapshotMoveKeyInfos dBKey : reclaimKeysList) {
       RepeatedOmKeyInfo omKeyInfos =
           createRepeatedOmKeyInfo(dBKey.getKeyInfosList());
+      // omKeyInfos can be null, because everything from RepeatedOmKeyInfo
+      // is moved to next snapshot which means this key can be deleted in
+      // the current snapshot processed by SDS. The reclaim key here indicates
+      // the key can be removed from the deleted current snapshot
+      if (omKeyInfos == null) {
+        metadataManager.getDeletedTable().deleteWithBatch(batchOp,
+            dBKey.getKey());
+        continue;
+      }
+      metadataManager.getDeletedTable().putWithBatch(batchOp,
+          dBKey.getKey(), omKeyInfos);
+    }
+  }
+
+  private void processDirs(BatchOperation batchOp,
+                           OMMetadataManager omMetadataManager,
+                           OmSnapshot fromOmSnapshot)
+      throws IOException {
+    for (String movedDirsKey : movedDirs) {
+      OmKeyInfo keyInfo = fromOmSnapshot.getMetadataManager()
+          .getDeletedDirTable()
+          .get(movedDirsKey);
+      if (keyInfo == null) {
+        continue;
+      }
+      // Move deleted dirs to next snapshot or active DB
+      omMetadataManager.getDeletedDirTable().putWithBatch(
+          batchOp, movedDirsKey, keyInfo);
+    }
+  }
+
+  private void processKeys(BatchOperation batchOp,
+      OMMetadataManager metadataManager) throws IOException {
+
+    // Move renamed keys to only the next snapshot or active DB.
+    for (HddsProtos.KeyValue renamedKey: renamedKeysList) {
+      metadataManager.getSnapshotRenamedTable()
+          .putWithBatch(batchOp, renamedKey.getKey(), renamedKey.getValue());
+    }
+
+    for (SnapshotMoveKeyInfos dBKey : nextDBKeysList) {
+      RepeatedOmKeyInfo omKeyInfos =
+          createRepeatedOmKeyInfo(dBKey, metadataManager);
       if (omKeyInfos == null) {
         continue;
       }
@@ -142,8 +215,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
   }
 
-  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(List<KeyInfo> keyInfoList)
-      throws IOException {
+  public static RepeatedOmKeyInfo createRepeatedOmKeyInfo(
+      List<KeyInfo> keyInfoList) throws IOException {
     RepeatedOmKeyInfo result = null;
 
     for (KeyInfo keyInfo: keyInfoList) {
@@ -155,6 +228,37 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     return result;
+  }
+
+  private RepeatedOmKeyInfo createRepeatedOmKeyInfo(
+      SnapshotMoveKeyInfos snapshotMoveKeyInfos,
+      OMMetadataManager metadataManager) throws IOException {
+    String dbKey = snapshotMoveKeyInfos.getKey();
+    List<KeyInfo> keyInfoList = snapshotMoveKeyInfos.getKeyInfosList();
+    // When older version of keys are moved to the next snapshot's deletedTable
+    // The newer version might also be in the next snapshot's deletedTable and
+    // it might overwrite. This is to avoid that and also avoid having
+    // orphans blocks.
+    RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
+
+    for (KeyInfo keyInfo : keyInfoList) {
+      OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(keyInfo);
+      if (result == null) {
+        result = new RepeatedOmKeyInfo(omKeyInfo);
+      } else if (!isSameAsLatestOmKeyInfo(omKeyInfo, result)) {
+        result.addOmKeyInfo(omKeyInfo);
+      }
+    }
+
+    return result;
+  }
+
+  private boolean isSameAsLatestOmKeyInfo(OmKeyInfo omKeyInfo,
+                                          RepeatedOmKeyInfo result) {
+    int size = result.getOmKeyInfoList().size();
+    assert size > 0;
+    OmKeyInfo keyInfoFromRepeated = result.getOmKeyInfoList().get(size - 1);
+    return omKeyInfo.equals(keyInfoFromRepeated);
   }
 }
 

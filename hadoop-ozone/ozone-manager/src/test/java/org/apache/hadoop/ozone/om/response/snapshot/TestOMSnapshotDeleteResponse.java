@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -46,7 +47,6 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
-
 
 /**
  * This class tests OMSnapshotDeleteResponse.
@@ -66,7 +66,7 @@ public class TestOMSnapshotDeleteResponse {
     String fsPath = folder.newFolder().getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -82,11 +82,12 @@ public class TestOMSnapshotDeleteResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
+    UUID snapshotId = UUID.randomUUID();
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,
-        snapshotId);
+        snapshotId,
+        Time.now());
 
     // confirm table is empty
     Assert.assertEquals(0,
@@ -94,6 +95,8 @@ public class TestOMSnapshotDeleteResponse {
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Prepare the table, write an entry with SnapshotCreate
+    OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
+        omMetadataManager, volumeName, bucketName);
     OMSnapshotCreateResponse omSnapshotCreateResponse =
         new OMSnapshotCreateResponse(OMResponse.newBuilder()
             .setCmdType(Type.CreateSnapshot)

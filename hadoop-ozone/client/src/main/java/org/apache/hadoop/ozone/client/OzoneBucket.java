@@ -131,6 +131,7 @@ public class OzoneBucket extends WithMetadata {
 
   private String sourceVolume;
   private String sourceBucket;
+  private boolean sourcePathExist = true;
 
   /**
    * Quota of bytes allocated for the bucket.
@@ -889,6 +890,28 @@ public class OzoneBucket extends WithMetadata {
     return result;
   }
 
+  /**
+   * Builder for OmBucketInfo.
+   /**
+   * Set time to a key in this bucket.
+   * @param keyName Full path name to the key in the bucket.
+   * @param mtime Modification time. Unchanged if -1.
+   * @param atime Access time. Unchanged if -1.
+   * @throws IOException
+   */
+  public void setTimes(String keyName, long mtime, long atime)
+      throws IOException {
+    proxy.setTimes(ozoneObj, keyName, mtime, atime);
+  }
+
+  public void setSourcePathExist(boolean b) {
+    this.sourcePathExist = b;
+  }
+
+  public boolean isSourcePathExist() {
+    return this.sourcePathExist;
+  }
+
   public static Builder newBuilder(ConfigurationSource conf,
       ClientProtocol proxy) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
@@ -1344,7 +1367,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getBucketName(), keyName,
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig());
+            keyInfo.getReplicationConfig(),
+            keyInfo.isFile());
 
         keysResultList.add(ozoneKey);
 
@@ -1445,7 +1469,8 @@ public class OzoneBucket extends WithMetadata {
             keyInfo.getBucketName(), keyName,
             keyInfo.getDataSize(), keyInfo.getCreationTime(),
             keyInfo.getModificationTime(),
-            keyInfo.getReplicationConfig());
+            keyInfo.getReplicationConfig(),
+            keyInfo.isFile());
         keysResultList.add(ozoneKey);
       }
     }

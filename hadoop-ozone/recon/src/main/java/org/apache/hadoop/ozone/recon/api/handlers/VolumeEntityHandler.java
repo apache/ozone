@@ -164,16 +164,15 @@ public class VolumeEntityHandler extends EntityHandler {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
     String[] names = getNames();
-    List<OmBucketInfo> buckets = getOmMetadataManager().
-        listBucketsUnderVolume(names[0]);
-    int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_BINS];
+    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
 
     // accumulate file size distribution arrays from all buckets under volume
     for (OmBucketInfo bucket : buckets) {
       long bucketObjectId = bucket.getObjectID();
       int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
       // add on each bin
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         volumeFileSizeDist[i] += bucketFileSizeDist[i];
       }
     }

@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test StorageContainerServiceProviderImpl APIs.
@@ -53,7 +53,7 @@ public class TestStorageContainerServiceProviderImpl {
   private HddsProtos.PipelineID pipelineID;
 
   @BeforeEach
-  public void setup() {
+  void setup(@TempDir File testDir) {
     injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
@@ -61,7 +61,6 @@ public class TestStorageContainerServiceProviderImpl {
           StorageContainerLocationProtocol mockScmClient = mock(
               StorageContainerLocationProtocol.class);
           ReconUtils reconUtils =  new ReconUtils();
-          File testDir = GenericTestUtils.getRandomizedTestDir();
           OzoneConfiguration conf = new OzoneConfiguration();
           conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
           pipelineID = PipelineID.randomId().getProtobuf();

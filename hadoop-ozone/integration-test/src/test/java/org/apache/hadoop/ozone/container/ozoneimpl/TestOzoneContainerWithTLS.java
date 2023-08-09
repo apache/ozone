@@ -27,12 +27,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
 import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -73,7 +74,10 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_DIR_NAME_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_KEY_LEN;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -99,6 +103,7 @@ public class TestOzoneContainerWithTLS {
   private OzoneConfiguration conf;
   private ContainerTokenSecretManager secretManager;
   private CertificateClientTestImpl caClient;
+  private SecretKeyClient secretKeyClient;
   private boolean containerTokenEnabled;
   private int certLifetime = 15 * 1000; // 15s
 
@@ -132,20 +137,24 @@ public class TestOzoneContainerWithTLS {
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_ENABLED, true);
 
     conf.setBoolean(HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT, true);
+    conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     conf.setInt(HDDS_KEY_LEN, 1024);
 
     // certificate lives for 10s
     conf.set(HDDS_X509_DEFAULT_DURATION,
         Duration.ofMillis(certLifetime).toString());
     conf.set(HDDS_X509_RENEW_GRACE_DURATION, "PT2S");
+    conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT1S"); // 1s
+    conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT1S"); // 1s
 
     long expiryTime = conf.getTimeDuration(
         HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME, "1s",
         TimeUnit.MILLISECONDS);
 
     caClient = new CertificateClientTestImpl(conf);
-    secretManager = new ContainerTokenSecretManager(new SecurityConfig(conf),
-        expiryTime);
+    secretKeyClient = new SecretKeyTestClient();
+    secretManager = new ContainerTokenSecretManager(expiryTime,
+        secretKeyClient);
   }
 
   @Test(expected = CertificateExpiredException.class)
@@ -177,23 +186,24 @@ public class TestOzoneContainerWithTLS {
       conf.setBoolean(
           OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
+          secretKeyClient);
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
-      XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
-          Collections.singletonList(caClient.getCACertificate()));
+      try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
+          Collections.singletonList(caClient.getCACertificate()))) {
 
-      if (containerTokenEnabled) {
-        secretManager.start(caClient);
-        client.connect();
-        createSecureContainer(client, containerId,
-            secretManager.generateToken(
-                UserGroupInformation.getCurrentUser().getUserName(),
-                ContainerID.valueOf(containerId)));
-      } else {
-        client.connect();
-        createContainer(client, containerId);
+        if (containerTokenEnabled) {
+          client.connect();
+          createSecureContainer(client, containerId,
+              secretManager.generateToken(
+                  UserGroupInformation.getCurrentUser().getUserName(),
+                  ContainerID.valueOf(containerId)));
+        } else {
+          client.connect();
+          createContainer(client, containerId);
+        }
       }
     } finally {
       if (container != null) {
@@ -216,14 +226,11 @@ public class TestOzoneContainerWithTLS {
 
     OzoneContainer container = null;
     try {
-      container = new OzoneContainer(dn, conf, getContext(dn), caClient);
+      container = new OzoneContainer(dn, conf, getContext(dn), caClient,
+          secretKeyClient);
 
       // Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
-
-      if (containerTokenEnabled) {
-        secretManager.start(caClient);
-      }
 
       // Create containers
       long containerId = ContainerTestHelper.getTestContainerID();

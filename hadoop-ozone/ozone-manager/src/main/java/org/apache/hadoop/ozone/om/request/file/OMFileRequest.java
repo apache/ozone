@@ -26,10 +26,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -39,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -47,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -514,21 +517,6 @@ public final class OMFileRequest {
   }
 
   /**
-   * Updating the list of OmKeyInfo eligible for deleting blocks.
-   *
-   * @param omMetadataManager OM Metadata Manager
-   * @param dbDeletedKey      Ozone key in deletion table
-   * @param keysToDelete      Repeated OMKeyInfos
-   * @param trxnLogIndex      transaction log index
-   */
-  public static void addDeletedTableCacheEntry(
-          OMMetadataManager omMetadataManager, String dbDeletedKey,
-          RepeatedOmKeyInfo keysToDelete, long trxnLogIndex) {
-    omMetadataManager.getDeletedTable().addCacheEntry(
-        dbDeletedKey, keysToDelete, trxnLogIndex);
-  }
-
-  /**
    * Adding omKeyInfo to open file table.
    *
    * @param omMetadataMgr    OM Metadata Manager
@@ -645,8 +633,10 @@ public final class OMFileRequest {
    */
   @Nullable
   public static OzoneFileStatus getOMKeyInfoIfExists(
-      OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
-      String keyName, long scmBlockSize) throws IOException {
+      OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize, ReplicationConfig defaultReplication
+  ) throws IOException {
 
     OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
 
@@ -691,6 +681,11 @@ public final class OMFileRequest {
     if (omDirInfo != null) {
       OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
               keyName);
+      ReplicationConfig replicationConfig =
+          Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+              .map(DefaultReplicationConfig::getReplicationConfig)
+              .orElse(defaultReplication);
+      omKeyInfo.setReplicationConfig(replicationConfig);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
 
@@ -801,24 +796,27 @@ public final class OMFileRequest {
    * Check whether dst parent dir exists or not. If the parent exists, then the
    * source can be renamed to dst path.
    *
-   * @param volumeName  volume name
-   * @param bucketName  bucket name
-   * @param toKeyName   destination path
-   * @param metaMgr     metadata manager
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param toKeyName destination path
+   * @param ozoneManager
+   * @param metaMgr metadata manager
    * @return omDirectoryInfo object of destination path's parent
    * or null if parent is bucket
    * @throws IOException if the destination parent is not a directory.
    */
-  public static OmKeyInfo getKeyParentDir(String volumeName, String bucketName,
-      String toKeyName, OMMetadataManager metaMgr) throws IOException {
+  public static OmKeyInfo getKeyParentDir(
+      String volumeName, String bucketName, String toKeyName,
+      OzoneManager ozoneManager, OMMetadataManager metaMgr) throws IOException {
     int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
     // skip parent is root '/'
     if (totalDirsCount <= 1) {
       return null;
     }
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
-    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
-            volumeName, bucketName, toKeyParentDir, 0);
+    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(
+        metaMgr, volumeName, bucketName, toKeyParentDir, 0,
+        ozoneManager.getDefaultReplicationConfig());
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(

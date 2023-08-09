@@ -29,6 +29,7 @@ import com.google.common.base.Strings;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
@@ -76,6 +77,8 @@ public class TestOzoneFsSnapshot {
   @BeforeAll
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Start the cluster
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
@@ -280,6 +283,65 @@ public class TestOzoneFsSnapshot {
     String listSnapKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", snapshotPath});
     Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
+  }
+
+  @Test
+  public void testSnapshotDeleteSuccess() throws Exception {
+    String snapshotName = createSnapshot();
+    // Delete the created snapshot
+    int res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
+    // Asserts that delete request succeeded
+    Assertions.assertEquals(0, res);
+
+    // Wait for the snapshot to be marked deleted.
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+
+    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
+        200, 10000);
+  }
+
+  private static Stream<Arguments> deleteSnapshotFailureScenarios() {
+    String invalidBucketPath = "/invalid/uri";
+    return Stream.of(
+            Arguments.of("1st case: invalid snapshot name",
+                    BUCKET_PATH,
+                    "testsnap",
+                    "Snapshot does not exist",
+                    1),
+            Arguments.of("2nd case: invalid bucekt path",
+                    invalidBucketPath,
+                    "testsnap",
+                    "No such file or directory",
+                    1),
+            Arguments.of("3rd case: snapshot name not passed",
+                    BUCKET_PATH,
+                    "",
+                    "snapshot name can't be null or empty",
+                    -1),
+            Arguments.of("4th case: all parameters are missing",
+                    "",
+                    "",
+                    "Can not create a Path from an empty string",
+                    -1)
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("deleteSnapshotFailureScenarios")
+  public void testSnapshotDeleteFailure(String description,
+                                        String paramBucketPath,
+                                        String snapshotName,
+                                        String expectedMessage,
+                                        int expectedResponse) throws Exception {
+    String errorMessage = execShellCommandAndGetOutput(expectedResponse,
+            new String[]{"-deleteSnapshot", paramBucketPath, snapshotName});
+
+    Assertions.assertTrue(errorMessage
+            .contains(expectedMessage), errorMessage);
   }
 
   /**
