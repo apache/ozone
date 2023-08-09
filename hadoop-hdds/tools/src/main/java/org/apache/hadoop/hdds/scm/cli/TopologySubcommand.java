@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.HashMap;
 import java.util.InvalidPropertiesFormatException;
 import java.util.List;
@@ -146,9 +147,8 @@ public class TopologySubcommand extends ScmSubcommand
   //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes,
                                       String state) throws IOException {
-    HashMap<String, TreeSet<DatanodeDetails>> tree =
-        new HashMap<>();
-    HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> operationalState =
+    Map<String, TreeSet<DatanodeDetails>> tree = new HashMap<>();
+    Map<DatanodeDetails, HddsProtos.NodeOperationalState> operationalState =
         new HashMap<>();
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
