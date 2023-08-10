@@ -2260,12 +2260,17 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig);
     }
 
+    boolean enableHsync = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+
     return builder.setHandler(openKey)
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
-        .setClientMetrics(clientMetrics);
+        .setClientMetrics(clientMetrics)
+        .setEnableHsync(enableHsync);
   }
 
   @Override

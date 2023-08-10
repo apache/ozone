@@ -93,6 +93,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   private long clientID;
+  private boolean enableHsync;
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
       ContainerClientMetrics clientMetrics) {
@@ -141,7 +142,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
       boolean unsafeByteBufferConversion,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics,
+      boolean enableHsync
   ) {
     this.config = config;
     this.replication = replicationConfig;
@@ -162,6 +164,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.enableHsync = enableHsync;
   }
 
   /**
@@ -454,6 +457,10 @@ public class KeyOutputStream extends OutputStream implements Syncable {
 
   @Override
   public synchronized void hsync() throws IOException {
+    if (!enableHsync) {
+      throw new UnsupportedOperationException(
+          "Hsync is not enabled. To enable, set ozone.fs.hsync.enabled = true");
+    }
     if (replication.getReplicationType() != ReplicationType.RATIS) {
       throw new UnsupportedOperationException(
           "Replication type is not " + ReplicationType.RATIS);
@@ -585,6 +592,7 @@ public class KeyOutputStream extends OutputStream implements Syncable {
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
+    private boolean enableHsync;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -676,6 +684,11 @@ public class KeyOutputStream extends OutputStream implements Syncable {
       return this;
     }
 
+    public Builder setEnableHsync(boolean enableHsync) {
+      this.enableHsync = enableHsync;
+      return this;
+    }
+
     public ContainerClientMetrics getClientMetrics() {
       return clientMetrics;
     }
@@ -692,7 +705,8 @@ public class KeyOutputStream extends OutputStream implements Syncable {
           multipartNumber,
           isMultipartKey,
           unsafeByteBufferConversion,
-          clientMetrics);
+          clientMetrics,
+          enableHsync);
     }
 
   }
