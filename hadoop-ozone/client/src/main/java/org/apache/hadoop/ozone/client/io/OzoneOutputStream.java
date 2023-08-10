@@ -33,20 +33,21 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   private final OutputStream outputStream;
   private final Syncable syncable;
+  private boolean enableHsync;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
    *
    * @param outputStream an {@link OutputStream} which is {@link Syncable}.
    */
-  public OzoneOutputStream(Syncable outputStream) {
+  public OzoneOutputStream(Syncable outputStream, boolean enableHsync) {
     this(Optional.of(Objects.requireNonNull(outputStream,
                 "outputStream == null"))
         .filter(s -> s instanceof OutputStream)
         .map(s -> (OutputStream)s)
         .orElseThrow(() -> new IllegalArgumentException(
             "The parameter syncable is not an OutputStream")),
-        outputStream);
+        outputStream, enableHsync);
   }
 
   /**
@@ -56,13 +57,16 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
    * @param outputStream for writing data.
    * @param syncable an optional parameter
    *                 for accessing the {@link Syncable} feature.
+   * @param enableHsync if false, hsync() executes flush() instead.
    */
-  public OzoneOutputStream(OutputStream outputStream, Syncable syncable) {
+  public OzoneOutputStream(OutputStream outputStream, Syncable syncable,
+      boolean enableHsync) {
     this.outputStream = Objects.requireNonNull(outputStream,
         "outputStream == null");
     this.syncable = syncable != null ? syncable
         : outputStream instanceof Syncable ? (Syncable) outputStream
         : null;
+    this.enableHsync = enableHsync;
   }
 
   @Override
@@ -87,6 +91,10 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
   }
 
   public void hsync() throws IOException {
+    if (!enableHsync) {
+      outputStream.flush();
+      return;
+    }
     if (syncable != null) {
       if (outputStream != syncable) {
         outputStream.flush();

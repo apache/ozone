@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -416,7 +417,8 @@ public class TestHSync {
   }
 
   @Test
-  public void testThrowUnsupportedException() throws Exception {
+  public void testDisableHsync() throws Exception {
+    // When hsync is disabled, client does not throw exception.
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -432,12 +434,12 @@ public class TestHSync {
     try (FileSystem fs = FileSystem.get(CONF)) {
       final Path file = new Path(dir, "file");
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
-        assertThrows(UnsupportedOperationException.class,
-            () -> outputStream.hsync());
+        assertThrows(OMException.class, () -> outputStream.hsync());
       }
+    } finally {
+      // re-enable the feature flag
+      CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     }
-    // re-enable the feature flag
-    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 
   private void testEncryptedStreamCapabilities(boolean isEC) throws IOException,
