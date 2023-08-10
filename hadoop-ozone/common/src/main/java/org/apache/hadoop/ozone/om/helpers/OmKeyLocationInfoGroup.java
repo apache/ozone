@@ -184,11 +184,20 @@ public class OmKeyLocationInfoGroup {
 
   @Override
   public String toString() {
-    return "OmKeyLocationInfoGroup{" +
-        "version=" + version +
-        ", locationVersionMap=" + locationVersionMap +
-        ", isMultipartKey=" + isMultipartKey +
-        '}';
+    StringBuilder sb = new StringBuilder();
+    sb.append("version:").append(version).append(" ");
+    sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
+    for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
+      for (OmKeyLocationInfo kli: kliList) {
+        sb.append("conID ").append(kli.getContainerID());
+        sb.append(" ");
+        sb.append("locID ").append(kli.getLocalID());
+        sb.append(" ");
+        sb.append("bcsID ").append(kli.getBlockCommitSequenceId());
+        sb.append(" || ");
+      }
+    }
+    return sb.toString();
   }
 
   @Override
