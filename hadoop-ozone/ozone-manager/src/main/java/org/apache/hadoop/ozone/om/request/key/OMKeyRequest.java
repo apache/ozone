@@ -878,19 +878,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Using iterator instead of for/forEach for ease of in-place entry removal
     Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
         .getOmKeyInfoList().iterator();
-    // Pardon the loops. ContainerBlockID is nested 9-layer deep:
-    // keysToBeFiltered
-    //     .getOmKeyInfoList()
-    //     .get(0)
-    //     .getKeyLocationVersions()
-    //     .get(0)
-    //     .getLocationVersionMap()
-    //     .get(version)
-    //     .get(0)
-    //     .getBlockID()
-    //     .getContainerBlockID();
+
+    // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
+    // keysToBeFiltered               // RepeatedOmKeyInfo
+    //     .getOmKeyInfoList()        // List<OmKeyInfo>
+    //     .get(0)                    // OmKeyInfo
+    //     .getKeyLocationVersions()  // List<OmKeyLocationInfoGroup>
+    //     .get(0)                    // OmKeyLocationInfoGroup
+    //     .getLocationVersionMap()   // Map<Long, List<OmKeyLocationInfo>>
+    //     .get(version)              // List<OmKeyLocationInfo>
+    //     .get(0)                    // OmKeyLocationInfo
+    //     .getBlockID()              // BlockID
+    //     .getContainerBlockID();    // ContainerBlockID
+
     while (iterOmKeyInfo.hasNext()) {
-      // Note with HDDS-8463, each RepeatedOmKeyInfo should have only one entry,
+      // Note with HDDS-8462, each RepeatedOmKeyInfo should have only one entry,
       // so this outer most loop should never be entered twice in each call.
 
       // But for completeness sake I shall put it here.
@@ -918,7 +920,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
                 .getBlockID().getContainerBlockID();
 
             if (cbIdSet.contains(cbId)) {
-              // Remove this block from oldVerKeyInfo when it is still in-use.
+              // Remove this block from oldVerKeyInfo because it is referenced.
               iterKeyLocInfo.remove();
               LOG.debug("Filtered out block: {}", cbId);
             }

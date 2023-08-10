@@ -287,6 +287,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // Add to cache of open key table and key table.
       if (!isHSync) {
+        // If isHSync = false, put a tombstone in OpenKeyTable cache,
+        // indicating the key is removed from OpenKeyTable.
+        // So that this key can't be committed again.
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKey, trxnLogIndex);
       }

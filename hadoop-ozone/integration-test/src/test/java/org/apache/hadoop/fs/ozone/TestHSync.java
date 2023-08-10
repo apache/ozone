@@ -180,7 +180,7 @@ public class TestHSync {
           RepeatedOmKeyInfo val = kv.getValue();
           LOG.error("Unexpected deletedTable entry: key = {}, val = {}",
               key, val);
-          Assertions.fail("deletedTable should not have an entry for key = " +
+          Assertions.fail("deletedTable should not have such entry. key = " +
               key);
         }
       }
