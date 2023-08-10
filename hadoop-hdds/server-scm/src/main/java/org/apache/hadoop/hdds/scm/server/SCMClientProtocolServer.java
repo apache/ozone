@@ -727,7 +727,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     try {
       scm.getPipelineManager().activatePipeline(
@@ -744,7 +744,7 @@ public class SCMClientProtocolServer implements
   @Override
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
@@ -829,7 +829,7 @@ public class SCMClientProtocolServer implements
     }
 
     boolean auditSuccess = true;
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("newLeaderId", newLeaderId);
     try {
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
@@ -1018,7 +1018,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     if (threshold.isPresent()) {
       double tsd = threshold.get();
       auditMap.put("threshold", String.valueOf(tsd));
