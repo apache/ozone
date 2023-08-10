@@ -81,9 +81,7 @@ public class ListSubcommand extends ScmCertSubcommand {
       defaultValue = "false",
       description = "Format output as JSON")
   private boolean json;
-
-  private static final String OUTPUT_FORMAT = "%-17s %-30s %-30s %-110s %-110s";
-
+  
   private HddsProtos.NodeType parseCertRole(String r) {
     if (r.equalsIgnoreCase("om")) {
       return HddsProtos.NodeType.OM;
@@ -92,12 +90,6 @@ public class ListSubcommand extends ScmCertSubcommand {
     } else {
       return HddsProtos.NodeType.DATANODE;
     }
-  }
-
-  private void printCert(X509Certificate cert) {
-    LOG.info(String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
-        cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN(),
-        cert.getIssuerDN()));
   }
 
   @Override
