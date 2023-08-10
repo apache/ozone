@@ -108,10 +108,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       omMetrics.incNumKeyCommits();
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
-          isHSync, volumeName, bucketName, keyName);
-    }
+    LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+        isHSync, volumeName, bucketName, keyName);
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -279,11 +277,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
     } else {
-      // Debug logging for HSync
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Key successfully committed with isHSync = {}, " +
-            "omKeyInfo = {}", isHSync, omKeyInfo);
-      }
+      // Debug logging for HSync key commits
+      LOG.debug("Key successfully committed with isHSync = {}, " +
+          "omKeyInfo = {}", isHSync, omKeyInfo);
     }
 
     return omClientResponse;

@@ -863,10 +863,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void filterOutBlocksStillInUse(OmKeyInfo referenceKey,
                                            RepeatedOmKeyInfo keysToBeFiltered) {
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Before block filtering, keysToBeFiltered = {}",
-          keysToBeFiltered);
-    }
+    LOG.debug("Before block filtering, keysToBeFiltered = {}",
+        keysToBeFiltered);
 
     // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
     // the referenceKey.
@@ -944,9 +942,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("After block filtering,  keysToBeFiltered = {}",
-          keysToBeFiltered);
-    }
+    LOG.debug(" After block filtering, keysToBeFiltered = {}",
+        keysToBeFiltered);
   }
 }

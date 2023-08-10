@@ -151,10 +151,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omMetrics.incNumKeyCommits();
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
-          isHSync, volumeName, bucketName, keyName);
-    }
+    LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+        isHSync, volumeName, bucketName, keyName);
 
     try {
       commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
@@ -324,11 +322,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
     } else {
-      // Debug logging for HSync
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Key successfully committed with isHSync = {}, " +
-            "omKeyInfo = {}", isHSync, omKeyInfo);
-      }
+      // Debug logging for HSync key commits
+      LOG.debug("Key successfully committed with isHSync = {}, " +
+          "omKeyInfo = {}", isHSync, omKeyInfo);
     }
 
     return omClientResponse;
