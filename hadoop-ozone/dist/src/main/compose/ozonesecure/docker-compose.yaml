@@ -37,7 +37,7 @@ services:
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    hostname: datanode
+    hostname: dn
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
