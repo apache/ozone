@@ -115,7 +115,8 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
       }
       syncable.hsync();
     } else {
-      outputStream.flush();
+      throw new UnsupportedOperationException(outputStream.getClass()
+          + " is not " + Syncable.class.getSimpleName());
     }
   }
 
