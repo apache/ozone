@@ -233,7 +233,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.getOmSnapshotManager())
         .thenReturn(omSnapshotManager);
 
-    // Turn on DEBUG level logging for relevant classes
+    // Enable DEBUG level logging for relevant classes
     GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
