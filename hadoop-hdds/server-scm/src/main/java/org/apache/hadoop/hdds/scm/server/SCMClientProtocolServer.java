@@ -869,7 +869,7 @@ public class SCMClientProtocolServer implements
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("count", String.valueOf(count));
     auditMap.put("startTxId", String.valueOf(startTxId));
     try {
