@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
@@ -102,6 +101,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -390,13 +390,11 @@ public class TestOzoneFileSystem {
     checkInvalidPath(file1);
   }
 
-  private void checkInvalidPath(Path path) throws Exception {
-    try {
-      LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
-          () -> fs.create(path, false));
-    } catch (AssertionError e) {
-      fail("testCreateWithInvalidPaths failed for path" + path);
-    }
+  private void checkInvalidPath(Path path) {
+    InvalidPathException pathException = assertThrows(
+        InvalidPathException.class, () -> fs.create(path, false)
+    );
+    assertTrue(pathException.getMessage().contains("Invalid path Name"));
   }
 
   @Test
@@ -1440,8 +1438,10 @@ public class TestOzoneFileSystem {
         fs.exists(new Path(dest, "sub_dir1")));
 
     // Test if one path belongs to other FileSystem.
-    LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
         () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+    assertTrue(exception.getMessage().contains("Wrong FS"));
   }
 
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)

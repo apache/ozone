@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -131,6 +130,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DEL
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -1747,9 +1747,9 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(dir1Status.equals(fs.getFileStatus(dirPath1)));
 
     // confirm link is gone
-    LambdaTestUtils.intercept(FileNotFoundException.class,
-        "File not found.",
+    FileNotFoundException exception = assertThrows(FileNotFoundException.class,
         () -> fs.getFileStatus(dirPathLink));
+    assertTrue(exception.getMessage().contains("File not found."));
 
     // Cleanup
     fs.delete(volumePath1, true);
@@ -2063,9 +2063,10 @@ public class TestRootedOzoneFileSystem {
     checkInvalidPath(file1);
   }
 
-  private void checkInvalidPath(Path path) throws Exception {
-    LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
+  private void checkInvalidPath(Path path) {
+    InvalidPathException exception = assertThrows(InvalidPathException.class,
         () -> fs.create(path, false));
+    assertTrue(exception.getMessage().contains("Invalid path Name"));
   }
 
 
@@ -2284,7 +2285,7 @@ public class TestRootedOzoneFileSystem {
     String bucketNameLocal = RandomStringUtils.randomNumeric(5);
     Path volume = new Path("/" + volumeNameLocal);
     ofs.mkdirs(volume);
-    LambdaTestUtils.intercept(OMException.class,
+    assertThrows(OMException.class,
         () -> ofs.getFileStatus(new Path(volume, bucketNameLocal)));
     // Cleanup
     ofs.delete(volume, true);
@@ -2519,9 +2520,11 @@ public class TestRootedOzoneFileSystem {
     String errorMsg = "Path is not a bucket";
     String finalFromSnap = fromSnap;
     String finalToSnap = toSnap;
-    LambdaTestUtils.intercept(IllegalArgumentException.class, errorMsg,
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
         () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
             finalToSnap));
+    assertTrue(exception.getMessage().contains(errorMsg));
   }
 
   @Test

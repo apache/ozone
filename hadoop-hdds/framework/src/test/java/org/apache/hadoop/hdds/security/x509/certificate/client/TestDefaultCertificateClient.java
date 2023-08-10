@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 
@@ -73,6 +72,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -210,9 +210,10 @@ public class TestDefaultCertificateClient {
         dnSecurityConfig.getPublicKeyFileName()).toFile());
 
     // Expect error when there is no private key to sign.
-    LambdaTestUtils.intercept(IOException.class, "Error while " +
-            "signing the stream",
+    IOException ioException = assertThrows(IOException.class,
         () -> dnCertClient.signData(data.getBytes(UTF_8)));
+    assertTrue(ioException.getMessage()
+        .contains("Error while signing the stream"));
 
     generateKeyPairFiles();
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
@@ -283,18 +284,20 @@ public class TestDefaultCertificateClient {
         DN_COMPONENT);
 
     // Certificate not found.
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
-        () -> dnCertClient.getCertificate(cert1.getSerialNumber()
-            .toString()));
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
-        () -> dnCertClient.getCertificate(cert2.getSerialNumber()
-            .toString()));
-    LambdaTestUtils.intercept(CertificateException.class, "Error while" +
-            " getting certificate",
+    CertificateException certException = assertThrows(
+        CertificateException.class,
+        () -> dnCertClient.getCertificate(cert1.getSerialNumber().toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
+    certException = assertThrows(CertificateException.class,
+        () -> dnCertClient.getCertificate(cert2.getSerialNumber().toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
+    certException = assertThrows(CertificateException.class,
         () -> dnCertClient.getCertificate(cert3.getSerialNumber()
             .toString()));
+    assertTrue(certException.getMessage()
+        .contains("Error while getting certificate"));
     codec.writeCertificate(certPath, "1.crt",
         getPEMEncodedString(cert1));
     codec.writeCertificate(certPath, "2.crt",

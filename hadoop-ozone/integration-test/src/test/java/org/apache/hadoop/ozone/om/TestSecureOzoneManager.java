@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.After;
 import org.junit.Assert;
@@ -224,9 +223,10 @@ public class TestSecureOzoneManager {
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
-    LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
-            " certificate",
+    RuntimeException rte = Assert.assertThrows(RuntimeException.class,
         () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
+    Assert.assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
+        " om-unknown:9862", rte.getMessage());
   }
 
 }
