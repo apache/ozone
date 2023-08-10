@@ -375,7 +375,7 @@ public class TestObjectStoreWithFSO {
    *                    |
    *                    a
    *                    |
-   *      -----------------------------------
+   *      --------------------------------------
    *     |              |                       |
    *     b1             b2                      b3
    *    -----           --------               ----------
@@ -472,6 +472,13 @@ public class TestObjectStoreWithFSO {
     ozoneKeyIterator =
         ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Key level, prefix=key case
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b1/c1/c1.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b1/c1/c1.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
   }
 
