@@ -511,7 +511,7 @@ public class TestWritableECContainerProvider {
     }
   }
 
-    @ParameterizedTest
+  @ParameterizedTest
   @MethodSource("policies")
   public void testExcludedNodesPassedToCreatePipelineIfProvided(
       PipelineChoosePolicy policy) throws IOException {
