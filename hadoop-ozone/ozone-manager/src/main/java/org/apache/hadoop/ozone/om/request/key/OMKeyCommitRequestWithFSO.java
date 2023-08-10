@@ -274,15 +274,15 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
     }
 
+    // Debug logging for HSync and non-HSync key commits, successful or not
+    LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
+        result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
+
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
-    } else {
-      // Debug logging for HSync key commits
-      LOG.debug("Key successfully committed with isHSync = {}, " +
-          "omKeyInfo = {}", isHSync, omKeyInfo);
     }
 
     return omClientResponse;
