@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,8 +54,6 @@ public class TestRatisPipelineCreateAndDestroy {
   private PipelineManager pipelineManager;
 
   public void init(int numDatanodes) throws Exception {
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

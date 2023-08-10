@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,15 +33,13 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
-import org.apache.hadoop.test.PathUtils;
-import org.apache.hadoop.test.TestGenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,12 +64,10 @@ public class TestMiniOzoneCluster {
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  private static final File TEST_ROOT = TestGenericTestUtils.getTestDir();
-
   @BeforeAll
-  public static void setup() {
+  static void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
     conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
@@ -118,11 +113,6 @@ public class TestMiniOzoneCluster {
   @Test
   public void testContainerRandomPort() throws IOException {
     OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
-    File testDir = PathUtils.getTestDir(TestOzoneContainer.class);
-    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
-        testDir.getAbsolutePath());
-    ozoneConf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        TEST_ROOT.toString());
 
     // Each instance of SM will create an ozone container
     // that bounds to a random port.

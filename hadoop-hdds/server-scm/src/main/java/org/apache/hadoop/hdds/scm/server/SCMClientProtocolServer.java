@@ -113,6 +113,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
@@ -131,14 +132,14 @@ public class SCMClientProtocolServer implements
   private final RPC.Server clientRpcServer;
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
+  private final OzoneConfiguration config;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
 
-  public SCMClientProtocolServer(
-      OzoneConfiguration conf,
+  public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm,
-      ReconfigurationHandler reconfigurationHandler
-  ) throws IOException {
+      ReconfigurationHandler reconfigurationHandler) throws IOException {
     this.scm = scm;
+    this.config = conf;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -821,12 +822,8 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
 
-    if (scm.getRootCARotationManager() != null &&
-        scm.getRootCARotationManager().isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
-          " Please try the operation later again."),
-          ResultCodes.CA_ROTATION_IN_PROGRESS);
-    }
+    checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
+        false, config, "transferLeadership");
 
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();

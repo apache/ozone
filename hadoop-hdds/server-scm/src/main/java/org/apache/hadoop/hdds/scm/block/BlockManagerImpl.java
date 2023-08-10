@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 
 
 /** Block Manager manages the block access for SCM. */
-public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
+public class BlockManagerImpl implements BlockManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockManagerImpl.class);
   // TODO : FIX ME : Hard coding the owner.
@@ -277,16 +277,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       MBeans.unregister(mxBean);
       mxBean = null;
     }
-  }
-
-  @Override
-  public int getOpenContainersNo() {
-    return 0;
-    // TODO : FIX ME : The open container being a single number does not make
-    // sense.
-    // We have to get open containers by Replication Type and Replication
-    // factor. Hence returning 0 for now.
-    // containers.get(HddsProtos.LifeCycleState.OPEN).size();
   }
 
   @Override
