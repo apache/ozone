@@ -432,7 +432,7 @@ public class TestHSync {
     ThreadLocalRandom.current().nextBytes(data);
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      final Path file = new Path(dir, "file");
+      final Path file = new Path(dir, "file_hsync_disable");
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         outputStream.hsync();
         assertThrows(FileNotFoundException.class,
