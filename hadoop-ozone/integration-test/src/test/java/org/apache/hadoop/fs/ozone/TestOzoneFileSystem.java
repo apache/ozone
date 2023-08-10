@@ -166,7 +166,7 @@ public class TestOzoneFileSystem {
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
-  private static FileSystem fs;
+  public static FileSystem fs;
   private static OzoneFileSystem o3fs;
   private static OzoneBucket ozoneBucket;
   private static String volumeName;
@@ -1294,7 +1294,7 @@ public class TestOzoneFileSystem {
    */
   @Test
   public void testRenameFile() throws Exception {
-    final String root = "/root";
+    final String root = "/root1";
     Path rootPath = new Path(fs.getUri().toString() + root);
     fs.mkdirs(rootPath);
 
@@ -1315,6 +1315,7 @@ public class TestOzoneFileSystem {
       assertEquals("Renamed failed", 1, fStatus.length);
       assertEquals("Wrong path name!", file1Destin, fStatus[0].getPath());
     }
+    fs.delete(rootPath, true);
   }
 
   /**
