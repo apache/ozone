@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -89,7 +90,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     super.cleanup();
     try {
       deleteRootDir();
-    } catch (IOException e) {
+    } catch (IOException | InterruptedException | TimeoutException e) {
       LOG.info("Failed to cleanup DB tables.", e);
       fail("Failed to cleanup DB tables." + e.getMessage());
     }
