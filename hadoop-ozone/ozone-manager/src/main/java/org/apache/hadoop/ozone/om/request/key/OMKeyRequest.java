@@ -26,12 +26,17 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -100,7 +105,8 @@ import static org.apache.hadoop.util.Time.monotonicNow;
  */
 public abstract class OMKeyRequest extends OMClientRequest {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  @VisibleForTesting
+  public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -843,5 +849,104 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  /**
+   * Remove blocks in-place from keysToBeFiltered that exist in referenceKey.
+   * <p>
+   * keysToBeFiltered.getOmKeyInfoList() becomes empty when all blocks are
+   * filtered.
+   *
+   * @param referenceKey OmKeyInfo
+   * @param keysToBeFiltered RepeatedOmKeyInfo
+   */
+  protected void filterOutBlocksStillInUse(OmKeyInfo referenceKey,
+                                           RepeatedOmKeyInfo keysToBeFiltered) {
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Before block filtering, keysToBeFiltered = {}",
+          keysToBeFiltered);
+    }
+
+    // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
+    // the referenceKey.
+    HashSet<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
+        .stream()
+        .flatMap(e -> e.getLocationList().stream())
+        .map(omKeyLocationInfo ->
+            omKeyLocationInfo.getBlockID().getContainerBlockID())
+        .collect(Collectors.toCollection(HashSet::new));
+
+    // Use iterator instead of for/forEach for ease of entry removal
+    Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
+        .getOmKeyInfoList().iterator();
+    // Pardon the loops. ContainerBlockID is nested 9-layers deep:
+    // keysToBeFiltered
+    //     .getOmKeyInfoList()
+    //     .get(0)
+    //     .getKeyLocationVersions()
+    //     .get(0)
+    //     .getLocationVersionMap()
+    //     .get(version)
+    //     .get(0)
+    //     .getBlockID()
+    //     .getContainerBlockID();
+    while (iterOmKeyInfo.hasNext()) {
+      // Note with HDDS-8463, each RepeatedOmKeyInfo should have only one entry,
+      // so this outer most loop should never be entered twice in each call.
+
+      // But for completeness sake I shall put it here.
+      // Remove only when RepeatedOmKeyInfo is no longer used.
+
+      OmKeyInfo oldOmKeyInfo = iterOmKeyInfo.next();
+
+      Iterator<OmKeyLocationInfoGroup> iterKeyLocInfoGroup = oldOmKeyInfo
+          .getKeyLocationVersions().iterator();
+      while (iterKeyLocInfoGroup.hasNext()) {
+        OmKeyLocationInfoGroup keyLocInfoGroup = iterKeyLocInfoGroup.next();
+
+        Iterator<Map.Entry<Long, List<OmKeyLocationInfo>>> itMap =
+            keyLocInfoGroup.getLocationVersionMap().entrySet().iterator();
+
+        while (itMap.hasNext()) {
+          Map.Entry<Long, List<OmKeyLocationInfo>> mapEntry = itMap.next();
+          List<OmKeyLocationInfo> omKeyLocationInfoList = mapEntry.getValue();
+
+          Iterator<OmKeyLocationInfo> iterKeyLocInfo =
+              omKeyLocationInfoList.iterator();
+          while (iterKeyLocInfo.hasNext()) {
+            OmKeyLocationInfo keyLocationInfo = iterKeyLocInfo.next();
+            ContainerBlockID cbId = keyLocationInfo
+                .getBlockID().getContainerBlockID();
+
+            if (cbIdSet.contains(cbId)) {
+              // Remove this block from oldVerKeyInfo when it is still in-use.
+              iterKeyLocInfo.remove();
+              LOG.debug("Filtered out block: {}", cbId);
+            }
+          }
+
+          // Optional cleanup
+          if (omKeyLocationInfoList.isEmpty()) {
+            itMap.remove();
+          }
+        }
+
+        // Optional cleanup
+        if (keyLocInfoGroup.getLocationVersionMap().isEmpty()) {
+          iterKeyLocInfoGroup.remove();
+        }
+      }
+
+      // Optional cleanup
+      if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
+        iterOmKeyInfo.remove();
+      }
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("After block filtering,  keysToBeFiltered = {}",
+          keysToBeFiltered);
+    }
   }
 }

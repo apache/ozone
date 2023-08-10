@@ -199,7 +199,16 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
-        oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+
+        // Remove any block from oldVerKeyInfo that share the same container ID
+        // and local ID with omKeyInfo blocks'.
+        // Otherwise, it causes data loss once those shared blocks are added
+        // to deletedTable and processed by KeyDeletingService for deletion.
+        filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
+
+        if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
+          oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+        }
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -260,6 +269,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
           omMetrics, exception, omKeyInfo, result);
+    } else {
+      // Debug logging for HSync
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Key successfully committed with isHSync = {}, " +
+            "omKeyInfo = {}", isHSync, omKeyInfo);
+      }
     }
 
     return omClientResponse;

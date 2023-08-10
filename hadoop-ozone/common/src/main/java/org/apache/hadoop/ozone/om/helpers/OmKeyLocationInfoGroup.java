@@ -81,6 +81,13 @@ public class OmKeyLocationInfoGroup {
   }
 
   /**
+   * @return Raw internal locationVersionMap.
+   */
+  public Map<Long, List<OmKeyLocationInfo>> getLocationVersionMap() {
+    return locationVersionMap;
+  }
+
+  /**
    * Return only the blocks that are created in the most recent version.
    *
    * @return the list of blocks that are created in the latest version.
