@@ -66,7 +66,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String cId;
   private String scmHostname;
   private ExecutorService executorService;
-  private AtomicReference<String> certSerialId = new AtomicReference<>();
+  private AtomicReference<String> newCertSerialId = new AtomicReference<>();
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
@@ -113,8 +113,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    certSerialId.set(getNextCertificateId());
-    return getCSRBuilder(certSerialId.get());
+    return getCSRBuilder(getNextCertificateId());
   }
 
   /**
@@ -125,6 +124,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    */
   public CertificateSignRequest.Builder getCSRBuilder(String certSerialId)
       throws CertificateException {
+    newCertSerialId.set(certSerialId);
     String subject = String.format(SCM_SUB_CA_PREFIX, certSerialId)
         + scmHostname;
 
@@ -180,8 +180,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       // Get SCM sub CA cert.
       SCMGetCertResponseProto response =
           getScmSecureClient().getSCMCertChain(scmNodeDetailsProto,
-              getEncodedString(request), certSerialId.get(), true);
-      certSerialId.set(null);
+              getEncodedString(request), newCertSerialId.get(), true);
+      newCertSerialId.set(null);
 
       CertificateCodec certCodec = new CertificateCodec(
           getSecurityConfig(), certPath);

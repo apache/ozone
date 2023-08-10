@@ -39,21 +39,24 @@ execute_robot_test scm kinit.robot
 wait_for_execute_command scm 30 "jps | grep StorageContainerManagerStarter |  sed 's/StorageContainerManagerStarter//' | xargs | xargs -I {} jstack {} | grep 'RootCARotationManager-Active'"
 
 # wait and verify root CA is rotated
-wait_for_execute_command scm 180 "ozone admin cert info 2"
-wait_for_execute_command datanode 30 "find /data/metadata/dn/certs/ROOTCA-2.crt"
+wait_for_root_certificate scm 180 2
+execute_robot_test datanode kinit.robot
+wait_for_execute_command datanode 30 "ozone admin cert list --role=scm | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/om/certs/ROOTCA-{}.crt | xargs find"
+
 # We need to wait here for the new certificate in OM as well, because it might
 # get to the OM later, and the client will not trust the DataNode with the new
 # certificate and will not refetch the CA certs as that will be implemented in
 # HDDS-8958.
-wait_for_execute_command om 30 "find /data/metadata/om/certs/ROOTCA-2.crt"
+execute_robot_test om kinit.robot
+wait_for_execute_command om 30 "ozone admin cert list --role=scm | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/om/certs/ROOTCA-{}.crt | xargs find"
 execute_robot_test scm -v PREFIX:"rootca" certrotation/root-ca-rotation-client-checks.robot
 
 # verify om operations and data operations
 execute_commands_in_container scm "ozone sh volume create /r-v1 && ozone sh bucket create /r-v1/r-b1"
 
 # wait for second root CA rotation
-wait_for_execute_command scm 180 "ozone admin cert info 3"
-wait_for_execute_command om 30 "find /data/metadata/om/certs/ROOTCA-3.crt"
+wait_for_root_certificate scm 180 3
+wait_for_execute_command om 30 "ozone admin cert list --role=scm | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/om/certs/ROOTCA-{}.crt | xargs find"
 wait_for_execute_command scm 60 "! ozone admin cert info 1"
 execute_robot_test scm -v PREFIX:"rootca2" certrotation/root-ca-rotation-client-checks.robot
 # check the metrics
