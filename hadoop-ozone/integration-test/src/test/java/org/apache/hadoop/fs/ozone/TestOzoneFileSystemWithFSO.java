@@ -38,6 +38,7 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -62,6 +63,7 @@ import static org.junit.Assert.fail;
  *
  */
 @RunWith(Parameterized.class)
+@Isolated
 public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Parameterized.Parameters
