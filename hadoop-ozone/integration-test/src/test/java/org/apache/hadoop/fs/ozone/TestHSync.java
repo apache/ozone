@@ -457,7 +457,7 @@ public class TestHSync {
     when(codec.createEncryptor()).thenReturn(encryptor);
     CryptoOutputStream cos =
         new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
-    OzoneOutputStream oos = new OzoneOutputStream(cos);
+    OzoneOutputStream oos = new OzoneOutputStream(cos, true);
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
 
     try (CapableOzoneFSOutputStream cofsos =
