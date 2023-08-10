@@ -877,10 +877,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omKeyLocationInfo.getBlockID().getContainerBlockID())
         .collect(Collectors.toCollection(HashSet::new));
 
-    // Use iterator instead of for/forEach for ease of entry removal
+    // Using iterator instead of for/forEach for ease of in-place entry removal
     Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
         .getOmKeyInfoList().iterator();
-    // Pardon the loops. ContainerBlockID is nested 9-layers deep:
+    // Pardon the loops. ContainerBlockID is nested 9-layer deep:
     // keysToBeFiltered
     //     .getOmKeyInfoList()
     //     .get(0)
@@ -926,19 +926,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
             }
           }
 
-          // Optional cleanup
+          // Cleanup
           if (omKeyLocationInfoList.isEmpty()) {
             itMap.remove();
           }
         }
 
-        // Optional cleanup
+        // Cleanup
         if (keyLocInfoGroup.getLocationVersionMap().isEmpty()) {
           iterKeyLocInfoGroup.remove();
         }
       }
 
-      // Optional cleanup
+      // Cleanup
       if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
         iterOmKeyInfo.remove();
       }

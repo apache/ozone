@@ -164,7 +164,7 @@ public class BlockLocationInfo {
   }
 
   @Override
-  public String  toString() {
+  public String toString() {
     return "{blockID={" + blockID + "}" +
         ", length=" + length +
         ", offset=" + offset +
