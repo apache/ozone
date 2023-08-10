@@ -308,7 +308,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OzoneConfiguration conf = ozoneManager.getConfiguration();
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
     BucketLayout bucketLayout = getBucketLayout();
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, bucketLayout);

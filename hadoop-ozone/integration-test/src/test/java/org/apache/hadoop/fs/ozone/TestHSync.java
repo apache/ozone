@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -434,7 +434,9 @@ public class TestHSync {
     try (FileSystem fs = FileSystem.get(CONF)) {
       final Path file = new Path(dir, "file");
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
-        assertThrows(OMException.class, () -> outputStream.hsync());
+        outputStream.hsync();
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(file));
       }
     } finally {
       // re-enable the feature flag
