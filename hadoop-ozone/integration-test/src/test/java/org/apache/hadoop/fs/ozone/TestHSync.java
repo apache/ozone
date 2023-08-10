@@ -436,6 +436,8 @@ public class TestHSync {
             () -> outputStream.hsync());
       }
     }
+    // re-enable the feature flag
+    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 
   private void testEncryptedStreamCapabilities(boolean isEC) throws IOException,

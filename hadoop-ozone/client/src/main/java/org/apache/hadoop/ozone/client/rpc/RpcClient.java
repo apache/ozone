@@ -2213,8 +2213,15 @@ public class RpcClient implements ClientProtocol {
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
+    boolean enableHsync = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    Syncable syncable = null;
+    if (enableHsync) {
+      syncable = keyOutputStream;
+    }
     final OzoneOutputStream out = createSecureOutputStream(
-        openKey, keyOutputStream, keyOutputStream);
+        openKey, keyOutputStream, syncable);
     return out != null ? out : new OzoneOutputStream(keyOutputStream);
   }
 
@@ -2260,17 +2267,12 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig);
     }
 
-    boolean enableHsync = conf.getBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
-
     return builder.setHandler(openKey)
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(conf.getObject(OzoneClientConfig.class))
-        .setClientMetrics(clientMetrics)
-        .setEnableHsync(enableHsync);
+        .setClientMetrics(clientMetrics);
   }
 
   @Override

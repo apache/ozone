@@ -313,8 +313,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, bucketLayout);
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
-    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
-        .get(bucketKey);
 
     assertThrows(OMException.class, () ->
         performHsyncCommit(allocatedKeyLocationList.subList(0, 5)));
