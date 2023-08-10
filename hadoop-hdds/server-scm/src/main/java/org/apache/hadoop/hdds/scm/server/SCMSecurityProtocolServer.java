@@ -546,7 +546,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
   }
 
   @Override
-  public String getNextCertificateId() throws IOException{
+  public String getNextCertificateId() throws IOException {
     return String.valueOf(sequenceIdGen.getNextId(CERTIFICATE_ID));
   }
 
