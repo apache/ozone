@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -147,7 +148,7 @@ public class TestHSync {
   }
 
   @Test
-  public void testKeyHSyncThenClose() throws IOException {
+  public void testKeyHSyncThenClose() throws Exception {
     // Check that deletedTable should not have keys with the same block as in
     // keyTable's when a key is hsync()'ed then close()'d.
 
@@ -168,11 +169,16 @@ public class TestHSync {
       }
     }
 
-    OMMetadataManager ommm = cluster.getOzoneManager().getMetadataManager();
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    // Wait for double buffer to trigger all pending addToDBBatch(),
+    // including OMKeyCommitResponse(WithFSO)'s that writes to deletedTable.
+    ozoneManager.awaitDoubleBufferFlush();
+
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     // deletedTable should not have an entry for file at all in this case
     try (TableIterator<String,
         ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-        tableIter = ommm.getDeletedTable().iterator()) {
+        tableIter = metadataManager.getDeletedTable().iterator()) {
       while (tableIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
         String key = kv.getKey();

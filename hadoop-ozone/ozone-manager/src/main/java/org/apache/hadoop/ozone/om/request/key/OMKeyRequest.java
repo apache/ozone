@@ -854,8 +854,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   /**
    * Remove blocks in-place from keysToBeFiltered that exist in referenceKey.
    * <p>
-   * keysToBeFiltered.getOmKeyInfoList() becomes empty when all blocks are
-   * filtered.
+   * keysToBeFiltered.getOmKeyInfoList() becomes an empty list when all blocks
+   * are filtered out.
    *
    * @param referenceKey OmKeyInfo
    * @param keysToBeFiltered RepeatedOmKeyInfo
@@ -905,11 +905,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       while (iterKeyLocInfoGroup.hasNext()) {
         OmKeyLocationInfoGroup keyLocInfoGroup = iterKeyLocInfoGroup.next();
 
-        Iterator<Map.Entry<Long, List<OmKeyLocationInfo>>> itMap =
+        Iterator<Map.Entry<Long, List<OmKeyLocationInfo>>> iterVerMap =
             keyLocInfoGroup.getLocationVersionMap().entrySet().iterator();
 
-        while (itMap.hasNext()) {
-          Map.Entry<Long, List<OmKeyLocationInfo>> mapEntry = itMap.next();
+        while (iterVerMap.hasNext()) {
+          Map.Entry<Long, List<OmKeyLocationInfo>> mapEntry = iterVerMap.next();
           List<OmKeyLocationInfo> omKeyLocationInfoList = mapEntry.getValue();
 
           Iterator<OmKeyLocationInfo> iterKeyLocInfo =
@@ -928,7 +928,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
           // Cleanup
           if (omKeyLocationInfoList.isEmpty()) {
-            itMap.remove();
+            iterVerMap.remove();
           }
         }
 
@@ -944,7 +944,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
-    LOG.debug(" After block filtering, keysToBeFiltered = {}",
+    // Intentional extra space for alignment
+    LOG.debug("After block filtering,  keysToBeFiltered = {}",
         keysToBeFiltered);
   }
 }
