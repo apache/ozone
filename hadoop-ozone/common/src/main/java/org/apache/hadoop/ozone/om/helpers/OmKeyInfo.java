@@ -436,7 +436,7 @@ public final class OmKeyInfo extends WithParentObjectId
         ", creationTime=" + creationTime +
         ", modificationTime=" + modificationTime +
         ", replicationConfig=" + replicationConfig +
-        ", encInfo=" + encInfo +
+        ", encInfo=" + (encInfo == null ? "null" : "<REDACTED>") +
         ", fileChecksum=" + fileChecksum +
         ", isFile=" + isFile +
         ", fileName='" + fileName + '\'' +
