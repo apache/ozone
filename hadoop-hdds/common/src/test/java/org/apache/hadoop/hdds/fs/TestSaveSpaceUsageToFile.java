@@ -31,7 +31,7 @@ import java.time.Instant;
 import java.util.OptionalLong;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,7 +94,10 @@ public class TestSaveSpaceUsageToFile {
 
     subject.save(VALID_USAGE_SOURCE);
     Instant expired = Instant.now().plus(shortExpiry);
-    waitFor(() -> Instant.now().isAfter(expired), 10, 1000);
+
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> Instant.now().isAfter(expired));
     OptionalLong savedValue = subject.load();
 
     assertTrue(file.exists());

@@ -82,6 +82,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -90,7 +91,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
@@ -104,6 +104,9 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -371,10 +374,13 @@ public class TestBlockDeletingService {
    *  Run service runDeletingTasks and wait for it's been processed.
    */
   private void deleteAndWait(BlockDeletingServiceTestImpl service,
-      int timesOfProcessed) throws TimeoutException, InterruptedException {
+                             int timesOfProcessed) {
     service.runDeletingTasks();
-    GenericTestUtils.waitFor(()
-        -> service.getTimesOfProcessed() == timesOfProcessed, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> Assert.assertEquals(timesOfProcessed,
+            service.getTimesOfProcessed()));
   }
 
   /**
@@ -564,7 +570,9 @@ public class TestBlockDeletingService {
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
     BlockDeletingServiceMetrics deletingServiceMetrics = svc.getMetrics();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(svc::isStarted);
 
     // Ensure 1 container was created
     List<ContainerData> containerData = Lists.newArrayList();
@@ -607,9 +615,10 @@ public class TestBlockDeletingService {
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
 
-      GenericTestUtils.waitFor(() ->
-              containerData.get(0).getBytesUsed() == containerSpace /
-                      3, 100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> Assert.assertEquals(containerSpace / 3,
+              containerData.get(0).getBytesUsed()));
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
@@ -633,8 +642,10 @@ public class TestBlockDeletingService {
 
       // After deletion of all 3 blocks, space used by the containers
       // should be zero.
-      GenericTestUtils.waitFor(() ->
-              containerData.get(0).getBytesUsed() == 0, 100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() ->
+              Assert.assertEquals(0, containerData.get(0).getBytesUsed()));
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
@@ -690,7 +701,10 @@ public class TestBlockDeletingService {
     BlockDeletingServiceTestImpl svc =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     svc.start();
-    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(svc::isStarted);
 
     // Ensure 2 container was created
     List<ContainerData> containerData = Lists.newArrayList();
@@ -757,8 +771,10 @@ public class TestBlockDeletingService {
     deleteAndWait(svc, 3);
     deleteAndWait(svc, 4);
     deleteAndWait(svc, 5);
-    GenericTestUtils.waitFor(() -> ctr2.getNumPendingDeletionBlocks() == 0,
-        200, 2000);
+    await().atMost(Duration.ofSeconds(2))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() ->
+            Assert.assertEquals(0, ctr2.getNumPendingDeletionBlocks()));
 
     // To make sure the container stat calculation is right
     Assert.assertEquals(0, ctr1.getBlockCount());
@@ -774,7 +790,6 @@ public class TestBlockDeletingService {
     for (File f: unrecordedChunks) {
       Assert.assertFalse(f.exists());
     }
-
     svc.shutdown();
   }
 
@@ -797,15 +812,22 @@ public class TestBlockDeletingService {
     BlockDeletingServiceTestImpl service =
         getBlockDeletingService(containerSet, conf, keyValueHandler);
     service.start();
-    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(service::isStarted);
 
     // Run some deleting tasks and verify there are threads running
     service.runDeletingTasks();
-    GenericTestUtils.waitFor(() -> service.getThreadCount() > 0, 100, 1000);
+
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> service.getThreadCount() > 0);
 
     // Shutdown service and verify all threads are stopped
     service.shutdown();
-    GenericTestUtils.waitFor(() -> service.getThreadCount() == 0, 100, 1000);
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> Assert.assertEquals(0, service.getThreadCount()));
   }
 
   @Test
@@ -832,20 +854,16 @@ public class TestBlockDeletingService {
     svc.start();
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
-    GenericTestUtils.waitFor(() -> {
-      if (log.getOutput().contains("Background task execution took")) {
-        log.stopCapturing();
-        return true;
-      }
 
-      return false;
-    }, 100, 1000);
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(log.getOutput(),
+            containsString("Background task execution took")));
 
     log.stopCapturing();
     svc.shutdown();
 
     // test for normal case that doesn't have timeout limitation
-
     createToDeleteBlocks(containerSet, 1, 3, 1);
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
@@ -859,13 +877,10 @@ public class TestBlockDeletingService {
     KeyValueContainerData data = container.getContainerData();
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return getUnderDeletionBlocksCount(meta, data) == 0;
-        } catch (IOException ignored) {
-        }
-        return false;
-      }, 100, 1000);
+      await().atMost(Duration.ofSeconds(1))
+          .pollInterval(Duration.ofMillis(100))
+          .ignoreException(IOException.class)
+          .until(() -> getUnderDeletionBlocksCount(meta, data) == 0);
       newLog.stopCapturing();
 
       // The block deleting successfully and shouldn't catch timed
@@ -933,17 +948,19 @@ public class TestBlockDeletingService {
     List<ContainerData> containerData = Lists.newArrayList();
     containerSet.listContainer(0L, containerCount, containerData);
     try {
-      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(service::isStarted);
 
       // Deleting one of the two containers and its single block.
       // Hence, space used by the container of whose block has been
       // deleted should be zero.
       deleteAndWait(service, 1);
 
-      GenericTestUtils.waitFor(() ->
-              (containerData.get(0).getBytesUsed() == 0 ||
-                      containerData.get(1).getBytesUsed() == 0),
-              100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> containerData.get(0).getBytesUsed() == 0 ||
+              containerData.get(1).getBytesUsed() == 0);
 
       Assert.assertFalse((containerData.get(0).getBytesUsed() == 0) && (
           containerData.get(1).getBytesUsed() == 0));
@@ -952,10 +969,10 @@ public class TestBlockDeletingService {
       // containers should be zero.
       deleteAndWait(service, 2);
 
-      GenericTestUtils.waitFor(() ->
-              (containerData.get(0).getBytesUsed() ==
-                      0 && containerData.get(1).getBytesUsed() == 0),
-              100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() ->  containerData.get(0).getBytesUsed() == 0 &&
+              containerData.get(1).getBytesUsed() == 0);
     } finally {
       service.shutdown();
     }
@@ -1006,7 +1023,9 @@ public class TestBlockDeletingService {
     long totalContainerSpace =
         containerCount * containerData.get(0).getBytesUsed();
     try {
-      GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(service::isStarted);
       // Total blocks = 3 * 5 = 15
       // blockLimitPerInterval = 10
       // each interval will at most runDeletingTasks = 10 blocks
@@ -1018,12 +1037,11 @@ public class TestBlockDeletingService {
       // of container - current total space of container).
       deleteAndWait(service, 1);
 
-      GenericTestUtils.waitFor(() ->
-              blockLimitPerInterval * blockSpace ==
-                      (totalContainerSpace -
-                              currentBlockSpace(containerData, containerCount)),
-              100, 3000);
-
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> blockLimitPerInterval * blockSpace ==
+              (totalContainerSpace -
+                  currentBlockSpace(containerData, containerCount)));
       // There is only 5 blocks left to runDeletingTasks
 
       // (Deleted space of previous 10 blocks + these left 5 blocks) should
@@ -1033,12 +1051,11 @@ public class TestBlockDeletingService {
       deleteAndWait(service, 2);
 
       long totalContainerBlocks = blocksPerContainer * containerCount;
-      GenericTestUtils.waitFor(() ->
-              totalContainerBlocks * blockSpace ==
-                      (totalContainerSpace -
-                              currentBlockSpace(containerData, containerCount)),
-              100, 3000);
-
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> totalContainerBlocks * blockSpace ==
+              (totalContainerSpace -
+                  currentBlockSpace(containerData, containerCount)));
     } finally {
       service.shutdown();
     }
@@ -1050,7 +1067,6 @@ public class TestBlockDeletingService {
    * @param expectedCount expected records in the table
    * @param containerData KeyValueContainerData
    * @param filter KeyPrefixFilter
-   * @throws IOException
    */
   private void assertBlockDataTableRecordCount(int expectedCount,
       KeyValueContainerData containerData, KeyPrefixFilter filter)
@@ -1069,10 +1085,11 @@ public class TestBlockDeletingService {
    * @param handle DB handle
    * @param filter KeyPrefixFilter
    * @param containerID the container ID to filter results
-   * @throws IOException
    */
   private void assertBlockDataTableRecordCount(int expectedCount,
-      DBHandle handle, KeyPrefixFilter filter, long containerID)
+                                               DBHandle handle,
+                                               KeyPrefixFilter filter,
+                                               long containerID)
       throws IOException {
     long count = 0L;
     try (BlockIterator<BlockData> iterator = handle.getStore().
@@ -1094,10 +1111,10 @@ public class TestBlockDeletingService {
    * @param fileName the string of file to be created
    * @param dir      the directory where file to be created
    * @param sizeInBytes the bytes size of the file
-   * @throws IOException
    */
-  private void createRandomContentFile(String fileName, File dir,
-      long sizeInBytes) throws IOException {
+  private void createRandomContentFile(String fileName,
+                                       File dir,
+                                       long sizeInBytes) throws IOException {
     File file = new File(dir, fileName);
     try (RandomAccessFile randomAccessFile = new RandomAccessFile(file,
         "rw")) {

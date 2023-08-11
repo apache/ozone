@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.RootCaRotationPoller;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
+import org.awaitility.core.ConditionTimeoutException;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -40,11 +41,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test for Root Ca Rotation polling mechanism on client side.
@@ -89,8 +90,10 @@ public class TestRootCaRotationPoller {
           return null;
         }));
     poller.run();
-    Assertions.assertThrows(TimeoutException.class, () ->
-        GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000));
+    Assertions.assertThrows(ConditionTimeoutException.class, () ->
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(50))
+            .until(atomicBoolean::get));
   }
 
   @Test
@@ -117,7 +120,9 @@ public class TestRootCaRotationPoller {
           Assertions.assertEquals(certificates.size(), 2);
           return null;
         }));
-    GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(50))
+        .until(atomicBoolean::get);
   }
 
   @Test
@@ -149,8 +154,10 @@ public class TestRootCaRotationPoller {
           Assertions.assertEquals(certificates.size(), 2);
           return null;
         }));
-    //Assert for the poller success even if there was an error at first
-    GenericTestUtils.waitFor(atomicBoolean::get, 50, 5000);
+    // Assert for the poller success even if there was an error at first
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(50))
+        .until(atomicBoolean::get);
     //And that we see the error in the logs
     Assertions.assertTrue(logCapturer.getOutput().contains(
         "There was a caught exception when trying to sign the certificate"));

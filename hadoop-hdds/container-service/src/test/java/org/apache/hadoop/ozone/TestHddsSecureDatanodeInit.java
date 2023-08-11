@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone;
 
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOK
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.HddsDatanodeService.getLogger;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -112,8 +114,7 @@ public class TestHddsSecureDatanodeInit {
 
     service = new HddsDatanodeService(args) {
       @Override
-      SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient()
-          throws IOException {
+      SCMSecurityProtocolClientSideTranslatorPB createScmSecurityClient() {
         return mock(SCMSecurityProtocolClientSideTranslatorPB.class);
       }
     };
@@ -328,23 +329,22 @@ public class TestHddsSecureDatanodeInit {
     rootCaList.add(pemCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
-    String certId = newCertHolder.getSerialNumber().toString();
-    Assert.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    BigInteger certId = newCertHolder.getSerialNumber();
+    Assert.assertNotEquals(certId, client.getCertificate().getSerialNumber());
 
     // start monitor task to renew key and cert
     client.startCertificateRenewerService();
 
     // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId);
-    }, 1000, CERT_LIFETIME * 1000);
+    await().atMost(Duration.ofSeconds(CERT_LIFETIME))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> Assert.assertEquals(certId,
+            client.getCertificate().getSerialNumber()));
+
     PrivateKey privateKey1 = client.getPrivateKey();
     PublicKey publicKey1 = client.getPublicKey();
-    String caCertId1 = client.getCACertificate().getSerialNumber().toString();
-    String rootCaCertId1 =
-        client.getRootCACertificate().getSerialNumber().toString();
+    BigInteger caCertId1 = client.getCACertificate().getSerialNumber();
+    BigInteger rootCaCertId1 = client.getRootCACertificate().getSerialNumber();
 
     // test the second time certificate rotation, generate a new cert
     newCertHolder = generateX509CertHolder(null, null,
@@ -362,13 +362,13 @@ public class TestHddsSecureDatanodeInit {
         .thenReturn(responseProto);
     rootCaList.add(pemCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
-    String certId2 = newCertHolder.getSerialNumber().toString();
+    BigInteger certId2 = newCertHolder.getSerialNumber();
 
     // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId2);
-    }, 1000, CERT_LIFETIME * 1000);
+    await().atMost(Duration.ofSeconds(CERT_LIFETIME))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> Assert.assertEquals(certId2,
+            client.getCertificate().getSerialNumber()));
     Assert.assertFalse(client.getPrivateKey().equals(privateKey1));
     Assert.assertFalse(client.getPublicKey().equals(publicKey1));
     Assert.assertFalse(client.getCACertificate().getSerialNumber()
@@ -432,13 +432,13 @@ public class TestHddsSecureDatanodeInit {
         .build();
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
         .thenReturn(responseProto);
-    String certId2 = newCertHolder.getSerialNumber().toString();
+    BigInteger certId2 = newCertHolder.getSerialNumber();
 
     // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId2);
-    }, 1000, CERT_LIFETIME * 1000);
+    await().atMost(Duration.ofSeconds(CERT_LIFETIME))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> Assert.assertEquals(certId2,
+            client.getCertificate().getSerialNumber()));
   }
 
   private static X509CertificateHolder generateX509CertHolder(KeyPair keyPair,

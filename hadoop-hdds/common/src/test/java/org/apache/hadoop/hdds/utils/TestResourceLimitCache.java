@@ -16,17 +16,19 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test for ResourceLimitCache.
@@ -65,7 +67,10 @@ public class TestResourceLimitCache {
     // has acquired 6 permits out of 10
     resourceCache.remove(4);
 
-    GenericTestUtils.waitFor(future::isDone, 100, 1000);
+
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .until(future::isDone);
     // map has the key 1
     Assertions.assertTrue(future.isDone());
     Assertions.assertFalse(future.isCompletedExceptionally());

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -53,13 +53,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
 
 /**
  * Test cases to verify {@link org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl}.
@@ -72,8 +71,7 @@ class TestSCMHAManagerImpl {
   private SCMHAManager primarySCMHAManager;
 
   @BeforeEach
-  void setup() throws IOException, InterruptedException,
-      TimeoutException {
+  void setup() throws IOException {
     clusterID = UUID.randomUUID().toString();
     OzoneConfiguration conf = getConfig("scm1", 9894);
     final StorageContainerManager scm = getMockStorageContainerManager(conf);
@@ -97,11 +95,10 @@ class TestSCMHAManagerImpl {
     return conf;
   }
 
-  public void waitForSCMToBeReady(DivisionInfo ratisDivision)
-      throws TimeoutException,
-      InterruptedException {
-    GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
-          1000, 10000);
+  public void waitForSCMToBeReady(DivisionInfo ratisDivision) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(ratisDivision::isLeaderReady);
   }
 
   @AfterEach
@@ -110,7 +107,7 @@ class TestSCMHAManagerImpl {
   }
 
   @Test
-  public void testAddSCM() throws IOException, InterruptedException {
+  public void testAddSCM() throws IOException {
     Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
@@ -161,7 +158,7 @@ class TestSCMHAManagerImpl {
     }
   }
   @Test
-  public void testRemoveSCM() throws IOException, InterruptedException {
+  public void testRemoveSCM() throws IOException {
     Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 

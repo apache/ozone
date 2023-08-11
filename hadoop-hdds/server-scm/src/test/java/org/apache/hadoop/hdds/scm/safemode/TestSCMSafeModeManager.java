@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,6 +71,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.awaitility.Awaitility.await;
 
 /** Test class for SCMSafeModeManager.
  */
@@ -143,8 +145,9 @@ public class TestSCMSafeModeManager {
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getNumContainerWithOneReplicaReportedThreshold().value());
 
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 5);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
 
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
@@ -190,8 +193,9 @@ public class TestSCMSafeModeManager {
     assertEquals(100, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
 
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 5);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
   }
 
 
@@ -423,23 +427,25 @@ public class TestSCMSafeModeManager {
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentPipelinesWithAtleastOneReplicaCount().value());
 
-
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 5);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
   }
 
-  private void checkHealthy(int expectedCount) throws Exception {
-    GenericTestUtils.waitFor(() -> scmSafeModeManager
-            .getHealthyPipelineSafeModeRule()
-            .getCurrentHealthyPipelineCount() == expectedCount,
-        100,  5000);
+  private void checkHealthy(int expectedCount) {
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertEquals(expectedCount,
+            scmSafeModeManager.getHealthyPipelineSafeModeRule()
+                .getCurrentHealthyPipelineCount()));
   }
 
-  private void checkOpen(int expectedCount) throws Exception {
-    GenericTestUtils.waitFor(() -> scmSafeModeManager
-            .getOneReplicaPipelineSafeModeRule()
-            .getCurrentReportedPipelineCount() == expectedCount,
-        1000,  5000);
+  private void checkOpen(int expectedCount) {
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertEquals(expectedCount,
+            scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
+                .getCurrentReportedPipelineCount()));
   }
 
   private void firePipelineEvent(PipelineManager pipelineManager,
@@ -469,7 +475,6 @@ public class TestSCMSafeModeManager {
               pipelineReportsProto.build()));
     }
   }
-
 
   @Test
   public void testDisableSafeMode() {
@@ -525,11 +530,12 @@ public class TestSCMSafeModeManager {
     // threshold should be (10+15)/25.
     testContainerThreshold(containers.subList(10, 25), 1.0);
 
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        100, 1000 * 5);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
   }
 
-  private void testSafeModeDataNodes(int numOfDns) throws Exception {
+  private void testSafeModeDataNodes(int numOfDns) {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, numOfDns);
     scmSafeModeManager = new SCMSafeModeManager(
@@ -548,26 +554,29 @@ public class TestSCMSafeModeManager {
     }
 
     if (numOfDns == 0) {
-      GenericTestUtils.waitFor(() -> scmSafeModeManager.getInSafeMode(),
-          10, 1000 * 10);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(10))
+          .until(() -> scmSafeModeManager.getInSafeMode());
       return;
     }
     // Register last DataNode and check that SCM is out of Safe mode.
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-        10, 1000 * 10);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
   }
 
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
-      double expectedThreshold)
-      throws Exception {
+                                      double expectedThreshold) {
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(dnContainers));
-    GenericTestUtils.waitFor(() -> {
-      double threshold = scmSafeModeManager.getCurrentContainerThreshold();
-      return threshold == expectedThreshold;
-    }, 100, 2000 * 9);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertEquals(expectedThreshold,
+            scmSafeModeManager.getCurrentContainerThreshold()));
   }
 
   @Test
@@ -617,8 +626,9 @@ public class TestSCMSafeModeManager {
 
       firePipelineEvent(pipelineManager, pipeline);
 
-      GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-          100, 1000 * 10);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> !scmSafeModeManager.getInSafeMode());
       pipelineManager.close();
     } finally {
       config.setBoolean(
@@ -697,12 +707,10 @@ public class TestSCMSafeModeManager {
     Pipeline pipeline;
     try {
       pipeline = pipelineManager.createPipeline(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE));
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     } catch (SCMException ex) {
       pipeline = pipelineManager.getPipelines(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE)).get(0);
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE)).get(0);
     }
 
     // Mark pipeline healthy

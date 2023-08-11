@@ -65,6 +65,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICAT
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doNothing;
@@ -232,10 +235,11 @@ public class TestRootCARotationManager {
 
     String msg = "Root certificate " +
         cert.getSerialNumber().toString() + " rotation is started.";
-    GenericTestUtils.waitFor(
-        () -> !logs.getOutput().contains("Start the rotation immediately") &&
-            logs.getOutput().contains(msg),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            !logs.getOutput().contains("Start the rotation immediately") &&
+            logs.getOutput().contains(msg));
     assertEquals(1, StringUtils.countMatches(logs.getOutput(), msg));
   }
 
@@ -263,11 +267,13 @@ public class TestRootCARotationManager {
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
 
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("Start the rotation immediately") &&
-        logs.getOutput().contains("Root certificate " +
-            cert.getSerialNumber().toString() + " rotation is started."),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            logs.getOutput().contains("Start the rotation immediately") &&
+                logs.getOutput().contains("Root certificate " +
+                    cert.getSerialNumber().toString() +
+                    " rotation is started."));
   }
 
   @Test
@@ -297,10 +303,11 @@ public class TestRootCARotationManager {
     rootCARotationManager.start();
     rootCARotationManager.notifyStatusChanged();
 
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("No RootCARotationManager " +
-                "configuration found in stateful storage"),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(logs.getOutput(),
+            containsString("No RootCARotationManager configuration found " +
+                "in stateful storage")));
 
     when(statefulServiceStateManager.readConfiguration(Mockito.anyString()))
         .thenReturn(new CertInfo.Builder().setX509Certificate(cert)
@@ -312,27 +319,30 @@ public class TestRootCARotationManager {
     rootCARotationManager.notifyStatusChanged();
     when(scmContext.isLeader()).thenReturn(true);
     rootCARotationManager.notifyStatusChanged();
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("isPostProcessing is true for"),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(logs.getOutput(),
+            containsString("isPostProcessing is true for")));
 
     logs.clearOutput();
     when(scmContext.isLeader()).thenReturn(false);
     rootCARotationManager.notifyStatusChanged();
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("disable monitor task"),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(logs.getOutput(),
+            containsString("disable monitor task")));
 
     logs.clearOutput();
     when(scmContext.isLeader()).thenReturn(true);
     rootCARotationManager.notifyStatusChanged();
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("isPostProcessing is true for"),
-        100, 10000);
-
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("isPostProcessing is false"),
-        100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(logs.getOutput(),
+            containsString("isPostProcessing is true for")));
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertThat(logs.getOutput(),
+            containsString("isPostProcessing is false")));
     doNothing().when(statefulServiceStateManager)
         .deleteConfiguration(Mockito.anyString());
     verify(statefulServiceStateManager, times(1))

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -57,6 +58,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
+
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -141,9 +146,10 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     // As 90% of 7 with ceil is 7, if we send 6 pipeline reports, rule
     // validate should be still false.
-
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "reported count is 6"), 1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertThat(logCapturer.getOutput(),
+            containsString("reported count is 6")));
 
     Assertions.assertFalse(rule.validate());
 
@@ -151,9 +157,10 @@ public class TestOneReplicaPipelineSafeModeRule {
     firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
             pipelineFactorThreeCount));
 
-    GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(rule::validate);
   }
-
 
   @Test
   public void testOneReplicaPipelineRuleMixedPipelines() throws Exception {
@@ -175,8 +182,11 @@ public class TestOneReplicaPipelineSafeModeRule {
         pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE));
     firePipelineEvent(pipelines);
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "reported count is 0"), 1000, 5000);
+
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertThat(logCapturer.getOutput(),
+            containsString("reported count is 0")));
 
     // fired events for one node ratis pipeline, so we will be still false.
     Assertions.assertFalse(rule.validate());
@@ -187,14 +197,18 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     firePipelineEvent(pipelines.subList(0, pipelineCountThree - 1));
 
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-        "reported count is 6"), 1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertThat(logCapturer.getOutput(),
+            containsString("reported count is 6")));
 
     //Fire last pipeline event from datanode.
     firePipelineEvent(pipelines.subList(pipelineCountThree - 1,
             pipelineCountThree));
 
-    GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(rule::validate);
   }
 
   private void createPipelines(int count,

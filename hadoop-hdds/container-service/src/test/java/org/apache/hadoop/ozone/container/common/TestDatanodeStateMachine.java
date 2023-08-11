@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+
+import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -151,22 +155,20 @@ public class TestDatanodeStateMachine {
   }
 
   /**
-   * Assert that starting statemachine executes the Init State.
+   * Assert that starting state machine executes the Init State.
    */
   @Test
-  public void testStartStopDatanodeStateMachine() throws IOException,
-      InterruptedException, TimeoutException {
+  public void testStartStopDatanodeStateMachine() throws IOException {
     try (DatanodeStateMachine stateMachine =
         new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
       stateMachine.startDaemon();
       SCMConnectionManager connectionManager =
           stateMachine.getConnectionManager();
-      GenericTestUtils.waitFor(
-          () -> {
-            int size = connectionManager.getValues().size();
-            LOG.info("connectionManager.getValues().size() is {}", size);
-            return size == 1;
-          }, 1000, 30000);
+
+      await().atMost(Duration.ofSeconds(30))
+          .pollInterval(Duration.ofSeconds(1))
+          .untilAsserted(() ->
+              assertEquals(1, connectionManager.getValues().size()));
 
       stateMachine.stopDaemon();
       assertTrue(stateMachine.isDaemonStopped());
@@ -260,16 +262,18 @@ public class TestDatanodeStateMachine {
       // Wait for GetVersion call (called by task.execute) to finish. After
       // Earlier task.execute called into GetVersion. Wait for the execution
       // to finish and the endPointState to move to REGISTER state.
-      GenericTestUtils.waitFor(() -> {
-        for (EndpointStateMachine endpoint :
-            stateMachine.getConnectionManager().getValues()) {
-          if (endpoint.getState() !=
-              EndpointStateMachine.EndPointStates.REGISTER) {
-            return false;
-          }
-        }
-        return true;
-      }, 1000, 50000);
+      await().atMost(Duration.ofSeconds(50))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> {
+            for (EndpointStateMachine endpoint :
+                stateMachine.getConnectionManager().getValues()) {
+              if (endpoint.getState() !=
+                  EndpointStateMachine.EndPointStates.REGISTER) {
+                return false;
+              }
+            }
+            return true;
+          });
 
       // If we are in running state, we should be in running.
       Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,

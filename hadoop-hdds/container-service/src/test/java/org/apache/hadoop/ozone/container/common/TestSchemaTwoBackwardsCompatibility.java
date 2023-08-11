@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -64,6 +63,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -75,6 +75,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTA
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -257,12 +258,19 @@ public class TestSchemaTwoBackwardsCompatibility {
     BlockDeletingServiceTestImpl service =
         new BlockDeletingServiceTestImpl(ozoneContainer, 1000, conf);
     service.start();
-    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(100))
+        .until(service::isStarted);
     service.runDeletingTasks();
-    GenericTestUtils.waitFor(() -> service.getTimesOfProcessed() == 1,
-        100, 3000);
-    GenericTestUtils.waitFor(() -> cData.getBytesUsed() != initialTotalSpace,
-        100, 3000);
+
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> service.getTimesOfProcessed() == 1);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> cData.getBytesUsed() != initialTotalSpace);
 
     // check in-memory metadata after deletion
     long blockSize = CHUNK_LENGTH * CHUNKS_PER_BLOCK;

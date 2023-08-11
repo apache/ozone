@@ -77,7 +77,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static java.lang.Thread.State.TIMED_WAITING;
+import static org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerTask.Status.STOPPED;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -1075,22 +1078,23 @@ public class TestContainerBalancerTask {
      Wait for the thread to start sleeping and assert that it's sleeping.
      This is the delay before it starts balancing.
      */
-    GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
-    Assertions.assertEquals(Thread.State.TIMED_WAITING,
-        balancingThread.getState());
+    await().atMost(Duration.ofMillis(20))
+        .pollInterval(Duration.ofMillis(1))
+        .untilAsserted(() ->
+            Assertions.assertEquals(TIMED_WAITING, balancingThread.getState()));
 
     // interrupt the thread from its sleep, wait and assert that balancer has
     // STOPPED
     balancingThread.interrupt();
-    GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
-        ContainerBalancerTask.Status.STOPPED, 1, 20);
-    Assertions.assertEquals(ContainerBalancerTask.Status.STOPPED,
-        containerBalancerTask.getBalancerStatus());
+    await().atMost(Duration.ofMillis(20))
+        .pollInterval(Duration.ofMillis(1))
+        .untilAsserted(() -> Assertions.assertEquals(STOPPED,
+            containerBalancerTask.getBalancerStatus()));
 
     // ensure the thread dies
-    GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
-    Assertions.assertFalse(balancingThread.isAlive());
+    await().atMost(Duration.ofMillis(20))
+        .pollInterval(Duration.ofMillis(1))
+        .untilAsserted(() -> Assertions.assertFalse(balancingThread.isAlive()));
   }
 
   /**

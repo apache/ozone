@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -60,6 +59,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.ArrayList;
@@ -69,6 +69,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -278,13 +279,10 @@ public class TestSchemaOneBackwardsCompatibility {
 
     runBlockDeletingService(keyValueHandler);
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return (newKvData().getBytesUsed() != initialTotalSpace);
-      } catch (IOException ex) {
-      }
-      return false;
-    }, 100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() -> newKvData().getBytesUsed() != initialTotalSpace);
 
     long currentTotalSpace = newKvData().getBytesUsed();
     long numberOfBlocksDeleted =
@@ -370,13 +368,10 @@ public class TestSchemaOneBackwardsCompatibility {
 
       runBlockDeletingService(keyValueHandler);
 
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return (newKvData().getBytesUsed() != initialTotalSpace);
-        } catch (IOException ex) {
-        }
-        return false;
-      }, 100, 3000);
+      await().atMost(Duration.ofSeconds(3))
+          .pollInterval(Duration.ofMillis(100))
+          .ignoreException(IOException.class)
+          .until(() -> newKvData().getBytesUsed() != initialTotalSpace);
 
       long currentTotalSpace = newKvData().getBytesUsed();
 
@@ -545,10 +540,15 @@ public class TestSchemaOneBackwardsCompatibility {
     BlockDeletingServiceTestImpl service =
         new BlockDeletingServiceTestImpl(container, 1000, conf);
     service.start();
-    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(service::isStarted);
     service.runDeletingTasks();
-    GenericTestUtils
-        .waitFor(() -> service.getTimesOfProcessed() == 1, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> service.getTimesOfProcessed() == 1);
 
   }
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,7 +55,6 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -160,15 +161,14 @@ public class TestCloseContainerEventHandler {
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
     // wait for event to happen
-    GenericTestUtils.waitFor(() -> {
-      try {
-        Mockito.verify(eventPublisher, atLeastOnce())
-            .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
-      } catch (Throwable ex) {
-        return false;
-      }
-      return true;
-    }, 1000, (int) timeoutInMs * 3);
+    await().atMost(Duration.ofSeconds(timeoutInMs * 3))
+        .pollInterval(Duration.ofMillis(1000))
+        .ignoreExceptions()
+        .until(() -> {
+          Mockito.verify(eventPublisher, atLeastOnce())
+              .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+          return true;
+        });
     leaseManager.shutdown();
   }
 

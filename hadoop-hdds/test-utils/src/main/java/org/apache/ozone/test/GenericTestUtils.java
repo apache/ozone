@@ -148,13 +148,6 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Assert that a given file exists.
-   */
-  public static void assertExists(File f) {
-    assertTrue("File " + f + " should exist", f.exists());
-  }
-
-  /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {

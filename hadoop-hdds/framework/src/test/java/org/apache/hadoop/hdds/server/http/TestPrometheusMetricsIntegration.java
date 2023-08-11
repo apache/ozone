@@ -18,10 +18,12 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.awaitility.Awaitility.await;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
@@ -33,7 +35,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -229,19 +230,14 @@ public class TestPrometheusMetricsIntegration {
    * @param registeredMetric to check if it's published
    * @return all published metrics
    */
-  private String waitForMetricsToPublish(String registeredMetric)
-      throws InterruptedException, TimeoutException {
-
+  private String waitForMetricsToPublish(String registeredMetric) {
     final String[] writtenMetrics = new String[1];
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        writtenMetrics[0] = publishMetricsAndGetOutput();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      return writtenMetrics[0].contains(registeredMetric);
-    }, 1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> {
+          writtenMetrics[0] = publishMetricsAndGetOutput();
+          return writtenMetrics[0].contains(registeredMetric);
+        });
 
     return writtenMetrics[0];
   }

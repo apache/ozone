@@ -22,10 +22,10 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import java.time.Duration;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Utility class to read audit logs.
@@ -48,11 +48,11 @@ public final class AuditLogTestUtils {
    * Searches for the given action in the audit log file.
    */
   public static void verifyAuditLog(AuditAction action,
-      AuditEventStatus eventStatus)
-      throws InterruptedException, TimeoutException {
-    waitFor(
-        () -> auditLogContains(action.getAction(), eventStatus.getStatus()),
-        1000, 10000);
+                                    AuditEventStatus eventStatus) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            auditLogContains(action.getAction(), eventStatus.getStatus()));
   }
 
   public static boolean auditLogContains(String... strings) {

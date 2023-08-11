@@ -78,6 +78,7 @@ import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -114,6 +115,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.CONTAINER_USED_BYTES_DEFA
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.when;
 
 /**
@@ -1391,11 +1393,12 @@ public class TestLegacyReplicationManager {
       // Run first iteraiton
 
       replicationManager.processAll();
-      GenericTestUtils.waitFor(
-          () -> (currentReplicateCommandCount + 2) == datanodeCommandHandler
-              .getInvocationCount(
-                  SCMCommandProto.Type.replicateContainerCommand),
-          50, 5000);
+
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(50))
+          .until(() -> (currentReplicateCommandCount + 2) ==
+              datanodeCommandHandler.getInvocationCount(
+                  SCMCommandProto.Type.replicateContainerCommand));
 
       ReplicationManagerReport report = replicationManager.getContainerReport();
       Assertions.assertEquals(1,

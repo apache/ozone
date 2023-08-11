@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -32,7 +33,6 @@ import java.util.Set;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -46,6 +46,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests for RocksDBTable Store.
@@ -299,11 +301,10 @@ public class TestTypedRDBTableStore {
         epochs.add(i);
       }
       testTable.cleanupCache(epochs);
-
-      GenericTestUtils.waitFor(() ->
-          ((TypedTable<String, String>) testTable).getCache().size() == 4,
-          100, 5000);
-
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() ->
+              ((TypedTable<String, String>) testTable).getCache().size() == 4);
 
       //Check remaining values
       for (int x = 6; x < iterCount; x++) {

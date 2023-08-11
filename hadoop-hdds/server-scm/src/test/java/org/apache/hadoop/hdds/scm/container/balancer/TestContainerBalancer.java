@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -43,8 +44,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import static java.lang.Thread.State.TIMED_WAITING;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -235,8 +238,7 @@ public class TestContainerBalancer {
   @Test
   public void testDelayedStartOnSCMStatusChange()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException,
-      InterruptedException {
+      InvalidContainerBalancerConfigurationException {
     long delayDuration = conf.getTimeDuration(
         HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, 10, TimeUnit.SECONDS);
     balancerConfiguration =
@@ -244,8 +246,9 @@ public class TestContainerBalancer {
 
     // Start the ContainerBalancer service.
     containerBalancer.startBalancer(balancerConfiguration);
-    GenericTestUtils.waitFor(() -> containerBalancer.isBalancerRunning(), 1,
-        20);
+    await().atMost(Duration.ofMillis(20))
+        .pollInterval(Duration.ofMillis(1))
+        .until(containerBalancer::isBalancerRunning);
     Assertions.assertTrue(containerBalancer.isBalancerRunning());
 
     // Balancer should stop the current balancing thread when it receives a
@@ -268,15 +271,17 @@ public class TestContainerBalancer {
     containerBalancer.notifyStatusChanged();
     Assertions.assertTrue(containerBalancer.isBalancerRunning());
     Thread balancingThread = containerBalancer.getCurrentBalancingThread();
-    GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
+    await().atMost(Duration.ofMillis(20))
+        .pollInterval(Duration.ofMillis(2))
+        .untilAsserted(() ->
+            Assertions.assertEquals(TIMED_WAITING, balancingThread.getState()));
     Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
     stopBalancer();
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      InvalidContainerBalancerConfigurationException {
     containerBalancer.startBalancer(config);
   }
 

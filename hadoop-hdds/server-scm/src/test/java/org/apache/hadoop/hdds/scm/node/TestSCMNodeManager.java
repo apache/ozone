@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,8 +43,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -111,7 +111,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -443,8 +445,8 @@ public class TestSCMNodeManager {
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
-      Predicate<Integer> countCheck, Collection<DatanodeDetails> allowedDNs)
-      throws Exception {
+                               Predicate<Integer> countCheck,
+                               Collection<DatanodeDetails> allowedDNs) {
 
     Set<String> allowedDnIds = allowedDNs.stream()
         .map(DatanodeDetails::getUuidString)
@@ -454,48 +456,49 @@ public class TestSCMNodeManager {
         .getInstance(factor);
 
     // Wait for the expected number of pipelines using allowed DNs.
-    GenericTestUtils.waitFor(() -> {
-      // Closed pipelines are no longer in operation so we should not count
-      // them. We cannot check for open pipelines only because this is a mock
-      // test so the pipelines may remain in ALLOCATED state.
-      List<Pipeline> pipelines = scm.getPipelineManager()
-          .getPipelines(replConfig)
-          .stream()
-          .filter(p -> p.getPipelineState() != Pipeline.PipelineState.CLOSED)
-          .collect(Collectors.toList());
-      LOG.info("Found {} non-closed pipelines of type {} and factor {}.",
-          pipelines.size(),
-          replConfig.getReplicationType(), replConfig.getReplicationFactor());
-      boolean success = countCheck.test(pipelines.size());
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> {
+          // Closed pipelines are no longer in operation so we should not
+          // count them. We cannot check for open pipelines only because
+          // this is a mock test so the pipelines may remain in ALLOCATED
+          // state.
+          List<Pipeline> pipelines = scm.getPipelineManager()
+              .getPipelines(replConfig)
+              .stream()
+              .filter(p -> p.getPipelineState() != CLOSED)
+              .collect(Collectors.toList());
+          LOG.info("Found {} non-closed pipelines of type {} and factor " +
+                  "{}.", pipelines.size(), replConfig.getReplicationType(),
+              replConfig.getReplicationFactor());
+          boolean success = countCheck.test(pipelines.size());
 
-      // If we have the correct number of pipelines, make sure that none of
-      // these pipelines use nodes outside of allowedDNs.
-      if (success) {
-        for (Pipeline pipeline: pipelines) {
-          for (DatanodeDetails pipelineDN: pipeline.getNodes()) {
-            // Do not wait for this condition to be true. Disallowed DNs should
-            // never be used once we have the expected number of pipelines.
-            if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
-              String message = String.format("Pipeline %s used datanode %s " +
-                      "which is not in the set of allowed datanodes: %s",
-                  pipeline.getId().toString(), pipelineDN.getUuidString(),
-                  allowedDnIds);
-              fail(message);
+          // If we have the correct number of pipelines, make sure that none
+          // of these pipelines use nodes outside of allowedDNs.
+          if (success) {
+            for (Pipeline pipeline : pipelines) {
+              for (DatanodeDetails pipelineDN : pipeline.getNodes()) {
+                // Do not wait for this condition to be true. Disallowed
+                // DNs should never be used once we have the expected
+                // number of pipelines.
+                if (!allowedDnIds.contains(pipelineDN.getUuidString())) {
+                  String message = String.format("Pipeline %s used " +
+                          "datanode %s which is not in the set of " +
+                          "allowed datanodes: %s",
+                      pipeline.getId().toString(),
+                      pipelineDN.getUuidString(),
+                      allowedDnIds);
+                  fail(message);
+                }
+              }
             }
           }
-        }
-      }
-
-      return success;
-    }, 1000, 10000);
+          return success;
+        });
   }
 
   /**
    * asserts that if we send no heartbeats node manager stays in safemode.
-   *
-   * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
    */
   @Test
   public void testScmNoHeartbeats()
@@ -516,7 +519,7 @@ public class TestSCMNodeManager {
    *
    * @throws IOException
    * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmShutdown()
@@ -548,7 +551,7 @@ public class TestSCMNodeManager {
    *
    * @throws IOException
    * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmHealthyNodeCount()
@@ -585,8 +588,7 @@ public class TestSCMNodeManager {
    * processing thread it is a sane value.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmSanityOfUserConfig2()
@@ -666,7 +668,7 @@ public class TestSCMNodeManager {
    *
    * @throws IOException
    * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   @Disabled("HDDS-5098")
@@ -809,7 +811,7 @@ public class TestSCMNodeManager {
       assertEquals(2, nodeManager.getAllNodes().size());
       assertEquals(2,
           nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
-      /**
+      /*
        * Simulate a JVM Pause and subsequent handling in following steps:
        * Step 1 : stop heartbeat check process for stale node interval
        * Step 2 : resume heartbeat check
@@ -1103,8 +1105,8 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Asserts that a dead node, stale node and healthy nodes co-exist. The counts
-   * , lists and node ID match the expected node state.
+   * Asserts that a dead node, stale node and healthy nodes co-exist.
+   * The counts, lists and node ID match the expected node state.
    * <p/>
    * This test is pretty complicated because it explores all states of Node
    * manager in a single test. Please read thru the comments to get an idea of
@@ -1118,7 +1120,7 @@ public class TestSCMNodeManager {
    * @throws InterruptedException
    * @throws TimeoutException
    */
-  /**
+  /*
    * These values are very important. Here is what it means so you don't
    * have to look it up while reading this code.
    *
@@ -1150,7 +1152,6 @@ public class TestSCMNodeManager {
    *  track of the state of the cluster nodes.
    *
    */
-
   @Test
   public void testScmClusterIsInExpectedState1()
       throws IOException, InterruptedException, AuthenticationException {
@@ -1161,10 +1162,7 @@ public class TestSCMNodeManager {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
 
-
-    /**
-     * Cluster state: Healthy: All nodes are heartbeat-ing like normal.
-     */
+    // Cluster state: Healthy: All nodes are heartbeat-ing like normal.
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
@@ -1184,11 +1182,11 @@ public class TestSCMNodeManager {
       // Sleep so that heartbeat processing thread gets to run.
       Thread.sleep(500);
 
-      //Assert all nodes are healthy.
+      // Assert all nodes are healthy.
       assertEquals(3, nodeManager.getAllNodes().size());
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
-      /**
+      /*
        * Cluster state: Quiesced: We are going to sleep for 3 seconds. Which
        * means that no node is heartbeating. All nodes should move to Stale.
        */
@@ -1197,14 +1195,13 @@ public class TestSCMNodeManager {
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
 
 
-      /**
+      /*
        * Cluster State : Move healthy node back to healthy state, move other 2
        * nodes to Stale State.
        *
        * We heartbeat healthy node after 1 second and let other 2 nodes elapse
        * the 3 second windows.
        */
-
       nodeManager.processHeartbeat(healthyNode, layoutInfo);
       nodeManager.processHeartbeat(staleNode, layoutInfo);
       nodeManager.processHeartbeat(deadNode, layoutInfo);
@@ -1216,7 +1213,7 @@ public class TestSCMNodeManager {
 
 
       // 3.5 seconds from last heartbeat for the stale and deadNode. So those
-      //  2 nodes must move to Stale state and the healthy node must
+      // 2 nodes must move to Stale state and the healthy node must
       // remain in the healthy State.
       List<DatanodeDetails> healthyList = nodeManager.getNodes(
           NodeStatus.inServiceHealthy());
@@ -1226,11 +1223,10 @@ public class TestSCMNodeManager {
 
       assertEquals(2, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
 
-      /**
+      /*
        * Cluster State: Allow healthyNode to remain in healthy state and
        * staleNode to move to stale state and deadNode to move to dead state.
        */
-
       nodeManager.processHeartbeat(healthyNode, layoutInfo);
       nodeManager.processHeartbeat(staleNode, layoutInfo);
       Thread.sleep(1500);
@@ -1262,7 +1258,7 @@ public class TestSCMNodeManager {
       assertEquals(1, deadList.size(), "Expected one dead node");
       assertEquals(deadNode.getUuid(), deadList.get(0).getUuid(),
           "Dead node is not the expected ID");
-      /**
+      /*
        * Cluster State : let us heartbeat all the nodes and verify that we get
        * back all the nodes in healthy state.
        */
@@ -1270,7 +1266,6 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(staleNode, layoutInfo);
       nodeManager.processHeartbeat(deadNode, layoutInfo);
       Thread.sleep(500);
-      //Assert all nodes are healthy.
       assertEquals(3, nodeManager.getAllNodes().size());
       assertEquals(3, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
     }
@@ -1334,11 +1329,11 @@ public class TestSCMNodeManager {
    *
    * @throws IOException
    * @throws InterruptedException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmClusterIsInExpectedState2()
-      throws IOException, InterruptedException, TimeoutException,
-      AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException {
     final int healthyCount = 5000;
     final int staleCount = 100;
     final int deadCount = 10;
@@ -1416,15 +1411,13 @@ public class TestSCMNodeManager {
         assertTrue(deadNodeList.contains(node));
       }
 
-
-
       // Checking stale nodes is tricky since they have to move between
       // healthy and stale to avoid becoming dead nodes. So we search for
       // that state for a while, if we don't find that state waitfor will
       // throw.
-      GenericTestUtils.waitFor(() -> findNodes(nodeManager, staleCount, STALE),
-          500, 4 * 1000);
-
+      await().atMost(Duration.ofSeconds(4))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> findNodes(nodeManager, staleCount, STALE));
       thread1.interrupt();
       thread2.interrupt();
     }
@@ -1435,12 +1428,11 @@ public class TestSCMNodeManager {
    *
    * @throws IOException
    * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmCanHandleScale()
-      throws IOException, InterruptedException, TimeoutException,
-      AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException {
     final int healthyCount = 3000;
     final int staleCount = 3000;
     OzoneConfiguration conf = getConf();
@@ -1483,8 +1475,9 @@ public class TestSCMNodeManager {
       thread2.start();
       Thread.sleep(3 * 1000);
 
-      GenericTestUtils.waitFor(() -> findNodes(nodeManager, staleCount, STALE),
-          500, 20 * 1000);
+      await().atMost(Duration.ofSeconds(20))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> findNodes(nodeManager, staleCount, STALE));
       assertEquals(healthyCount + staleCount,
           nodeManager.getAllNodes().size(), "Node count mismatch");
 
@@ -1497,12 +1490,11 @@ public class TestSCMNodeManager {
    * Test multiple nodes sending initial heartbeat with their node report.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
-  public void testScmStatsFromNodeReport()
-      throws IOException, InterruptedException, AuthenticationException {
+  public void testScmStatsFromNodeReport() throws IOException,
+      AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1552,12 +1544,11 @@ public class TestSCMNodeManager {
    * with multiple volumes.
    *
    * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
-  public void tesVolumeInfoFromNodeReport()
-      throws IOException, InterruptedException, AuthenticationException {
+  public void tesVolumeInfoFromNodeReport() throws IOException,
+      AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1605,12 +1596,11 @@ public class TestSCMNodeManager {
    * status (healthy, stale and dead).
    * @throws IOException
    * @throws InterruptedException
-   * @throws TimeoutException
+   * @throws AuthenticationException
    */
   @Test
   public void testScmNodeReportUpdate()
-      throws IOException, InterruptedException, TimeoutException,
-      AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     final int heartbeatCount = 5;
     final int nodeCount = 1;
@@ -1654,9 +1644,10 @@ public class TestSCMNodeManager {
       final long expectedScmUsed = usedPerHeartbeat * (heartbeatCount - 1);
       final long expectedRemaining = capacity - expectedScmUsed;
 
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getStats().getScmUsed().get() == expectedScmUsed,
-          100, 4 * 1000);
+      await().atMost(Duration.ofSeconds(4))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> assertEquals(expectedScmUsed,
+              nodeManager.getStats().getScmUsed().get()));
 
       long foundCapacity = nodeManager.getStats().getCapacity().get();
       assertEquals(capacity, foundCapacity);
@@ -1690,9 +1681,10 @@ public class TestSCMNodeManager {
 
       // Wait up to 4s so that the node becomes stale
       // Verify the usage info should be unchanged.
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getNodeCount(NodeStatus.inServiceStale()) == 1, 100,
-          4 * 1000);
+      await().atMost(Duration.ofSeconds(4))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> assertEquals(1,
+              nodeManager.getNodeCount(NodeStatus.inServiceStale())));
       assertEquals(nodeCount, nodeManager.getNodeStats().size());
 
       foundCapacity = nodeManager.getNodeStat(datanodeDetails).get()
@@ -1708,9 +1700,10 @@ public class TestSCMNodeManager {
 
       // Wait up to 4 more seconds so the node becomes dead
       // Verify usage info should be updated.
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getNodeCount(NodeStatus.inServiceDead()) == 1, 100,
-          4 * 1000);
+      await().atMost(Duration.ofSeconds(4))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> assertEquals(1,
+              nodeManager.getNodeCount(NodeStatus.inServiceDead())));
 
       assertEquals(0, nodeManager.getNodeStats().size());
       foundCapacity = nodeManager.getStats().getCapacity().get();
@@ -1732,12 +1725,15 @@ public class TestSCMNodeManager {
 
       // Wait up to 5 seconds so that the dead node becomes healthy
       // Verify usage info should be updated.
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1,
-          100, 5 * 1000);
-      GenericTestUtils.waitFor(
-          () -> nodeManager.getStats().getScmUsed().get() == expectedScmUsed,
-          100, 4 * 1000);
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> assertEquals(1,
+              nodeManager.getNodeCount(NodeStatus.inServiceHealthy())));
+
+      await().atMost(Duration.ofSeconds(4))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() -> assertEquals(expectedScmUsed,
+              nodeManager.getStats().getScmUsed().get()));
       assertEquals(nodeCount, nodeManager.getNodeStats().size());
       foundCapacity = nodeManager.getNodeStat(datanodeDetails).get()
           .getCapacity().get();

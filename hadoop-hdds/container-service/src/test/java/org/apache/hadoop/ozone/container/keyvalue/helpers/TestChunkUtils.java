@@ -24,6 +24,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -38,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 
@@ -46,6 +46,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
 import org.junit.jupiter.api.Assertions;
+
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -106,8 +108,9 @@ public class TestChunkUtils {
         });
       }
       try {
-        GenericTestUtils.waitFor(() -> processed.get() == threads,
-            100, (int) TimeUnit.SECONDS.toMillis(5));
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(100))
+            .untilAsserted(() -> assertEquals(threads, processed.get()));
       } finally {
         executor.shutdownNow();
       }
@@ -148,8 +151,9 @@ public class TestChunkUtils {
         });
       }
       try {
-        GenericTestUtils.waitFor(() -> processed.get() == threads,
-            100, maxTotalWait);
+        await().atMost(Duration.ofMillis(maxTotalWait))
+            .pollInterval(Duration.ofMillis(100))
+            .untilAsserted(() -> assertEquals(threads, processed.get()));
       } finally {
         executor.shutdownNow();
       }

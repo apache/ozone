@@ -25,7 +25,6 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
@@ -39,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -184,8 +184,10 @@ public class TestBackgroundContainerMetadataScanner extends
     // Start metadata scanner thread in the background.
     scanner.start();
     // Wait for at least one iteration to complete.
-    GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
-        5000);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> metrics.getNumScanIterations() >= 1);
     // Volume health should have been checked.
     Mockito.verify(vol, atLeastOnce()).isFailed();
     // Scanner should not have shutdown when it encountered the failed volume.
@@ -194,7 +196,9 @@ public class TestBackgroundContainerMetadataScanner extends
     // Now explicitly shutdown the scanner.
     scanner.shutdown();
     // Wait for shutdown to finish.
-    GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> !scanner.isAlive());
 
     // All containers were on the failed volume, so they should not have
     // been scanned.

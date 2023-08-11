@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * This class tests HealthyPipelineSafeMode rule.
@@ -190,14 +193,15 @@ public class TestHealthyPipelineSafeModeRule {
       // validate should return true after fire pipeline event
 
 
-      //Here testing with out pipelinereport handler, so not moving created
+      //Here testing without pipeline report handler, so not moving created
       // pipelines to allocated state, as pipelines changing to healthy is
       // handled by pipeline report handler. So, leaving pipeline's in pipeline
       // manager in open state for test case simplicity.
-
       firePipelineEvent(pipeline1, eventQueue);
-      GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
-          1000, 5000);
+
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofSeconds(1))
+          .untilAsserted(healthyPipelineSafeModeRule::validate);
     } finally {
       scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
@@ -294,16 +298,17 @@ public class TestHealthyPipelineSafeModeRule {
       // pipeline, validate() should return false
       firePipelineEvent(pipeline1, eventQueue);
 
-      GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
-          "reported count is 1"),
-          1000, 5000);
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> logCapturer.getOutput().contains("reported count is 1"));
       Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
       firePipelineEvent(pipeline3, eventQueue);
 
-      GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
-          1000, 5000);
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(healthyPipelineSafeModeRule::validate);
 
     } finally {
       scmMetadataStore.getStore().close();

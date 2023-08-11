@@ -19,12 +19,14 @@ package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -75,10 +77,10 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.awaitility.Awaitility.await;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -511,18 +513,16 @@ public class TestBlockManager {
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList());
     // block should be allocated in different pipelines
-    GenericTestUtils.waitFor(() -> {
-      try {
-        AllocatedBlock block = blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
-                OzoneConsts.OZONE,
-                new ExcludeList());
-        return !block.getPipeline().getId()
-            .equals(allocatedBlock.getPipeline().getId());
-      } catch (IOException e) {
-      }
-      return false;
-    }, 100, 1000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          AllocatedBlock block = blockManager
+              .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
+                  OzoneConsts.OZONE, new ExcludeList());
+          return !Objects.equals(block.getPipeline().getId(),
+              allocatedBlock.getPipeline().getId());
+        });
   }
 
   private boolean verifyNumberOfContainersInPipelines(
@@ -544,7 +544,7 @@ public class TestBlockManager {
   @Test
   @Timeout(100)
   public void testMultipleBlockAllocationWithClosedContainer()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException {
     nodeManager.setNumPipelinePerDatanode(1);
     nodeManager.setNumHealthyVolumes(1);
     // create pipelines
@@ -558,17 +558,15 @@ public class TestBlockManager {
     // wait till each pipeline has the configured number of containers.
     // After this each pipeline has numContainerPerOwnerInPipeline containers
     // for each owner
-    GenericTestUtils.waitFor(() -> {
-      try {
-        blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
-                OzoneConsts.OZONE,
-                new ExcludeList());
-      } catch (IOException e) {
-      }
-      return verifyNumberOfContainersInPipelines(
-          numContainerPerOwnerInPipeline);
-    }, 10, 1000);
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(10))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+              replicationConfig, OzoneConsts.OZONE, new ExcludeList());
+          return verifyNumberOfContainersInPipelines(
+              numContainerPerOwnerInPipeline);
+        });
 
     // close all the containers in all the pipelines
     for (Pipeline pipeline : pipelineManager.getPipelines(replicationConfig)) {
@@ -577,23 +575,23 @@ public class TestBlockManager {
         eventQueue.fireEvent(SCMEvents.CLOSE_CONTAINER, cid);
       }
     }
+
     // wait till no containers are left in the pipelines
-    GenericTestUtils
-        .waitFor(() -> verifyNumberOfContainersInPipelines(0), 10, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> verifyNumberOfContainersInPipelines(0));
 
     // allocate block so that each pipeline has the configured number of
     // containers.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
-                OzoneConsts.OZONE,
-                new ExcludeList());
-      } catch (IOException e) {
-      }
-      return verifyNumberOfContainersInPipelines(
-          numContainerPerOwnerInPipeline);
-    }, 10, 1000);
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(10))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+              replicationConfig, OzoneConsts.OZONE, new ExcludeList());
+          return verifyNumberOfContainersInPipelines(
+              numContainerPerOwnerInPipeline);
+        });
   }
 
   @Test
