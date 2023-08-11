@@ -125,7 +125,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   private volatile String currentCompactionLogPath = null;
 
-  static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
+  public static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
 
   /**
    * Marks the beginning of a comment line in the compaction log.
@@ -1449,6 +1449,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   public String getSSTBackupDir() {
     return sstBackupDir;
+  }
+
+  public String getCompactionLogDir() {
+    return compactionLogDir;
   }
 
   private static final class SnapshotLogInfo {

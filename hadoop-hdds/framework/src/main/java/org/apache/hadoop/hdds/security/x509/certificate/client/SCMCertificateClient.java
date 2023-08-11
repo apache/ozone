@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -27,14 +28,20 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
@@ -59,7 +66,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String scmId;
   private String cId;
   private String scmHostname;
-  private SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient;
+  private ExecutorService executorService;
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
@@ -226,6 +233,71 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     } catch (Throwable e) {
       LOG.error("Error while fetching/storing SCM signed certificate.", e);
       throw new RuntimeException(e);
+    }
+  }
+
+  public void refreshCACertificates() throws IOException {
+    if (executorService == null) {
+      executorService = Executors.newSingleThreadExecutor(
+          new ThreadFactoryBuilder().setNameFormat(
+                  getComponentName() + "-refreshCACertificates")
+              .setDaemon(true).build());
+    }
+    executorService.execute(new RefreshCACertificates(getScmSecureClient()));
+  }
+
+  /**
+   * Task to refresh root CA certificates for SCM.
+   */
+  public class RefreshCACertificates implements Runnable {
+    private final SCMSecurityProtocolClientSideTranslatorPB scmSecureClient;
+
+    public RefreshCACertificates(
+        SCMSecurityProtocolClientSideTranslatorPB client) {
+      this.scmSecureClient = client;
+    }
+
+    @Override
+    public void run() {
+      try {
+        // In case root CA certificate is rotated during this SCM is offline
+        // period, fetch the new root CA list from leader SCM and refresh ratis
+        // server's tlsConfig.
+        List<String> rootCAPems = scmSecureClient.getAllRootCaCertificates();
+
+        // SCM certificate client currently sets root CA as CA cert
+        Set<X509Certificate> certList = getAllRootCaCerts();
+        certList = certList.isEmpty() ? getAllCaCerts() : certList;
+
+        List<X509Certificate> rootCAsFromLeaderSCM =
+            OzoneSecurityUtil.convertToX509(rootCAPems);
+        rootCAsFromLeaderSCM.removeAll(certList);
+
+        if (rootCAsFromLeaderSCM.isEmpty()) {
+          LOG.info("CA certificates are not changed.");
+          return;
+        }
+
+        for (X509Certificate cert : rootCAsFromLeaderSCM) {
+          LOG.info("Fetched new root CA certificate {} from leader SCM",
+              cert.getSerialNumber().toString());
+          storeCertificate(
+              CertificateCodec.getPEMEncodedString(cert), CAType.SUBORDINATE);
+        }
+        String scmCertId = getCertificate().getSerialNumber().toString();
+        notifyNotificationReceivers(scmCertId, scmCertId);
+      } catch (IOException e) {
+        LOG.error("Failed to refresh CA certificates", e);
+      }
+    }
+  }
+
+  @Override
+  public synchronized void close() throws IOException {
+    super.close();
+    if (executorService != null) {
+      executorService.shutdownNow();
+      executorService = null;
     }
   }
 }

@@ -127,6 +127,8 @@ public final class SnapshotInfo implements Auditable {
   private long dbTxSequenceNumber;
   private boolean deepClean;
 
+  private boolean sstFiltered;
+
   /**
    * Private constructor, constructed via builder.
    * @param snapshotId - Snapshot UUID.
@@ -157,7 +159,8 @@ public final class SnapshotInfo implements Auditable {
                        String snapshotPath,
                        String checkpointDir,
                        long dbTxSequenceNumber,
-                       boolean deepCleaned) {
+                       boolean deepCleaned,
+                       boolean sstFiltered) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -171,6 +174,7 @@ public final class SnapshotInfo implements Auditable {
     this.checkpointDir = checkpointDir;
     this.dbTxSequenceNumber = dbTxSequenceNumber;
     this.deepClean = deepCleaned;
+    this.sstFiltered = sstFiltered;
   }
 
   public void setName(String name) {
@@ -261,6 +265,14 @@ public final class SnapshotInfo implements Auditable {
     return checkpointDir;
   }
 
+  public boolean isSstFiltered() {
+    return sstFiltered;
+  }
+
+  public void setSstFiltered(boolean sstFiltered) {
+    this.sstFiltered = sstFiltered;
+  }
+
   public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
       newBuilder() {
     return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
@@ -279,7 +291,8 @@ public final class SnapshotInfo implements Auditable {
         .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
-        .setDeepClean(deepClean);
+        .setDeepClean(deepClean)
+        .setSstFiltered(sstFiltered);
   }
 
   /**
@@ -299,6 +312,8 @@ public final class SnapshotInfo implements Auditable {
     private String checkpointDir;
     private long dbTxSequenceNumber;
     private boolean deepClean;
+
+    private boolean sstFiltered;
 
     public Builder() {
       // default values
@@ -370,6 +385,11 @@ public final class SnapshotInfo implements Auditable {
       return this;
     }
 
+    public Builder setSstFiltered(boolean sstFiltered) {
+      this.sstFiltered = sstFiltered;
+      return this;
+    }
+
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -385,7 +405,8 @@ public final class SnapshotInfo implements Auditable {
           snapshotPath,
           checkpointDir,
           dbTxSequenceNumber,
-          deepClean
+          deepClean,
+          sstFiltered
       );
     }
   }
@@ -402,7 +423,8 @@ public final class SnapshotInfo implements Auditable {
         .setBucketName(bucketName)
         .setSnapshotStatus(snapshotStatus.toProto())
         .setCreationTime(creationTime)
-        .setDeletionTime(deletionTime);
+        .setDeletionTime(deletionTime)
+        .setSstFiltered(sstFiltered);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -449,6 +471,10 @@ public final class SnapshotInfo implements Auditable {
 
     if (snapshotInfoProto.hasDeepClean()) {
       osib.setDeepClean(snapshotInfoProto.getDeepClean());
+    }
+
+    if (snapshotInfoProto.hasSstFiltered()) {
+      osib.setSstFiltered(snapshotInfoProto.getSstFiltered());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())

@@ -280,7 +280,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ReplicationManager replicationManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private CertificateClient scmCertificateClient;
+  private SCMCertificateClient scmCertificateClient;
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
@@ -956,15 +956,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmCertificateClient;
   }
 
-  @VisibleForTesting
-  public void setScmCertificateClient(CertificateClient client)
-      throws IOException {
-    if (scmCertificateClient != null) {
-      scmCertificateClient.close();
-    }
-    scmCertificateClient = client;
-  }
-
   public Clock getSystemClock() {
     return systemClock;
   }
@@ -1543,6 +1534,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // At this point leader is not known
     scmHAMetricsUpdate(null);
+
+    if (scmCertificateClient != null) {
+      // In case root CA certificate is rotated during this SCM is offline
+      // period, fetch the new root CA list from leader SCM and refresh ratis
+      // server's tlsConfig.
+      scmCertificateClient.refreshCACertificates();
+    }
   }
 
   /**
