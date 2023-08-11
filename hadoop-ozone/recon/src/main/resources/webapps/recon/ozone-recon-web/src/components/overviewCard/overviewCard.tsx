@@ -46,18 +46,31 @@ const defaultProps = {
 
 interface IOverviewCardWrapperProps {
   linkToUrl: string;
+  title:string
 }
 
 class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
   render() {
     const {linkToUrl, children} = this.props;
-    if (linkToUrl) {
+    if (linkToUrl ) {
+      if(linkToUrl === '/Om'){
       return (
-        <Link to={linkToUrl}>
+        <Link to={{
+          pathname: linkToUrl,
+          state: { activeTab: children._owner && children._owner.stateNode.props && children._owner.stateNode.props.title === "Open Keys Summary"? '2':'3'}
+        }} >
           {children}
         </Link>
-      );
-    }
+        )
+      }
+      else{
+        return (
+            <Link to={linkToUrl}>
+              {children}
+            </Link>
+        )
+      }
+      }
 
     return children;
   }
