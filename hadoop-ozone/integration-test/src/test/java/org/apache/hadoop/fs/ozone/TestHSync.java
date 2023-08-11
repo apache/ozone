@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
@@ -415,6 +416,34 @@ public class TestHSync {
     testEncryptedStreamCapabilities(true);
   }
 
+  @Test
+  public void testDisableHsync() throws Exception {
+    // When hsync is disabled, client does not throw exception.
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    final byte[] data = new byte[1];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "file_hsync_disable");
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.hsync();
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(file));
+      }
+    } finally {
+      // re-enable the feature flag
+      CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    }
+  }
+
   private void testEncryptedStreamCapabilities(boolean isEC) throws IOException,
       GeneralSecurityException {
     KeyOutputStream kos;
@@ -430,7 +459,7 @@ public class TestHSync {
     when(codec.createEncryptor()).thenReturn(encryptor);
     CryptoOutputStream cos =
         new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
-    OzoneOutputStream oos = new OzoneOutputStream(cos);
+    OzoneOutputStream oos = new OzoneOutputStream(cos, true);
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
 
     try (CapableOzoneFSOutputStream cofsos =
