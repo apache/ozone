@@ -202,6 +202,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         volumeName, null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
+      if (bucketInfo.isLink()) {
+        continue;
+      }
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
         totalBucketQuota += nextQuotaInBytes;

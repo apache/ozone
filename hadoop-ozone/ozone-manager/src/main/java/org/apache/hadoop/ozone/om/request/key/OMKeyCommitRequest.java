@@ -28,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -66,6 +67,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -96,6 +98,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     if (checkKeyNameEnabled) {
       OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    }
+    boolean isHsync = commitKeyRequest.hasHsync() &&
+        commitKeyRequest.getHsync();
+    boolean enableHsync = ozoneManager.getConfiguration().getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    if (isHsync && !enableHsync) {
+      throw new OMException("Hsync is not enabled. To enable, " +
+          "set ozone.fs.hsync.enabled = true", NOT_SUPPORTED_OPERATION);
     }
 
     String keyPath = keyArgs.getKeyName();

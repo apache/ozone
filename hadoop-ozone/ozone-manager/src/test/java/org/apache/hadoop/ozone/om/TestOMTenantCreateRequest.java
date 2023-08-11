@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateT
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -44,6 +43,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -152,8 +152,9 @@ public class TestOMTenantCreateRequest {
     Mockito.doReturn(ownerName).when(omTenantCreateRequest1).getUserName();
 
     // Should throw in preExecute
-    LambdaTestUtils.intercept(OMException.class, "VOLUME_ALREADY_EXISTS",
+    OMException omException = Assert.assertThrows(OMException.class,
         () -> omTenantCreateRequest1.preExecute(ozoneManager));
+    Assert.assertEquals(VOLUME_ALREADY_EXISTS, omException.getResult());
 
     // Now with forceCreationWhenVolumeExists = true
     originalRequest =
@@ -215,13 +216,16 @@ public class TestOMTenantCreateRequest {
   }
 
   @Test
-  public void testRejectNonS3CompliantTenantIdCreationWithStrictS3True()
-      throws Exception {
+  public void testRejectNonS3CompliantTenantIdCreationWithStrictS3True() {
     String[] nonS3CompliantTenantId =
         {"tenantid_underscore", "_tenantid___multi_underscore_", "tenantid_"};
     when(ozoneManager.isStrictS3()).thenReturn(true);
     for (String tenantId : nonS3CompliantTenantId) {
-      rejectTenantIdCreationHelper(tenantId);
+
+      OMException omException = Assert.assertThrows(OMException.class,
+          () -> doPreExecute(tenantId));
+      Assert.assertEquals("Invalid volume name: " + tenantId,
+          omException.getMessage());
     }
   }
 
@@ -256,14 +260,6 @@ public class TestOMTenantCreateRequest {
     Assert.assertEquals(Status.OK, omResponse.getStatus());
     Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(tenantId)));
-  }
-
-  private void rejectTenantIdCreationHelper(String tenantId)
-      throws Exception {
-    // Verify exception thrown on invalid volume name
-    LambdaTestUtils.intercept(OMException.class, "Invalid volume name: "
-            + tenantId,
-        () -> doPreExecute(tenantId));
   }
 
   private void doPreExecute(String tenantId) throws Exception {

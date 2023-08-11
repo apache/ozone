@@ -26,7 +26,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -51,6 +54,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+
+import static org.junit.Assert.assertThrows;
 
 /**
  * Class tests OMKeyCommitRequest class.
@@ -296,6 +301,21 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getLatestVersionLocations().getLocationList());
     Assert.assertEquals(3, intersection.size());
 
+  }
+
+  @Test
+  public void testRejectHsyncIfNotEnabled() throws Exception {
+    OzoneConfiguration conf = ozoneManager.getConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+    BucketLayout bucketLayout = getBucketLayout();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+
+    assertThrows(OMException.class, () ->
+        performHsyncCommit(allocatedKeyLocationList.subList(0, 5)));
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 
   @Test

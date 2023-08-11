@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
 import org.apache.commons.io.FileUtils;
@@ -168,11 +167,11 @@ public class TestHddsSecureDatanodeInit {
   }
 
   @Test
-  public void testSecureDnStartupCase0() throws Exception {
+  public void testSecureDnStartupCase0() {
 
     // Case 0: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail as no SCM is not running.
-    LambdaTestUtils.intercept(Exception.class, "",
+    Assertions.assertThrows(Exception.class,
         () -> service.initializeCertificateClient(client));
 
     Assertions.assertNotNull(client.getPrivateKey());
@@ -185,11 +184,12 @@ public class TestHddsSecureDatanodeInit {
   @Test
   public void testSecureDnStartupCase1() throws Exception {
     // Case 1: When only certificate is present.
-
     certCodec.writeCertificate(certHolder);
-    LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
-            " initialization failed",
+    RuntimeException rteException = Assertions.assertThrows(
+        RuntimeException.class,
         () -> service.initializeCertificateClient(client));
+    Assertions.assertTrue(rteException.getMessage()
+        .contains("DN security initialization failed"));
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
@@ -201,9 +201,11 @@ public class TestHddsSecureDatanodeInit {
   public void testSecureDnStartupCase2() throws Exception {
     // Case 2: When private key and certificate is missing.
     keyCodec.writePublicKey(publicKey);
-    LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
-            " initialization failed",
+    RuntimeException rteException = Assertions.assertThrows(
+        RuntimeException.class,
         () -> service.initializeCertificateClient(client));
+    Assertions.assertTrue(rteException.getMessage()
+        .contains("DN security initialization failed"));
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNull(client.getCertificate());
@@ -216,9 +218,11 @@ public class TestHddsSecureDatanodeInit {
     // Case 3: When only public key and certificate is present.
     keyCodec.writePublicKey(publicKey);
     certCodec.writeCertificate(certHolder);
-    LambdaTestUtils.intercept(RuntimeException.class, "DN security" +
-            " initialization failed",
+    RuntimeException rteException = Assertions.assertThrows(
+        RuntimeException.class,
         () -> service.initializeCertificateClient(client));
+    Assertions.assertTrue(rteException.getMessage()
+        .contains("DN security initialization failed"));
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
@@ -230,9 +234,11 @@ public class TestHddsSecureDatanodeInit {
   public void testSecureDnStartupCase4() throws Exception {
     // Case 4: When public key as well as certificate is missing.
     keyCodec.writePrivateKey(privateKey);
-    LambdaTestUtils.intercept(RuntimeException.class, " DN security" +
-            " initialization failed",
+    RuntimeException rteException = Assertions.assertThrows(
+        RuntimeException.class,
         () -> service.initializeCertificateClient(client));
+    Assertions.assertTrue(rteException.getMessage()
+        .contains("DN security initialization failed"));
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNull(client.getPublicKey());
     Assertions.assertNull(client.getCertificate());
@@ -259,7 +265,7 @@ public class TestHddsSecureDatanodeInit {
     // Case 6: If key pair already exist than response should be GETCERT.
     keyCodec.writePublicKey(publicKey);
     keyCodec.writePrivateKey(privateKey);
-    LambdaTestUtils.intercept(Exception.class, "",
+    Assertions.assertThrows(Exception.class,
         () -> service.initializeCertificateClient(client));
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
