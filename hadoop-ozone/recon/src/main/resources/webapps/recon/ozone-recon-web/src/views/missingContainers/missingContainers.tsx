@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
 import {Icon, Table, Tooltip, Tabs} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import filesize from 'filesize';
@@ -25,6 +24,7 @@ import moment from 'moment';
 import {showDataFetchError, timeFormat} from 'utils/common';
 import './missingContainers.less';
 import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({standard: 'iec'});
 const {TabPane} = Tabs;
@@ -211,8 +211,8 @@ interface IMissingContainersState {
   expandedRowData: IExpandedRow;
 }
 
-let cancelContainerToken: CancelTokenSource;
-let cancelRowExpandToken: CancelTokenSource;
+let cancelContainerSignal: AbortController;
+let cancelRowExpandSignal: AbortController;
 
 export class MissingContainers extends React.Component<Record<string, object>, IMissingContainersState> {
   constructor(props = {}) {
@@ -233,9 +233,10 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       loading: true
     });
 
-    cancelContainerToken = axios.CancelToken.source();
+    const { request, controller } = AxiosGetHelper('/api/v1/containers/unhealthy', cancelContainerSignal);
+    cancelContainerSignal = controller;
 
-    axios.get('/api/v1/containers/unhealthy', { cancelToken: cancelContainerToken.token }).then(allContainersResponse => {
+    request.then(allContainersResponse => {
 
       const allContainersResponseData: IUnhealthyContainersResponse = allContainersResponse.data;
       const allContainers: IContainerResponse[] = allContainersResponseData.containers;
@@ -268,7 +269,10 @@ export class MissingContainers extends React.Component<Record<string, object>, I
   }
 
   componentWillUnmount(): void {
-    cancelContainerToken && cancelContainerToken.cancel("Request cancelled because Container view was changed");
+    cancelRequests([
+      cancelContainerSignal,
+      cancelRowExpandSignal
+    ]);
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -286,11 +290,10 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         };
       });
 
-      //Cancel any pending request
-      cancelRowExpandToken && cancelRowExpandToken.cancel();
-      cancelRowExpandToken = axios.CancelToken.source();
+      const { request, controller } = AxiosGetHelper(`/api/v1/containers/${record.containerID}/keys`, cancelRowExpandSignal);
+      cancelRowExpandSignal = controller;
 
-      axios.get(`/api/v1/containers/${record.containerID}/keys`, { cancelToken: cancelRowExpandToken.token }).then(response => {
+      request.then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
         this.setState(({expandedRowData}) => {
           const expandedRowState: IExpandedRowState =

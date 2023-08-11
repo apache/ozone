@@ -19,7 +19,7 @@
 import React from 'react';
 import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/overviewCard/overviewCard';
-import axios, { CancelTokenSource } from 'axios';
+import axios from 'axios';
 import {IStorageReport} from 'types/datanode.types';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
@@ -27,6 +27,7 @@ import {showDataFetchError,byteToSize} from 'utils/common';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import filesize from 'filesize';
 import './overview.less';
+import { AxiosAllGetHelper, AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({round: 1});
 
@@ -70,8 +71,8 @@ interface IOverviewState {
   deletePendingSummarytotalDeletedKeys: number,
 }
 
-let cancelOverviewToken: CancelTokenSource;
-let cancelOMDBSyncToken: CancelTokenSource;
+let cancelOverviewSignal: AbortController;
+let cancelOMDBSyncSignal: AbortController;
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
   interval = 0;
@@ -116,17 +117,20 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     });
 
     //cancel any previous pending requests
-    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("OM-DB Sync request cancelled because data was updated");
-    cancelOverviewToken && cancelOverviewToken.cancel("Overview request cancelled because data was updated");
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ], "Request cancelled because data was updated");
 
-    cancelOverviewToken = axios.CancelToken.source();
+    const { requests, controller } = AxiosAllGetHelper([
+      '/api/v1/clusterState',
+      '/api/v1/task/status',
+      '/api/v1/keys/open?limit=0',
+      '/api/v1/keys/deletePending?limit=1'
+    ], cancelOverviewSignal);
+    cancelOverviewSignal = controller;
 
-    axios.all([
-      axios.get('/api/v1/clusterState', { cancelToken: cancelOverviewToken.token }),
-      axios.get('/api/v1/task/status', { cancelToken: cancelOverviewToken.token }),
-      axios.get('/api/v1/keys/open?limit=0', { cancelToken: cancelOverviewToken.token }),
-      axios.get('/api/v1/keys/deletePending?limit=1', { cancelToken: cancelOverviewToken.token }),
-    ]).then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
+    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
@@ -171,11 +175,14 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       loading: true
     });
 
-    //cancel any previous pending requests
-    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("OM-DB Sync request cancelled because data was updated");
-    cancelOMDBSyncToken = axios.CancelToken.source();
+    const { request, controller } = AxiosGetHelper(
+      '/api/v1/triggerdbsync/om',
+      cancelOMDBSyncSignal,
+      "OM-DB Sync request cancelled because data was updated"
+    );
+    cancelOMDBSyncSignal = controller;
 
-    axios.get('/api/v1/triggerdbsync/om', { cancelToken: cancelOMDBSyncToken.token }).then( omstatusResponse => {    
+    request.then( omstatusResponse => {    
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -196,8 +203,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
-    cancelOMDBSyncToken && cancelOMDBSyncToken.cancel("Request cancelled because Overview view changed");
-    cancelOverviewToken && cancelOverviewToken.cancel("Request cancelled because Overview view changed");
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ], "Request cancelled because Overview view changed");
   }
 
   render() {

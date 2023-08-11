@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
 import { Row, Icon, Button, Input, Dropdown, Menu, DatePicker, Form } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
 import moment from 'moment';
@@ -24,6 +23,7 @@ import { showDataFetchError } from 'utils/common';
 import './heatmap.less';
 import HeatMapConfiguration from './heatMapConfiguration';
 import * as CONSTANTS from './constants/heatmapConstants';
+import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 
 type inputPathValidity = "" | "error" | "success" | "warning" | "validating" | undefined
 
@@ -85,7 +85,7 @@ const colourScheme = {
   ]
 };
 
-let cancelHeatmapToken: CancelTokenSource;
+let cancelHeatmapSignal: AbortController;
 
 export class Heatmap extends React.Component<Record<string, object>, ITreeState> {
   constructor(props = {}) {
@@ -157,13 +157,11 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
       treeEndpointFailed: false
     });
 
-    // Cancel any previous pending requests
-    cancelHeatmapToken && cancelHeatmapToken.cancel("Cancelling request because TreeMap updated");
-    cancelHeatmapToken = axios.CancelToken.source();
-
     if (date && path && entityType) {
       const treeEndpoint = `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`;
-      axios.get(treeEndpoint, { cancelToken: cancelHeatmapToken.token }).then(response => {
+      const { request, controller } = AxiosGetHelper(treeEndpoint, cancelHeatmapSignal)
+      cancelHeatmapSignal = controller;
+      request.then(response => {
         minSize = this.minmax(response.data)[0];
         maxSize = this.minmax(response.data)[1];
         let treeResponse: ITreeResponse = this.updateSize(response.data);
@@ -210,7 +208,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   componentWillUnmount(): void {
-    cancelHeatmapToken && cancelHeatmapToken.cancel("Request cancelled because HeatMap view changed")
+    cancelHeatmapSignal && cancelHeatmapSignal.cancel("Request cancelled because HeatMap view changed")
   }
 
   onChange = (date: any[]) => {

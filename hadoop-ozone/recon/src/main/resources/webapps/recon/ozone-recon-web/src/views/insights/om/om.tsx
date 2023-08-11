@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
 import { Table, Tabs, Menu, Dropdown, Icon, Tooltip } from 'antd';
 import { PaginationConfig } from 'antd/lib/pagination';
 import filesize from 'filesize';
@@ -26,6 +25,7 @@ import { showDataFetchError, byteToSize } from 'utils/common';
 import './om.less';
 import { ColumnSearch } from 'utils/columnSearch';
 import { Link } from 'react-router-dom';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 
 const size = filesize.partial({ standard: 'iec' });
@@ -308,11 +308,11 @@ interface IOmdbInsightsState {
   prevClickable :boolean
 }
 
-let cancelMismatchedEndpointToken: CancelTokenSource;
-let cancelOpenKeysToken: CancelTokenSource;
-let cancelDeletePendingToken: CancelTokenSource;
-let cancelDeletedKeysToken: CancelTokenSource;
-let cancelRowExpandToken: CancelTokenSource;
+let cancelMismatchedEndpointSignal: AbortController;
+let cancelOpenKeysSignal: AbortController;
+let cancelDeletePendingSignal: AbortController;
+let cancelDeletedKeysSignal: AbortController;
+let cancelRowExpandSignal: AbortController;
 
 export class Om extends React.Component<Record<string, object>, IOmdbInsightsState> {
 
@@ -470,16 +470,18 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     });
 
     //Cancel any previous pending request
-    cancelMismatchedEndpointToken && cancelMismatchedEndpointToken.cancel("Tab view shifted");
-    cancelOpenKeysToken && cancelOpenKeysToken.cancel("Tab view shifted");
-    cancelDeletePendingToken && cancelDeletePendingToken.cancel("Tab view shifted");
-    cancelDeletedKeysToken && cancelDeletedKeysToken.cancel("Tab view shifted");
-    cancelRowExpandToken && cancelRowExpandToken.cancel("Tab view shifted");
-
-    cancelMismatchedEndpointToken = axios.CancelToken.source();
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ], "Tab view shifted");
 
     const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${mismatchMissingState}`
-    axios.get(mismatchEndpoint, { cancelToken: cancelMismatchedEndpointToken.token }).then(mismatchContainersResponse => {
+    const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
+    cancelMismatchedEndpointSignal = controller;
+    request.then(mismatchContainersResponse => {
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
       if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
         //No Further Records may be last record
@@ -521,14 +523,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevClickable:true
     });
 
-    //cancel any pending request
-    cancelMismatchedEndpointToken && cancelMismatchedEndpointToken.cancel("Tab view shifted");
-    cancelOpenKeysToken && cancelOpenKeysToken.cancel("Tab view shifted");
-    cancelDeletePendingToken && cancelDeletePendingToken.cancel("Tab view shifted");
-    cancelDeletedKeysToken && cancelDeletedKeysToken.cancel("Tab view shifted");
-    cancelRowExpandToken && cancelRowExpandToken.cancel("Tab view shifted");
-
-    cancelOpenKeysToken = axios.CancelToken.source();
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ], "Tab view shifted");
 
     let openKeysEndpoint;
     if (prevKeyOpen === "") {
@@ -538,7 +540,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${limit}&prevKey=${prevKeyOpen}`;
     }
 
-    axios.get(openKeysEndpoint, { cancelToken: cancelOpenKeysToken.token }).then(openKeysResponse => {
+    const { request, controller } = AxiosGetHelper(openKeysEndpoint, cancelOpenKeysSignal)
+    cancelOpenKeysSignal = controller
+    request.then(openKeysResponse => {
       const openKeys = openKeysResponse && openKeysResponse.data;
       let allopenKeysResponse: any[] = [];
       for (let key in openKeys) {
@@ -587,14 +591,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevClickable :true
     });
 
-    //Cancel any pending request
-    cancelMismatchedEndpointToken && cancelMismatchedEndpointToken.cancel("Tab view shifted");
-    cancelOpenKeysToken && cancelOpenKeysToken.cancel("Tab view shifted");
-    cancelDeletePendingToken && cancelDeletePendingToken.cancel("Tab view shifted");
-    cancelDeletedKeysToken && cancelDeletedKeysToken.cancel("Tab view shifted");
-    cancelRowExpandToken && cancelRowExpandToken.cancel("Tab view shifted");
-
-    cancelDeletePendingToken = axios.CancelToken.source();
+     //Cancel any previous pending request
+     cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ], "Tab view shifted");
 
     keysPendingExpanded =[];
     let deletePendingKeysEndpoint;
@@ -604,7 +608,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     else {
       deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey=${prevKeyDeletePending}`;
     }
-    axios.get(deletePendingKeysEndpoint, { cancelToken: cancelDeletePendingToken.token }).then(deletePendingKeysResponse => {
+
+    const { request, controller } = AxiosGetHelper(deletePendingKeysEndpoint, cancelDeletePendingSignal);
+    cancelDeletePendingSignal = controller;
+
+    request.then(deletePendingKeysResponse => {
       const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
       //Use Summation Logic iterate through all object and find sum of all datasize
       let deletedKeyInfoData = [];
@@ -710,17 +718,19 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevClickable: true
     });
 
-    //Cancel any pending request
-    cancelMismatchedEndpointToken && cancelMismatchedEndpointToken.cancel("Tab view shifted");
-    cancelOpenKeysToken && cancelOpenKeysToken.cancel("Tab view shifted");
-    cancelDeletePendingToken && cancelDeletePendingToken.cancel("Tab view shifted");
-    cancelDeletedKeysToken && cancelDeletedKeysToken.cancel("Tab view shifted");
-    cancelRowExpandToken && cancelRowExpandToken.cancel("Tab view shifted");
-
-    cancelDeletedKeysToken = axios.CancelToken.source();
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ], "Tab view shifted");
 
     const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`;
-    axios.get(deletedKeysEndpoint, { cancelToken: cancelDeletedKeysToken.token }).then(deletedKeysResponse => {
+    const { request, controller } = AxiosGetHelper(deletedKeysEndpoint, cancelDeletedKeysSignal);
+    cancelDeletedKeysSignal = controller 
+    request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
       deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
       if (deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey === null) {
@@ -899,10 +909,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         };
       });
 
-      cancelRowExpandToken && cancelRowExpandToken.cancel();
-      cancelRowExpandToken = axios.CancelToken.source();
+      const { request, controller } = AxiosGetHelper(`/api/v1/containers/${record.containerId}/keys`, cancelRowExpandSignal);
+      cancelRowExpandSignal = controller;
 
-      axios.get(`/api/v1/containers/${record.containerId}/keys`, { cancelToken: cancelRowExpandToken.token }).then(response => {
+      request.then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
         this.setState(({ expandedRowData }) => {
           const expandedRowState: IExpandedRowState =

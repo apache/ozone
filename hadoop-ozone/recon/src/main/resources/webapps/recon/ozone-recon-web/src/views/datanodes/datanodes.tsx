@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
 import {Table, Icon, Tooltip} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
@@ -37,6 +36,7 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -303,7 +303,7 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
-let cancelToken: CancelTokenSource;
+let cancelSignal: AbortController;
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
@@ -341,14 +341,10 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-
-    if (typeof cancelToken != typeof undefined){
-      //Some existing request might be there so we will cancel that before sending new request
-      cancelToken.cancel("Cancelling old datanode request");
-    }
-
-    cancelToken = axios.CancelToken.source(); // Generate token for new request
-    axios.get('/api/v1/datanodes', { cancelToken: cancelToken.token }).then(response => {
+    
+    const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
+    cancelSignal = controller;
+    request.then(response => {
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
@@ -396,7 +392,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
-    cancelToken && cancelToken.cancel("Request cancelled because Datanode view changed");
+    cancelSignal && cancelSignal.abort("Request cancelled because Datanode view changed");
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

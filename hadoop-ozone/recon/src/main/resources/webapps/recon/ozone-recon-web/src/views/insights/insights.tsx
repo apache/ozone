@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
+import axios from 'axios';
 import {Icon, Row, Col, Tabs} from 'antd';
 import filesize from 'filesize';
 import {showDataFetchError} from 'utils/common';
@@ -26,6 +26,7 @@ import * as Plotly from 'plotly.js';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import './insights.less';
+import { AxiosAllGetHelper } from 'utils/axiosRequestHelper';
 const {TabPane} = Tabs;
 
 const size = filesize.partial({standard: 'iec',round: 0});
@@ -66,7 +67,7 @@ const allBucketsOption: IOption = {
   value: '*'
 };
 
-let cancelInsightToken: CancelTokenSource;
+let cancelInsightSignal: AbortController;
 
 export class Insights extends React.Component<Record<string, object>, IInsightsState> {
   constructor(props = {}) {
@@ -216,13 +217,13 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.setState({
       isLoading: true
     });
+    const { requests, controller } = AxiosAllGetHelper([
+      '/api/v1/utilization/fileCount',
+      '/api/v1/utilization/containerCount'
+    ], cancelInsightSignal);
 
-    cancelInsightToken = axios.CancelToken.source();
-
-    axios.all([
-      axios.get('/api/v1/utilization/fileCount', { cancelToken: cancelInsightToken.token }),
-      axios.get('/api/v1/utilization/containerCount', { cancelToken: cancelInsightToken.token })
-    ]).then(axios.spread((fileCountresponse, containerCountresponse) => {
+    cancelInsightSignal = controller;
+    requests.then(axios.spread((fileCountresponse, containerCountresponse) => {
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
       const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
       // Construct volume -> bucket[] map for populating filters
@@ -267,7 +268,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   componentWillUnmount(): void {
-    cancelInsightToken && cancelInsightToken.cancel("Request cancelled because Insights view changed"); 
+    cancelInsightSignal && cancelInsightSignal.abort("Request cancelled because Insights view changed"); 
   }
 
   render() {

@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios, { CancelTokenSource } from 'axios';
 import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
@@ -25,6 +24,7 @@ import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -58,10 +58,10 @@ interface IDUState {
   displayLimit: number;
 }
 
-let cancelPieToken: CancelTokenSource;
-let cancelSummaryToken: CancelTokenSource;
-let cancelQuotaToken: CancelTokenSource;
-let cancelKeyMetadataToken: CancelTokenSource;
+let cancelPieSignal: AbortController
+let cancelSummarySignal: AbortController
+let cancelQuotaSignal: AbortController;
+let cancelKeyMetadataSignal: AbortController;
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -99,10 +99,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   handleSubmit = _e => {
     // Avoid empty request trigger 400 response
-    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel("Cancelling metadata request because new path entered");
-    cancelQuotaToken && cancelQuotaToken.cancel("Cancelling metadata request because new path entered");
-    cancelSummaryToken && cancelSummaryToken.cancel("Cancelling metadata request because new path entered");
-    cancelPieToken && cancelPieToken.cancel("Cancelling metadata request because new path entered");
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ], "Cancelling metadata request because new path entered");
 
     if (!this.state.inputPath) {
       this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
@@ -115,10 +117,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   // The returned path is passed in, which should have been
   // normalized by the backend
   goBack = (e, path) => {
-    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
-    cancelQuotaToken && cancelQuotaToken.cancel();
-    cancelSummaryToken && cancelSummaryToken.cancel();
-    cancelPieToken && cancelPieToken.cancel();
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ]);
 
     if (!path || path === '/') {
       return;
@@ -139,13 +143,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
-
-    //There might be an existing request being sent for PieChart
-    cancelPieToken && cancelPieToken.cancel("Cancelling current path DiskUsage request because new path data requested");
-
-    cancelPieToken = axios.CancelToken.source();  // generate a new token for the new request
     const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
-    axios.get(duEndpoint, { cancelToken: cancelPieToken.token }).then(response => {
+    const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
+    cancelPieSignal = controller;
+    request.then(response => {
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
@@ -242,10 +243,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   componentWillUnmount(): void {
-    cancelPieToken && cancelPieToken.cancel("Request cancelled because DiskUsage view changed");
-    cancelSummaryToken && cancelSummaryToken.cancel();
-    cancelQuotaToken && cancelQuotaToken.cancel();
-    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
+    cancelRequests([
+      cancelPieSignal,
+      cancelSummarySignal,
+      cancelQuotaSignal,
+      cancelKeyMetadataSignal
+    ], "Request cancelled because DiskUsage view changed");
   }
 
   clickPieSection(e, curPath: string): void {
@@ -261,9 +264,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   refreshCurPath(e, path: string): void {
-    cancelKeyMetadataToken && cancelKeyMetadataToken.cancel();
-    cancelQuotaToken && cancelQuotaToken.cancel();
-    cancelSummaryToken && cancelSummaryToken.cancel();
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal
+    ]);
 
     if (!path) {
       return;
@@ -289,20 +294,18 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     const keys = [];
     const values = [];
 
-    // We do not perform any action inside the metadata button click, so no need to cancel
-    // update the references with new tokens for the new requests
-    cancelSummaryToken = axios.CancelToken.source();
-    cancelQuotaToken = axios.CancelToken.source();
-    cancelKeyMetadataToken = axios.CancelToken.source();
-
-    axios.get(summaryEndpoint, { cancelToken: cancelSummaryToken.token }).then(response => {
+    const { request: summaryRequest, controller: summaryNewController } = AxiosGetHelper(summaryEndpoint, cancelSummarySignal);
+    cancelSummarySignal = summaryNewController;
+    summaryRequest.then(response => {
       const summaryResponse = response.data;
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
       if (summaryResponse.countStats.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
-        axios.get(keyEndpoint, { cancelToken: cancelKeyMetadataToken.token }).then(response => {
+        const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
+        cancelKeyMetadataSignal = metadataNewController;
+        metadataRequest.then(response => {
           keys.push('File Size');
           values.push(this.byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
@@ -474,7 +477,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
-    axios.get(quotaEndpoint, { cancelToken: cancelQuotaToken.token }).then(response => {
+    const { request: quotaRequest, controller: quotaNewController } = AxiosGetHelper(quotaEndpoint, cancelQuotaSignal);
+    cancelQuotaSignal = quotaNewController;
+    quotaRequest.then(response => {
       const quotaResponse = response.data;
 
       if (quotaResponse.status === 'PATH_NOT_FOUND') {
