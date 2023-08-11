@@ -101,16 +101,20 @@ public class ManagedSstFileReader {
           private ManagedOptions options;
           private ReadOptions readOptions;
 
+          private Optional<ManagedSlice> lowerBoundSLice;
+
+          private Optional<ManagedSlice> upperBoundSlice;
+
           @Override
           protected void init() {
             this.options = new ManagedOptions();
             this.readOptions = new ManagedReadOptions();
-            lowerBound.ifPresent(
-                s -> readOptions.setIterateLowerBound(new ManagedSlice(
-                    StringUtils.string2Bytes(s))));
-            upperBound.ifPresent(
-                s -> readOptions.setIterateUpperBound(new ManagedSlice(
-                    StringUtils.string2Bytes(s))));
+            this.lowerBoundSLice = lowerBound
+                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+            this.upperBoundSlice = upperBound
+                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+            lowerBoundSLice.ifPresent(s -> readOptions.setIterateLowerBound(s));
+            upperBoundSlice.ifPresent(s -> readOptions.setIterateUpperBound(s));
           }
 
           @Override
@@ -148,17 +152,23 @@ public class ManagedSstFileReader {
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
           private ManagedOptions options;
+          private Optional<ManagedSlice> lowerBoundSlice;
+          private Optional<ManagedSlice> upperBoundSlice;
 
           @Override
           protected void init() {
             this.options = new ManagedOptions();
+            this.lowerBoundSlice = lowerBound
+                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+            this.upperBoundSlice = upperBound
+                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
           }
 
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                options, lowerBound, upperBound) {
+                options, lowerBoundSlice, upperBoundSlice) {
               @Override
               protected String getTransformedValue(Optional<KeyValue> value) {
                 return value.map(v -> StringUtils.bytes2String(v.getKey()))
@@ -171,6 +181,8 @@ public class ManagedSstFileReader {
           public void close() throws UncheckedIOException {
             super.close();
             options.close();
+            lowerBoundSlice.ifPresent(ManagedSlice::close);
+            upperBoundSlice.ifPresent(ManagedSlice::close);
           }
         };
     return getStreamFromIterator(itr);

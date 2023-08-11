@@ -68,8 +68,8 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath, ManagedOptions options,
-                                Optional<String> lowerKeyBound,
-                                Optional<String> upperKeyBound)
+                                Optional<ManagedSlice> lowerKeyBound,
+                                Optional<ManagedSlice> upperKeyBound)
       throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
@@ -135,15 +135,17 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-                    ManagedOptions options, Optional<String> lowerKeyBound,
-                    Optional<String> upperKeyBound)
+      ManagedOptions options, Optional<ManagedSlice> lowerKeyBound,
+      Optional<ManagedSlice> upperKeyBound)
       throws NativeLibraryNotLoadedException {
     Map<String, String> argMap = Maps.newHashMap();
     argMap.put("file", sstFile.getAbsolutePath());
     argMap.put("silent", null);
     argMap.put("command", "scan");
-    lowerKeyBound.ifPresent(s -> argMap.put("from", s));
-    upperKeyBound.ifPresent(s -> argMap.put("to", s));
+    lowerKeyBound.ifPresent(s -> argMap.put("from",
+        String.valueOf(s.getNativeHandle())));
+    upperKeyBound.ifPresent(s -> argMap.put("to",
+        String.valueOf(s.getNativeHandle())));
     this.sstDumpToolTask = sstDumpTool.run(argMap, options);
     processOutput = sstDumpToolTask.getPipedOutput();
     intBuffer = new byte[4];

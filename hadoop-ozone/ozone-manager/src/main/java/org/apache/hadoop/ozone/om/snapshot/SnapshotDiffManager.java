@@ -1131,7 +1131,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
     char[] upperBoundCharArray = tablePrefix.toCharArray();
-    upperBoundCharArray[upperBoundCharArray.length -1] += 1;
+    upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
     Optional<String> sstFileReaderLowerBound = Optional.of(tablePrefix);
     Optional<String> sstFileReaderUpperBound =
         Optional.of(String.valueOf(upperBoundCharArray));

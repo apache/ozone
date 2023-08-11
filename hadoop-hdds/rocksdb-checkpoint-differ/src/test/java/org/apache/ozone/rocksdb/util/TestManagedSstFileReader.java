@@ -26,10 +26,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
@@ -37,13 +37,9 @@ import org.rocksdb.RocksDBException;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -62,14 +58,14 @@ class TestManagedSstFileReader {
 
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
-  private static final String KEY_PREFIX = IntStream.range(1, 256).boxed()
+  private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
       .map(i -> String.format("%c", i))
       .collect(Collectors.joining(""));
 
   private String createRandomSSTFile(TreeMap<String, Integer> keys)
       throws IOException, RocksDBException {
     File file = File.createTempFile("tmp_sst_file", ".sst");
-    file.deleteOnExit();
+//    file.deleteOnExit();
 
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions managedEnvOptions = new ManagedEnvOptions();
@@ -117,36 +113,6 @@ class TestManagedSstFileReader {
     return Pair.of(keys, files);
   }
 
-  public String getLexicographicallyLowerString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length -1] -= 1;
-    return String.valueOf(charVal);
-  }
-
-  public String getLexicographicallyHigherString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length -1] += 1;
-    return String.valueOf(charVal);
-  }
-
-  private List<Optional<String>> getTestingBounds(
-      TreeMap<String, Integer> keys) {
-    Set<String> boundary = new HashSet<>();
-    if (keys.size() > 0) {
-      List<String> sortedKeys = new ArrayList<>(keys.keySet());
-      boundary.add(getLexicographicallyLowerString(keys.firstKey()));
-      boundary.add(keys.firstKey());
-      for (int i = 1; i <= 10; i++) {
-        boundary.add(sortedKeys.get((i * keys.size() / 10) -1));
-      }
-      boundary.add(getLexicographicallyHigherString(keys.lastKey()));
-    }
-    List<Optional<String>> bounds = boundary.stream().map(Optional::of)
-        .collect(Collectors.toList());
-    bounds.add(Optional.empty());
-    return bounds;
-  }
-
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
@@ -155,9 +121,13 @@ class TestManagedSstFileReader {
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
     TreeMap<String, Integer> keys = data.getLeft();
-    List<Optional<String>> bounds = getTestingBounds(keys);
+    // Getting every possible combination of 2 elements from the sampled keys.
+    // Reading the sst file lying within the given bounds and
+    // validating the keys read from the sst file.
+    List<Optional<String>> bounds = GenericTestUtils.getTestingBounds(keys);
     for (Optional<String> lowerBound : bounds) {
       for (Optional<String> upperBound : bounds) {
+        // Calculating the expected keys which lie in the given boundary.
         Map<String, Integer> keysInBoundary =
             keys.entrySet().stream().filter(entry -> lowerBound
                     .map(l -> entry.getKey().compareTo(l) >= 0)
@@ -173,7 +143,8 @@ class TestManagedSstFileReader {
             Assertions.assertEquals(keysInBoundary.get(key), 1);
             Assertions.assertNotNull(keysInBoundary.remove(key));
           });
-          keysInBoundary.values().forEach(val -> Assertions.assertEquals(0, val));
+          keysInBoundary.values()
+              .forEach(val -> Assertions.assertEquals(0, val));
         }
       }
     }
@@ -197,11 +168,14 @@ class TestManagedSstFileReader {
         .build(), new ThreadPoolExecutor.DiscardPolicy());
     ManagedSSTDumpTool sstDumpTool =
         new ManagedSSTDumpTool(executorService, 256);
-
-    List<Optional<String>> bounds = getTestingBounds(keys);
+    // Getting every possible combination of 2 elements from the sampled keys.
+    // Reading the sst file lying within the given bounds and
+    // validating the keys read from the sst file.
+    List<Optional<String>> bounds = GenericTestUtils.getTestingBounds(keys);
     try {
       for (Optional<String> lowerBound : bounds) {
         for (Optional<String> upperBound : bounds) {
+          // Calculating the expected keys which lie in the given boundary.
           Map<String, Integer> keysInBoundary =
               keys.entrySet().stream().filter(entry -> lowerBound
                       .map(l -> entry.getKey().compareTo(l) >= 0)
