@@ -875,21 +875,23 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omKeyLocationInfo.getBlockID().getContainerBlockID())
         .collect(Collectors.toCollection(HashSet::new));
 
-    // Using iterator instead of for/forEach for ease of in-place entry removal
+    // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
+    // keysToBeFiltered               // Layer 0. RepeatedOmKeyInfo
+    //     .getOmKeyInfoList()        // 1. List<OmKeyInfo>
+    //     .get(0)                    // 2. OmKeyInfo
+    //     .getKeyLocationVersions()  // 3. List<OmKeyLocationInfoGroup>
+    //     .get(0)                    // 4. OmKeyLocationInfoGroup
+    //     .getLocationVersionMap()   // 5. Map<Long, List<OmKeyLocationInfo>>
+    //     .get(version)              // 6. List<OmKeyLocationInfo>
+    //     .get(0)                    // 7. OmKeyLocationInfo
+    //     .getBlockID()              // 8. BlockID
+    //     .getContainerBlockID();    // 9. ContainerBlockID
+
+    // Using iterator instead of `for` or `forEach` for in-place entry removal
+
+    // Layer 1: List<OmKeyInfo>
     Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
         .getOmKeyInfoList().iterator();
-
-    // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
-    // keysToBeFiltered               // RepeatedOmKeyInfo
-    //     .getOmKeyInfoList()        // List<OmKeyInfo>
-    //     .get(0)                    // OmKeyInfo
-    //     .getKeyLocationVersions()  // List<OmKeyLocationInfoGroup>
-    //     .get(0)                    // OmKeyLocationInfoGroup
-    //     .getLocationVersionMap()   // Map<Long, List<OmKeyLocationInfo>>
-    //     .get(version)              // List<OmKeyLocationInfo>
-    //     .get(0)                    // OmKeyLocationInfo
-    //     .getBlockID()              // BlockID
-    //     .getContainerBlockID();    // ContainerBlockID
 
     while (iterOmKeyInfo.hasNext()) {
       // Note with HDDS-8462, each RepeatedOmKeyInfo should have only one entry,
@@ -898,24 +900,29 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // But for completeness sake I shall put it here.
       // Remove only when RepeatedOmKeyInfo is no longer used.
 
+      // Layer 2: OmKeyInfo
       OmKeyInfo oldOmKeyInfo = iterOmKeyInfo.next();
-
+      // Layer 3: List<OmKeyLocationInfoGroup>
       Iterator<OmKeyLocationInfoGroup> iterKeyLocInfoGroup = oldOmKeyInfo
           .getKeyLocationVersions().iterator();
       while (iterKeyLocInfoGroup.hasNext()) {
+        // Layer 4: OmKeyLocationInfoGroup
         OmKeyLocationInfoGroup keyLocInfoGroup = iterKeyLocInfoGroup.next();
-
+        // Layer 5: Map<Long, List<OmKeyLocationInfo>>
         Iterator<Map.Entry<Long, List<OmKeyLocationInfo>>> iterVerMap =
             keyLocInfoGroup.getLocationVersionMap().entrySet().iterator();
 
         while (iterVerMap.hasNext()) {
           Map.Entry<Long, List<OmKeyLocationInfo>> mapEntry = iterVerMap.next();
+          // Layer 6: List<OmKeyLocationInfo>
           List<OmKeyLocationInfo> omKeyLocationInfoList = mapEntry.getValue();
 
           Iterator<OmKeyLocationInfo> iterKeyLocInfo =
               omKeyLocationInfoList.iterator();
           while (iterKeyLocInfo.hasNext()) {
+            // Layer 7: OmKeyLocationInfo
             OmKeyLocationInfo keyLocationInfo = iterKeyLocInfo.next();
+            // Layer 8: BlockID. Then Layer 9: ContainerBlockID
             ContainerBlockID cbId = keyLocationInfo
                 .getBlockID().getContainerBlockID();
 
@@ -926,19 +933,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
             }
           }
 
-          // Cleanup
+          // Cleanup when Layer 6 is an empty list
           if (omKeyLocationInfoList.isEmpty()) {
             iterVerMap.remove();
           }
         }
 
-        // Cleanup
+        // Cleanup when Layer 5 is an empty map
         if (keyLocInfoGroup.getLocationVersionMap().isEmpty()) {
           iterKeyLocInfoGroup.remove();
         }
       }
 
-      // Cleanup
+      // Cleanup when Layer 3 is an empty list
       if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
         iterOmKeyInfo.remove();
       }
