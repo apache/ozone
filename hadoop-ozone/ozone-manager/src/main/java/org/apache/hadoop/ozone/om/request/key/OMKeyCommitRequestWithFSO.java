@@ -274,7 +274,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
     }
 
-    // Debug logging for HSync and non-HSync key commits, successful or not
+    // Debug logging for any key commit operation, successful or not
     LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 

@@ -313,8 +313,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omMetadataManager, bucketLayout);
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
 
+    // hsync should throw OMException
     assertThrows(OMException.class, () ->
-        performHsyncCommit(allocatedKeyLocationList.subList(0, 5)));
+        doKeyCommit(true, allocatedKeyLocationList.subList(0, 5)));
+
+    // Regular key commit should still work
+    doKeyCommit(false, allocatedKeyLocationList.subList(0, 5));
+
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
   }
 
