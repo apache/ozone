@@ -101,7 +101,7 @@ public class TestBasicOzoneFileSystems {
 
       BasicRootedOzoneFileSystem ofs =
           Mockito.spy((BasicRootedOzoneFileSystem) subject);
-      Mockito.doReturn(adapter).when(ofs).getAdapter();
+      Mockito.when(ofs.getAdapter()).thenReturn(adapter);
 
       Path ofsBucketStr = new Path("ofs://om/vol1/buck1/");
       Path ofsDir1 = new Path(ofsBucketStr, "dir1");
@@ -119,7 +119,7 @@ public class TestBasicOzoneFileSystems {
       Mockito.doReturn(snapshotName).when(adapter).createSnapshot(any(), any());
 
       BasicOzoneFileSystem o3fs = Mockito.spy((BasicOzoneFileSystem) subject);
-      Mockito.doReturn(adapter).when(o3fs).getAdapter();
+      Mockito.when(o3fs.getAdapter()).thenReturn(adapter);
 
       Path o3fsBucketStr = new Path("o3fs://buck1.vol1.om/");
       Path o3fsDir1 = new Path(o3fsBucketStr, "dir1");
