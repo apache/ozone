@@ -294,7 +294,8 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
         .setDeepClean(deepClean)
-        .setSstFiltered(sstFiltered);
+        .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize);
   }
 
   /**
