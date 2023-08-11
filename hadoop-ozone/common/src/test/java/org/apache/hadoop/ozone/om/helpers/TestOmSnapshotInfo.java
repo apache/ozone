@@ -67,6 +67,8 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
+        .setSstFiltered(false)
+        .setReferencedSize(10000L)
         .build();
   }
 
@@ -86,6 +88,7 @@ public class TestOmSnapshotInfo {
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
         .setSstFiltered(false)
+        .setReferencedSize(10000L)
         .build();
   }
 
@@ -117,6 +120,12 @@ public class TestOmSnapshotInfo {
         snapshotInfoEntryActual.getSnapshotStatus());
     Assert.assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
         snapshotInfoEntryActual.getDbTxSequenceNumber());
+    Assert.assertEquals(snapshotInfoEntryExpected.getDeepClean(),
+        snapshotInfoEntryActual.getDeepClean());
+    Assert.assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
+        snapshotInfoEntryActual.getSstFiltered());
+    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
+        snapshotInfoEntryActual.getReferencedSize());
     Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
@@ -138,6 +147,14 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getBucketName());
     Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
+    Assert.assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
+        snapshotInfoActual.getDbTxSequenceNumber());
+    Assert.assertEquals(snapshotInfoExpected.getDeepClean(),
+        snapshotInfoActual.getDeepClean());
+    Assert.assertEquals(snapshotInfoExpected.isSstFiltered(),
+        snapshotInfoActual.isSstFiltered());
+    Assert.assertEquals(snapshotInfoExpected.getReferencedSize(),
+        snapshotInfoActual.getReferencedSize());
     Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 
