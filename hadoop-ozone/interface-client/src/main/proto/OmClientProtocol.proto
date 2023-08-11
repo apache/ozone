@@ -820,7 +820,8 @@ message SnapshotInfo {
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
- }
+  optional uint64 referencedSize = 15;
+}
 
 message SnapshotDiffJobProto {
   optional uint64 creationTime = 1;

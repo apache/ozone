@@ -24,11 +24,13 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -160,6 +162,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
 
+      // Snapshot referenced size should be bucket's used bytes
+      OmBucketInfo omBucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
+      snapshotInfo.setReferencedSize(omBucketInfo.getUsedBytes());
+
       addSnapshotInfoToSnapshotChainAndCache(omMetadataManager,
           transactionLogIndex);
 
@@ -282,5 +289,18 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       LOG.error("Failed to remove snapshot: {} from SnapshotChainManager.",
           info, exception);
     }
+  }
+
+  /**
+   * Same as OMKeyRequest#getBucketInfo.
+   */
+  protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
+                                       String volume, String bucket) {
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+
+    CacheValue<OmBucketInfo> value = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey));
+
+    return value != null ? value.getCacheValue() : null;
   }
 }

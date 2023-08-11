@@ -126,8 +126,8 @@ public final class SnapshotInfo implements Auditable {
    */
   private long dbTxSequenceNumber;
   private boolean deepClean;
-
   private boolean sstFiltered;
+  private long referencedSize;
 
   /**
    * Private constructor, constructed via builder.
@@ -160,7 +160,8 @@ public final class SnapshotInfo implements Auditable {
                        String checkpointDir,
                        long dbTxSequenceNumber,
                        boolean deepCleaned,
-                       boolean sstFiltered) {
+                       boolean sstFiltered,
+                       long referencedSize) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -175,6 +176,7 @@ public final class SnapshotInfo implements Auditable {
     this.dbTxSequenceNumber = dbTxSequenceNumber;
     this.deepClean = deepCleaned;
     this.sstFiltered = sstFiltered;
+    this.referencedSize = referencedSize;
   }
 
   public void setName(String name) {
@@ -312,8 +314,8 @@ public final class SnapshotInfo implements Auditable {
     private String checkpointDir;
     private long dbTxSequenceNumber;
     private boolean deepClean;
-
     private boolean sstFiltered;
+    private long referencedSize;
 
     public Builder() {
       // default values
@@ -390,6 +392,11 @@ public final class SnapshotInfo implements Auditable {
       return this;
     }
 
+    public Builder setReferencedSize(long referencedSize) {
+      this.referencedSize = referencedSize;
+      return this;
+    }
+
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -406,7 +413,8 @@ public final class SnapshotInfo implements Auditable {
           checkpointDir,
           dbTxSequenceNumber,
           deepClean,
-          sstFiltered
+          sstFiltered,
+          referencedSize
       );
     }
   }
@@ -424,7 +432,8 @@ public final class SnapshotInfo implements Auditable {
         .setSnapshotStatus(snapshotStatus.toProto())
         .setCreationTime(creationTime)
         .setDeletionTime(deletionTime)
-        .setSstFiltered(sstFiltered);
+        .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -477,6 +486,10 @@ public final class SnapshotInfo implements Auditable {
       osib.setSstFiltered(snapshotInfoProto.getSstFiltered());
     }
 
+    if (snapshotInfoProto.hasReferencedSize()) {
+      osib.setReferencedSize(snapshotInfoProto.getReferencedSize());
+    }
+
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
         .setCheckpointDir(snapshotInfoProto.getCheckpointDir())
         .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
@@ -527,6 +540,14 @@ public final class SnapshotInfo implements Auditable {
       String snapshotName) {
     return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
         + OM_KEY_PREFIX + snapshotName;
+  }
+
+  public void setReferencedSize(long referencedSize) {
+    this.referencedSize = referencedSize;
+  }
+
+  public long getReferencedSize() {
+    return referencedSize;
   }
 
   /**
@@ -589,7 +610,9 @@ public final class SnapshotInfo implements Auditable {
         Objects.equals(
             globalPreviousSnapshotId, that.globalPreviousSnapshotId) &&
         snapshotPath.equals(that.snapshotPath) &&
-        checkpointDir.equals(that.checkpointDir);
+        checkpointDir.equals(that.checkpointDir) &&
+        Objects.equals(deepClean, that.deepClean) &&
+        Objects.equals(referencedSize, that.referencedSize);
   }
 
   @Override
@@ -597,6 +620,7 @@ public final class SnapshotInfo implements Auditable {
     return Objects.hash(snapshotId, name, volumeName, bucketName,
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
-        globalPreviousSnapshotId, snapshotPath, checkpointDir);
+        globalPreviousSnapshotId, snapshotPath, checkpointDir,
+        deepClean, referencedSize);
   }
 }
