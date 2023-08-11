@@ -19,17 +19,13 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Utility class to help test OM upgrade scenarios.
@@ -40,11 +36,12 @@ public final class OMUpgradeTestUtils {
     // Utility class.
   }
 
-  public static void assertClusterPrepared(
-      long preparedIndex, List<OzoneManager> ozoneManagers) throws Exception {
+  public static void assertClusterPrepared(long preparedIndex,
+                                           List<OzoneManager> ozoneManagers) {
     for (OzoneManager om : ozoneManagers) {
-      LambdaTestUtils.await(120000,
-          1000, () -> {
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> {
             if (!om.isRunning()) {
               return false;
             } else {
@@ -69,20 +66,11 @@ public final class OMUpgradeTestUtils {
     }
   }
 
-  public static void waitForFinalization(OzoneManagerProtocol omClient)
-      throws TimeoutException, InterruptedException {
-    waitFor(() -> {
-      try {
-        UpgradeFinalizer.StatusAndMessages statusAndMessages =
-            omClient.queryUpgradeFinalizationProgress("finalize-test", false,
-                false);
-        System.out.println("Finalization Messages : " +
-            statusAndMessages.msgs());
-        return statusAndMessages.status().equals(FINALIZATION_DONE);
-      } catch (IOException e) {
-        Assert.fail(e.getMessage());
-      }
-      return false;
-    }, 2000, 20000);
+  public static void waitForFinalization(OzoneManagerProtocol omClient) {
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(() -> FINALIZATION_DONE ==
+            omClient.queryUpgradeFinalizationProgress("finalize-test",
+                false, false).status());
   }
 }

@@ -42,9 +42,7 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -73,6 +71,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.awaitility.Awaitility.await;
 
 /**
  * This class tests the data scanner functionality.
@@ -128,20 +127,21 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
   }
 
-  protected void waitForScmToSeeUnhealthyReplica(long containerID)
-      throws Exception {
+  protected void waitForScmToSeeUnhealthyReplica(long containerID) {
     ContainerManager scmContainerManager = cluster.getStorageContainerManager()
         .getContainerManager();
-    LambdaTestUtils.await(5000, 500,
-        () -> getContainerReplica(scmContainerManager, containerID)
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> getContainerReplica(scmContainerManager, containerID)
             .getState() == State.UNHEALTHY);
   }
 
-  protected void waitForScmToCloseContainer(long containerID) throws Exception {
+  protected void waitForScmToCloseContainer(long containerID) {
     ContainerManager cm = cluster.getStorageContainerManager()
         .getContainerManager();
-    LambdaTestUtils.await(5000, 500,
-        () -> cm.getContainer(new ContainerID(containerID)).getState()
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> cm.getContainer(new ContainerID(containerID)).getState()
             != HddsProtos.LifeCycleState.OPEN);
   }
 
@@ -171,10 +171,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
   protected void closeContainerAndWait(long containerID) throws Exception {
     cluster.getStorageContainerLocationClient().closeContainer(containerID);
 
-    GenericTestUtils.waitFor(
-        () -> TestHelper.isContainerClosed(cluster, containerID,
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
-        1000, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> TestHelper.isContainerClosed(cluster, containerID,
+            cluster.getHddsDatanodes().get(0).getDatanodeDetails()));
   }
 
   protected long writeDataToOpenContainer() throws Exception {

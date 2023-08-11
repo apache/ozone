@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon;
 
 import java.time.Duration;
-import java.util.List;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -33,9 +32,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Assert;
@@ -48,6 +44,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.awaitility.Awaitility.await;
+import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.MISSING;
 
 /**
  * Integration Tests for Recon's tasks.
@@ -135,8 +133,10 @@ public class TestReconTasks {
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
     // Make sure Recon's pipeline state is initialized.
-    LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 1));
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofSeconds(5))
+        .until(() -> (reconPipelineManager.getPipelines().size() >= 1));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
@@ -157,24 +157,16 @@ public class TestReconTasks {
     // Bring down the Datanode that had the container replica.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
-    LambdaTestUtils.await(120000, 10000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
-      return (allMissingContainers.size() == 1);
-    });
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(10))
+        .until(() -> reconContainerManager.getContainerSchemaManager()
+            .getUnhealthyContainers(MISSING, 0, 1000).size() == 1);
 
     // Restart the Datanode to make sure we remove the missing container.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
-    LambdaTestUtils.await(120000, 10000, () -> {
-      List<UnhealthyContainers> allMissingContainers =
-          reconContainerManager.getContainerSchemaManager()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-                  0, 1000);
-      return (allMissingContainers.isEmpty());
-    });
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(10))
+        .until(() -> reconContainerManager.getContainerSchemaManager()
+            .getUnhealthyContainers(MISSING, 0, 1000).isEmpty());
   }
 }

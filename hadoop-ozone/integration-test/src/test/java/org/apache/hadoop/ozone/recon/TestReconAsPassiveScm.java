@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.time.Duration;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -35,7 +36,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,6 +50,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -100,8 +103,9 @@ public class TestReconAsPassiveScm {
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
-    LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 4));
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(5))
+        .until(() -> (reconPipelineManager.getPipelines().size() >= 4));
 
     // Verify if Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
@@ -149,9 +153,12 @@ public class TestReconAsPassiveScm {
     GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
     reconScm.getEventQueue().fireEvent(CLOSE_CONTAINER,
         containerInfo.containerID());
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-            .contains("Ignoring unsupported command closeContainerCommand"),
-        1000, 20000);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertThat(logCapturer.getOutput(),
+            containsString(
+                "Ignoring unsupported command closeContainerCommand")));
   }
 
   @Test
@@ -165,9 +172,9 @@ public class TestReconAsPassiveScm {
     assertTrue(scmContainerManager.getContainers().isEmpty());
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     assertTrue(reconContainerManager.getContainers().isEmpty());
-
-    LambdaTestUtils.await(60000, 5000,
-        () -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(5))
+        .until(() -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
 
     cluster.stopRecon();
 
@@ -208,9 +215,9 @@ public class TestReconAsPassiveScm {
     PipelineManager reconPipelineManager = newReconScm.getPipelineManager();
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));
-
-    LambdaTestUtils.await(90000, 5000,
-        () -> (newReconScm.getContainerManager()
+    await().atMost(Duration.ofSeconds(90))
+        .pollInterval(Duration.ofSeconds(5))
+        .until(() -> (newReconScm.getContainerManager()
             .containerExist(ContainerID.valueOf(containerID))));
   }
 }

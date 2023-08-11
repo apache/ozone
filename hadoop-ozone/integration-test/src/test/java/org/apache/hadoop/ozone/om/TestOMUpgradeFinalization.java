@@ -23,16 +23,16 @@ import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepare
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -46,8 +46,8 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.util.LifeCycle;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -76,8 +76,6 @@ public class TestOMUpgradeFinalization {
 
   /**
    * Defines a "from" layout version to finalize from.
-   *
-   * @return
    */
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -136,7 +134,6 @@ public class TestOMUpgradeFinalization {
    */
   @Test
   public void testOmFinalization() throws Exception {
-    // Assert OM Layout Version is 'fromLayoutVersion' on deploy.
     assertEquals(fromLayoutVersion,
         ozoneManager.getVersionManager().getMetadataLayoutVersion());
     assertNull(ozoneManager.getMetadataManager()
@@ -148,17 +145,17 @@ public class TestOMUpgradeFinalization {
     System.out.println("Finalization Messages : " + response.msgs());
 
     waitForFinalization(omClient);
-
-    LambdaTestUtils.await(30000, 3000, () -> {
-      String lvString = ozoneManager.getMetadataManager().getMetaTable()
-          .get(LAYOUT_VERSION_KEY);
-      return maxLayoutVersion() == Integer.parseInt(lvString);
-    });
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(3))
+        .until(() -> {
+          String lvString = ozoneManager.getMetadataManager().getMetaTable()
+              .get(LAYOUT_VERSION_KEY);
+          return maxLayoutVersion() == Integer.parseInt(lvString);
+        });
   }
 
   @Test
   public void testOmFinalizationWithOneOmDown() throws Exception {
-
     List<OzoneManager> runningOms = cluster.getOzoneManagersList();
     final int shutdownOMIndex = 2;
     OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
@@ -181,10 +178,11 @@ public class TestOMUpgradeFinalization {
     cluster.restartOzoneManager(downedOM, true);
 
     try {
-      waitFor(() -> downedOM.getOmRatisServer()
-              .getOmStateMachine().getLifeCycleState().isPausingOrPaused(),
-          1000, 60000);
-    } catch (TimeoutException timeEx) {
+      await().atMost(Duration.ofSeconds(60))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> downedOM.getOmRatisServer()
+              .getOmStateMachine().getLifeCycleState().isPausingOrPaused());
+    } catch (ConditionTimeoutException timeEx) {
       LifeCycle.State state = downedOM.getOmRatisServer()
           .getOmStateMachine().getLifeCycle().getCurrentState();
       if (state != LifeCycle.State.RUNNING) {
@@ -192,19 +190,16 @@ public class TestOMUpgradeFinalization {
       }
     }
 
-    waitFor(() -> {
-      LifeCycle.State lifeCycleState = downedOM.getOmRatisServer()
-          .getOmStateMachine().getLifeCycle().getCurrentState();
-      return !lifeCycleState.isPausingOrPaused();
-    }, 1000, 60000);
-
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> !downedOM.getOmRatisServer().getOmStateMachine()
+            .getLifeCycle().getCurrentState().isPausingOrPaused());
 
     assertEquals(maxLayoutVersion(),
         ozoneManager.getVersionManager().getMetadataLayoutVersion());
     String lvString = ozoneManager.getMetadataManager().getMetaTable()
         .get(LAYOUT_VERSION_KEY);
     assertNotNull(lvString);
-    assertEquals(maxLayoutVersion(),
-        Integer.parseInt(lvString));
+    assertEquals(maxLayoutVersion(), Integer.parseInt(lvString));
   }
 }

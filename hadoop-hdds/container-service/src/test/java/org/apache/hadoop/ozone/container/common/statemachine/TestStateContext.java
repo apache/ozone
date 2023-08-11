@@ -21,7 +21,8 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates.SHUTDOWN;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,7 +45,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -64,7 +65,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.LambdaTestUtils;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -450,10 +451,10 @@ public class TestStateContext {
           }
 
           @Override
-          public DatanodeStates await(long time, TimeUnit timeUnit)
-              throws InterruptedException, TimeoutException {
-            waitFor(() -> DatanodeStates.SHUTDOWN.equals(getState()), 100,
-                10000);
+          public DatanodeStates await(long time, TimeUnit timeUnit)  {
+            Awaitility.await().atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(100))
+                .untilAsserted(() -> assertEquals(SHUTDOWN, getState()));
             return DatanodeStates.RUNNING;
           }
         };
@@ -469,14 +470,17 @@ public class TestStateContext {
           }
         }
     ).start();
-    subject.setState(DatanodeStates.SHUTDOWN);
-    waitFor(taskExecuted::get, 100, 10000);
+    subject.setState(SHUTDOWN);
 
-    assertEquals(DatanodeStates.SHUTDOWN, subject.getState());
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(taskExecuted::get);
+
+    assertEquals(SHUTDOWN, subject.getState());
   }
 
   @Test
-  public void testIsThreadPoolAvailable() throws Exception {
+  public void testIsThreadPoolAvailable() {
     StateContext stateContext = new StateContext(
         new OzoneConfiguration(), null, null);
 
@@ -496,8 +500,9 @@ public class TestStateContext {
     Assertions.assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
     futureOne.complete("futureOne");
-    LambdaTestUtils.await(1000, 100, () ->
-        stateContext.isThreadPoolAvailable(executorService));
+    await().atMost(Duration.ofMillis(1000))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> stateContext.isThreadPoolAvailable(executorService));
 
     futureTwo.complete("futureTwo");
     executorService.shutdown();
@@ -549,8 +554,10 @@ public class TestStateContext {
     assertEquals(0, executed.get());
 
     future.complete("any");
-    LambdaTestUtils.await(1000, 100, () ->
-        subject.isThreadPoolAvailable(executorService));
+
+    await().atMost(Duration.ofMillis(1000))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> subject.isThreadPoolAvailable(executorService));
 
     subject.execute(executorService, 2, TimeUnit.SECONDS);
     assertEquals(1, awaited.get());

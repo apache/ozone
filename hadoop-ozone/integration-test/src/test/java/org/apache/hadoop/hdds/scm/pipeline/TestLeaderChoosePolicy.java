@@ -22,16 +22,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +39,7 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests for LeaderChoosePolicy.
@@ -57,11 +56,11 @@ public class TestLeaderChoosePolicy {
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
-            .setHbInterval(2000)
-            .setHbProcessorInterval(1000)
-            .build();
+        .setNumDatanodes(numDatanodes)
+        .setTotalPipelineNumLimit(numDatanodes + numDatanodes / 3)
+        .setHbInterval(2000)
+        .setHbProcessorInterval(1000)
+        .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
@@ -72,15 +71,16 @@ public class TestLeaderChoosePolicy {
     cluster.shutdown();
   }
 
-  private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn)
-      throws Exception {
+  private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn) {
     List<Pipeline> pipelines = pipelineManager
         .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
     for (Pipeline pipeline : pipelines) {
-      LambdaTestUtils.await(30000, 500, () ->
-          pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
+      await().atMost(Duration.ofSeconds(30))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() ->
+              pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
     }
 
     Map<UUID, Integer> leaderCount = new HashMap<>();
@@ -93,9 +93,10 @@ public class TestLeaderChoosePolicy {
       leaderCount.put(leader, leaderCount.get(leader) + 1);
     }
 
-    Assert.assertTrue(leaderCount.size() == dnNum);
+    Assertions.assertEquals(leaderCount.size(), dnNum);
     for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
-      Assert.assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
+      Assertions.assertEquals((int) leaderCount.get(entry.getKey()),
+          leaderNumOfEachDn);
     }
   }
 
@@ -114,9 +115,9 @@ public class TestLeaderChoosePolicy {
     // make sure two pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0,
-        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
-            ReplicationFactor.ONE)).size());
+    Assertions.assertEquals(0, pipelineManager.getPipelines(
+        RatisReplicationConfig.getInstance(
+        ReplicationFactor.ONE)).size());
 
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
@@ -132,8 +133,8 @@ public class TestLeaderChoosePolicy {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines();
 
-    Assert.assertEquals(
-        pipelinesBeforeRestart.size(), pipelinesAfterRestart.size());
+    Assertions.assertEquals(pipelinesBeforeRestart.size(),
+        pipelinesAfterRestart.size());
 
     for (Pipeline p : pipelinesBeforeRestart) {
       boolean equal = false;
@@ -144,7 +145,7 @@ public class TestLeaderChoosePolicy {
         }
       }
 
-      Assert.assertTrue(equal);
+      Assertions.assertTrue(equal);
     }
   }
 
@@ -163,7 +164,7 @@ public class TestLeaderChoosePolicy {
     // make sure pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
+    Assertions.assertEquals(0, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -206,11 +207,12 @@ public class TestLeaderChoosePolicy {
     waitForPipelines(pipelineNum);
   }
 
-  private void waitForPipelines(int numPipelines)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
-        .size() >= numPipelines, 100, 60000);
+  private void waitForPipelines(int numPipelines) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> pipelineManager
+            .getPipelines(RatisReplicationConfig.getInstance(
+                ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
+            .size() >= numPipelines);
   }
 }

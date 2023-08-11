@@ -33,8 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.After;
@@ -45,6 +43,8 @@ import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
@@ -53,6 +53,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.junit.Assert.assertEquals;
@@ -255,22 +256,16 @@ public class TestOMBucketLayoutUpgrade {
     return bucketName;
   }
 
-  /**
-   * Complete the cluster upgrade.
-   *
-   * @throws Exception if upgrade fails.
-   */
-  private void finalizeUpgrade() throws Exception {
-    UpgradeFinalizer.StatusAndMessages response =
-        omClient.finalizeUpgrade("finalize-test");
-    System.out.println("Finalization Messages : " + response.msgs());
-
+  private void finalizeUpgrade() throws IOException {
+    omClient.finalizeUpgrade("finalize-test");
     waitForFinalization(omClient);
 
-    LambdaTestUtils.await(30000, 3000, () -> {
-      String lvString = ozoneManager.getMetadataManager().getMetaTable()
-          .get(LAYOUT_VERSION_KEY);
-      return maxLayoutVersion() == Integer.parseInt(lvString);
-    });
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(3))
+        .until(() -> {
+          String lvString = ozoneManager.getMetadataManager().getMetaTable()
+              .get(LAYOUT_VERSION_KEY);
+          return maxLayoutVersion() == Integer.parseInt(lvString);
+        });
   }
 }

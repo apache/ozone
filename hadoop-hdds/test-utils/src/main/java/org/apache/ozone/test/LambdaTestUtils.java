@@ -65,125 +65,6 @@ public final class LambdaTestUtils {
   }
 
   /**
-   * Wait for a condition to be met, with a retry policy returning the
-   * sleep time before the next attempt is made. If, at the end
-   * of the timeout period, the condition is still false (or failing with
-   * an exception), the timeout handler is invoked, passing in the timeout
-   * and any exception raised in the last invocation. The exception returned
-   * by this timeout handler is then rethrown.
-   * <p>
-   * Example: Wait 30s for a condition to be met, with a sleep of 30s
-   * between each probe.
-   * If the operation is failing, then, after 30s, the timeout handler
-   * is called. This returns the exception passed in (if any),
-   * or generates a new one.
-   * <pre>
-   * await(
-   *   30 * 1000,
-   *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); },
-   *   () -> 500),
-   *   (timeout, ex) -> ex != null ? ex : new TimeoutException("timeout"));
-   * </pre>
-   *
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made.
-   * @param check predicate to evaluate
-   * @param retry retry escalation logic
-   * @param timeoutHandler handler invoked on timeout;
-   * the returned exception will be thrown
-   * @return the number of iterations before the condition was satisfied
-   * @throws Exception the exception returned by {@code timeoutHandler} on
-   * timeout
-   * @throws FailFastException immediately if the evaluated operation raises it
-   * @throws InterruptedException if interrupted.
-   */
-  public static int await(int timeoutMillis,
-      Callable<Boolean> check,
-      Callable<Integer> retry,
-      TimeoutHandler timeoutHandler)
-      throws Exception {
-    Preconditions.checkArgument(timeoutMillis >= 0,
-        "timeoutMillis must be >= 0");
-    Preconditions.checkNotNull(timeoutHandler);
-
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
-    Throwable ex = null;
-    boolean running = true;
-    int iterations = 0;
-    while (running) {
-      iterations++;
-      try {
-        if (check.call()) {
-          return iterations;
-        }
-        // the probe failed but did not raise an exception. Reset any
-        // exception raised by a previous probe failure.
-        ex = null;
-      } catch (InterruptedException
-          | FailFastException
-          | VirtualMachineError e) {
-        throw e;
-      } catch (Throwable e) {
-        LOG.debug("eventually() iteration {}", iterations, e);
-        ex = e;
-      }
-      running = System.currentTimeMillis() < endTime;
-      if (running) {
-        int sleeptime = retry.call();
-        if (sleeptime >= 0) {
-          Thread.sleep(sleeptime);
-        } else {
-          running = false;
-        }
-      }
-    }
-    // timeout
-    Throwable evaluate;
-    try {
-      evaluate = timeoutHandler.evaluate(timeoutMillis, ex);
-      if (evaluate == null) {
-        // bad timeout handler logic; fall back to GenerateTimeout so the
-        // underlying problem isn't lost.
-        LOG.error("timeout handler {} did not throw an exception ",
-            timeoutHandler);
-        evaluate = new GenerateTimeout().evaluate(timeoutMillis, ex);
-      }
-    } catch (Throwable throwable) {
-      evaluate = throwable;
-    }
-    return raise(evaluate);
-  }
-
-  /**
-   * Simplified {@link #await(int, Callable, Callable, TimeoutHandler)}
-   * operation with a fixed interval
-   * and {@link GenerateTimeout} handler to generate a {@code TimeoutException}.
-   * <p>
-   * Example: await for probe to succeed:
-   * <pre>
-   * await(
-   *   30 * 1000, 500,
-   *   () -> { return 0 == filesystem.listFiles(new Path("/")).length); });
-   * </pre>
-   *
-   * @param timeoutMillis timeout in milliseconds.
-   * Can be zero, in which case only one attempt is made.
-   * @param intervalMillis interval in milliseconds between checks
-   * @param check predicate to evaluate
-   * @return the number of iterations before the condition was satisfied
-   * @throws Exception returned by {@code failure} on timeout
-   * @throws FailFastException immediately if the evaluated operation raises it
-   * @throws InterruptedException if interrupted.
-   */
-  public static int await(int timeoutMillis,
-      int intervalMillis,
-      Callable<Boolean> check) throws Exception {
-    return await(timeoutMillis, check,
-        new FixedRetryInterval(intervalMillis),
-        new GenerateTimeout());
-  }
-
-  /**
    * Repeatedly execute a closure until it returns a value rather than
    * raise an exception.
    * Exceptions are caught and, with one exception,
@@ -507,8 +388,7 @@ public final class LambdaTestUtils {
 
   /**
    * An exception which triggers a fast exist from the
-   * {@link #eventually(int, Callable, Callable)} and
-   * {@link #await(int, Callable, Callable, TimeoutHandler)} loops.
+   * {@link #eventually(int, Callable, Callable)}.
    */
   public static class FailFastException extends Exception {
 
@@ -557,5 +437,4 @@ public final class LambdaTestUtils {
       return null;
     }
   }
-
 }

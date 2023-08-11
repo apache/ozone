@@ -32,16 +32,14 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
@@ -50,6 +48,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Helper methods for testing HDDS upgrade finalization in integration tests.
@@ -66,16 +65,17 @@ public final class TestHddsUpgradeUtils {
           HddsProtos.ReplicationFactor.THREE);
 
   public static void waitForFinalizationFromClient(
-      StorageContainerLocationProtocol scmClient, String clientID)
-      throws Exception {
-    LambdaTestUtils.await(60_000, 1_000, () -> {
-      UpgradeFinalizer.Status status = scmClient
-          .queryUpgradeFinalizationProgress(clientID, true, true)
-          .status();
-      LOG.info("Waiting for upgrade finalization to complete from client." +
-              " Current status is {}.", status);
-      return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
-    });
+      StorageContainerLocationProtocol scmClient,
+      String clientID
+  ) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> {
+          UpgradeFinalizer.Status status = scmClient
+              .queryUpgradeFinalizationProgress(clientID, true, true)
+              .status();
+          return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
+        });
   }
 
   /*
@@ -119,13 +119,10 @@ public final class TestHddsUpgradeUtils {
     // SCM should not return from finalization until there is at least one
     // pipeline to use.
     PipelineManager scmPipelineManager = scm.getPipelineManager();
-    try {
-      GenericTestUtils.waitFor(
-          () -> scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() >= 1,
-          500, 60000);
-    } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
-    }
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() >= 1);
 
     // SCM will not return from finalization until there is at least one
     // RATIS 3 pipeline. For this to exist, all three of our datanodes must
@@ -187,25 +184,19 @@ public final class TestHddsUpgradeUtils {
       closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
     }
 
-    try {
-      GenericTestUtils.waitFor(() -> {
-        for (HddsDatanodeService dataNode : datanodes) {
-          DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-          try {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(500))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          for (HddsDatanodeService dataNode : datanodes) {
+            DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
             if ((dsm.queryUpgradeStatus().status() != FINALIZATION_DONE) &&
                 (dsm.queryUpgradeStatus().status() != ALREADY_FINALIZED)) {
               return false;
             }
-          } catch (IOException e) {
-            LOG.error("Failed to query datanode upgrade status.", e);
-            return false;
           }
-        }
-        return true;
-      }, 500, 60000);
-    } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on Data Nodes.");
-    }
+          return true;
+        });
 
     int countContainers = 0;
     for (HddsDatanodeService dataNode : datanodes) {

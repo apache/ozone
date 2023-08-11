@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.awaitility.Awaitility.await;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -141,8 +140,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             reconTaskStatusDao, containerHealthSchemaManager,
             placementMock, reconTaskConfig);
     containerHealthTask.start();
-    LambdaTestUtils.await(6000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 5));
+    await().atMost(Duration.ofSeconds(6))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> (unHealthyContainersTableHandle.count() == 5));
     UnhealthyContainers rec =
         unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
@@ -203,14 +203,14 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     // Was mis-replicated - make it healthy now
     placementMock.setMisRepWhenDnPresent(null);
-
-    LambdaTestUtils.await(6000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 3));
+    await().atMost(Duration.ofSeconds(6))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> (unHealthyContainersTableHandle.count() == 3));
     rec = unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("UNDER_REPLICATED", rec.getContainerState());
     assertEquals(1, rec.getReplicaDelta().intValue());
 
-    // This container is now healthy, it should not be in the table any more
+    // This container is now healthy, it should not be in the table anymore.
     assertEquals(0,
         unHealthyContainersTableHandle.fetchByContainerId(2L).size());
 
@@ -285,8 +285,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             reconTaskStatusDao, containerHealthSchemaManager,
             placementMock, reconTaskConfig);
     containerHealthTask.start();
-    LambdaTestUtils.await(6000, 1000, () ->
-        (unHealthyContainersTableHandle.count() == 1));
+    await().atMost(Duration.ofSeconds(6))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> (unHealthyContainersTableHandle.count() == 1));
     UnhealthyContainers rec =
         unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
     assertEquals("MISSING", rec.getContainerState());
@@ -357,8 +358,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
         List<DatanodeDetails> favoredNodes,
-        int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
-        throws IOException {
+        int nodesRequired, long metadataSizeRequired, long dataSizeRequired) {
       return null;
     }
 
@@ -387,13 +387,11 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     private boolean isDnPresent(List<DatanodeDetails> dns) {
       for (DatanodeDetails dn : dns) {
-        if (misRepWhenDnPresent != null
-            && dn.getUuid().equals(misRepWhenDnPresent)) {
+        if (dn.getUuid().equals(misRepWhenDnPresent)) {
           return true;
         }
       }
       return false;
     }
   }
-
 }

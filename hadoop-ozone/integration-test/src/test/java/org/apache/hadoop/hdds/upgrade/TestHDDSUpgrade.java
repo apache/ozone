@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static java.lang.Thread.sleep;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
@@ -34,8 +33,10 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
+import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,11 +79,10 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.apache.ozone.test.tag.Slow;
@@ -125,11 +125,6 @@ public class TestHDDSUpgrade {
 
   private static MiniOzoneClusterProvider clusterProvider;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void setUp() throws Exception {
     init();
@@ -229,29 +224,28 @@ public class TestHDDSUpgrade {
       throws IOException, TimeoutException {
     Pipeline ratisPipeline1 = scmPipelineManager.createPipeline(RATIS_THREE);
     scmPipelineManager.openPipeline(ratisPipeline1.getId());
-    Assert.assertEquals(0,
+    Assertions.assertEquals(0,
         scmPipelineManager.getNumberOfContainers(ratisPipeline1.getId()));
     PipelineID pid = scmContainerManager.allocateContainer(RATIS_THREE,
         "Owner1").getPipelineID();
-    Assert.assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
-    Assert.assertEquals(pid, ratisPipeline1.getId());
+    Assertions.assertEquals(1, scmPipelineManager.getNumberOfContainers(pid));
+    Assertions.assertEquals(pid, ratisPipeline1.getId());
   }
 
   /*
    * Helper function to wait for Pipeline creation.
    */
-  private void waitForPipelineCreated() throws Exception {
-    LambdaTestUtils.await(10000, 500, () -> {
-      List<Pipeline> pipelines =
-          scmPipelineManager.getPipelines(RATIS_THREE, OPEN);
-      return pipelines.size() == 1;
-    });
+  private void waitForPipelineCreated() {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() == 1);
   }
 
   /*
    * Helper function for container creation.
    */
-  private void createTestContainers() throws IOException, TimeoutException {
+  private void createTestContainers() throws IOException {
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     ContainerInfo ci1 = scmContainerManager.allocateContainer(
         RATIS_THREE, "Owner1");
@@ -290,7 +284,7 @@ public class TestHDDSUpgrade {
     // Trigger Finalization on the SCM
     StatusAndMessages status = scm.getFinalizationManager().finalizeUpgrade(
         "xyz");
-    Assert.assertEquals(STARTING_FINALIZATION, status.status());
+    Assertions.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Wait for the Finalization to complete on the SCM.
     TestHddsUpgradeUtils.waitForFinalizationFromClient(
@@ -308,7 +302,7 @@ public class TestHDDSUpgrade {
         .stream()
         .filter(postUpgradeOpenPipelines::contains)
         .count();
-    Assert.assertEquals(0, numPreUpgradeOpenPipelines);
+    Assertions.assertEquals(0, numPreUpgradeOpenPipelines);
 
     // Verify Post-Upgrade conditions on the SCM.
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
@@ -426,30 +420,20 @@ public class TestHDDSUpgrade {
    */
   private Thread injectDataNodeFailureDuringDataNodeUpgrade(
       DatanodeDetails dn) {
-    Thread t = null;
-    try {
-      // Schedule the DataNode restart on a separate thread context
-      // otherwise DataNode restart will hang. Also any cluster modification
-      // needs to be guarded since it could get modified in multiple independent
-      // threads.
-      t = new Thread(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            synchronized (cluster) {
-              cluster.restartHddsDatanode(dn, true);
-            }
-          } catch (Exception e) {
-            e.printStackTrace();
-            testPassed.set(false);
-          }
+    // Schedule the DataNode restart on a separate thread context
+    // otherwise DataNode restart will hang. Also any cluster modification
+    // needs to be guarded since it could get modified in multiple independent
+    // threads.
+    return new Thread(() -> {
+      try {
+        synchronized (cluster) {
+          cluster.restartHddsDatanode(dn, true);
         }
-      });
-    } catch (Exception e) {
-      LOG.info("DataNode Restart Failed!");
-      Assert.fail(e.getMessage());
-    }
-    return t;
+      } catch (Exception e) {
+        e.printStackTrace();
+        testPassed.set(false);
+      }
+    });
   }
 
   /*
@@ -467,29 +451,26 @@ public class TestHDDSUpgrade {
       IOException {
     // This needs to happen in a separate thread context otherwise
     // DataNode restart will hang.
-    return new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          // Since we are modifying cluster in an independent thread context,
-          // we synchronize access to it to avoid concurrent modification
-          // exception.
-          synchronized (cluster) {
-            // Work on a Copy of current set of DataNodes to avoid
-            // running into tricky situations.
-            List<HddsDatanodeService> currentDataNodes =
-                new ArrayList<>(cluster.getHddsDatanodes());
-            for (HddsDatanodeService ds: currentDataNodes) {
-              DatanodeDetails dn = ds.getDatanodeDetails();
-              cluster.restartHddsDatanode(dn, false);
-            }
-            cluster.restartStorageContainerManager(false);
-            cluster.waitForClusterToBeReady();
+    return new Thread(() -> {
+      try {
+        // Since we are modifying cluster in an independent thread context,
+        // we synchronize access to it to avoid concurrent modification
+        // exception.
+        synchronized (cluster) {
+          // Work on a Copy of current set of DataNodes to avoid
+          // running into tricky situations.
+          List<HddsDatanodeService> currentDataNodes =
+              new ArrayList<>(cluster.getHddsDatanodes());
+          for (HddsDatanodeService ds: currentDataNodes) {
+            DatanodeDetails dn = ds.getDatanodeDetails();
+            cluster.restartHddsDatanode(dn, false);
           }
-        } catch (Exception e) {
-          e.printStackTrace();
-          testPassed.set(false);
+          cluster.restartStorageContainerManager(false);
+          cluster.waitForClusterToBeReady();
         }
+      } catch (Exception e) {
+        e.printStackTrace();
+        testPassed.set(false);
       }
     });
   }
@@ -515,7 +496,7 @@ public class TestHDDSUpgrade {
         BEFORE_PRE_FINALIZE_UPGRADE,
         this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -534,7 +515,7 @@ public class TestHDDSUpgrade {
         AFTER_PRE_FINALIZE_UPGRADE,
         this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -551,9 +532,9 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_COMPLETE_FINALIZATION,
-        () -> this.injectSCMFailureDuringSCMUpgrade());
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -570,9 +551,9 @@ public class TestHDDSUpgrade {
     testPassed.set(true);
     scmFinalizationExecutor.configureTestInjectionFunction(
         AFTER_POST_FINALIZE_UPGRADE,
-        () -> this.injectSCMFailureDuringSCMUpgrade());
+        this::injectSCMFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -591,7 +572,7 @@ public class TestHDDSUpgrade {
         BEFORE_PRE_FINALIZE_UPGRADE,
         this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -610,7 +591,7 @@ public class TestHDDSUpgrade {
         AFTER_PRE_FINALIZE_UPGRADE,
         this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -629,7 +610,7 @@ public class TestHDDSUpgrade {
         AFTER_COMPLETE_FINALIZATION,
         this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -648,7 +629,7 @@ public class TestHDDSUpgrade {
         AFTER_POST_FINALIZE_UPGRADE,
         this::injectDataNodeFailureDuringSCMUpgrade);
     testFinalizationWithFailureInjectionHelper(null);
-    Assert.assertTrue(testPassed.get());
+    Assertions.assertTrue(testPassed.get());
   }
 
   /*
@@ -683,7 +664,7 @@ public class TestHDDSUpgrade {
           .getUpgradeFinalizer())
           .setFinalizationExecutor(dataNodeFinalizationExecutor);
       testFinalizationWithFailureInjectionHelper(failureInjectionThread);
-      Assert.assertTrue(testPassed.get());
+      Assertions.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
         init();
@@ -714,9 +695,7 @@ public class TestHDDSUpgrade {
         UpgradeTestInjectionPoints.values()) {
       scmFinalizationExecutor.configureTestInjectionFunction(
           scmInjectionPoint,
-          () -> {
-            return this.injectSCMFailureDuringSCMUpgrade();
-          });
+          this::injectSCMFailureDuringSCMUpgrade);
 
       for (UpgradeTestInjectionPoints datanodeInjectionPoint :
           UpgradeTestInjectionPoints.values()) {
@@ -736,7 +715,7 @@ public class TestHDDSUpgrade {
             .setFinalizationExecutor(dataNodeFinalizationExecutor);
         testFinalizationWithFailureInjectionHelper(
             dataNodefailureInjectionThread);
-        Assert.assertTrue(testPassed.get());
+        Assertions.assertTrue(testPassed.get());
         synchronized (cluster) {
           shutdown();
           init();
@@ -777,7 +756,7 @@ public class TestHDDSUpgrade {
       scm.getFinalizationManager().getUpgradeFinalizer()
           .setFinalizationExecutor(finalizationExecutor);
       testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
-      Assert.assertTrue(testPassed.get());
+      Assertions.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
         init();
@@ -817,7 +796,7 @@ public class TestHDDSUpgrade {
           .getUpgradeFinalizer())
           .setFinalizationExecutor(dataNodeFinalizationExecutor);
       testFinalizationWithFailureInjectionHelper(helpingFailureInjectionThread);
-      Assert.assertTrue(testPassed.get());
+      Assertions.assertTrue(testPassed.get());
       synchronized (cluster) {
         shutdown();
         init();
@@ -843,7 +822,7 @@ public class TestHDDSUpgrade {
     // Trigger Finalization on the SCM
     StatusAndMessages status =
         scm.getFinalizationManager().finalizeUpgrade("xyz");
-    Assert.assertEquals(STARTING_FINALIZATION, status.status());
+    Assertions.assertEquals(STARTING_FINALIZATION, status.status());
 
     // Make sure that any outstanding thread created by failure injection
     // has completed its job.
@@ -879,19 +858,16 @@ public class TestHDDSUpgrade {
         HEALTHY_READONLY, HEALTHY);
 
     // Need to wait for post finalization heartbeat from DNs.
-    LambdaTestUtils.await(600000, 500, () -> {
-      try {
-        loadSCMState();
-        TestHddsUpgradeUtils.testDataNodesStateOnSCM(
-            cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
-            HEALTHY, null);
-        sleep(100);
-      } catch (Throwable ex) {
-        LOG.info(ex.getMessage());
-        return false;
-      }
-      return true;
-    });
+    await().atMost(Duration.ofMinutes(10))
+        .pollInterval(Duration.ofMillis(500))
+        .ignoreExceptions()
+        .until(() -> {
+          loadSCMState();
+          TestHddsUpgradeUtils.testDataNodesStateOnSCM(
+              cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
+              HEALTHY, null);
+          return true;
+        });
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
@@ -907,7 +883,7 @@ public class TestHDDSUpgrade {
         DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
         Set<PipelineID> pipelines =
             scm.getScmNodeManager().getPipelines(dsm.getDatanodeDetails());
-        Assert.assertTrue(pipelines != null);
+        Assertions.assertNotNull(pipelines);
       }
     }
   }

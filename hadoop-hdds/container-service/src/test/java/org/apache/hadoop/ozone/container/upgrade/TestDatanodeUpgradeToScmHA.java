@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicationSource;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -58,6 +57,7 @@ import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -70,6 +70,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
@@ -264,9 +265,11 @@ public class TestDatanodeUpgradeToScmHA {
         .getContainer(containerID).getContainerState();
     Assert.assertEquals(State.UNHEALTHY, containerState);
     dsm.finalizeUpgrade();
-    LambdaTestUtils.await(2000, 500,
-        () -> dsm.getLayoutVersionManager()
-            .isAllowed(HDDSLayoutFeature.SCM_HA));
+
+    await().atMost(Duration.ofMillis(2000))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.SCM_HA));
 
     /// FINALIZED: Volume marked failed but gets restored on disk ///
 
@@ -371,9 +374,10 @@ public class TestDatanodeUpgradeToScmHA {
 
     closeContainer(containerID, pipeline);
     dsm.finalizeUpgrade();
-    LambdaTestUtils.await(2000, 500,
-        () -> dsm.getLayoutVersionManager()
-            .isAllowed(HDDSLayoutFeature.SCM_HA));
+    await().atMost(Duration.ofMillis(2000))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.SCM_HA));
 
     /// FINALIZED: Add a new volume and check its formatting ///
 
