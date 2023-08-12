@@ -45,11 +45,11 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
@@ -70,8 +70,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -213,9 +215,10 @@ public final class TestSecretKeySnapshot {
 
     // wait until leader SCM got enough secret keys.
     SecretKeyManager leaderSecretKeyManager = leaderSCM.getSecretKeyManager();
-    GenericTestUtils.waitFor(
-        () -> leaderSecretKeyManager.getSortedKeys().size() >= 2,
-        ROTATE_CHECK_DURATION_MS, EXPIRY_DURATION_MS);
+
+    await().atMost(Duration.ofMinutes(EXPIRY_DURATION_MS))
+        .pollInterval(Duration.ofMillis(ROTATE_CHECK_DURATION_MS))
+        .until(() -> leaderSecretKeyManager.getSortedKeys().size() >= 2);
 
     writeToIncreaseLogIndex(leaderSCM, 200);
     ManagedSecretKey currentKeyInLeader =
@@ -234,9 +237,10 @@ public final class TestSecretKeySnapshot {
     // Wait & retry for follower to update transactions to leader
     // snapshot index.
     // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() ->
-        followerSM.getLastAppliedTermIndex().getIndex() >= 200,
-        100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            followerSM.getLastAppliedTermIndex().getIndex() >= 200);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
     assertTrue(followerLastAppliedIndex >= 200);
@@ -258,21 +262,24 @@ public final class TestSecretKeySnapshot {
     // normally post snapshot.
     ManagedSecretKey currentKeyPostSnapshot =
         leaderSecretKeyManager.getCurrentSecretKey();
-    GenericTestUtils.waitFor(() ->
-            !leaderSecretKeyManager.getCurrentSecretKey()
-                .equals(currentKeyPostSnapshot),
-        ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
+
+    await().atMost(Duration.ofMillis(ROTATE_DURATION_MS))
+        .pollInterval(Duration.ofMillis(ROTATE_CHECK_DURATION_MS))
+        .untilAsserted(() -> assertNotEquals(currentKeyPostSnapshot,
+            leaderSecretKeyManager.getCurrentSecretKey()));
     List<ManagedSecretKey> latestLeaderKeys =
         leaderSecretKeyManager.getSortedKeys();
-    GenericTestUtils.waitFor(() ->
-            latestLeaderKeys.equals(
-            followerSecretKeyManager.getSortedKeys()),
-        ROTATE_CHECK_DURATION_MS, ROTATE_DURATION_MS);
+    await().atMost(Duration.ofMillis(ROTATE_DURATION_MS))
+        .pollInterval(Duration.ofMillis(ROTATE_CHECK_DURATION_MS))
+        .untilAsserted(() ->
+            assertEquals(followerSecretKeyManager.getSortedKeys(),
+                latestLeaderKeys));
   }
 
   private List<ContainerInfo> writeToIncreaseLogIndex(
-      StorageContainerManager scm, long targetLogIndex)
-      throws IOException, InterruptedException, TimeoutException {
+      StorageContainerManager scm,
+      long targetLogIndex
+  ) throws IOException, InterruptedException {
     List<ContainerInfo> containers = new ArrayList<>();
     SCMStateMachine stateMachine =
         scm.getScmHAManager().getRatisServer().getSCMStateMachine();
@@ -288,5 +295,4 @@ public final class TestSecretKeySnapshot {
     }
     return containers;
   }
-
 }

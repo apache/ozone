@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -44,12 +43,13 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -138,8 +138,7 @@ public class TestMultiTenantVolume {
    * Trigger OM upgrade finalization from the client and block until completion
    * (status FINALIZATION_DONE).
    */
-  private static void finalizeOMUpgrade()
-      throws IOException, InterruptedException, TimeoutException {
+  private static void finalizeOMUpgrade() throws IOException {
 
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
@@ -153,18 +152,14 @@ public class TestMultiTenantVolume {
 
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        final UpgradeFinalizer.StatusAndMessages progress =
-            omClient.queryUpgradeFinalizationProgress(
-                upgradeClientID, false, false);
-        return isDone(progress.status());
-      } catch (IOException e) {
-        Assert.fail("Unexpected exception while waiting for "
-            + "the OM upgrade to finalize: " + e.getMessage());
-      }
-      return false;
-    }, 500, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> {
+          final UpgradeFinalizer.StatusAndMessages progress =
+              omClient.queryUpgradeFinalizationProgress(
+                  upgradeClientID, false, false);
+          return isDone(progress.status());
+        });
   }
 
   @Test

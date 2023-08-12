@@ -29,16 +29,18 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests for MultiRaft set up.
@@ -158,12 +160,9 @@ public class  TestMultiRaftSetup {
     });
   }
 
-  private void waitForPipelineCreated(int num) throws Exception {
-    LambdaTestUtils.await(10000, 500, () -> {
-      List<Pipeline> pipelines =
-          pipelineManager.getPipelines(RATIS_THREE);
-      return pipelines.size() == num;
-    });
+  private void waitForPipelineCreated(int num) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> pipelineManager.getPipelines(RATIS_THREE).size() == num);
   }
-
 }

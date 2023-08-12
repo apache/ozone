@@ -36,6 +36,9 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.awaitility.Awaitility.await;
+
 /**
  * Integration tests for the background container metadata scanner. This
  * scanner does a quick check of container metadata to find obvious failures
@@ -104,14 +107,14 @@ public class TestBackgroundContainerMetadataScannerIntegration
     corruption.applyTo(getDnContainer(closedContainerID));
     corruption.applyTo(getDnContainer(openContainerID));
     // Wait for the scanner to detect corruption.
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(closedContainerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        500, 5000);
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(openContainerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        500, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            getDnContainer(closedContainerID).getContainerState() == UNHEALTHY);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            getDnContainer(openContainerID).getContainerState() == UNHEALTHY);
 
     // Wait for SCM to get reports of the unhealthy replicas.
     waitForScmToSeeUnhealthyReplica(closedContainerID);

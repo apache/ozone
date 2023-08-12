@@ -72,6 +72,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -248,9 +249,14 @@ public class TestOMSnapshotDAG {
 
       // RocksDB does checkpointing in a separate thread, wait for it
     final File checkpointSnap1 = new File(snap1.getDbPath());
-    GenericTestUtils.waitFor(checkpointSnap1::exists, 2000, 20000);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(checkpointSnap1::exists);
     final File checkpointSnap2 = new File(snap2.getDbPath());
-    GenericTestUtils.waitFor(checkpointSnap2::exists, 2000, 20000);
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(checkpointSnap2::exists);
 
     List<String> sstDiffList21 = differ.getSSTDiffList(snap2, snap1);
     LOG.debug("Got diff list: {}", sstDiffList21);
@@ -271,7 +277,9 @@ public class TestOMSnapshotDAG {
         ((RDBStore)((OmSnapshot)snapDB3.get())
             .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     final File checkpointSnap3 = new File(snap3.getDbPath());
-    GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(checkpointSnap3::exists);
 
     List<String> sstDiffList32 = differ.getSSTDiffList(snap3, snap2);
 
@@ -366,5 +374,4 @@ public class TestOMSnapshotDAG {
     Assertions.assertNotNull(fileList);
     Assertions.assertEquals(0L, fileList.length);
   }
-
 }

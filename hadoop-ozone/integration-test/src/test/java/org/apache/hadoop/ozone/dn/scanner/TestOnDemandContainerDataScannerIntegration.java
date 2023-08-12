@@ -31,7 +31,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.time.Duration;
 import java.util.Collection;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Integration tests for the on demand container data scanner. This scanner
@@ -109,10 +113,10 @@ public class TestOnDemandContainerDataScannerIntegration
     readFromCorruptedKey(keyName);
     // Reading from the corrupted key should have triggered an on-demand scan
     // of the container, which will detect the corruption.
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(containerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        500, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            getDnContainer(containerID).getContainerState() == UNHEALTHY);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);

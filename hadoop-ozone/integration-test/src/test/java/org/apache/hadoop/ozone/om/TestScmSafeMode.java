@@ -54,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -132,12 +134,13 @@ public class TestScmSafeMode {
   @Test(timeout = 300_000)
   public void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
-    TestStorageContainerManagerHelper helper =
-        new TestStorageContainerManagerHelper(cluster, conf);
-    Map<String, OmKeyInfo> keyLocations = helper.createKeys(100, 4096);
-    final List<ContainerInfo> containers = cluster
-        .getStorageContainerManager().getContainerManager().getContainers();
-    GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
+    final List<ContainerInfo> containers = cluster.getStorageContainerManager()
+        .getContainerManager()
+        .getContainers();
+
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> containers.size() >= 3);
 
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
@@ -158,7 +161,6 @@ public class TestScmSafeMode {
       fail("failed");
     }
 
-
     StorageContainerManager scm;
 
     scm = cluster.getStorageContainerManager();
@@ -166,12 +168,11 @@ public class TestScmSafeMode {
 
     om = cluster.getOzoneManager();
 
-
     final OzoneBucket bucket1 =
         client.getObjectStore().getVolume(volumeName)
             .getBucket(bucketName);
 
-// As cluster is restarted with out datanodes restart
+    // As cluster is restarted without datanodes restart
     IOException ioException = assertThrows(IOException.class,
         () -> bucket1.createKey(keyName, 1000, RATIS, ONE,
             new HashMap<>()));
@@ -203,16 +204,12 @@ public class TestScmSafeMode {
     cluster.getStorageContainerManager().getClientProtocolServer()
         .forceExitSafeMode();
     // Test 3: SCM should be out of safe mode.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return !cluster.getStorageContainerManager().getClientProtocolServer()
-            .inSafeMode();
-      } catch (IOException e) {
-        Assert.fail("Cluster");
-        return false;
-      }
-    }, 10, 1000 * 5);
-
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() -> !cluster.getStorageContainerManager()
+            .getClientProtocolServer()
+            .inSafeMode());
   }
 
   @Test(timeout = 300_000)
@@ -238,7 +235,10 @@ public class TestScmSafeMode {
     Map<String, OmKeyInfo> keyLocations = helper.createKeys(100 * 2, 4096);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
-    GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> containers.size() >= 3);
 
     // Removing some container to keep them open.
     containers.remove(0);
@@ -274,12 +274,14 @@ public class TestScmSafeMode {
     scm = cluster.getStorageContainerManager();
     assertTrue(scm.isInSafeMode());
     assertFalse(logCapturer.getOutput().contains("SCM exiting safe mode."));
-    assertTrue(scm.getCurrentContainerThreshold() == 0);
+    assertEquals(0, scm.getCurrentContainerThreshold(), 0.0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       dn.start();
     }
-    GenericTestUtils
-        .waitFor(() -> scm.getCurrentContainerThreshold() == 1.0, 100, 20000);
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() ->
+            assertEquals(1, scm.getCurrentContainerThreshold(), 0.0));
 
     EventQueue eventQueue =
         (EventQueue) cluster.getStorageContainerManager().getEventQueue();
@@ -319,9 +321,10 @@ public class TestScmSafeMode {
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());
     final List<ContainerInfo> containers = scm.getContainerManager()
         .getContainers();
-    GenericTestUtils.waitFor(clientProtocolServer::getSafeModeStatus,
-        50, 1000 * 30);
-    assertTrue(clientProtocolServer.getSafeModeStatus());
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(50))
+        .untilAsserted(() ->
+            assertTrue(clientProtocolServer.getSafeModeStatus()));
 
     cluster.shutdownHddsDatanodes();
     Thread.sleep(30000);

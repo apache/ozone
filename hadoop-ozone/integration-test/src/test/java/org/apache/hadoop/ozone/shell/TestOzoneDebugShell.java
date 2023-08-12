@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,6 +63,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test Ozone Debug shell.
@@ -151,8 +151,10 @@ public class TestOzoneDebugShell {
     Assertions.assertEquals(snapshotName, snapshot.getName());
     String dbPath = getSnapshotDBPath(snapshot.getCheckpointDir());
     String snapshotCurrent = dbPath + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils
-        .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
+
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->  new File(snapshotCurrent).exists());
     String[] args =
         new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
     int exitCode = cmd.execute(args);

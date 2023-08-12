@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.After;
 import org.junit.Assert;
@@ -49,8 +48,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.TestDirectoryDeletingServiceWithFSO.assertSubPathsCount;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -58,6 +57,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.fail;
 
 /**
@@ -219,24 +219,22 @@ public class TestRootedDDSWithFSO {
     }
   }
 
-  private void assertTableRowCount(Table<String, ?> table, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> assertTableRowCount(count, table), 1000,
-        120000); // 2 minutes
+  private void assertTableRowCount(Table<String, ?> table, int count) {
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertTableRowCount(count, table));
   }
 
-  private boolean assertTableRowCount(int expectedCount,
-      Table<String, ?> table) {
-    long count = 0L;
+  private void assertTableRowCount(int expectedCount,
+                                   Table<String, ?> table) {
     try {
-      count = cluster.getOzoneManager().getMetadataManager()
+      long count = cluster.getOzoneManager().getMetadataManager()
           .countRowsInTable(table);
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count, expectedCount);
     } catch (IOException ex) {
       fail("testDoubleBuffer failed with: " + ex);
     }
-    return count == expectedCount;
   }
 
   private static BucketLayout getFSOBucketLayout() {

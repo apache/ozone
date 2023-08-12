@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -49,6 +49,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
@@ -70,7 +71,6 @@ public class TestSCMContainerManagerMetrics {
     client = cluster.newClient();
     scm = cluster.getStorageContainerManager();
   }
-
 
   @AfterEach
   public void teardown() {
@@ -160,12 +160,13 @@ public class TestSCMContainerManagerMetrics {
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
 
-
-    GenericTestUtils.waitFor(() -> {
-      final MetricsRecordBuilder scmMetrics =
-          getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-      return getLongCounter("NumICRReportsProcessedSuccessful",
-          scmMetrics) == 1;
-    }, 1000, 500000);
+    await().atMost(Duration.ofSeconds(500))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> {
+          final MetricsRecordBuilder scmMetrics =
+              getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
+          return getLongCounter("NumICRReportsProcessedSuccessful",
+              scmMetrics) == 1;
+        });
   }
 }

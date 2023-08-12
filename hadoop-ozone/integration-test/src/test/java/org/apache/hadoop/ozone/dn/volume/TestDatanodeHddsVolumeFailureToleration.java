@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
@@ -43,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -57,6 +57,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
@@ -143,8 +146,10 @@ public class TestDatanodeHddsVolumeFailureToleration {
     cluster.restartHddsDatanode(0, false);
     // Give the datanode time to restart. This may be slow in a mini ozone
     // cluster.
-    GenericTestUtils.waitFor(() -> exitCapturer.getOutput()
-        .contains("Exiting with status 1: ExitException"), 500, 60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() -> assertThat(exitCapturer.getOutput(),
+            containsString("Exiting with status 1: ExitException")));
     Assert.assertTrue(dsmCapturer.getOutput()
         .contains("DatanodeStateMachine Shutdown due to too many bad volumes"));
 

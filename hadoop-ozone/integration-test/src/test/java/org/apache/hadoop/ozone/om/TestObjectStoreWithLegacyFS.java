@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,10 +53,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
@@ -135,15 +137,15 @@ public class TestObjectStoreWithLegacyFS {
     String dbKey = cluster.getOzoneManager().getMetadataManager()
         .getOzoneKey(volumeName, bucketName, seekKey);
 
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, keyName), 500,
-            60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> assertKeyCount(keyTable, dbKey, 1, keyName));
 
     ozoneBucket.renameKey(keyName, "dir1/NewKey-1");
 
-    GenericTestUtils
-        .waitFor(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"), 500,
-            60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> assertKeyCount(keyTable, dbKey, 1, "dir1/NewKey-1"));
   }
 
   private boolean assertKeyCount(

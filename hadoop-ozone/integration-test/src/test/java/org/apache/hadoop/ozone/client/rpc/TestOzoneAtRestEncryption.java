@@ -23,6 +23,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -78,6 +79,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -368,13 +370,11 @@ class TestOzoneAtRestEncryption {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return getMatchedKeyInfo(keyName, omMetadataManager) != null;
-      } catch (IOException e) {
-        return false;
-      }
-    }, 500, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(500))
+        .ignoreException(IOException.class)
+        .until(() -> getMatchedKeyInfo(keyName, omMetadataManager) != null);
+
     RepeatedOmKeyInfo deletedKeys =
         getMatchedKeyInfo(keyName, omMetadataManager);
     assertNotNull(deletedKeys);

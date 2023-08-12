@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -33,7 +34,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,6 +49,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test client-side CRUD snapshot operations with Ozone Manager.
@@ -299,9 +301,10 @@ public class TestOzoneFsSnapshot {
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
 
-    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
-        200, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() -> Assertions.assertEquals(SNAPSHOT_DELETED,
+                snapshotInfo.getSnapshotStatus()));
   }
 
   private static Stream<Arguments> deleteSnapshotFailureScenarios() {
@@ -400,8 +403,10 @@ public class TestOzoneFsSnapshot {
         .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
     String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
         OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
-        1000, 100000);
+
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> new File(snapshotDirName).exists());
 
     return snapshotName;
   }

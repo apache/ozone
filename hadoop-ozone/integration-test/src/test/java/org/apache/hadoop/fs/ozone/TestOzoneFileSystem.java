@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -98,6 +99,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -632,17 +634,11 @@ public class TestOzoneFileSystem {
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
 
-    // Wait until the filestatus is updated
+    // Wait until the file status is updated
     if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0);
     }
 
     FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
@@ -668,15 +664,9 @@ public class TestOzoneFileSystem {
     writeClient.commitKey(keyArgs, session.getId());
     // Wait until the filestatus is updated
     if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0);
     }
     FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
     // the number of immediate children of root is 1
@@ -1665,30 +1655,18 @@ public class TestOzoneFileSystem {
     Path trashPath = new Path(userTrashCurrent, testKeyName);
 
     // Wait until the TrashEmptier purges the key
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return !o3fs.exists(trashPath);
-      } catch (IOException e) {
-        LOG.error("Delete from Trash Failed");
-        Assert.fail("Delete from Trash Failed");
-        return false;
-      }
-    }, 1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> !o3fs.exists(trashPath));
 
     // userTrash path will contain the checkpoint folder
     FileStatus[] statusList = fs.listStatus(userTrash);
     Assert.assertNotEquals(Arrays.toString(statusList), 0, statusList.length);
 
     // wait for deletion of checkpoint dir
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return o3fs.listStatus(userTrash).length == 0;
-      } catch (IOException e) {
-        LOG.error("Delete from Trash Failed", e);
-        Assert.fail("Delete from Trash Failed");
-        return false;
-      }
-    }, 1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> o3fs.listStatus(userTrash).length == 0);
   }
 
   @Test

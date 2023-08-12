@@ -32,13 +32,13 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +49,7 @@ import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test OM's {@link KeyDeletingService}.
@@ -132,23 +133,17 @@ public class TestKeyPurging {
     // Verify that KeyDeletingService picks up deleted keys and purges them
     // from DB.
     KeyManager keyManager = om.getKeyManager();
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) keyManager.getDeletingService();
+    KeyDeletingService keyDeletingService = keyManager.getDeletingService();
 
-    GenericTestUtils.waitFor(
-        () -> keyDeletingService.getDeletedKeyCount().get() >= NUM_KEYS,
-        1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> Assert.assertTrue(
+            keyDeletingService.getRunCount().get() >= NUM_KEYS));
 
-    Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
-
-    GenericTestUtils.waitFor(
-        () -> {
-          try {
-            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
-                .getKeyBlocksList().size() == 0;
-          } catch (IOException e) {
-            return false;
-          }
-        }, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+            .getKeyBlocksList().size() == 0);
   }
 }

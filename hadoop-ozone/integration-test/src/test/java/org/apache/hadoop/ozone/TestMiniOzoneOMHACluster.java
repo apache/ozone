@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -30,12 +29,13 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.awaitility.Awaitility.await;
 
 /**
  * This class tests MiniOzoneHAClusterImpl.
@@ -89,14 +89,17 @@ public class TestMiniOzoneOMHACluster {
   }
 
   @Test
-  public void testGetOMLeader() throws InterruptedException, TimeoutException {
+  public void testGetOMLeader() {
     AtomicReference<OzoneManager> ozoneManager = new AtomicReference<>();
     // Wait for OM leader election to finish
-    GenericTestUtils.waitFor(() -> {
-      OzoneManager om = cluster.getOMLeader();
-      ozoneManager.set(om);
-      return om != null;
-    }, 100, 120000);
+
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> {
+          OzoneManager om = cluster.getOMLeader();
+          ozoneManager.set(om);
+          return om != null;
+        });
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",

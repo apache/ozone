@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -42,7 +44,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
@@ -61,10 +62,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -504,10 +505,9 @@ public class TestDecommissionAndMaintenance {
   @Test
   // For a node which is online the maintenance should end automatically when
   // maintenance expires and the node should go back into service.
-  // If the node is dead when maintenance expires, its replicas will be purge
+  // If the node is dead when maintenance expires, its replicas will be purged
   // and new replicas created.
-  public void testMaintenanceEndsAutomaticallyAtTimeout()
-      throws Exception {
+  public void testMaintenanceEndsAutomaticallyAtTimeout() throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
     ContainerInfo container = waitForAndReturnContainer(ratisRepConfig, 3);
@@ -537,19 +537,20 @@ public class TestDecommissionAndMaintenance {
     waitForDnToReachOpState(dn, IN_SERVICE);
     // Ensure there are 3 replicas not including the dead node, indicating a new
     // replica was created
-    GenericTestUtils.waitFor(() -> getContainerReplicas(container)
-            .stream()
-            .filter(r -> !r.getDatanodeDetails().equals(dn))
-            .count() == 3,
-        200, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() -> assertEquals(3,
+            getContainerReplicas(container)
+                .stream()
+                .filter(r -> !r.getDatanodeDetails().equals(dn))
+                .count()));
   }
 
   @Test
   // If is SCM is Restarted when a maintenance node is dead, then we lose all
   // the replicas associated with it, as the dead node cannot report them back
   // in. If that happens, SCM has no choice except to replicate the containers.
-  public void testSCMHandlesRestartForMaintenanceNode()
-      throws Exception {
+  public void testSCMHandlesRestartForMaintenanceNode() throws Exception {
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ratisRepConfig);
     ContainerInfo container = waitForAndReturnContainer(ratisRepConfig, 3);
@@ -575,8 +576,14 @@ public class TestDecommissionAndMaintenance {
 
     // The node should be added back to the decommission monitor to ensure
     // maintenance end time is correctly tracked.
-    GenericTestUtils.waitFor(() -> scm.getScmDecommissionManager().getMonitor()
-        .getTrackedNodes().size() == 1, 200, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() -> assertEquals(1,
+            scm.getScmDecommissionManager()
+                .getMonitor()
+                .getTrackedNodes()
+                .size()
+        ));
 
     // Now let the node go dead and repeat the test. This time ensure a new
     // replica is created.
@@ -586,9 +593,10 @@ public class TestDecommissionAndMaintenance {
     cluster.restartStorageContainerManager(false);
     setManagers();
 
-    GenericTestUtils.waitFor(
-        () -> nm.getNodeCount(IN_SERVICE, null) == DATANODE_COUNT - 1,
-        200, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() -> assertEquals(DATANODE_COUNT - 1,
+            nm.getNodeCount(IN_SERVICE, null)));
 
     // Ensure there are 3 replicas not including the dead node, indicating a new
     // replica was created
@@ -618,10 +626,11 @@ public class TestDecommissionAndMaintenance {
    * @param keyCount The number of keys to create
    * @param keyPrefix The prefix to use for the key name.
    * @param replicationConfig The replication config for the keys
-   * @throws IOException
    */
-  private void generateData(int keyCount, String keyPrefix,
-      ReplicationConfig replicationConfig) throws IOException {
+  private void generateData(int keyCount,
+                            String keyPrefix,
+                            ReplicationConfig replicationConfig)
+      throws IOException {
     for (int i = 0; i < keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, replicationConfig,
           "this is the content");
@@ -679,55 +688,48 @@ public class TestDecommissionAndMaintenance {
    * Wait for the given datanode to reach the given operational state.
    * @param dn Datanode for which to check the state
    * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   private void waitForDnToReachOpState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> getNodeStatus(dn).getOperationalState().equals(state),
-        200, 30000);
+                                       NodeOperationalState state) {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() ->
+            assertEquals(state, getNodeStatus(dn).getOperationalState()));
   }
 
   /**
    * Wait for the given datanode to reach the given Health state.
    * @param dn Datanode for which to check the state
    * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   private void waitForDnToReachHealthState(DatanodeDetails dn,
-      HddsProtos.NodeState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> getNodeStatus(dn).getHealth().equals(state),
-        200, 30000);
+                                           NodeState state) {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() ->
+                assertEquals(state, getNodeStatus(dn).getHealth()));
   }
 
   /**
    * Wait for the given datanode to reach the given persisted state.
    * @param dn Datanode for which to check the state
    * @param state The state to wait for.
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   private void waitForDnToReachPersistedOpState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState state)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> dn.getPersistedOpState().equals(state),
-        200, 30000);
+                                                NodeOperationalState state) {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() ->
+            assertEquals(state, dn.getPersistedOpState()));
   }
 
   /**
    * Get any container present in the cluster and wait to ensure 3 replicas
    * have been reported before returning the container.
    * @return A single container present on the cluster
-   * @throws Exception
    */
   private ContainerInfo waitForAndReturnContainer(ReplicationConfig repConfig,
-      int expectedReplicas) throws Exception {
+                                                  int expectedReplicas) {
     List<ContainerInfo> containers = cm.getContainers();
     ContainerInfo container = null;
     for (ContainerInfo c : containers) {
@@ -742,22 +744,20 @@ public class TestDecommissionAndMaintenance {
   }
 
   /**
-   * Wait for the ReplicationManager thread to start, and when it does, stop
-   * it.
-   * @throws Exception
+   * Wait for the ReplicationManager thread to start, and when it does, stop it.
    */
-  private void stopReplicationManager() throws Exception {
-    GenericTestUtils.waitFor(
-        () -> scm.getReplicationManager().isRunning(),
-        200, 30000);
+  private void stopReplicationManager() {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .until(() -> scm.getReplicationManager().isRunning());
     scm.getReplicationManager().stop();
   }
 
-  private void waitForContainerReplicas(ContainerInfo container, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(
-        () -> getContainerReplicas(container).size() == count,
-        200, 30000);
+  private void waitForContainerReplicas(ContainerInfo container, int count) {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .untilAsserted(() ->
+            assertEquals(count, getContainerReplicas(container).size()));
   }
 
 }

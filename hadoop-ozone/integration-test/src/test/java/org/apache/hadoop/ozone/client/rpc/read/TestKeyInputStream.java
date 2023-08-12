@@ -24,17 +24,13 @@ import java.util.Arrays;
 
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
@@ -46,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
@@ -56,7 +51,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
-import static org.junit.Assert.fail;
 
 /**
  * Tests {@link KeyInputStream}.
@@ -449,27 +443,6 @@ public class TestKeyInputStream extends TestInputStreamBase {
       // check that we can still read it
       assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
-  }
-
-  private void waitForNodeToBecomeDead(
-      DatanodeDetails datanode) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() ->
-        HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
-        100, 30000);
-    LOG.info("Node {} is {}", datanode.getUuidString(),
-        getNodeHealth(datanode));
-  }
-
-  private HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
-    HddsProtos.NodeState health = null;
-    try {
-      NodeManager nodeManager =
-          getCluster().getStorageContainerManager().getScmNodeManager();
-      health = nodeManager.getNodeStatus(dn).getHealth();
-    } catch (NodeNotFoundException e) {
-      fail("Unexpected NodeNotFound exception");
-    }
-    return health;
   }
 
   private void assertReadFully(byte[] data, InputStream in,

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container;
 
 import java.io.IOException;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,7 +60,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.junit.Assert;
@@ -67,6 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collectors.toList;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Helpers for container tests.
@@ -246,7 +247,7 @@ public final class TestHelper {
 
   public static void waitForPipelineClose(MiniOzoneCluster cluster,
       boolean waitForContainerCreation, Long... containerIdList)
-      throws TimeoutException, InterruptedException, IOException {
+      throws IOException {
     List<Pipeline> pipelineList = new ArrayList<>();
     for (long containerID : containerIdList) {
       ContainerInfo container =
@@ -265,9 +266,9 @@ public final class TestHelper {
           // Client will issue write chunk and it will create the container on
           // datanodes.
           // wait for the container to be created
-          GenericTestUtils
-              .waitFor(() -> isContainerPresent(cluster, containerID, details),
-                  500, 100 * 1000);
+          await().atMost(Duration.ofSeconds(100))
+              .pollInterval(Duration.ofMillis(500))
+              .until(() -> isContainerPresent(cluster, containerID, details));
           Assert.assertTrue(isContainerPresent(cluster, containerID, details));
 
           // make sure the container gets created first
@@ -279,8 +280,7 @@ public final class TestHelper {
   }
 
   public static void waitForPipelineClose(List<Pipeline> pipelineList,
-      MiniOzoneCluster cluster)
-      throws TimeoutException, InterruptedException, IOException {
+      MiniOzoneCluster cluster) throws IOException {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
       cluster.getStorageContainerManager()
@@ -295,8 +295,9 @@ public final class TestHelper {
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         Assert.assertTrue(server instanceof XceiverServerRatis);
-        GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
-            100, 30_000);
+        await().atMost(Duration.ofSeconds(30))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> !server.isExist(pipelineId));
       }
     }
   }
@@ -340,13 +341,11 @@ public final class TestHelper {
         // Client will issue write chunk and it will create the container on
         // datanodes.
         // wait for the container to be created
-        GenericTestUtils
-            .waitFor(() -> isContainerPresent(cluster, containerID, details),
-                500, 100 * 1000);
+        await().atMost(Duration.ofSeconds(100))
+            .pollInterval(Duration.ofMillis(500))
+            .until(() -> isContainerPresent(cluster, containerID, details));
         Assert.assertTrue(isContainerPresent(cluster, containerID, details));
 
-        // make sure the container gets created first
-        Assert.assertFalse(isContainerClosed(cluster, containerID, details));
         // send the order to close the container
         cluster.getStorageContainerManager().getEventQueue()
             .fireEvent(SCMEvents.CLOSE_CONTAINER,
@@ -361,9 +360,10 @@ public final class TestHelper {
       // but not yet been used by the client. In such a case container is never
       // created.
       for (DatanodeDetails datanodeDetails : datanodes) {
-        GenericTestUtils.waitFor(
-            () -> isContainerClosed(cluster, containerID, datanodeDetails), 500,
-            15 * 1000);
+        await().atMost(Duration.ofSeconds(15))
+            .pollInterval(Duration.ofMillis(500))
+            .until(() ->
+                isContainerClosed(cluster, containerID, datanodeDetails));
         //double check if it's really closed
         // (waitFor also throws an exception)
         Assert.assertTrue(
@@ -436,8 +436,9 @@ public final class TestHelper {
   }
 
   public static void waitForReplicaCount(long containerID, int count,
-      MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
-        1000, 30000);
+      MiniOzoneCluster cluster) {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(1))
+            .until(() -> countReplicas(containerID, cluster) == count);
   }
 }

@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,6 +34,8 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test Node failure detection and handling in Ratis.
@@ -95,14 +96,16 @@ public class TestNodeFailure {
       try {
         waitForPipelineCreation(pipeline.getId());
         cluster.shutdownHddsDatanode(pipeline.getFirstNode());
-        GenericTestUtils.waitFor(() -> {
-          try {
-            return pipelineManager.getPipeline(pipeline.getId())
-                .getPipelineState().equals(Pipeline.PipelineState.CLOSED);
-          } catch (PipelineNotFoundException ex) {
-            return true;
-          }
-        }, timeForFailure / 2, timeForFailure * 3);
+        await().atMost(Duration.ofMillis(timeForFailure * 3L))
+            .pollInterval(Duration.ofMillis(timeForFailure / 2L))
+            .until(() -> {
+              try {
+                return pipelineManager.getPipeline(pipeline.getId())
+                    .getPipelineState() == Pipeline.PipelineState.CLOSED;
+              } catch (PipelineNotFoundException ex) {
+                return true;
+              }
+            });
       } catch (Exception e) {
         Assertions.fail("Test Failed: " + e.getMessage());
       }
@@ -113,15 +116,11 @@ public class TestNodeFailure {
    * Waits until the Pipeline is marked as OPEN.
    * @param pipelineID Id of the pipeline
    */
-  private void waitForPipelineCreation(final PipelineID pipelineID)
-      throws Exception {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return pipelineManager.getPipeline(pipelineID)
-            .getPipelineState().equals(Pipeline.PipelineState.OPEN);
-      } catch (PipelineNotFoundException ex) {
-        return false;
-      }
-    }, 1000, 1000 * 60);
+  private void waitForPipelineCreation(final PipelineID pipelineID) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(PipelineNotFoundException.class)
+        .until(() -> pipelineManager.getPipeline(pipelineID)
+            .getPipelineState() == Pipeline.PipelineState.OPEN);
   }
 }

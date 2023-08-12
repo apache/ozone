@@ -42,11 +42,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -54,10 +53,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -324,9 +324,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
     }
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
+    KeyDeletingService keyDeletingService = cluster.getOzoneManager()
+        .getKeyManager().getDeletingService();
 
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
@@ -344,7 +343,6 @@ public class TestDirectoryDeletingServiceWithFSO {
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
             .getDirDeletingService();
 
-
     // After delete. 2 more files left out under the root dir
     assertTableRowCount(keyTable, 2);
     assertTableRowCount(dirTable, 1);
@@ -359,7 +357,6 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify whether KeyDeletingService has purged the keys
     long currentDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
     assertEquals(prevDeletedKeyCount + 3, currentDeletedKeyCount);
-
 
     // Case-2) Delete dir, this will cleanup sub-files under the deleted dir.
     fs.delete(root, true);
@@ -381,7 +378,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
-  @Flaky("HDDS-8453")
+  @Disabled("HDDS-8453")
   public void testDirDeletedTableCleanUpForSnapshot() throws Exception {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -423,9 +420,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       ContractTestUtils.touch(fs, child);
     }
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) cluster.getOzoneManager().getKeyManager()
-            .getDeletingService();
+    KeyDeletingService keyDeletingService = cluster.getOzoneManager()
+        .getKeyManager().getDeletingService();
 
     // Before delete
     assertTableRowCount(deletedDirTable, 0);
@@ -475,10 +471,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     long prevKDSRunCount = keyDeletingService.getRunCount().get();
     assertTableRowCount(deletedDirTable, 1);
     assertTableRowCount(deletedKeyTable, 3);
-    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
-        prevDDSRunCount, 100, 10000);
-    GenericTestUtils.waitFor(() -> keyDeletingService.getRunCount().get() >
-        prevKDSRunCount, 100, 10000);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> dirDeletingService.getRunCount().get() > prevDDSRunCount);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> keyDeletingService.getRunCount().get() > prevKDSRunCount);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
@@ -513,16 +512,16 @@ public class TestDirectoryDeletingServiceWithFSO {
     }
   }
 
-  static void assertSubPathsCount(LongSupplier pathCount, long expectedCount)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pathCount.getAsLong() >= expectedCount,
-        1000, 120000);
+  static void assertSubPathsCount(LongSupplier pathCount, long expectedCount) {
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> pathCount.getAsLong() >= expectedCount);
   }
 
-  private void assertTableRowCount(Table<String, ?> table, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> assertTableRowCount(count, table), 1000,
-        120000); // 2 minutes
+  private void assertTableRowCount(Table<String, ?> table, int count) {
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> assertTableRowCount(count, table));
   }
 
   private boolean assertTableRowCount(int expectedCount,

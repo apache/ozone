@@ -32,8 +32,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Integration tests for the background container data scanner. This scanner
@@ -88,10 +92,10 @@ public class TestBackgroundContainerDataScannerIntegration
 
     corruption.applyTo(getDnContainer(containerID));
     // Wait for the scanner to detect corruption.
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(containerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        500, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() ->
+            getDnContainer(containerID).getContainerState() == UNHEALTHY);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);

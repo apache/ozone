@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -58,6 +59,7 @@ import org.slf4j.event.Level;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test for OM bootstrap process.
@@ -134,9 +136,11 @@ public class TestAddRemoveOzoneManager {
     }
 
     OzoneManager newOM = cluster.getOzoneManager(nodeId);
-    GenericTestUtils.waitFor(() ->
-        newOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= lastTransactionIndex, 100, 100000);
+
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> newOM.getOmRatisServer().getLastAppliedTermIndex()
+            .getIndex() >= lastTransactionIndex);
 
     // Check Ratis Dir for log files
     File[] logFiles = getRatisLogFiles(newOM);
@@ -191,7 +195,10 @@ public class TestAddRemoveOzoneManager {
         .toLong(TimeUnit.MILLISECONDS) * 3);
 
     // Verify that one of the new OMs is the leader
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
+
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> cluster.getOMLeader() != null);
     OzoneManager omLeader = cluster.getOMLeader();
 
     Assert.assertTrue("New Bootstrapped OM not elected Leader even though " +
@@ -409,16 +416,20 @@ public class TestAddRemoveOzoneManager {
     omAdminProtocolClient.decommission(decommNodeDetails);
 
     // Verify decomm node is removed from the HA ring
-    GenericTestUtils.waitFor(() -> {
-      for (OzoneManager om : activeOMs) {
-        if (om.getPeerNodes().contains(decommNodeId)) {
-          return false;
-        }
-      }
-      return true;
-    }, 100, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> {
+          for (OzoneManager om : activeOMs) {
+            if (om.getPeerNodes().contains(decommNodeId)) {
+              return false;
+            }
+          }
+          return true;
+        });
 
     // Wait for new leader election if required
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> cluster.getOMLeader() != null);
   }
 }

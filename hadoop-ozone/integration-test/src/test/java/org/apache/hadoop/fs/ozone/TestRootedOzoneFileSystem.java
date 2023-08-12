@@ -89,6 +89,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -128,6 +129,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -359,16 +361,15 @@ public class TestRootedOzoneFileSystem {
       String path = "/" + dirs.subList(0, size).stream()
               .collect(Collectors.joining("/"));
       Path parent = new Path(path);
-      // Wait until the filestatus is updated
+      // Wait until the file status is updated
       if (!enabledFileSystemPaths) {
-        GenericTestUtils.waitFor(() -> {
-          try {
-            fs.getFileStatus(parent);
-            return true;
-          } catch (IOException e) {
-            return false;
-          }
-        }, 1000, 120000);
+        await().atMost(Duration.ofSeconds(120))
+            .pollInterval(Duration.ofSeconds(1))
+            .ignoreException(IOException.class)
+            .until(() -> {
+              fs.getFileStatus(parent);
+              return true;
+            });
       }
       FileStatus fileStatus = fs.getFileStatus(parent);
       Assert.assertEquals((size == dirs.size() - 1 &&
@@ -1989,17 +1990,11 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(ofs.exists(trashPath)
         || ofs.listStatus(ofs.listStatus(userTrash)[0].getPath()).length > 0);
 
-
     // Wait until the TrashEmptier purges the keys
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return !ofs.exists(trashPath) && !ofs.exists(trashPath2);
-      } catch (IOException e) {
-        LOG.error("Delete from Trash Failed", e);
-        Assert.fail("Delete from Trash Failed");
-        return false;
-      }
-    }, 1000, 180000);
+    await().atMost(Duration.ofMinutes(3))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> !ofs.exists(trashPath) && !ofs.exists(trashPath2));
 
     if (isBucketFSOptimized) {
       Assert.assertTrue(getOMMetrics()
@@ -2014,42 +2009,31 @@ public class TestRootedOzoneFileSystem {
     }
 
     // wait for deletion of checkpoint dir
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return ofs.listStatus(userTrash).length == 0 &&
-            ofs.listStatus(userTrash2).length == 0;
-      } catch (IOException e) {
-        LOG.error("Delete from Trash Failed", e);
-        Assert.fail("Delete from Trash Failed");
-        return false;
-      }
-    }, 1000, 120000);
+    await().atMost(Duration.ofMinutes(2))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> ofs.listStatus(userTrash).length == 0 &&
+            ofs.listStatus(userTrash2).length == 0);
 
     // This condition should succeed once the checkpoint directory is deleted
     if (isBucketFSOptimized) {
-      GenericTestUtils.waitFor(
-          () -> getOMMetrics().getNumTrashAtomicDirDeletes() >
-              prevNumTrashAtomicDirDeletes, 100, 180000);
+      await().atMost(Duration.ofMinutes(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> getOMMetrics().getNumTrashAtomicDirDeletes() >
+              prevNumTrashAtomicDirDeletes);
     } else {
-      GenericTestUtils.waitFor(
-          () -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
+      await().atMost(Duration.ofMinutes(3))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> getOMMetrics().getNumTrashDeletes() > prevNumTrashDeletes
               && getOMMetrics().getNumTrashFilesDeletes()
-              >= prevNumTrashFileDeletes, 100, 180000);
+              >= prevNumTrashFileDeletes);
     }
-    // Cleanup
     ofs.delete(trashRoot, true);
     ofs.delete(trashRoot2, true);
-
-  }
-
-  private Path getTrashKeyPath(Path keyPath, Path userTrash) {
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    String key = keyPath.toString().substring(1);
-    return new Path(userTrashCurrent, key);
   }
 
   @Test
-  public void testCreateWithInvalidPaths() throws Exception {
+  public void testCreateWithInvalidPaths() {
     // Test for path with ..
     Path parent = new Path("../../../../../d1/d2/");
     Path file1 = new Path(parent, "key1");
@@ -2554,5 +2538,4 @@ public class TestRootedOzoneFileSystem {
     // verify that mtime is NOT updated as expected.
     Assert.assertEquals(mtime, fileStatus.getModificationTime());
   }
-
 }

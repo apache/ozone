@@ -19,19 +19,22 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.concurrent.TimeoutException;
+import java.time.Duration;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test RocksDB logging for Ozone Manager.
@@ -69,13 +72,8 @@ public class TestOzoneManagerRocksDBLogging {
 
   @Test
   public void testOMRocksDBLoggingEnabled() throws Exception {
-    try {
-      waitForRocksDbLog();
-      Assert.fail("Unexpected RocksDB log: " + logCapturer.getOutput());
-    } catch (TimeoutException ex) {
-      Assert.assertTrue(ex.getMessage().contains("Timed out"));
-    }
-
+    Assert.assertThrows(ConditionTimeoutException.class,
+        TestOzoneManagerRocksDBLogging::waitForRocksDbLog);
     enableRocksDbLogging(true);
     cluster.restartOzoneManager();
 
@@ -87,11 +85,9 @@ public class TestOzoneManagerRocksDBLogging {
     conf.setFromObject(dbConf);
   }
 
-  private static void waitForRocksDbLog()
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-            .contains("db_impl.cc"),
-        1000, 30000);
+  private static void waitForRocksDbLog() {
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> logCapturer.getOutput().contains("db_impl.cc"));
   }
-
 }

@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.After;
 import org.junit.Assert;
@@ -55,6 +54,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Real unit test for OzoneECClient.
@@ -1028,10 +1029,8 @@ public class TestOzoneECClient {
         failedDNs.add(DatanodeDetails
             .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
       }
-
       // First let's set storage as bad
       ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
-
     }
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
@@ -1221,12 +1220,15 @@ public class TestOzoneECClient {
     return locationInfoList;
   }
 
-  private static void waitForFlushingThreadToFinish(
-      ECKeyOutputStream ecOut) throws Exception {
+  private static void waitForFlushingThreadToFinish(ECKeyOutputStream ecOut)
+      throws Exception {
     final long checkpoint = System.currentTimeMillis();
     ecOut.insertFlushCheckpoint(checkpoint);
-    GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
-        100, 10000);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() ->
+            Assert.assertEquals(checkpoint, ecOut.getFlushCheckpoint()));
   }
 
   private static OzoneConfiguration createConfiguration() {

@@ -70,6 +70,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -285,22 +287,20 @@ public class TestDeleteWithSlowFollower {
     long numPendingDeletionBlocks = containerData.getNumPendingDeletionBlocks();
     BlockData blockData =
         keyValueHandler.getBlockManager().getBlock(container, blockID);
-    //cluster.getOzoneManager().deleteKey(keyArgs);
     client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
             deleteKey("ratis");
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .asSCMHADBTransactionBuffer().flush();
-        }
-        return
-            dnStateMachine.getCommandDispatcher()
-                .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
-      } catch (IOException e) {
-        return false;
-      }
-    }, 500, 100000);
+
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(500))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+            cluster.getStorageContainerManager().getScmHAManager()
+                .asSCMHADBTransactionBuffer().flush();
+          }
+          return dnStateMachine.getCommandDispatcher()
+              .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
+        });
     Assert.assertTrue(containerData.getDeleteTransactionId() > delTrxId);
     Assert.assertTrue(
         containerData.getNumPendingDeletionBlocks() > numPendingDeletionBlocks);

@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
@@ -35,14 +34,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests for RatisPipelineUtils.
@@ -134,10 +134,11 @@ public class TestRatisPipelineCreateAndDestroy {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     }
 
-    GenericTestUtils.waitFor(() ->
-                    cluster.getStorageContainerManager().getScmNodeManager()
-                            .getNodeCount(NodeStatus.inServiceHealthy()) == 0,
-                    100, 10 * 1000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> Assert.assertEquals(0,
+            cluster.getStorageContainerManager().getScmNodeManager()
+            .getNodeCount(NodeStatus.inServiceHealthy())));
 
     // try creating another pipeline now
     try {
@@ -174,11 +175,12 @@ public class TestRatisPipelineCreateAndDestroy {
     }
   }
 
-  private void waitForPipelines(int numPipelines)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
-        .size() >= numPipelines, 100, 60000);
+  private void waitForPipelines(int numPipelines) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> pipelineManager
+            .getPipelines(RatisReplicationConfig.getInstance(
+                ReplicationFactor.THREE), Pipeline.PipelineState.OPEN)
+            .size() >= numPipelines);
   }
 }

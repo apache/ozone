@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.ozone.test.GenericTestUtils;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -36,14 +36,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.time.Duration;
 import java.util.HashMap;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test the behaviour of the datanode and scm when communicating
@@ -111,12 +112,11 @@ public class TestRefreshVolumeUsageHandler {
           .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
       try {
-        GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
-            datanodeDetails, currentScmUsed), 500, 5 * 1000);
-      } catch (TimeoutException te) {
-        //no op
-      } catch (InterruptedException ie) {
-        //no op
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(500))
+            .until(() ->
+                isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed));
+      } catch (ConditionTimeoutException ignored) {
       }
 
       //after waiting for several node report , this usage info
@@ -130,8 +130,10 @@ public class TestRefreshVolumeUsageHandler {
           .getScmNodeManager().refreshAllHealthyDnUsageInfo();
 
       //waiting for the new usage info is refreshed
-      GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
-          datanodeDetails, currentScmUsed), 500, 5 * 1000);
+      await().atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() ->
+              isUsageInfoRefreshed(cluster, datanodeDetails, currentScmUsed));
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -53,18 +54,14 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteBucketResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -179,9 +176,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 5;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() ->
-        doubleBuffer.getFlushedTransactionCount() ==
-            (bucketCount + deleteCount + 1), 100, 120000);
+    await().atMost(Duration.ofMinutes(2))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> doubleBuffer.getFlushedTransactionCount() ==
+            (bucketCount + deleteCount + 1));
 
     Assert.assertEquals(1, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -197,10 +195,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     checkDeletedBuckets(deleteBucketQueue);
 
-    // Check lastAppliedIndex is updated correctly or not.
-    GenericTestUtils.waitFor(() ->
-        bucketCount + deleteCount + 1 == lastAppliedIndex,
-        100, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> bucketCount + deleteCount + 1 == lastAppliedIndex);
 
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
@@ -253,8 +250,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 10;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() -> doubleBuffer.getFlushedTransactionCount()
-            == (bucketCount + deleteCount + 2), 100, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> doubleBuffer.getFlushedTransactionCount() ==
+            (bucketCount + deleteCount + 2));
 
     Assert.assertEquals(2, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -405,18 +404,22 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     int expectedBuckets = bucketsPerVolume * volumeCount;
     long expectedTransactions = volumeCount + expectedBuckets;
 
-    GenericTestUtils.waitFor(() ->
-        expectedTransactions == doubleBuffer.getFlushedTransactionCount(),
-        100, volumeCount * 500);
+    await().atMost(Duration.ofMillis(volumeCount * 500L))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            expectedTransactions == doubleBuffer.getFlushedTransactionCount());
 
-    GenericTestUtils.waitFor(() ->
-        assertRowCount(volumeCount, omMetadataManager.getVolumeTable()),
-        300, volumeCount * 300);
+    await().atMost(Duration.ofMillis(volumeCount * 300L))
+        .pollInterval(Duration.ofMillis(250))
+        .until(() ->
+        assertRowCount(volumeCount, omMetadataManager.getVolumeTable()));
 
 
-    GenericTestUtils.waitFor(() ->
-        assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
-        300, volumeCount * 300);
+    await().atMost(Duration.ofMillis(volumeCount * 500L))
+        .pollInterval(Duration.ofMillis(300))
+        .until(() ->
+            assertRowCount(expectedBuckets,
+                omMetadataManager.getBucketTable()));
 
     Assert.assertTrue(doubleBuffer.getFlushIterations() > 0);
   }
@@ -484,20 +487,5 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
             ozoneManagerDoubleBufferHelper);
 
   }
-
-  /**
-   * Create OMBucketDeleteResponse for specified volume and bucket.
-   * @return OMBucketDeleteResponse
-   */
-  private OMBucketDeleteResponse deleteBucket(String volumeName,
-      String bucketName) {
-    return new OMBucketDeleteResponse(OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
-        .build(), volumeName, bucketName);
-  }
-
-
 }
 

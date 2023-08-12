@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -129,6 +130,7 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -144,6 +146,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1954,16 +1957,11 @@ public abstract class TestOzoneRpcClientAbstract {
     }
 
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ContainerInfo containerInfo = scm.getContainerInfo(containerID);
-        System.out.println("state " + containerInfo.getState());
-        return containerInfo.getState() == HddsProtos.LifeCycleState.CLOSING;
-      } catch (IOException e) {
-        fail("Failed to get container info for " + e.getMessage());
-        return false;
-      }
-    }, 1000, 10000);
+
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> scm.getContainerInfo(containerID).getState() == CLOSING);
 
     // Try reading keyName2
     try {

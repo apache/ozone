@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.awaitility.Awaitility.await;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -44,7 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -106,11 +107,13 @@ public class TestReconWithOzoneManagerHA {
   public void testReconGetsSnapshotFromLeader() throws Exception {
     AtomicReference<OzoneManager> ozoneManager = new AtomicReference<>();
     // Wait for OM leader election to finish
-    GenericTestUtils.waitFor(() -> {
-      OzoneManager om = cluster.getOMLeader();
-      ozoneManager.set(om);
-      return om != null;
-    }, 100, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> {
+          OzoneManager om = cluster.getOMLeader();
+          ozoneManager.set(om);
+          return om != null;
+        });
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
         + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",

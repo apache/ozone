@@ -59,6 +59,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
@@ -89,7 +90,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.assertExceptionContains;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -181,11 +182,11 @@ public final class TestBlockTokens {
     readDataWithoutRetry(keyInfo);
 
     // after the rotation passes, the old token is still usable.
-    waitFor(
-        () -> !Objects.equals(getScmSecretKeyManager().getCurrentSecretKey(),
-            currentScmKey),
-        ROTATION_CHECK_DURATION_IN_MS,
-        ROTATE_DURATION_IN_MS + ROTATION_CHECK_DURATION_IN_MS);
+    await().atMost(Duration.ofMillis(ROTATE_DURATION_IN_MS *
+            ROTATION_CHECK_DURATION_IN_MS))
+        .pollInterval(Duration.ofMillis(ROTATE_DURATION_IN_MS))
+        .until(() -> !Objects.equals(getScmSecretKeyManager()
+            .getCurrentSecretKey(), currentScmKey));
     readDataWithoutRetry(keyInfo);
   }
 
@@ -198,9 +199,10 @@ public final class TestBlockTokens {
     // wait until the secret key expires.
     ManagedSecretKey secretKey =
         requireNonNull(getScmSecretKeyManager().getSecretKey(secretKeyId));
-    waitFor(secretKey::isExpired, ROTATION_CHECK_DURATION_IN_MS,
-        EXPIRY_DURATION_IN_MS);
-    assertTrue(secretKey.isExpired());
+
+    await().atMost(Duration.ofMillis(EXPIRY_DURATION_IN_MS))
+        .pollInterval(Duration.ofMillis(ROTATION_CHECK_DURATION_IN_MS))
+        .untilAsserted(() -> assertTrue(secretKey.isExpired()));
     // verify that the read is denied because of the expired secret key.
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> readDataWithoutRetry(keyInfo));
@@ -218,9 +220,9 @@ public final class TestBlockTokens {
     // wait until the secret key expires.
     ManagedSecretKey secretKey =
         requireNonNull(getScmSecretKeyManager().getSecretKey(secretKeyId));
-    waitFor(secretKey::isExpired, ROTATION_CHECK_DURATION_IN_MS,
-        EXPIRY_DURATION_IN_MS);
-    assertTrue(secretKey.isExpired());
+    await().atMost(Duration.ofMillis(EXPIRY_DURATION_IN_MS))
+        .pollInterval(Duration.ofMillis(ROTATION_CHECK_DURATION_IN_MS))
+        .untilAsserted(() -> assertTrue(secretKey.isExpired()));
     // verify that the read is denied because of the expired secret key.
     readData(keyInfo, k -> {
       try {

@@ -72,6 +72,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -94,6 +95,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -248,10 +252,11 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+                >= leaderOMSnapshotIndex - 1);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -285,9 +290,9 @@ public class TestOMRatisSnapshots {
     }
 
     // Verify RPC server is running
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.isOmRpcServerRunning();
-    }, 100, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(50))
+        .until(followerOM::isOmRpcServerRunning);
 
     assertLogCapture(logCapture,
         "Install Checkpoint is finished");
@@ -409,9 +414,10 @@ public class TestOMRatisSnapshots {
     cluster.startInactiveOM(followerNodeId);
 
     // Wait the follower download the snapshot,but get stuck by injector
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmSnapshotProvider().getNumDownloaded() == 1;
-    }, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            followerOM.getOmSnapshotProvider().getNumDownloaded() == 1);
 
     // Get two incremental tarballs, adding new keys/snapshot for each.
     IncrementData firstIncrement = getNextIncrementalTarball(160, 2, leaderOM,
@@ -433,10 +439,11 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 30s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 1000, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+                >= leaderOMSnapshotIndex - 1);
 
     assertEquals(3, followerOM.getOmSnapshotProvider().getNumDownloaded());
     // Verify that the follower OM's DB contains the transactions which were
@@ -469,22 +476,18 @@ public class TestOMRatisSnapshots {
     assertEquals(2, dbMetrics.getNumIncrementalCheckpoints());
 
     // Verify RPC server is running
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.isOmRpcServerRunning();
-    }, 100, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(followerOM::isOmRpcServerRunning);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
             .get(followerOMMetaMngr.getOzoneKey(
-                volumeName, bucketName, newKeys.get(0))) != null;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 100, 10000);
+                volumeName, bucketName, newKeys.get(0))) != null);
 
     // Verify follower candidate directory get cleaned
     String[] filesInCandidate = followerOM.getOmSnapshotProvider().
@@ -541,9 +544,10 @@ public class TestOMRatisSnapshots {
 
     // Wait the follower download the incremental snapshot, but get stuck
     // by injector
-    GenericTestUtils.waitFor(() ->
-        followerOM.getOmSnapshotProvider().getNumDownloaded() ==
-        expectedNumDownloads, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> assertEquals(expectedNumDownloads,
+            followerOM.getOmSnapshotProvider().getNumDownloaded()));
 
     assertTrue(followerOM.getOmRatisServer().
         getLastAppliedTermIndex().getIndex()
@@ -617,9 +621,10 @@ public class TestOMRatisSnapshots {
     cluster.startInactiveOM(followerNodeId);
 
     // Wait the follower download the snapshot,but get stuck by injector
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmSnapshotProvider().getNumDownloaded() == 1;
-    }, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertEquals(1,
+            followerOM.getOmSnapshotProvider().getNumDownloaded()));
 
     // Do some transactions, let leader OM take a new snapshot and purge the
     // old logs, so that follower must download the new snapshot again.
@@ -634,9 +639,10 @@ public class TestOMRatisSnapshots {
 
     // Wait the follower download the incremental snapshot, but get stuck
     // by injector
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmSnapshotProvider().getNumDownloaded() == 2;
-    }, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> assertEquals(2,
+            followerOM.getOmSnapshotProvider().getNumDownloaded()));
 
     // Corrupt the mixed checkpoint in the candidate DB dir
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
@@ -664,10 +670,11 @@ public class TestOMRatisSnapshots {
 
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 1000, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+                >= leaderOMSnapshotIndex - 1);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
@@ -689,41 +696,34 @@ public class TestOMRatisSnapshots {
     }
 
     // Verify the metrics
-    GenericTestUtils.waitFor(() -> {
-      DBCheckpointMetrics dbMetrics =
-          leaderOM.getMetrics().getDBCheckpointMetrics();
-      return dbMetrics.getLastCheckpointStreamingNumSSTExcluded() == 0;
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> leaderOM.getMetrics().getDBCheckpointMetrics()
+            .getLastCheckpointStreamingNumSSTExcluded() == 0);
 
-    GenericTestUtils.waitFor(() -> {
-      DBCheckpointMetrics dbMetrics =
-          leaderOM.getMetrics().getDBCheckpointMetrics();
-      return dbMetrics.getNumIncrementalCheckpoints() >= 1;
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> leaderOM.getMetrics().getDBCheckpointMetrics()
+            .getNumIncrementalCheckpoints() >= 1);
 
-    GenericTestUtils.waitFor(() -> {
-      DBCheckpointMetrics dbMetrics =
-          leaderOM.getMetrics().getDBCheckpointMetrics();
-      return dbMetrics.getNumCheckpoints() >= 3;
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> leaderOM.getMetrics().getDBCheckpointMetrics()
+                .getNumCheckpoints() >= 3);
 
     // Verify RPC server is running
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.isOmRpcServerRunning();
-    }, 100, 5000);
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .until(followerOM::isOmRpcServerRunning);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
-            .get(followerOMMetaMngr.getOzoneKey(
-                volumeName, bucketName, newKeys.get(0))) != null;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerOMMetaMngr.getKeyTable(TEST_BUCKET_LAYOUT)
+            .get(followerOMMetaMngr.getOzoneKey(volumeName, bucketName,
+                newKeys.get(0))) != null);
 
     // Verify follower candidate directory get cleaned
     String[] filesInCandidate = followerOM.getOmSnapshotProvider().
@@ -779,10 +779,10 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerOM.getOmRatisServer().getLastAppliedTermIndex()
+            .getIndex() >= leaderOMSnapshotIndex - 1);
 
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
@@ -883,10 +883,10 @@ public class TestOMRatisSnapshots {
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
-    }, 100, 3000);
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerOM.getOmRatisServer().getLastAppliedTermIndex()
+            .getIndex() >= leaderOMSnapshotIndex - 1);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -1100,11 +1100,11 @@ public class TestOMRatisSnapshots {
   }
 
   private void assertLogCapture(GenericTestUtils.LogCapturer logCapture,
-                              String msg)
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      return logCapture.getOutput().contains(msg);
-    }, 100, 5000);
+                                String msg) {
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() ->
+            assertThat(logCapture.getOutput(), containsString(msg)));
   }
 
   // Returns temp dir where tarball was untarred.
@@ -1151,7 +1151,7 @@ public class TestOMRatisSnapshots {
     }
 
     @Override
-    public void resume() throws IOException {
+    public void resume() {
       // Make sure injector pauses before resuming.
       try {
         ready.await();
@@ -1163,7 +1163,7 @@ public class TestOMRatisSnapshots {
     }
 
     @Override
-    public void reset() throws IOException {
+    public void reset() {
       init();
     }
   }

@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
@@ -54,11 +53,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests for Pipeline Closing.
@@ -144,23 +146,19 @@ public class TestPipelineClose {
   }
 
   @Test
-  public void testPipelineCloseWithOpenContainer()
-      throws IOException, TimeoutException, InterruptedException {
+  public void testPipelineCloseWithOpenContainer() throws IOException {
     Set<ContainerID> setOpen = pipelineManager.getContainersInPipeline(
         ratisContainer.getPipeline().getId());
     Assert.assertEquals(1, setOpen.size());
 
-    pipelineManager
-        .closePipeline(ratisContainer.getPipeline(), false);
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return containerManager
+    pipelineManager.closePipeline(ratisContainer.getPipeline(), false);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(1))
+        .ignoreException(ContainerNotFoundException.class)
+        .until(() -> containerManager
             .getContainer(ratisContainer.getContainerInfo().containerID())
-            .getState() == HddsProtos.LifeCycleState.CLOSING;
-      } catch (ContainerNotFoundException e) {
-        return false;
-      }
-    }, 100, 10000);
+            .getState() == HddsProtos.LifeCycleState.CLOSING);
   }
 
   @Test

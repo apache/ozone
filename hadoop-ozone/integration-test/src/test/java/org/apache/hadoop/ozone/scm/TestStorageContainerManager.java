@@ -134,6 +134,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.awaitility.Awaitility.await;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -321,20 +323,19 @@ public class TestStorageContainerManager {
 
       // Once TXs are written into the log, SCM starts to fetch TX
       // entries from the log and schedule block deletions in HB interval,
-      // after sometime, all the TX should be proceed and by then
+      // after sometime, all the TX should be proceeded and by then
       // the number of containerBlocks of all known containers will be
       // empty again.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getNumOfValidTransactions() == 0;
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 10000);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> {
+            if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+              cluster.getStorageContainerManager().getScmHAManager()
+                  .asSCMHADBTransactionBuffer().flush();
+            }
+            return delLog.getNumOfValidTransactions() == 0;
+          });
       Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -354,17 +355,16 @@ public class TestStorageContainerManager {
 
       // These blocks cannot be found in the container, skip deleting them
       // eventually these TX will success.
-      GenericTestUtils.waitFor(() -> {
-        try {
-          if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-            cluster.getStorageContainerManager().getScmHAManager()
-                .asSCMHADBTransactionBuffer().flush();
-          }
-          return delLog.getFailedTransactions(-1, 0).size() == 0;
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 20000);
+      await().atMost(Duration.ofSeconds(20))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> {
+            if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
+              cluster.getStorageContainerManager().getScmHAManager()
+                  .asSCMHADBTransactionBuffer().flush();
+            }
+            return delLog.getFailedTransactions(-1, 0).size() == 0;
+          });
     } finally {
       cluster.shutdown();
     }
@@ -422,31 +422,36 @@ public class TestStorageContainerManager {
       Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
 
       // Verify the size in delete commands is expected.
-      GenericTestUtils.waitFor(() -> {
-        NodeManager nodeManager = cluster.getStorageContainerManager()
-            .getScmNodeManager();
-        LayoutVersionManager versionManager =
-            nodeManager.getLayoutVersionManager();
-        StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo
-            = StorageContainerDatanodeProtocolProtos.LayoutVersionProto
-            .newBuilder()
-            .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-            .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-            .build();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
-            nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0),
-            layoutInfo);
-        if (commands != null) {
-          for (SCMCommand cmd : commands) {
-            if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
-              List<DeletedBlocksTransaction> deletedTXs =
-                  ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
-              return deletedTXs != null && deletedTXs.size() == limitSize;
+
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> {
+            NodeManager nodeManager = cluster.getStorageContainerManager()
+                .getScmNodeManager();
+            LayoutVersionManager versionManager =
+                nodeManager.getLayoutVersionManager();
+            StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo
+                = StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+                .newBuilder()
+                .setSoftwareLayoutVersion(
+                    versionManager.getSoftwareLayoutVersion())
+                .setMetadataLayoutVersion(
+                    versionManager.getMetadataLayoutVersion())
+                .build();
+            List<SCMCommand> commands = nodeManager.processHeartbeat(
+                nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0),
+                layoutInfo);
+            if (commands != null) {
+              for (SCMCommand cmd : commands) {
+                if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
+                  List<DeletedBlocksTransaction> deletedTXs =
+                      ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
+                  return deletedTXs != null && deletedTXs.size() == limitSize;
+                }
+              }
             }
-          }
-        }
-        return false;
-      }, 500, 10000);
+            return false;
+          });
     } finally {
       cluster.shutdown();
     }
@@ -780,9 +785,12 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
 
       helper.createKeys(10, 4096);
-      GenericTestUtils.waitFor(() ->
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainers() != null, 1000, 10000);
+
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofSeconds(1))
+          .untilAsserted(() ->
+              assertNotNull(cluster.getStorageContainerManager()
+                  .getContainerManager().getContainers()));
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()
@@ -824,11 +832,13 @@ public class TestStorageContainerManager {
           new CloseContainerCommand(selectedContainer.getContainerID(),
               selectedContainer.getPipelineID(), false);
 
-      GenericTestUtils.waitFor(() -> {
-        SCMContext scmContext
-            = cluster.getStorageContainerManager().getScmContext();
-        return !scmContext.isInSafeMode() && scmContext.isLeader();
-      }, 1000, 25000);
+      await().atMost(Duration.ofSeconds(25))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() -> {
+            SCMContext scmContext = cluster.getStorageContainerManager()
+                .getScmContext();
+            return !scmContext.isInSafeMode() && scmContext.isLeader();
+          });
 
       // After safe mode is off, ReplicationManager starts to run with a delay.
       Thread.sleep(5000);
@@ -994,7 +1004,7 @@ public class TestStorageContainerManager {
   private void addTransactions(StorageContainerManager scm,
       DeletedBlockLog delLog,
       Map<Long, List<Long>> containerBlocksMap)
-      throws IOException, TimeoutException {
+      throws IOException {
     delLog.addTransactions(containerBlocksMap);
     if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();

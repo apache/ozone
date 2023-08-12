@@ -54,7 +54,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static java.time.Duration.between;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -75,6 +74,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -238,9 +238,10 @@ public final class TestBlockTokensCLI {
   }
 
   @Test
-  public void testRotateKeySCMAdminCommandWithForceFlag()
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 100, 1000);
+  public void testRotateKeySCMAdminCommandWithForceFlag() {
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> cluster.getScmLeader() != null);
     InetSocketAddress address = cluster.getScmLeader().getClientRpcAddress();
     String hostPort = address.getHostName() + ":" + address.getPort();
 
@@ -249,9 +250,10 @@ public final class TestBlockTokensCLI {
   }
 
   @Test
-  public void testRotateKeySCMAdminCommandWithoutForceFlag()
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 100, 1000);
+  public void testRotateKeySCMAdminCommandWithoutForceFlag() {
+    await().atMost(Duration.ofSeconds(1))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> cluster.getScmLeader() != null);
     InetSocketAddress address = cluster.getScmLeader().getClientRpcAddress();
     String hostPort = address.getHostName() + ":" + address.getPort();
 
@@ -274,8 +276,7 @@ public final class TestBlockTokensCLI {
     ozoneAdmin.execute(args);
 
     // Get the new secret key.
-    String newKey =
-        getScmSecretKeyManager().getCurrentSecretKey().toString();
+    String newKey = getScmSecretKeyManager().getCurrentSecretKey().toString();
 
     // Assert that the old key and new key are not the same after rotating if
     // either:
@@ -322,8 +323,7 @@ public final class TestBlockTokensCLI {
     return args;
   }
 
-  private static void startCluster()
-      throws IOException, TimeoutException, InterruptedException {
+  private static void startCluster() throws IOException {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)

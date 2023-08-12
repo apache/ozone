@@ -35,13 +35,13 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test cases to verify the SCM pipeline bytesWritten metrics.
@@ -131,11 +132,14 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     final String metricName =
         SCMPipelineMetrics.getBytesWrittenMetricName(pipeline);
-    GenericTestUtils.waitFor(() -> {
-      MetricsRecordBuilder metrics = getMetrics(
-          SCMPipelineMetrics.class.getSimpleName());
-      return expectedBytesWritten == getLongCounter(metricName, metrics);
-    }, 500, 300000);
+
+    await().atMost(Duration.ofMinutes(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> {
+          MetricsRecordBuilder metrics = getMetrics(
+              SCMPipelineMetrics.class.getSimpleName());
+          return expectedBytesWritten == getLongCounter(metricName, metrics);
+        });
   }
 
   @AfterEach

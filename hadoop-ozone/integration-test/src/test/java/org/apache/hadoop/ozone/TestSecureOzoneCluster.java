@@ -158,6 +158,9 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.junit.After;
+
+import static org.awaitility.Awaitility.await;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -177,6 +180,7 @@ import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -966,9 +970,10 @@ public final class TestSecureOzoneCluster {
 
       // check after renew, client will have the new cert ID
       String id1 = newCertHolder.getSerialNumber().toString();
-      GenericTestUtils.waitFor(() ->
-              id1.equals(client.getCertificate().getSerialNumber().toString()),
-          1000, certificateLifetime * 1000);
+      await().atMost(Duration.ofSeconds(certificateLifetime))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() ->
+              id1.equals(client.getCertificate().getSerialNumber().toString()));
 
       // test the second time certificate rotation
       // second renewed cert
@@ -986,9 +991,10 @@ public final class TestSecureOzoneCluster {
       String id2 = newCertHolder.getSerialNumber().toString();
 
       // check after renew, client will have the new cert ID
-      GenericTestUtils.waitFor(() ->
-              id2.equals(client.getCertificate().getSerialNumber().toString()),
-          1000, certificateLifetime * 1000);
+      await().atMost(Duration.ofSeconds(certificateLifetime))
+          .pollInterval(Duration.ofSeconds(1))
+          .until(() ->
+              id2.equals(client.getCertificate().getSerialNumber().toString()));
     }
   }
   /**
@@ -1077,10 +1083,10 @@ public final class TestSecureOzoneCluster {
       String certId2 = newCertHolder.getSerialNumber().toString();
 
       // check after renew, client will have the new cert ID
-      GenericTestUtils.waitFor(() -> {
-        String newCertId = client.getCertificate().getSerialNumber().toString();
-        return newCertId.equals(certId2);
-      }, 1000, certificateLifetime * 1000);
+      await().atMost(Duration.ofSeconds(certificateLifetime))
+          .pollInterval(Duration.ofSeconds(1))
+          .untilAsserted(() -> Assert.assertEquals(certId2,
+              client.getCertificate().getSerialNumber().toString()));
     }
   }
 
@@ -1133,9 +1139,11 @@ public final class TestSecureOzoneCluster {
       om.setCertClient(mockClient);
 
       // check error message during renew
-      GenericTestUtils.waitFor(() -> omLogs.getOutput().contains(
-              "OzoneManage shutdown because certificate rollback failure."),
-          1000, certificateLifetime * 1000);
+      await().atMost(Duration.ofSeconds(certificateLifetime))
+          .pollInterval(Duration.ofSeconds(1))
+          .untilAsserted(() -> assertThat(omLogs.getOutput(),
+              containsString("OzoneManage shutdown because certificate " +
+                  "rollback failure.")));
     }
   }
 
@@ -1165,7 +1173,9 @@ public final class TestSecureOzoneCluster {
       // Start OM
       om.setCertClient(certClient);
       om.start();
-      GenericTestUtils.waitFor(() -> om.isLeaderReady(), 100, 10000);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> om.isLeaderReady());
 
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
@@ -1195,9 +1205,11 @@ public final class TestSecureOzoneCluster {
       assertTrue(expiryTime > 0);
 
       // Wait for OM certificate to renew
-      GenericTestUtils.waitFor(() -> !omCertId1.equals(
-          certClient.getCertificate().getSerialNumber().toString()),
-          100, certLifetime);
+      await().atMost(Duration.ofSeconds(certLifetime))
+          .pollInterval(Duration.ofMillis(100))
+          .untilAsserted(() ->
+              Assert.assertNotEquals(omCertId1,
+                  certClient.getCertificate().getSerialNumber().toString()));
       String omCertId2 =
           certClient.getCertificate().getSerialNumber().toString();
       assertNotEquals(omCertId1, omCertId2);
@@ -1287,27 +1299,31 @@ public final class TestSecureOzoneCluster {
       // set certificates in GrpcOmTransport
       GrpcOmTransport.setCaCerts(certList);
 
-      GenericTestUtils.waitFor(() -> om.isLeaderReady(), 500, 10000);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> om.isLeaderReady());
+
       String transportCls = GrpcOmTransportFactory.class.getName();
       conf.set(OZONE_OM_TRANSPORT_CLASS, transportCls);
       try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
 
         ServiceInfoEx serviceInfoEx = client.getObjectStore()
             .getClientProxy().getOzoneManagerClient().getServiceInfo();
-        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-            CertificateCodec.getPEMEncodedString(caCert)));
+        assertEquals(serviceInfoEx.getCaCertificate(),
+            CertificateCodec.getPEMEncodedString(caCert));
 
         // Wait for OM certificate to renewed
-        GenericTestUtils.waitFor(() ->
-                !omCert.getSerialNumber().toString().equals(
-                    omCertClient.getCertificate().getSerialNumber().toString()),
-            500, certLifetime * 1000);
+        await().atMost(Duration.ofSeconds(certLifetime))
+            .pollInterval(Duration.ofMillis(500))
+            .untilAsserted(() ->
+                Assert.assertEquals(omCert.getSerialNumber(),
+                    omCertClient.getCertificate().getSerialNumber()));
 
         // rerun the command using old client, it should succeed
         serviceInfoEx = client.getObjectStore()
             .getClientProxy().getOzoneManagerClient().getServiceInfo();
-        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-            CertificateCodec.getPEMEncodedString(caCert)));
+        assertEquals(serviceInfoEx.getCaCertificate(),
+            CertificateCodec.getPEMEncodedString(caCert));
       }
 
       // get new client, it should succeed.
@@ -1321,8 +1337,9 @@ public final class TestSecureOzoneCluster {
       }
 
       // Wait for old OM certificate to expire
-      GenericTestUtils.waitFor(() -> omCert.getNotAfter().before(new Date()),
-          500, certLifetime * 1000);
+      await().atMost(Duration.ofSeconds(certLifetime))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> omCert.getNotAfter().before(new Date()));
       // get new client, it should succeed too.
       try {
         OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);

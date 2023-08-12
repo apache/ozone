@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -61,6 +61,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -164,8 +165,10 @@ public class TestOzoneSnapshotRestore {
             .get(SnapshotInfo.getTableKey(volName, buckName, snapshotName));
     String snapshotDirName = OmSnapshotManager
         .getSnapshotPath(clientConf, snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
-            1000, 120000);
+
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> new File(snapshotDirName).exists());
     return snapshotKeyPrefix;
 
   }
@@ -335,14 +338,10 @@ public class TestOzoneSnapshotRestore {
   /**
    * Waits for key count to be equal to expected number of keys.
    */
-  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return 5 == keyCount(bucket, keyPrefix);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 1000, 10000);
+  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> keyCount(bucket, keyPrefix) == 5);
   }
 }

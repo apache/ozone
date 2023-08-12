@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.scm;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 
@@ -143,9 +145,10 @@ public class TestSCMInstallSnapshotWithHA {
     // Wait & retry for follower to update transactions to leader
     // snapshot index.
     // Timeout error if follower does not load update within 3s
-    GenericTestUtils.waitFor(() -> {
-      return followerSM.getLastAppliedTermIndex().getIndex() >= 200;
-    }, 100, 3000);
+
+    await().atMost(Duration.ofSeconds(3))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerSM.getLastAppliedTermIndex().getIndex() >= 200);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
     assertTrue(followerLastAppliedIndex >= 200);

@@ -39,13 +39,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -60,6 +60,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_D
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
 import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.awaitility.Awaitility.await;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -77,7 +78,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private final String clusterMetaPath;
 
-  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  private final Duration waitForClusterToBeReadyTimeout = Duration.ofMinutes(2);
+  private final Duration pollIntervalForClusterToBeReady =
+      Duration.ofSeconds(1);
 
   private static final int RATIS_RPC_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
@@ -170,14 +173,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         .findFirst().orElse(null);
   }
 
-  private OzoneManager getOMLeader(boolean waitForLeaderElection)
-      throws TimeoutException, InterruptedException {
+  private OzoneManager getOMLeader(boolean waitForLeaderElection) {
     if (waitForLeaderElection) {
       final OzoneManager[] om = new OzoneManager[1];
-      GenericTestUtils.waitFor(() -> {
-        om[0] = getOMLeader();
-        return om[0] != null;
-      }, 200, waitForClusterToBeReadyTimeout);
+      await().atMost(waitForClusterToBeReadyTimeout)
+          .pollInterval(Duration.ofMillis(200))
+          .until(() -> getOMLeader() != null);
+      om[0] = getOMLeader();
       return om[0];
     } else {
       return getOMLeader();
@@ -239,8 +241,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     ozoneManager.restart();
 
     if (waitForOM) {
-      GenericTestUtils.waitFor(ozoneManager::isRunning,
-          1000, waitForClusterToBeReadyTimeout);
+      await().atMost(waitForClusterToBeReadyTimeout)
+          .pollInterval(pollIntervalForClusterToBeReady)
+          .until(ozoneManager::isRunning);
     }
   }
 
@@ -284,16 +287,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     return null;
   }
 
-  public void waitForSCMToBeReady()
-      throws TimeoutException, InterruptedException  {
-    GenericTestUtils.waitFor(() -> {
-      for (StorageContainerManager scm : scmhaService.getServices()) {
-        if (scm.checkLeader()) {
-          return true;
-        }
-      }
-      return false;
-    }, 1000, waitForClusterToBeReadyTimeout);
+  public void waitForSCMToBeReady() {
+    await().atMost(waitForClusterToBeReadyTimeout)
+        .pollInterval(pollIntervalForClusterToBeReady)
+        .until(() -> {
+          for (StorageContainerManager scm : scmhaService.getServices()) {
+            if (scm.checkLeader()) {
+              return true;
+            }
+          }
+          return false;
+        });
   }
 
   @Override
@@ -833,41 +837,32 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * Wait for AddOM command to execute on all OMs.
    */
   private void waitForBootstrappedNodeToBeReady(OzoneManager newOM,
-      long leaderSnapshotIndex) throws Exception {
-    // Wait for bootstrapped nodes to catch up with others
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (newOM.getRatisSnapshotIndex() >= leaderSnapshotIndex) {
-          return true;
-        }
-      } catch (IOException e) {
-        return false;
-      }
-      return false;
-    }, 1000, waitForClusterToBeReadyTimeout);
+                                                long leaderSnapshotIndex) {
+    await().atMost(waitForClusterToBeReadyTimeout)
+        .pollInterval(pollIntervalForClusterToBeReady)
+        .ignoreException(IOException.class)
+        .until(() -> newOM.getRatisSnapshotIndex() >= leaderSnapshotIndex);
   }
 
-  private void waitForConfigUpdateOnActiveOMs(String newOMNodeId)
-      throws Exception {
+  private void waitForConfigUpdateOnActiveOMs(String newOMNodeId) {
     OzoneManager newOMNode = omhaService.getServiceById(newOMNodeId);
     OzoneManagerRatisServer newOMRatisServer = newOMNode.getOmRatisServer();
-    GenericTestUtils.waitFor(() -> {
-      // Each existing active OM should contain the new OM in its peerList.
-      // Also, the new OM should contain each existing active OM in it's OM
-      // peer list and RatisServer peerList.
-      for (OzoneManager om : omhaService.getActiveServices()) {
-        if (!om.doesPeerExist(newOMNodeId)) {
-          return false;
-        }
-        if (!newOMNode.doesPeerExist(om.getOMNodeId())) {
-          return false;
-        }
-        if (!newOMRatisServer.doesPeerExist(om.getOMNodeId())) {
-          return false;
-        }
-      }
-      return true;
-    }, 1000, waitForClusterToBeReadyTimeout);
+
+    await().atMost(waitForClusterToBeReadyTimeout)
+        .pollInterval(pollIntervalForClusterToBeReady)
+        .until(() -> {
+          // Each existing active OM should contain the new OM in its peerList.
+          // Also, the new OM should contain each existing active OM in it's OM
+          // peer list and RatisServer peerList.
+          for (OzoneManager om : omhaService.getActiveServices()) {
+            if (!om.doesPeerExist(newOMNodeId) ||
+                !newOMNode.doesPeerExist(om.getOMNodeId()) ||
+                !newOMRatisServer.doesPeerExist(om.getOMNodeId())) {
+              return false;
+            }
+          }
+          return true;
+        });
   }
 
   public void setupExitManagerForTesting() {

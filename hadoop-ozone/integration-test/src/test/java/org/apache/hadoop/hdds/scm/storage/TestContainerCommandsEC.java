@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -76,7 +75,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -112,7 +110,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
+import static org.awaitility.Awaitility.await;
 
 /**
  * This class tests container commands on EC containers.
@@ -288,17 +288,12 @@ public class TestContainerCommandsEC {
     }
 
     // Wait for all replicas in the pipeline to report as closed.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return scm.getContainerManager().getContainerReplicas(
-            ContainerID.valueOf(orphanContainerID)).stream()
-            .allMatch(cr -> cr.getState() ==
-                StorageContainerDatanodeProtocolProtos.
-                    ContainerReplicaProto.State.CLOSED);
-      } catch (ContainerNotFoundException e) {
-        throw new RuntimeException(e);
-      }
-    }, 500, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> scm.getContainerManager()
+            .getContainerReplicas(ContainerID.valueOf(orphanContainerID))
+            .stream()
+            .allMatch(cr -> cr.getState() == CLOSED));
 
     // Get the block ID of the key we have just written. This will be used to
     // delete the block from one of the datanode to make the stripe look like
@@ -322,21 +317,20 @@ public class TestContainerCommandsEC {
     try (XceiverClientGrpc client = new XceiverClientGrpc(
         createSingleNodePipeline(orphanPipeline, dn2, 1), cluster.getConf())) {
       // Wait for the block to be actually deleted
-      GenericTestUtils.waitFor(() -> {
-        try {
-          ListBlockResponseProto response = ContainerProtocolCalls
-              .listBlock(client, orphanContainerID, null, Integer.MAX_VALUE,
-                  orphanContainerToken);
-          for (BlockData bd : response.getBlockDataList()) {
-            if (bd.getBlockID().getLocalID() == localID) {
-              return false;
+
+      await().atMost(Duration.ofSeconds(30))
+          .pollInterval(Duration.ofMillis(500))
+          .until(() -> {
+            ListBlockResponseProto response = ContainerProtocolCalls
+                .listBlock(client, orphanContainerID, null, Integer.MAX_VALUE,
+                    orphanContainerToken);
+            for (BlockData bd : response.getBlockDataList()) {
+              if (bd.getBlockID().getLocalID() == localID) {
+                return false;
+              }
             }
-          }
-          return true;
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }, 500, 30000);
+            return true;
+          });
     }
 
     // Create a reconstruction command to create a new copy of indexes 4 and 5

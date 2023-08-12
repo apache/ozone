@@ -24,13 +24,13 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -63,6 +63,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -119,17 +120,19 @@ public class TestQueryNode {
     cluster.shutdownHddsDatanode(0);
     cluster.shutdownHddsDatanode(1);
 
-    GenericTestUtils.waitFor(() ->
-            cluster.getStorageContainerManager().getNodeCount(STALE) == 2,
-        100, 4 * 1000);
+    await().atMost(Duration.ofSeconds(4))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            cluster.getStorageContainerManager().getNodeCount(STALE) == 2);
 
     int nodeCount = scmClient.queryNode(null, STALE,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals(2, nodeCount, "Mismatch of expected nodes count");
 
-    GenericTestUtils.waitFor(() ->
-            cluster.getStorageContainerManager().getNodeCount(DEAD) == 2,
-        100, 4 * 1000);
+    await().atMost(Duration.ofSeconds(4))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            cluster.getStorageContainerManager().getNodeCount(DEAD) == 2);
 
     // Assert that we don't find any stale nodes.
     nodeCount = scmClient.queryNode(null, STALE,

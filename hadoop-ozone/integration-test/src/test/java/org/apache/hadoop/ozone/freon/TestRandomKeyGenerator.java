@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -81,7 +81,9 @@ public class TestRandomKeyGenerator {
 
     assertThrows(RuntimeException.class, () -> subject.runTests(
         n -> {
-          waitFor(subject::isCompleted, 100, 3000);
+          await().atMost(Duration.ofSeconds(3))
+              .pollInterval(Duration.ofMillis(100))
+              .until(subject::isCompleted);
           throw new RuntimeException("fail");
         }
     ));

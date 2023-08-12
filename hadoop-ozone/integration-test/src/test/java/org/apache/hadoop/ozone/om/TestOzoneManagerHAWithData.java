@@ -30,12 +30,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +47,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.fail;
 
 /**
@@ -351,17 +351,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
     }
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (ozoneManager.getRatisSnapshotIndex() > 0) {
-          return true;
-        }
-      } catch (IOException ex) {
-        fail("test failed during transactionInfo read");
-      }
-      return false;
-    }, 1000, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> ozoneManager.getRatisSnapshotIndex() > 0);
 
     // The current lastAppliedLogIndex on the state machine should be greater
     // than or equal to the saved snapshot index.
@@ -380,16 +372,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
           .getLastAppliedTermIndex().getIndex();
     }
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (ozoneManager.getRatisSnapshotIndex() > 0) {
-          return true;
-        }
-      } catch (IOException ex) {
-        fail("test failed during transactionInfo read");
-      }
-      return false;
-    }, 1000, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> ozoneManager.getRatisSnapshotIndex() > 0);
 
     // The new snapshot index must be greater than the previous snapshot index
     long ratisSnapshotIndexNew = ozoneManager.getRatisSnapshotIndex();
@@ -466,9 +451,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     followerOM1.restart();
 
     // Wait for the follower OM to catch up
-    GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex() >= leaderOMSnaphsotIndex,
-        100, 200000);
+    await().atMost(Duration.ofSeconds(200))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> followerOM1.getOmRatisServer().getLastAppliedTermIndex()
+            .getIndex() >= leaderOMSnaphsotIndex);
 
     // Do more transactions. The restarted OM should receive the
     // new transactions. It's last applied tx index should increase from the

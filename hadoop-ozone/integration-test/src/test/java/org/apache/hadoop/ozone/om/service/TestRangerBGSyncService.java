@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
@@ -34,6 +35,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -480,8 +482,9 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
-        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
+    await().atMost(Duration.ofMillis(WAIT_SYNC_TIMEOUT_MILLIS))
+        .pollInterval(Duration.ofMillis(CHECK_SYNC_MILLIS))
+        .until(() -> bgSync.getRangerSyncRunCount() > 1L);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
@@ -543,8 +546,9 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
-        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
+    await().atMost(Duration.ofMillis(WAIT_SYNC_TIMEOUT_MILLIS))
+        .pollInterval(Duration.ofMillis(CHECK_SYNC_MILLIS))
+        .until(() -> bgSync.getRangerSyncRunCount() > 1L);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
@@ -615,9 +619,9 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(
-        () -> bgSync.getRangerSyncRunCount() > currRunCount + 1L,
-        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
+    await().atMost(Duration.ofMillis(WAIT_SYNC_TIMEOUT_MILLIS))
+        .pollInterval(Duration.ofMillis(CHECK_SYNC_MILLIS))
+        .until(() -> bgSync.getRangerSyncRunCount() > currRunCount + 1L);
     bgSync.shutdown();
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
@@ -673,8 +677,9 @@ public class TestRangerBGSyncService {
     bgSync.start();
     // Wait for sync to finish once.
     // The counter is incremented at the beginning of the run, hence the ">"
-    GenericTestUtils.waitFor(() -> bgSync.getRangerSyncRunCount() > 1L,
-        CHECK_SYNC_MILLIS, WAIT_SYNC_TIMEOUT_MILLIS);
+    await().atMost(Duration.ofMillis(WAIT_SYNC_TIMEOUT_MILLIS))
+        .pollInterval(Duration.ofMillis(CHECK_SYNC_MILLIS))
+        .until(() -> bgSync.getRangerSyncRunCount() > 1L);
     bgSync.shutdown();
     long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =

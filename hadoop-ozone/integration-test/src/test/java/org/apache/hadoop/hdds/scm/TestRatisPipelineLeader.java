@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +35,8 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+import static org.awaitility.Awaitility.await;
+
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -86,15 +90,11 @@ public class TestRatisPipelineLeader {
     Assertions.assertTrue(optional.isPresent());
     Pipeline ratisPipeline = optional.get();
     // Verify correct leader info populated
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return verifyLeaderInfo(ratisPipeline);
-      } catch (Exception e) {
-        LOG.error("Failed verifying the leader info.", e);
-        Assertions.fail("Failed verifying the leader info.");
-        return false;
-      }
-    }, 200, 20000);
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(200))
+        .ignoreException(IOException.class)
+        .until(() -> verifyLeaderInfo(ratisPipeline));
+
     // Verify client connects to Leader without NotLeaderException
     final Logger log = LoggerFactory.getLogger(
         "org.apache.ratis.grpc.server.GrpcClientProtocolService");
@@ -134,18 +134,14 @@ public class TestRatisPipelineLeader {
     Thread.sleep(4000 * conf.getTimeDuration(
         DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         5, TimeUnit.SECONDS));
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return verifyLeaderInfo(ratisPipeline);
-      } catch (Exception e) {
-        LOG.error("Failed verifying the leader info.", e);
-        Assertions.fail("Failed getting leader info.");
-        return false;
-      }
-    }, 200, 20000);
+
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(200))
+        .ignoreException(IOException.class)
+        .until(() -> verifyLeaderInfo(ratisPipeline));
   }
 
-  private boolean verifyLeaderInfo(Pipeline ratisPipeline) throws Exception {
+  private boolean verifyLeaderInfo(Pipeline ratisPipeline) throws IOException {
     Optional<HddsDatanodeService> hddsDatanodeService =
         cluster.getHddsDatanodes().stream().filter(s ->
             s.getDatanodeStateMachine().getDatanodeDetails().getUuid()

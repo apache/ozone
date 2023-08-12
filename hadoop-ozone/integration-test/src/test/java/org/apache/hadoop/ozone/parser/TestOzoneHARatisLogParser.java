@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.segmentparser.OMRatisLogParser;
 import org.apache.hadoop.ozone.segmentparser.SCMRatisLogParser;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -42,10 +41,12 @@ import org.junit.jupiter.api.Timeout;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.time.Duration;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test Ozone OM and SCM HA Ratis log parser.
@@ -125,13 +126,15 @@ class TestOzoneHARatisLogParser {
     Assertions.assertTrue(groupDir.isDirectory());
     File currentDir = new File(groupDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
+
+    await().atMost(Duration.ofSeconds(15))
+        .pollInterval(Duration.ofMillis(100))
+        .until(logFile::exists);
     Assertions.assertTrue(logFile.isFile());
 
     OMRatisLogParser omRatisLogParser = new OMRatisLogParser();
     omRatisLogParser.setSegmentFile(logFile);
     omRatisLogParser.parseRatisLogs(OMRatisHelper::smProtoToString);
-
 
     // Not checking total entry count, because of not sure of exact count of
     // metadata entry changes.
@@ -154,7 +157,10 @@ class TestOzoneHARatisLogParser {
     Assertions.assertTrue(groupDir.isDirectory());
     currentDir = new File(groupDir, "current");
     logFile = new File(currentDir, "log_inprogress_1");
-    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
+
+    await().atMost(Duration.ofSeconds(15))
+        .pollInterval(Duration.ofMillis(100))
+        .until(logFile::exists);
     Assertions.assertTrue(logFile.isFile());
 
     SCMRatisLogParser scmRatisLogParser = new SCMRatisLogParser();

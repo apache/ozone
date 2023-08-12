@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -48,7 +49,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -114,8 +115,10 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           trxId.incrementAndGet());
     }
-    waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
-        100, 60000);
+
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount);
 
     assertTrue(metrics.getTotalNumOfFlushOperations() > 0);
     assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());

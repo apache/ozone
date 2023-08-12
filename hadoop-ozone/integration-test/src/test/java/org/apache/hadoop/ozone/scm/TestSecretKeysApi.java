@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -74,6 +75,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -202,13 +204,9 @@ public final class TestSecretKeysApi {
     SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
 
     // start the test when keys are full.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return secretKeyProtocol.getAllSecretKeys().size() >= 3;
-      } catch (IOException ex) {
-        throw new RuntimeException(ex);
-      }
-    }, 100, 4_000);
+    await().atMost(Duration.ofSeconds(4))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> secretKeyProtocol.getAllSecretKeys().size() >= 3);
 
     ManagedSecretKey initialKey = secretKeyProtocol.getCurrentSecretKey();
     assertNotNull(initialKey);
@@ -219,15 +217,10 @@ public final class TestSecretKeysApi {
     LOG.info("Initial keys: {}", initialKeys);
 
     // wait for the next rotation.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ManagedSecretKey newCurrentKey =
-            secretKeyProtocol.getCurrentSecretKey();
-        return !newCurrentKey.equals(initialKey);
-      } catch (IOException ex) {
-        throw new RuntimeException(ex);
-      }
-    }, 100, 1500);
+    await().atMost(Duration.ofMillis(1500))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            !secretKeyProtocol.getCurrentSecretKey().equals(initialKey));
     ManagedSecretKey  updatedKey = secretKeyProtocol.getCurrentSecretKey();
     List<ManagedSecretKey>  updatedKeys = secretKeyProtocol.getAllSecretKeys();
 

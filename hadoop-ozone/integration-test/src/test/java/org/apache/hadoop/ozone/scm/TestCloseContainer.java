@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +47,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -129,8 +129,9 @@ public class TestCloseContainer {
     assertEquals(originalSeq, newContainer.getSequenceId());
 
     // Ensure 3 replicas are reported successfully as expected.
-    GenericTestUtils.waitFor(() ->
-            getContainerReplicas(newContainer).size() == 3, 200, 30000);
+    await().atMost(Duration.ofSeconds(20))
+        .pollInterval(Duration.ofMillis(200))
+        .until(() -> getContainerReplicas(newContainer).size() == 3);
   }
 
   /**
@@ -138,12 +139,10 @@ public class TestCloseContainer {
    * if the container cannot be found. This is a helper method to allow the
    * container replica count to be checked in a lambda expression.
    * @param c The container for which to retrieve replicas
-   * @return
    */
   private Set<ContainerReplica> getContainerReplicas(ContainerInfo c) {
     return assertDoesNotThrow(() -> cluster.getStorageContainerManager()
         .getContainerManager().getContainerReplicas(c.containerID()),
         "Unexpected exception while retrieving container replicas");
   }
-
 }

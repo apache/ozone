@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -56,6 +57,7 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM
@@ -292,25 +294,24 @@ public class TestScmHAFinalization {
         "received with metadata layout version"));
   }
 
-  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
-      throws Exception {
+  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms) {
     for (StorageContainerManager scm: scms) {
       waitForScmToFinalize(scm);
     }
   }
 
-  private void waitForScmToFinalize(StorageContainerManager scm)
-      throws Exception {
-    GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
-    GenericTestUtils.waitFor(() -> {
-      FinalizationCheckpoint checkpoint =
-          scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
-          "finalization checkpoint is {}",
-          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
-      return checkpoint.hasCrossed(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE);
-    }, 2_000, 60_000);
+  private void waitForScmToFinalize(StorageContainerManager scm) {
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> !scm.isInSafeMode());
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(() -> {
+          FinalizationCheckpoint checkpoint = scm.getScmContext()
+              .getFinalizationCheckpoint();
+          return checkpoint.hasCrossed(
+              FinalizationCheckpoint.FINALIZATION_COMPLETE);
+        });
   }
 
   private void checkMidFinalizationConditions(

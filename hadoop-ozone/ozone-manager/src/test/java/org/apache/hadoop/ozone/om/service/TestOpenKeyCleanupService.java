@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -164,10 +164,9 @@ public class TestOpenKeyCleanupService {
 
     openKeyCleanupService.resume();
 
-    GenericTestUtils.waitFor(() -> openKeyCleanupService
-            .getRunCount() > oldrunCount,
-        (int) SERVICE_INTERVAL.toMillis(),
-        5 * (int) SERVICE_INTERVAL.toMillis());
+    await().atMost(SERVICE_INTERVAL.multipliedBy(5))
+        .pollInterval(SERVICE_INTERVAL)
+        .until(() -> openKeyCleanupService.getRunCount() > oldrunCount);
 
     // wait for requests to complete
     final int n = hsync ? numDEFKeys + numFSOKeys : 1;

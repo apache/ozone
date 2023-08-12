@@ -22,13 +22,12 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
+import java.time.Duration;
 
-import static org.junit.Assert.fail;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests key deletion in OM HA setup.
@@ -43,9 +42,6 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
     String keyName2 = "dir/file2";
     String keyName3 = "dir/file3";
     String keyName4 = "dir/file4";
-    List<String> keyList1 = new ArrayList<>();
-    keyList1.add(keyName2);
-    keyList1.add(keyName3);
 
     testCreateFile(ozoneBucket, keyName1, data, true, false);
     testCreateFile(ozoneBucket, keyName2, data, true, false);
@@ -58,34 +54,30 @@ public class TestOzoneManagerHAKeyDeletion extends TestOzoneManagerHA {
     ozoneBucket.deleteKey(keyName4);
 
     // Now check delete table has entries been removed.
-
     OzoneManager ozoneManager = getCluster().getOMLeader();
-
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) ozoneManager.getKeyManager().getDeletingService();
+    KeyDeletingService keyDeletingService = ozoneManager.getKeyManager()
+        .getDeletingService();
 
     // Check on leader OM Count.
-    GenericTestUtils.waitFor(() ->
-        keyDeletingService.getRunCount().get() >= 2, 10000, 120000);
-    GenericTestUtils.waitFor(() ->
-            keyDeletingService.getDeletedKeyCount().get() == 4, 10000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(10))
+        .until(() -> keyDeletingService.getRunCount().get() >= 2);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(10))
+        .until(() -> keyDeletingService.getDeletedKeyCount().get() == 4);
 
     // Check delete table is empty or not on all OMs.
-    getCluster().getOzoneManagersList().forEach((om) -> {
-      try {
-        GenericTestUtils.waitFor(() -> {
-          Table<String, RepeatedOmKeyInfo> deletedTable =
-              om.getMetadataManager().getDeletedTable();
-          try (TableIterator<?, ?> iterator = deletedTable.iterator()) {
-            return !iterator.hasNext();
-          } catch (Exception ex) {
-            return false;
-          }
-        },
-            10000, 120000);
-      } catch (Exception ex) {
-        fail("TestOzoneManagerHAKeyDeletion failed");
-      }
-    });
+    for (OzoneManager om : getCluster().getOzoneManagersList()) {
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(10))
+          .ignoreException(IOException.class)
+          .until(() -> {
+            Table<String, RepeatedOmKeyInfo> deletedTable =
+                om.getMetadataManager().getDeletedTable();
+            try (TableIterator<?, ?> iterator = deletedTable.iterator()) {
+              return !iterator.hasNext();
+            }
+          });
+    }
   }
 }

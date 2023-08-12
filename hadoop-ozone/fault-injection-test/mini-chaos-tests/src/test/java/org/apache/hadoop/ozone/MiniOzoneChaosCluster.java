@@ -43,11 +43,12 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * This class causes random failures in the chaos cluster.
@@ -148,17 +149,18 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
    * restart/ shutdown OM till all OMs are up again.
    */
   @Override
-  public void waitForClusterToBeReady()
-      throws TimeoutException, InterruptedException {
+  public void waitForClusterToBeReady() {
     super.waitForClusterToBeReady();
-    GenericTestUtils.waitFor(() -> {
-      for (OzoneManager om : getOzoneManagersList()) {
-        if (!om.isRunning()) {
-          return false;
-        }
-      }
-      return true;
-    }, 1000, waitForClusterToBeReadyTimeout);
+    await().atMost(Duration.ofMillis(waitForClusterToBeReadyTimeout))
+        .pollInterval(Duration.ofMillis(1000))
+        .until(() -> {
+          for (OzoneManager om : getOzoneManagersList()) {
+            if (!om.isRunning()) {
+              return false;
+            }
+          }
+          return true;
+        });
   }
 
   /**

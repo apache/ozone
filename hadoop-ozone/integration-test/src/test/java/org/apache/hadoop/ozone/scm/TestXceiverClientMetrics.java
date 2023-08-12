@@ -21,7 +21,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.awaitility.Awaitility.await;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.UUID;
@@ -30,10 +32,8 @@ import java.util.concurrent.CountDownLatch;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -145,35 +145,39 @@ public class TestXceiverClientMetrics {
       });
       sendThread.start();
 
-      GenericTestUtils.waitFor(() -> {
-        // check if pending metric count is increased
-        MetricsRecordBuilder metric =
-            getMetrics(XceiverClientMetrics.SOURCE_NAME);
-        long pendingOps = getLongCounter("PendingOps", metric);
-        long pendingPutSmallFileOps =
-            getLongCounter("numPendingPutSmallFile", metric);
+      await().atMost(Duration.ofSeconds(60))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> {
+            // check if pending metric count is increased
+            MetricsRecordBuilder metric =
+                getMetrics(XceiverClientMetrics.SOURCE_NAME);
+            long pendingOps = getLongCounter("PendingOps", metric);
+            long pendingPutSmallFileOps =
+                getLongCounter("numPendingPutSmallFile", metric);
 
-        if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
-          // reset break flag
-          breakFlag = true;
-          return true;
-        } else {
-          return false;
-        }
-      }, 100, 60000);
+            if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
+              // reset break flag
+              breakFlag = true;
+              return true;
+            } else {
+              return false;
+            }
+          });
 
       // blocking until we stop sending async requests
       latch.await();
       // Wait for all futures being done.
-      GenericTestUtils.waitFor(() -> {
-        for (CompletableFuture future : computeResults) {
-          if (!future.isDone()) {
-            return false;
-          }
-        }
 
-        return true;
-      }, 100, 60000);
+      await().atMost(Duration.ofSeconds(60))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> {
+            for (CompletableFuture future : computeResults) {
+              if (!future.isDone()) {
+                return false;
+              }
+            }
+            return true;
+          });
 
       // the counter value of pending metrics should be decreased to 0
       containerMetrics = getMetrics(XceiverClientMetrics.SOURCE_NAME);

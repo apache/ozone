@@ -22,14 +22,12 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -37,16 +35,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests SCM Safe mode with pipeline rules.
  */
-
 @Disabled
 public class TestSCMSafeModeWithPipelineRules {
 
@@ -97,7 +98,7 @@ public class TestSCMSafeModeWithPipelineRules {
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelineList =
         pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
-            ReplicationFactor.THREE));
+            THREE));
 
 
     pipelineList.get(0).getNodes().forEach(datanodeDetails -> {
@@ -115,16 +116,17 @@ public class TestSCMSafeModeWithPipelineRules {
 
     // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
-
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getHealthyPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            scmSafeModeManager.getHealthyPipelineSafeModeRule().validate());
 
     // As Ceil(0.9 * 2) is 2, and from second pipeline no datanodes's are
     // reported this rule is not met yet.
-    GenericTestUtils.waitFor(() ->
-        !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            !scmSafeModeManager.getOneReplicaPipelineSafeModeRule().validate());
 
     Assertions.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
@@ -136,15 +138,16 @@ public class TestSCMSafeModeWithPipelineRules {
       fail("Datanode restart failed");
     }
 
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() ->
+            scmSafeModeManager.getOneReplicaPipelineSafeModeRule().validate());
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> !scmSafeModeManager.getInSafeMode());
 
-    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 1000,
-        60000);
-
-    // As after safemode wait time is not completed, we should have total
+    // As after safe mode wait time is not completed, we should have total
     // pipeline's as original count 6(1 node pipelines) + 2 (3 node pipeline)
     Assertions.assertEquals(totalPipelineCount,
         pipelineManager.getPipelines().size());
@@ -152,8 +155,9 @@ public class TestSCMSafeModeWithPipelineRules {
     ReplicationManager replicationManager =
         cluster.getStorageContainerManager().getReplicationManager();
 
-    GenericTestUtils.waitFor(() ->
-        replicationManager.isRunning(), 1000, 60000);
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(replicationManager::isRunning);
 
 
     // As 4 datanodes are reported, 4 single node pipeline and 1 3 node
@@ -176,7 +180,6 @@ public class TestSCMSafeModeWithPipelineRules {
 
     waitForRatis1NodePipelines(datanodeCount);
     waitForRatis3NodePipelines(datanodeCount / 3);
-
   }
 
   @AfterEach
@@ -186,21 +189,19 @@ public class TestSCMSafeModeWithPipelineRules {
     }
   }
 
-
-  private void waitForRatis3NodePipelines(int numPipelines)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(RatisReplicationConfig
-                .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.OPEN)
-        .size() == numPipelines, 100, 60000);
+  private void waitForRatis3NodePipelines(int numPipelines) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(100))
+        .untilAsserted(() -> Assertions.assertEquals(numPipelines,
+            pipelineManager.getPipelines(
+                RatisReplicationConfig.getInstance(THREE), OPEN).size()));
   }
 
-  private void waitForRatis1NodePipelines(int numPipelines)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> pipelineManager
-        .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
-            Pipeline.PipelineState.OPEN)
-        .size() == numPipelines, 100, 60000);
+  private void waitForRatis1NodePipelines(int numPipelines) {
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(() -> Assertions.assertEquals(numPipelines,
+            pipelineManager.getPipelines(
+                RatisReplicationConfig.getInstance(ONE), OPEN).size()));
   }
 }

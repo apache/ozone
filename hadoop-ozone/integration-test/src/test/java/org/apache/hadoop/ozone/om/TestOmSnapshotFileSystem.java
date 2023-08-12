@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -62,6 +61,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -73,7 +73,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
@@ -81,6 +80,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
@@ -490,17 +490,12 @@ public class TestOmSnapshotFileSystem {
 
     Path parent = new Path("/");
 
-    // Wait until the filestatus is updated
+    // Wait until the file status is updated
     if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(parent).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> fs.listStatus(parent).length != 0);
     }
 
     String snapshotKeyPrefix = createSnapshot();
@@ -520,17 +515,11 @@ public class TestOmSnapshotFileSystem {
 
     Path parent = new Path("/");
 
-    // Wait until the filestatus is updated
     if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(parent).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> fs.listStatus(parent).length != 0);
     }
 
     String snapshotKeyPrefix = createSnapshot();
@@ -555,17 +544,11 @@ public class TestOmSnapshotFileSystem {
       out1.write(strBytes);
     }
 
-    // Wait until the filestatus is updated
     if (!enabledFileSystemPaths) {
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return fs.listStatus(parent).length != 0;
-        } catch (IOException e) {
-          LOG.error("listStatus() Failed", e);
-          Assert.fail("listStatus() Failed");
-          return false;
-        }
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> fs.listStatus(parent).length != 0);
     }
 
     String snapshotKeyPrefix = createSnapshot();
@@ -681,8 +664,7 @@ public class TestOmSnapshotFileSystem {
    * @throws IOException DB failure
    */
   @After
-  public void deleteRootDir()
-      throws IOException, InterruptedException, TimeoutException {
+  public void deleteRootDir() throws IOException {
     Path root = new Path("/");
     FileStatus[] fileStatuses = fs.listStatus(root);
 
@@ -694,24 +676,17 @@ public class TestOmSnapshotFileSystem {
       fs.delete(fStatus.getPath(), true);
     }
 
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return fs.listStatus(root).length == 0;
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .until(() -> fs.listStatus(root).length == 0);
   }
 
-  private String createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
+  private String createSnapshot() throws IOException {
     return createSnapshot(UUID.randomUUID().toString());
   }
 
-  private String createSnapshot(String snapshotName)
-      throws IOException, InterruptedException, TimeoutException {
-
+  private String createSnapshot(String snapshotName) throws IOException {
     // create snapshot
     writeClient.createSnapshot(volumeName, bucketName, snapshotName);
 
@@ -721,8 +696,9 @@ public class TestOmSnapshotFileSystem {
         .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
     String snapshotDirName = getSnapshotPath(conf, snapshotInfo) +
         OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
-        1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> new File(snapshotDirName).exists());
 
     return OM_KEY_PREFIX + OmSnapshotManager.getSnapshotPrefix(snapshotName);
   }

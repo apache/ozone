@@ -24,13 +24,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.awaitility.Awaitility.await;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToLongFunction;
 import java.util.stream.IntStream;
@@ -174,7 +173,7 @@ class TestContainerReplication {
    */
   private static void queueAndWaitForCompletion(ReplicateContainerCommand cmd,
       DatanodeDetails dn, ToLongFunction<ReplicationSupervisor> counter)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
 
     DatanodeStateMachine datanodeStateMachine =
         cluster.getHddsDatanode(dn).getDatanodeStateMachine();
@@ -184,9 +183,9 @@ class TestContainerReplication {
     StateContext context = datanodeStateMachine.getContext();
     context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
     context.addCommand(cmd);
-    waitFor(
-        () -> counter.applyAsLong(supervisor) == previousCount + 1,
-        100, 30000);
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> counter.applyAsLong(supervisor) == previousCount + 1);
   }
 
   private DatanodeDetails selectOtherNode(DatanodeDetails source)

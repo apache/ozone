@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test Datanode Ratis log parser.
@@ -83,7 +84,9 @@ public class TestDnRatisLogParser {
     File pipelineDir = new File(path, pid.toString());
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
+    await().atMost(Duration.ofSeconds(15))
+        .pollInterval(Duration.ofMillis(100))
+        .until(logFile::exists);
     Assert.assertTrue(logFile.isFile());
 
     DatanodeRatisLogParser datanodeRatisLogParser =

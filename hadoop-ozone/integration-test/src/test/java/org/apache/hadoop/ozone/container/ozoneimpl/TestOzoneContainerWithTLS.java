@@ -83,6 +83,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests ozone containers via secure grpc/netty.
@@ -251,9 +252,10 @@ public class TestOzoneContainerWithTLS {
       containerIdList.add(containerId++);
 
       // Wait certificate to expire
-      GenericTestUtils.waitFor(() ->
-              caClient.getCertificate().getNotAfter().before(new Date()),
-          100, certLifetime);
+      await().atMost(Duration.ofMillis(certLifetime))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() ->
+              caClient.getCertificate().getNotAfter().before(new Date()));
 
       List<DatanodeDetails> sourceDatanodes = new ArrayList<>();
       sourceDatanodes.add(dn);

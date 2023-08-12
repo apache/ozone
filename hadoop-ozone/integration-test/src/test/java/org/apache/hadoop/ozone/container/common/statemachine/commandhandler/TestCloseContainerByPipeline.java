@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,15 +50,16 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Test container closing.
@@ -156,9 +156,10 @@ public class TestCloseContainerByPipeline {
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
-    GenericTestUtils
-        .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
-            500, 5 * 1000);
+
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> isContainerClosed(cluster, containerID, datanodeDetails));
     // Make sure the closeContainerCommandHandler is Invoked
     Assert.assertTrue(
         closeContainerHandler.getInvocationCount() > lastInvocationCount);
@@ -166,7 +167,7 @@ public class TestCloseContainerByPipeline {
 
   @Test
   public void testCloseContainerViaStandAlone()
-      throws IOException, TimeoutException, InterruptedException {
+      throws IOException, InterruptedException {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("standalone", 1024, ReplicationType.RATIS,
@@ -210,10 +211,11 @@ public class TestCloseContainerByPipeline {
     //double check if it's really closed (waitFor also throws an exception)
     // TODO: change the below line after implementing QUASI_CLOSED to CLOSED
     // logic. The container will be QUASI closed as of now
-    GenericTestUtils
-        .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
-            500, 5 * 1000);
-    Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
+
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() -> Assert.assertTrue(
+            isContainerClosed(cluster, containerID, datanodeDetails)));
 
     cluster.getStorageContainerManager().getPipelineManager()
         .closePipeline(pipeline, false);
@@ -223,8 +225,7 @@ public class TestCloseContainerByPipeline {
   }
 
   @Test
-  public void testCloseContainerViaRatis() throws IOException,
-      TimeoutException, InterruptedException {
+  public void testCloseContainerViaRatis() throws IOException {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("ratis", 1024, ReplicationType.RATIS,
@@ -277,20 +278,16 @@ public class TestCloseContainerByPipeline {
 
     // Make sure that it is CLOSED
     for (DatanodeDetails datanodeDetails : datanodes) {
-      GenericTestUtils.waitFor(
-          () -> isContainerClosed(cluster, containerID, datanodeDetails), 500,
-          15 * 1000);
-      //double check if it's really closed (waitFor also throws an exception)
-      Assert.assertTrue(isContainerClosed(cluster,
-          containerID, datanodeDetails));
+      await().atMost(Duration.ofSeconds(15))
+          .pollInterval(Duration.ofMillis(500))
+          .untilAsserted(() -> Assert.assertTrue(
+              isContainerClosed(cluster, containerID, datanodeDetails)));
     }
   }
 
   @Disabled("Failing with timeout")
   @Test
-  public void testQuasiCloseTransitionViaRatis()
-      throws IOException, TimeoutException, InterruptedException {
-
+  public void testQuasiCloseTransitionViaRatis() throws IOException {
     String keyName = "testQuasiCloseTransitionViaRatis";
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey(keyName, 1024, ReplicationType.RATIS,
@@ -327,11 +324,10 @@ public class TestCloseContainerByPipeline {
 
     // All the containers in OPEN or CLOSING state should transition to
     // QUASI-CLOSED after pipeline close
-    GenericTestUtils.waitFor(
-        () -> isContainerQuasiClosed(cluster, containerID, datanodeDetails),
-        500, 5 * 1000);
-    Assert.assertTrue(
-        isContainerQuasiClosed(cluster, containerID, datanodeDetails));
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() -> Assert.assertTrue(
+            isContainerQuasiClosed(cluster, containerID, datanodeDetails)));
 
     // Send close container command from SCM to datanode with forced flag as
     // true
@@ -341,11 +337,10 @@ public class TestCloseContainerByPipeline {
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
-    GenericTestUtils
-        .waitFor(() -> isContainerClosed(
-            cluster, containerID, datanodeDetails), 500, 5 * 1000);
-    Assert.assertTrue(
-        isContainerClosed(cluster, containerID, datanodeDetails));
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() -> Assert.assertTrue(
+            isContainerClosed(cluster, containerID, datanodeDetails)));
   }
 
   private Boolean isContainerClosed(MiniOzoneCluster ozoneCluster,

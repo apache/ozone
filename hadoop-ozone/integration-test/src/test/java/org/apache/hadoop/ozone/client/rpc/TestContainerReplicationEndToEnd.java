@@ -62,6 +62,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
@@ -222,10 +223,10 @@ public class TestContainerReplicationEndToEnd {
     Assert.assertNotNull(dnService);
     final HddsDatanodeService newReplicaNode = dnService;
     // wait for the container to get replicated
-    GenericTestUtils.waitFor(() -> {
-      return newReplicaNode.getDatanodeStateMachine().getContainer()
-          .getContainerSet().getContainer(containerID) != null;
-    }, 500, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(500))
+        .until(() -> newReplicaNode.getDatanodeStateMachine().getContainer()
+            .getContainerSet().getContainer(containerID) != null);
     Assert.assertTrue(newReplicaNode.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID).getContainerData()
         .getBlockCommitSequenceId() > 0);

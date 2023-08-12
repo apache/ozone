@@ -22,10 +22,12 @@ package org.apache.hadoop.ozone.dn;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.ozone.test.GenericTestUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Utility offers low-level access methods to datanode.
@@ -222,29 +224,24 @@ public final class DatanodeTestUtils {
 
   /**
    * Wait for detect volume failure.
-   *
-   * @param volSet
-   * @param numOfChecks target number of checks
-   * @throws Exception
    */
   public static void waitForCheckVolume(MutableVolumeSet volSet,
-                                        long numOfChecks) throws Exception {
-    GenericTestUtils.waitFor(
-        () -> numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks(),
-        100, 10000);
+                                        long numOfChecks) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+                numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks());
   }
 
   /**
    * Wait for failed volume to be handled.
-   * @param volSet
-   * @param numOfFailedVolumes
-   * @throws Exception
    */
-  public static void waitForHandleFailedVolume(
-      MutableVolumeSet volSet, int numOfFailedVolumes) throws Exception {
-    GenericTestUtils.waitFor(
-        () -> numOfFailedVolumes == volSet.getFailedVolumesList().size(),
-        100, 10000);
+  public static void waitForHandleFailedVolume(MutableVolumeSet volSet,
+                                               int numOfFailedVolumes) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() ->
+            numOfFailedVolumes == volSet.getFailedVolumesList().size());
   }
 
   public static File getHddsVolumeClusterDir(HddsVolume vol) {

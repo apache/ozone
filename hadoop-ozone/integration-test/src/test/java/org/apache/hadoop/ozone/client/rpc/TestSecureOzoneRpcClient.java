@@ -71,12 +71,14 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -320,8 +322,10 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
             .setSignature(signature).setStringToSign(strToSign))
         .build();
 
-    GenericTestUtils.waitFor(() -> cluster.getOzoneManager().isLeaderReady(),
-        100, 120000);
+
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> cluster.getOzoneManager().isLeaderReady());
     OMResponse omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, writeRequest);
 

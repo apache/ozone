@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
@@ -45,10 +44,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -561,15 +562,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
 
     // wait for DB updates
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
-      } catch (IOException e) {
-        LOG.error("DB failure!", e);
-        Assert.fail("DB failure!");
-        return false;
-      }
-    }, 1000, 120000);
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .ignoreException(IOException.class)
+        .untilAsserted(() -> Assert.assertTrue(
+            omMgr.getOpenKeyTable(getBucketLayout()).isEmpty()));
   }
 
   /**

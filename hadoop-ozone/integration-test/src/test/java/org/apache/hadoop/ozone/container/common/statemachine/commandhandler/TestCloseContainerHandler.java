@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import java.time.Duration;
 import java.util.HashMap;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -39,12 +40,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.awaitility.Awaitility.await;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -135,13 +136,10 @@ public class TestCloseContainerHandler {
     cluster.getStorageContainerManager().getScmNodeManager()
         .addDatanodeCommand(datanodeDetails.getUuid(), command);
 
-    GenericTestUtils.waitFor(() ->
-            isContainerClosed(cluster, containerId.getId()),
-            500,
-            5 * 1000);
-
-    //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(cluster, containerId.getId()));
+    await().atMost(Duration.ofSeconds(5))
+        .pollInterval(Duration.ofMillis(500))
+        .untilAsserted(() ->
+            Assert.assertTrue(isContainerClosed(cluster, containerId.getId())));
   }
 
   private static Boolean isContainerClosed(MiniOzoneCluster cluster,

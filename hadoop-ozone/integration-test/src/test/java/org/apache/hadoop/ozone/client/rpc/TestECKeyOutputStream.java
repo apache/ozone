@@ -46,13 +46,13 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
@@ -62,6 +62,7 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests key output stream.
@@ -332,16 +333,14 @@ public class TestECKeyOutputStream {
     long currentKeyContainerID =
         key.getOzoneKeyLocations().get(0).getContainerID();
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return (containerOperationClient.getContainer(currentKeyContainerID)
-            .getNumberOfKeys() == 1) && (containerOperationClient
-            .getContainerReplicas(currentKeyContainerID).size() == 5);
-      } catch (IOException exception) {
-        Assert.fail("Unexpected exception " + exception);
-        return false;
-      }
-    }, 100, 10000);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() ->
+            (containerOperationClient.getContainer(currentKeyContainerID)
+                .getNumberOfKeys() == 1) && (containerOperationClient
+                .getContainerReplicas(currentKeyContainerID).size() == 5));
     validateContent(inputData, bucket, key);
   }
 
@@ -412,8 +411,10 @@ public class TestECKeyOutputStream {
         // Wait for flushing thread to finish its work.
         final long checkpoint = System.currentTimeMillis();
         ecOut.insertFlushCheckpoint(checkpoint);
-        GenericTestUtils.waitFor(() -> ecOut.getFlushCheckpoint() == checkpoint,
-            100, 10000);
+
+        await().atMost(Duration.ofSeconds(100))
+            .pollInterval(Duration.ofMillis(500))
+            .until(() -> ecOut.getFlushCheckpoint() == checkpoint);
 
         // Check the second blockGroup pipeline to make sure that the failed
         // node is not selected.

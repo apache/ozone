@@ -19,17 +19,18 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.fail;
 
 /**
@@ -46,7 +47,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
   @Test
   public void testKeyPathLockMultiThreading() throws Exception {
     testSameKeyPathWriteLockMultiThreading(10, 100);
-    testDiffKeyPathWriteLockMultiThreading(10, 100);
+    testDiffKeyPathWriteLockMultiThreading(10);
   }
 
   private static class Counter {
@@ -140,17 +141,15 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
         generateResourceHashCode(resource, sampleResourceName));
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
 
-    /**
-     * Critical Section. count = count + 1;
-     */
+    // Critical Section. count = count + 1;
     for (int idx = 0; idx < iterations; idx++) {
       counter.incrementCount();
     }
 
-    //  Sequence of tokens range from 1-100 (if iterations = 100) for each
-    //  thread. For example:
-    //  Thread-1 -> 1 - 100
-    //  Thread-2 -> 101 - 200 and so on.
+    // Sequence of tokens range from 1-100 (if iterations = 100) for each
+    // thread. For example:
+    // Thread-1 -> 1 - 100
+    // Thread-2 -> 101 - 200 and so on.
     listTokens.add(counter.getCount());
 
     lock.releaseWriteHashedLock(resource,
@@ -164,9 +163,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
   // "/a/b/c/d/key4 - WLock - 4th iteration"  -- allowed
   // "/a/b/c/d/key5 - WLock - 5th iteration"  -- allowed
   // (iterations are parallel)
-
-  public void testDiffKeyPathWriteLockMultiThreading(int threadCount,
-                                                     int iterations)
+  public void testDiffKeyPathWriteLockMultiThreading(int threadCount)
       throws Exception {
 
     String volumeName = UUID.randomUUID().toString();
@@ -175,11 +172,9 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
     Thread[] threads = new Thread[threadCount];
-    Counter counter = new Counter();
     CountDownLatch countDown = new CountDownLatch(threadCount);
 
     for (int i = 0; i < threads.length; i++) {
-
       threads[i] = new Thread(() -> {
         String keyName = UUID.randomUUID().toString();
         String[] sampleResourceName =
@@ -192,26 +187,13 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
       threads[i].start();
     }
 
-    /**
-     * Waiting for all the threads to count down
-     */
-    GenericTestUtils.waitFor(() -> {
-      if (countDown.getCount() > 0) {
-        LOG.info("Waiting for the threads to count down {} ",
-            countDown.getCount());
-        return false;
-      }
-      return true; // all threads have finished counting down.
-    }, 3000, 120000); // 2 minutes
-
-    Assert.assertEquals(0, countDown.getCount());
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(3))
+        .untilAsserted(() -> Assert.assertEquals(0, countDown.getCount()));
 
     for (Thread t : threads) {
       t.join();
     }
-
-    LOG.info("Expected = " + threadCount * iterations + ", Actual = " +
-        counter.getCount());
   }
 
   private void testDiffKeyPathWriteLockMultiThreadingUtil(

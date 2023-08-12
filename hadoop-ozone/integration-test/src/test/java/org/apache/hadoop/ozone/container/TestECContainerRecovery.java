@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -50,11 +49,10 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Reco
 import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -65,13 +63,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -90,8 +88,6 @@ public class TestECContainerRecovery {
   private static int dataBlocks = 3;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(TestECContainerRecovery.class);
   /**
    * Create a MiniDFSCluster for testing.
    */
@@ -309,25 +305,23 @@ public class TestECContainerRecovery {
                       "coordinator");
 
       Mockito.doAnswer(invocation -> {
-        GenericTestUtils.waitFor(() ->
-            dn.getDatanodeStateMachine()
-                .getContainer()
-                .getContainerSet()
-                .getContainer(finalContainer.getContainerID())
-                .getContainerState() ==
-                    ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-            1000, 100000);
+        await().atMost(Duration.ofSeconds(100))
+            .pollInterval(Duration.ofSeconds(1))
+            .untilAsserted(() -> Assertions.assertEquals(UNHEALTHY,
+                dn.getDatanodeStateMachine()
+                    .getContainer()
+                    .getContainerSet()
+                    .getContainer(finalContainer.getContainerID())
+                    .getContainerState()));
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;
       }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.any());
+          Mockito.any(), Mockito.any());
     }
 
     // Shutting down DN triggers close pipeline and close container.
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
-
-
 
     // Make sure container closed.
     waitForSCMContainerState(StorageContainerDatanodeProtocolProtos
@@ -342,12 +336,17 @@ public class TestECContainerRecovery {
     // Start the RM to resume the replication process and wait for the
     // reconstruction.
     scm.getReplicationManager().start();
-    GenericTestUtils.waitFor(() -> reconstructedDN.get() != null, 10000,
-            100000);
-    GenericTestUtils.waitFor(() -> reconstructedDN.get()
-            .getDatanodeStateMachine().getContainer().getContainerSet()
-            .getContainer(finalContainer.getContainerID()) == null,
-            10000, 100000);
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(10))
+        .untilAsserted(() -> Assertions.assertNotNull(reconstructedDN.get()));
+
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofSeconds(10))
+        .untilAsserted(() -> Assertions.assertNull(reconstructedDN.get()
+            .getDatanodeStateMachine()
+            .getContainer()
+            .getContainerSet()
+            .getContainer(finalContainer.getContainerID())));
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       dn.getDatanodeStateMachine().getContainer().getContainerSet()
               .setRecoveringTimeout(recoveryTimeoutMap.get(dn));
@@ -355,50 +354,38 @@ public class TestECContainerRecovery {
   }
 
   private void waitForDNContainerState(ContainerInfo container,
-      StorageContainerManager scm) throws InterruptedException,
-      TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        List<ContainerReplica> unhealthyReplicas = scm.getContainerManager()
-            .getContainerReplicas(container.containerID()).stream()
-            .filter(r -> !ReplicationManager
-                .compareState(container.getState(), r.getState()))
-            .collect(Collectors.toList());
-        return unhealthyReplicas.size() == 0;
-      } catch (ContainerNotFoundException e) {
-        return false;
-      }
-    }, 100, 100000);
+                                       StorageContainerManager scm) {
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(ContainerNotFoundException.class)
+        .until(() -> scm.getContainerManager()
+            .getContainerReplicas(container.containerID())
+            .stream()
+            .allMatch(r -> ReplicationManager
+                .compareState(container.getState(), r.getState())));
   }
 
   private void waitForSCMContainerState(
       StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State state,
-      ContainerID containerID) throws TimeoutException, InterruptedException {
-    //Wait until container closed at SCM
-    GenericTestUtils.waitFor(() -> {
-      try {
-        HddsProtos.LifeCycleState containerState = cluster
-            .getStorageContainerManager().getContainerManager()
-            .getContainer(containerID).getState();
-        return ReplicationManager.compareState(containerState, state);
-      } catch (IOException e) {
-        return false;
-      }
-    }, 100, 100000);
+      ContainerID containerID) {
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() -> {
+          HddsProtos.LifeCycleState containerState = cluster
+              .getStorageContainerManager().getContainerManager()
+              .getContainer(containerID).getState();
+          return ReplicationManager.compareState(containerState, state);
+        });
   }
 
   private void waitForContainerCount(int count, ContainerID containerID,
-      StorageContainerManager scm)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return scm.getContainerManager()
-            .getContainerReplicas(containerID)
-            .size() == count;
-      } catch (ContainerNotFoundException e) {
-        return false;
-      }
-    }, 100, 100000);
+                                     StorageContainerManager scm) {
+    await().atMost(Duration.ofSeconds(100))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(ContainerNotFoundException.class)
+        .until(() -> scm.getContainerManager()
+            .getContainerReplicas(containerID).size() == count);
   }
 
   private byte[] getInputBytes(int numChunks) {
@@ -411,9 +398,9 @@ public class TestECContainerRecovery {
     return inputData;
   }
 
-  private void waitForReplicationManagerStopped(ReplicationManager rm)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> !rm.isRunning(), 100, 10000);
+  private void waitForReplicationManagerStopped(ReplicationManager rm) {
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !rm.isRunning());
   }
-
 }

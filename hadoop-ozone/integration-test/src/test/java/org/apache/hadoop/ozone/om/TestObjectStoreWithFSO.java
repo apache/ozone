@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.AfterClass;
 import org.junit.After;
@@ -58,6 +57,7 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -73,6 +73,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -819,16 +820,10 @@ public class TestObjectStoreWithFSO {
 
     if (isEmpty) {
       // wait for DB updates
-      GenericTestUtils.waitFor(() -> {
-        try {
-          OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
-          return omKeyInfo == null;
-        } catch (IOException e) {
-          Assert.fail("DB failure!");
-          return false;
-        }
-
-      }, 1000, 120000);
+      await().atMost(Duration.ofSeconds(120))
+          .pollInterval(Duration.ofSeconds(1))
+          .ignoreException(IOException.class)
+          .until(() -> openFileTable.get(dbOpenFileKey) == null);
     } else {
       OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
       Assert.assertNotNull("Table is empty!", omKeyInfo);

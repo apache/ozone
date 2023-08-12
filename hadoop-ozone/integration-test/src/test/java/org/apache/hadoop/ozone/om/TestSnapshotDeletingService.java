@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,11 +49,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -62,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -131,8 +131,10 @@ public class TestSnapshotDeletingService {
     createSnapshotDataForBucket1();
 
     assertTableRowCount(snapshotInfoTable, 2);
-    GenericTestUtils.waitFor(() -> snapshotDeletingService
-            .getSuccessfulRunCount() >= 1, 1000, 10000);
+
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> snapshotDeletingService.getSuccessfulRunCount() >= 1);
 
     OmSnapshot bucket1snap3 = (OmSnapshot) om.getOmSnapshotManager()
         .checkForSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
@@ -148,7 +150,6 @@ public class TestSnapshotDeletingService {
 
   @Test
   public void testMultipleSnapshotKeyReclaim() throws Exception {
-
     Table<String, RepeatedOmKeyInfo> deletedTable =
         om.getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
@@ -421,7 +422,6 @@ public class TestSnapshotDeletingService {
     }
     assertTableRowCount(deletedTable, 15);
 
-    snap1 = null;
     rcSnap1.close();
   }
 
@@ -525,31 +525,29 @@ public class TestSnapshotDeletingService {
     UUID globalPreviousSnapshotId =
         deletedSnapshot.getGlobalPreviousSnapshotId();
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable()
-            .get(deletedSnapshot.getTableKey());
-        return snapshotInfo == null;
-      } catch (IOException e) {
-        LOG.error("Error getting snapInfo.");
-      }
-      return false;
-    }, 100, 10000);
+    await().atMost(Duration.ofSeconds(10))
+        .pollInterval(Duration.ofMillis(100))
+        .ignoreException(IOException.class)
+        .until(() -> metadataManager.getSnapshotInfoTable()
+            .get(deletedSnapshot.getTableKey()) == null);
 
     if (nextSnapshot != null) {
       SnapshotInfo nextSnapshotInfo = metadataManager
           .getSnapshotInfoTable().get(nextSnapshot);
-      GenericTestUtils.waitFor(() -> Objects.equals(
-          nextSnapshotInfo.getPathPreviousSnapshotId(), pathPreviousSnapshotId)
-          && Objects.equals(nextSnapshotInfo.getGlobalPreviousSnapshotId(),
-          globalPreviousSnapshotId), 100, 10000);
+
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> Objects.equals(pathPreviousSnapshotId,
+              nextSnapshotInfo.getPathPreviousSnapshotId())
+              && Objects.equals(globalPreviousSnapshotId,
+              nextSnapshotInfo.getGlobalPreviousSnapshotId()));
     }
   }
 
-  private void assertTableRowCount(Table<String, ?> table, int count)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> assertTableRowCount(count, table), 1000,
-        120000); // 2 minutes
+  private void assertTableRowCount(Table<String, ?> table, int count) {
+    await().atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .until(() -> assertTableRowCount(count, table));
   }
 
   private boolean assertTableRowCount(int expectedCount,

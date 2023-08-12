@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -32,11 +32,12 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.Assert;
+
+import static org.awaitility.Awaitility.await;
 
 /**
  * Helper class for Tests.
@@ -121,7 +122,6 @@ public final class OzoneTestUtils {
    *
    * @param consumer Consumer which accepts BlockID as argument.
    * @param omKeyLocationInfoGroups locationInfos for a key.
-   * @throws IOException
    */
   public static void performOperationOnKeyContainers(
       CheckedConsumer<BlockID, Exception> consumer,
@@ -154,13 +154,14 @@ public final class OzoneTestUtils {
     * Close container & Wait till container state becomes CLOSED.
    */
   public static void closeContainer(StorageContainerManager scm,
-      ContainerInfo container)
-      throws IOException, TimeoutException, InterruptedException {
+                                    ContainerInfo container)
+      throws IOException {
     Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
     scm.getPipelineManager().closePipeline(pipeline, false);
-    GenericTestUtils.waitFor(() ->
-            container.getState() == HddsProtos.LifeCycleState.CLOSED,
-        200, 30000);
+
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(200))
+        .until(() -> container.getState() == HddsProtos.LifeCycleState.CLOSED);
   }
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -91,6 +91,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.anyHostWithFreePort;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
 import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
@@ -103,6 +104,8 @@ import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.awaitility.Awaitility.await;
+
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
@@ -195,11 +198,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     return null;
   }
 
-  public void waitForSCMToBeReady() throws TimeoutException,
-      InterruptedException {
+  public void waitForSCMToBeReady() {
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      GenericTestUtils.waitFor(scm::checkLeader,
-          1000, waitForClusterToBeReadyTimeout);
+      await().atMost(Duration.ofMillis(waitForClusterToBeReadyTimeout))
+          .pollInterval(Duration.ofMillis(1000))
+          .until(scm::checkLeader);
     }
   }
 
@@ -211,26 +214,26 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * Waits for the Ozone cluster to be ready for processing requests.
    */
   @Override
-  public void waitForClusterToBeReady()
-      throws TimeoutException, InterruptedException {
+  public void waitForClusterToBeReady() {
     waitForSCMToBeReady();
-    GenericTestUtils.waitFor(() -> {
-      StorageContainerManager activeScm = getActiveSCM();
-      final int healthy = activeScm.getNodeCount(HEALTHY);
-      final boolean isNodeReady = healthy == hddsDatanodes.size();
-      final boolean exitSafeMode = !activeScm.isInSafeMode();
-      final boolean checkScmLeader = activeScm.checkLeader();
+    await().atMost(Duration.ofMillis(waitForClusterToBeReadyTimeout))
+        .pollInterval(Duration.ofMillis(1000))
+        .until(() -> {
+          StorageContainerManager activeScm = getActiveSCM();
+          final int healthy = activeScm.getNodeCount(HEALTHY);
+          final boolean isNodeReady = healthy == hddsDatanodes.size();
+          final boolean exitSafeMode = !activeScm.isInSafeMode();
+          final boolean checkScmLeader = activeScm.checkLeader();
 
-      LOG.info("{}. Got {} of {} DN Heartbeats.",
-          isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
-          healthy, hddsDatanodes.size());
-      LOG.info(exitSafeMode ? "Cluster exits safe mode" :
+          LOG.info("{}. Got {} of {} DN Heartbeats.",
+              isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
+              healthy, hddsDatanodes.size());
+          LOG.info(exitSafeMode ? "Cluster exits safe mode" :
               "Waiting for cluster to exit safe mode");
-      LOG.info(checkScmLeader ? "SCM became leader" :
-          "SCM has not become leader");
-
-      return isNodeReady && exitSafeMode && checkScmLeader;
-    }, 1000, waitForClusterToBeReadyTimeout);
+          LOG.info(checkScmLeader ? "SCM became leader" :
+              "SCM has not become leader");
+          return isNodeReady && exitSafeMode && checkScmLeader;
+        });
   }
 
   /**
@@ -239,14 +242,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
-                                       int timeoutInMs) throws
-      TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      int openPipelineCount = scm.getPipelineManager().
-          getPipelines(RatisReplicationConfig.getInstance(factor),
-              Pipeline.PipelineState.OPEN).size();
-      return openPipelineCount >= 1;
-    }, 1000, timeoutInMs);
+                                       int timeoutInMs) {
+    await().atMost(Duration.ofMillis(timeoutInMs))
+        .pollInterval(Duration.ofMillis(1000))
+        .until(() -> scm.getPipelineManager().
+            getPipelines(RatisReplicationConfig.getInstance(factor), OPEN)
+            .size() >= 1);
   }
 
   /**
@@ -263,20 +264,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   /**
    * Waits for SCM to be out of Safe Mode. Many tests can be run iff we are out
    * of Safe mode.
-   *
-   * @throws TimeoutException
-   * @throws InterruptedException
    */
   @Override
-  public void waitTobeOutOfSafeMode()
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      if (!scm.isInSafeMode()) {
-        return true;
-      }
-      LOG.info("Waiting for cluster to be ready. No datanodes found");
-      return false;
-    }, 100, 1000 * 45);
+  public void waitTobeOutOfSafeMode() {
+    await().atMost(Duration.ofSeconds(45))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> !scm.isInSafeMode());
   }
 
   @Override
@@ -377,23 +370,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     startRecon();
   }
 
-  private void waitForHddsDatanodeToStop(DatanodeDetails dn)
-      throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      NodeStatus status;
-      try {
-        status = getStorageContainerManager()
-            .getScmNodeManager().getNodeStatus(dn);
-      } catch (NodeNotFoundException e) {
-        return true;
-      }
-      if (status.equals(NodeStatus.inServiceHealthy())) {
-        LOG.info("Waiting on datanode to be marked stale.");
-        return false;
-      } else {
-        return true;
-      }
-    }, 1000, waitForClusterToBeReadyTimeout);
+  private void waitForHddsDatanodeToStop(DatanodeDetails dn) {
+    await().atMost(Duration.ofMillis(waitForClusterToBeReadyTimeout))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> {
+          try {
+            return !getStorageContainerManager()
+                .getScmNodeManager()
+                .getNodeStatus(dn)
+                .equals(NodeStatus.inServiceHealthy());
+          } catch (NodeNotFoundException e) {
+            return true;
+          }
+        });
   }
 
   @Override
@@ -697,7 +686,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       clientConfig.setStreamWindowSize(Math.round(
           streamBufferSizeUnit.get().toBytes(datastreamWindowSize.get())));
       conf.setFromObject(clientConfig);
-
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
           chunkSize.get(), streamBufferSizeUnit.get());
 
@@ -705,8 +693,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           streamBufferSizeUnit.get());
       // MiniOzoneCluster should have global pipeline upper limit.
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-          pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
-              pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
+          Math.max(pipelineNumLimit, DEFAULT_PIPELINE_LIMIT));
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
@@ -764,17 +751,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       scmStore.setScmId(scmId.get());
       scmStore.initialize();
-      //TODO: HDDS-6897
-      //Disabling Ratis for only of MiniOzoneClusterImpl.
-      //MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
+      // TODO: HDDS-6897
+      // Disabling Ratis for only of MiniOzoneClusterImpl.
+      // MiniOzoneClusterImpl doesn't work with Ratis enabled SCM
       if (StringUtils.isNotEmpty(
           conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))
-              && SCMHAUtils.isSCMHAEnabled(conf)) {
+          && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
         SCMRatisServerImpl.initialize(clusterId, scmId.get(),
-                SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                        .getLocalNodeDetails(), conf);
+            SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
+                .getLocalNodeDetails(), conf);
       }
     }
 

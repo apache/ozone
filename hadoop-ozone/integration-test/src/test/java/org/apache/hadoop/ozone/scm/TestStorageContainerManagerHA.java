@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -53,6 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,6 +64,7 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Base class for SCM HA tests.
@@ -151,16 +152,17 @@ public class TestStorageContainerManagerHA {
         .asSCMHADBTransactionBuffer().getLatestSnapshot();
     testPutKey();
     final StorageContainerManager leaderScmTmp = leaderScm;
-    GenericTestUtils.waitFor(() -> {
-      if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
-          .getLatestSnapshot() != null) {
-        if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
-            .getLatestSnapshot().getIndex() > latestSnapshot.getIndex()) {
-          return true;
-        }
-      }
-      return false;
-    }, 2000, 30000);
+
+    await().atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(2))
+        .until(() -> {
+          if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
+              .getLatestSnapshot() != null) {
+            return leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
+                .getLatestSnapshot().getIndex() > latestSnapshot.getIndex();
+          }
+          return false;
+        });
   }
 
   @Test
@@ -212,7 +214,9 @@ public class TestStorageContainerManagerHA {
       Assertions.assertNotEquals(-1, index);
       long finalIndex = index;
       // Ensure all follower scms have caught up with the leader
-      GenericTestUtils.waitFor(() -> areAllScmInSync(finalIndex), 100, 10000);
+      await().atMost(Duration.ofSeconds(10))
+          .pollInterval(Duration.ofMillis(100))
+          .until(() -> areAllScmInSync(finalIndex));
       final long containerID = keyLocationInfos.get(0).getContainerID();
       for (int k = 0; k < numOfSCMs; k++) {
         StorageContainerManager scm =
@@ -362,15 +366,11 @@ public class TestStorageContainerManagerHA {
    * There are test cases where we might need to
    * wait for a leader to be elected and ready.
    */
-  private void waitForLeaderToBeReady()
-      throws InterruptedException, TimeoutException {
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return cluster.getActiveSCM().checkLeader();
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, (int) ScmConfigKeys
-        .OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT);
+  private void waitForLeaderToBeReady() {
+    await().atMost(Duration.ofMillis(
+            ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT_DEFAULT))
+        .pollInterval(Duration.ofMillis(1000))
+        .ignoreExceptions()
+        .until(() -> cluster.getActiveSCM().checkLeader());
   }
 }

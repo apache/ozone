@@ -50,13 +50,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.awaitility.Awaitility.await;
 
 /**
  * Tests failover with SCM HA setup.
@@ -245,14 +246,11 @@ public class TestFailoverWithSCMHA {
    * @throws IOException
    * @throws IllegalContainerBalancerStateException
    * @throws InvalidContainerBalancerConfigurationException
-   * @throws InterruptedException
-   * @throws TimeoutException
    */
   @Test
   public void testContainerBalancerPersistsConfigurationInAllSCMs()
       throws IOException, IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, InterruptedException,
-      TimeoutException {
+      InvalidContainerBalancerConfigurationException {
     SCMClientConfig scmClientConfig =
         conf.getObject(SCMClientConfig.class);
     scmClientConfig.setRetryInterval(100);
@@ -276,8 +274,9 @@ public class TestFailoverWithSCMHA {
     containerBalancer.startBalancer(balancerConf);
 
     // assert that balancer has stopped since the cluster is already balanced
-    GenericTestUtils.waitFor(() -> !containerBalancer.isBalancerRunning(),
-        10, 500);
+    await().atMost(Duration.ofMillis(500))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> !containerBalancer.isBalancerRunning());
     Assertions.assertFalse(containerBalancer.isBalancerRunning());
 
     ByteString byteString =
@@ -285,7 +284,9 @@ public class TestFailoverWithSCMHA {
             containerBalancer.getServiceName());
     ContainerBalancerConfigurationProto proto =
         ContainerBalancerConfigurationProto.parseFrom(byteString);
-    GenericTestUtils.waitFor(() -> !proto.getShouldRun(), 5, 50);
+    await().atMost(Duration.ofMillis(50))
+        .pollInterval(Duration.ofMillis(5))
+        .until(() -> !proto.getShouldRun());
 
     long leaderTermIndex =
         leader.getScmHAManager().getRatisServer().getSCMStateMachine()
@@ -299,14 +300,20 @@ public class TestFailoverWithSCMHA {
         // Wait and retry for follower to update transactions to leader
         // snapshot index.
         // Timeout error if follower does not load update within 3s
-        GenericTestUtils.waitFor(() -> scm.getScmHAManager().getRatisServer()
-            .getSCMStateMachine().getLastAppliedTermIndex()
-            .getIndex() >= leaderTermIndex, 100, 3000);
+        await().atMost(Duration.ofSeconds(3))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> scm.getScmHAManager()
+                .getRatisServer()
+                .getSCMStateMachine()
+                .getLastAppliedTermIndex()
+                .getIndex() >= leaderTermIndex);
         ContainerBalancer followerBalancer = scm.getContainerBalancer();
-        GenericTestUtils.waitFor(
-            () -> !followerBalancer.isBalancerRunning(), 50, 5000);
-        GenericTestUtils.waitFor(() -> !followerBalancer.shouldRun(), 100,
-            5000);
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(50))
+            .until(() -> !followerBalancer.isBalancerRunning());
+        await().atMost(Duration.ofSeconds(5))
+            .pollInterval(Duration.ofMillis(100))
+            .until(() -> !followerBalancer.shouldRun());
       }
       scm.getStatefulServiceStateManager().readConfiguration(
           containerBalancer.getServiceName());

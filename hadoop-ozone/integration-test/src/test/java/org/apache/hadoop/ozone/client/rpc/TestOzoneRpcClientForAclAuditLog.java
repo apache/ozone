@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -49,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -62,6 +62,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -279,7 +280,10 @@ public class TestOzoneRpcClientForAclAuditLog {
   private void verifyLog(String... expected) throws Exception {
     File file = new File("audit.log");
     final List<String> lines = FileUtils.readLines(file, (String)null);
-    GenericTestUtils.waitFor(() -> lines != null, 100, 60000);
+
+    await().atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(100))
+        .until(() -> lines != null);
 
     try {
       // When log entry is expected, the log file will contain one line and
