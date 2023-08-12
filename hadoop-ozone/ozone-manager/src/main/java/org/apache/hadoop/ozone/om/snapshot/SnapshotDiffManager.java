@@ -894,9 +894,9 @@ public class SnapshotDiffManager implements AutoCloseable {
           new RocksDbPersistentMap<>(db, toSnapshotColumnFamily, codecRegistry,
               byte[].class, byte[].class);
       // Set of unique objectId between fromSnapshot and toSnapshot.
-      final PersistentMap<byte[], SnapshotDiffObject> objectIdToDiffObject =
+      final PersistentMap<byte[], byte[]> objectIdToDiffObject =
           new RocksDbPersistentMap<>(db, objectIDsColumnFamily, codecRegistry,
-              byte[].class, SnapshotDiffObject.class);
+              byte[].class, byte[].class);
 
       final BucketLayout bucketLayout = getBucketLayout(volumeName, bucketName,
           fromSnapshot.getMetadataManager());
@@ -995,7 +995,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                 volumeName, bucketName,
                 fromSnapshotName, toSnapshotName,
                 bucketLayout.isFileSystemOptimized(), oldParentIdPathMap,
-                newParentIdPathMap);
+                newParentIdPathMap, tablePrefixes);
             // If job is cancelled, totalDiffEntries will be equal to -1.
             if (totalDiffEntries >= 0 &&
                 areDiffJobAndSnapshotsActive(volumeName, bucketName,
@@ -1057,7 +1057,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Map<String, String> tablePrefixes,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-      final PersistentMap<byte[], SnapshotDiffObject> objectIdToDiffObject,
+      final PersistentMap<byte[], byte[]> objectIdToDiffObject,
       final Optional<Set<Long>> oldParentIds,
       final Optional<Set<Long>> newParentIds,
       final String diffDir) throws IOException, RocksDBException {
@@ -1117,7 +1117,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       Set<String> deltaFiles, boolean nativeRocksToolsLoaded,
       PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       PersistentMap<byte[], byte[]> newObjIdToKeyMap,
-      PersistentMap<byte[], SnapshotDiffObject> objectIdToDiffObject,
+      PersistentMap<byte[], byte[]> objectIdToDiffObject,
       Optional<Set<Long>> oldParentIds,
       Optional<Set<Long>> newParentIds,
       Map<String, String> tablePrefixes) throws IOException,
@@ -1128,6 +1128,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     String tablePrefix = getTablePrefix(tablePrefixes, fsTable.getName());
     boolean isDirectoryTable =
         fsTable.getName().equals(DIRECTORY_TABLE);
+    byte[] isDirectoryTableByteArray = {(byte) (isDirectoryTable ? 1 : 0)};
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
 
@@ -1154,10 +1155,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             byte[] rawValue = codecRegistry.asRawData(
                 key.substring(tablePrefix.length()));
             oldObjIdToKeyMap.put(rawObjId, rawValue);
-            SnapshotDiffObject diffObject =
-                createDiffObjectWithOldName(fromObjectId.getObjectID(), key,
-                    objectIdToDiffObject.get(rawObjId), isDirectoryTable);
-            objectIdToDiffObject.put(rawObjId, diffObject);
+            objectIdToDiffObject.put(rawObjId, isDirectoryTableByteArray);
             oldParentIds.ifPresent(set -> set.add(
                 fromObjectId.getParentObjectID()));
           }
@@ -1166,10 +1164,7 @@ public class SnapshotDiffManager implements AutoCloseable {
             byte[] rawValue = codecRegistry.asRawData(
                 key.substring(tablePrefix.length()));
             newObjIdToKeyMap.put(rawObjId, rawValue);
-            SnapshotDiffObject diffObject =
-                createDiffObjectWithNewName(toObjectId.getObjectID(), key,
-                    objectIdToDiffObject.get(rawObjId), isDirectoryTable);
-            objectIdToDiffObject.put(rawObjId, diffObject);
+            objectIdToDiffObject.put(rawObjId, isDirectoryTableByteArray);
             newParentIds.ifPresent(set -> set.add(toObjectId
                 .getParentObjectID()));
           }
@@ -1311,7 +1306,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final Table<String, OmKeyInfo> tsTable,
       final Table<String, OmDirectoryInfo> fsDirTable,
       final Table<String, OmDirectoryInfo> tsDirTable,
-      final PersistentMap<byte[], SnapshotDiffObject> objectIdToDiffObject,
+      final PersistentMap<byte[], byte[]> objectIdToDiffObject,
       final PersistentMap<byte[], byte[]> oldObjIdToKeyMap,
       final PersistentMap<byte[], byte[]> newObjIdToKeyMap,
       final String volumeName,
@@ -1320,7 +1315,8 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String toSnapshotName,
       final boolean isFSOBucket,
       final Optional<Map<Long, Path>> oldParentIdPathMap,
-      final Optional<Map<Long, Path>> newParentIdPathMap) {
+      final Optional<Map<Long, Path>> newParentIdPathMap,
+      final Map<String, String> tablePrefix) {
     LOG.info("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
@@ -1349,7 +1345,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final PersistentList<byte[]> modifyDiffs =
           createDiffReportPersistentList(modifyDiffColumnFamily);
 
-      try (ClosableIterator<Map.Entry<byte[], SnapshotDiffObject>>
+      try (ClosableIterator<Map.Entry<byte[], byte[]>>
                iterator = objectIdToDiffObject.iterator()) {
         // This counter is used, so that we can check every 100 elements
         // if the job is cancelled and snapshots are still active.
@@ -1361,9 +1357,9 @@ public class SnapshotDiffManager implements AutoCloseable {
             return -1L;
           }
 
-          Map.Entry<byte[], SnapshotDiffObject> nextEntry = iterator.next();
+          Map.Entry<byte[], byte[]> nextEntry = iterator.next();
           byte[] id = nextEntry.getKey();
-          SnapshotDiffObject snapshotDiffObject = nextEntry.getValue();
+          boolean isDirectoryObject = nextEntry.getValue()[0] == 1;
 
           /*
            * This key can be
@@ -1397,31 +1393,39 @@ public class SnapshotDiffManager implements AutoCloseable {
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
             deleteDiffs.add(codecRegistry.asRawData(entry));
-          } else if (Arrays.equals(oldKeyName, newKeyName)) { // Key modified.
+          } else if (isDirectoryObject &&
+              Arrays.equals(oldKeyName, newKeyName)) {
             String key = resolveBucketRelativePath(isFSOBucket,
                 newParentIdPathMap, newKeyName);
             DiffReportEntry entry =
                 SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, key);
             modifyDiffs.add(codecRegistry.asRawData(entry));
-          } else { // Key Renamed.
+          } else {
+            // Key Renamed.
+            String keyPrefix = getTablePrefix(tablePrefix,
+                (isDirectoryObject ? fsDirTable : fsTable).getName());
             String oldKey = resolveBucketRelativePath(isFSOBucket,
                 oldParentIdPathMap, oldKeyName);
-            String newKey = resolveBucketRelativePath(isFSOBucket,
-                newParentIdPathMap, newKeyName);
-            renameDiffs.add(codecRegistry.asRawData(
-                SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
-                    newKey)));
-
             // Check if block location is same or not. If it is not same,
             // key must have been overridden as well.
-            if (isObjectModified(snapshotDiffObject.getOldKeyName(),
-                snapshotDiffObject.getNewKeyName(),
-                snapshotDiffObject.isDirectory() ? fsDirTable : fsTable,
-                snapshotDiffObject.isDirectory() ? tsDirTable : tsTable)) {
+            boolean isObjectModified = false;
+            if (isObjectModified(
+                keyPrefix + codecRegistry.asObject(oldKeyName, String.class),
+                keyPrefix + codecRegistry.asObject(newKeyName, String.class),
+                isDirectoryObject ? fsDirTable : fsTable,
+                isDirectoryObject ? tsDirTable : tsTable)) {
               // Here, oldKey name is returned as modified. Modified key name is
               // based on base snapshot (from snapshot).
-              renameDiffs.add(codecRegistry.asRawData(
+              modifyDiffs.add(codecRegistry.asRawData(
                   SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, oldKey)));
+              isObjectModified = true;
+            }
+            if (!isObjectModified || !Arrays.equals(oldKeyName, newKeyName)) {
+              String newKey = resolveBucketRelativePath(isFSOBucket,
+                  newParentIdPathMap, newKeyName);
+              renameDiffs.add(codecRegistry.asRawData(
+                  SnapshotDiffReportOzone.getDiffReportEntry(RENAME, oldKey,
+                      newKey)));
             }
           }
 
@@ -1481,7 +1485,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private boolean isObjectModified(String fromObjectName, String toObjectName,
+  boolean isObjectModified(String fromObjectName, String toObjectName,
       final Table<String, ? extends WithObjectID> fromSnapshotTable,
       final Table<String, ? extends WithObjectID> toSnapshotTable)
       throws IOException {
