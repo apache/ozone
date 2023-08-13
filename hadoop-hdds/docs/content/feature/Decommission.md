@@ -25,7 +25,23 @@ summary: Decommissioning of SCM, OM and Datanode.
 
 #DataNode Decommission
 
-The DataNode decommission is the process that removes the existing DataNode from the Ozone cluster while ensuring that the new data should not be written to the decommissioned DataNode. When you initiate the process of decommissioning a DataNode, Ozone automatically ensures that all the storage containers on that DataNode have an additional copy created on another DataNode before the decommission completes.
+The DataNode decommission is the process that removes the existing DataNode from the Ozone cluster while ensuring that the new data should not be written to the decommissioned DataNode. When you initiate the process of decommissioning a DataNode, Ozone automatically ensures that all the storage containers on that DataNode have an additional copy created on another DataNode before the decommission completes. So, datanode will keep running after it has been decommissioned and may be used for reads, but not for writes until it is stopped manually.
+
+When we initiate the process of decommissioning, first we check the current state of the node, ideally it should be "IN_SERVICE", then we change it's state to "DECOMMISSIONING" and start the process of decommissioning, it goes through a workflow where the following happens:
+
+1. First an event is fired to close any pipelines on the node, which will also close any containers.
+
+2. Next the containers on the node are obtained and checked to see if new replicas are needed. If so, the new replicas are scheduled.
+
+3. After scheduling replication, the node remains pending until replication has completed.
+
+4. At this stage the node will complete the decommission process and the state of the node will be changed to "DECOMMISSIONED".
+
+To check the current state of the datanodes we can execute the following command,
+```shell
+ozone admin datanode list
+```
+
 
 To decommission a datanode you can execute the following command in cli,
 
