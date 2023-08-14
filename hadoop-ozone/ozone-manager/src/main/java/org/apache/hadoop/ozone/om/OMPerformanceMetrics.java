@@ -150,7 +150,7 @@ public class OMPerformanceMetrics {
     checkAccessLatencyNs.add(latencyInNs);
   }
 
-  public MutableRate getListKeysLatencyNs() {
-    return listKeysLatencyNs;
+  public void addListKeysLatencyNs(long latencyInNs) {
+    listKeysLatencyNs.add(latencyInNs);
   }
 }

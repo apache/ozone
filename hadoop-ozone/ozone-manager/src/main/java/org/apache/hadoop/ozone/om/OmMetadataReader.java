@@ -307,7 +307,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
-
+    long startNanos = Time.monotonicNowNanos();
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(
         Pair.of(volumeName, bucketName));
 
@@ -323,11 +323,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             bucket.realVolume(), bucket.realBucket(), keyPrefix);
       }
       metrics.incNumKeyLists();
-      List<OmKeyInfo> omKeyInfoList =
-          captureLatencyNs(perfMetrics.getListKeysLatencyNs(),
-              () -> keyManager.listKeys(bucket.realVolume(),
-                  bucket.realBucket(), startKey, keyPrefix, maxKeys));
-      return omKeyInfoList;
+      return keyManager.listKeys(bucket.realVolume(), bucket.realBucket(),
+          startKey, keyPrefix, maxKeys);
     } catch (IOException ex) {
       metrics.incNumKeyListFails();
       auditSuccess = false;
@@ -339,6 +336,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_KEYS,
             auditMap));
       }
+      perfMetrics.addListKeysLatencyNs(Time.monotonicNowNanos() - startNanos);
     }
   }
 
