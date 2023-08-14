@@ -822,8 +822,14 @@ public class TestObjectStoreWithFSO {
       // wait for DB updates
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .ignoreException(IOException.class)
-          .until(() -> openFileTable.get(dbOpenFileKey) == null);
+          .until(() -> {
+            try {
+              return openFileTable.get(dbOpenFileKey) == null;
+            } catch (IOException e) {
+              Assert.fail("DB failure.");
+              return false;
+            }
+          });
     } else {
       OmKeyInfo omKeyInfo = openFileTable.get(dbOpenFileKey);
       Assert.assertNotNull("Table is empty!", omKeyInfo);

@@ -155,10 +155,16 @@ public class TestMultiTenantVolume {
     await().atMost(Duration.ofSeconds(10))
         .pollInterval(Duration.ofMillis(500))
         .until(() -> {
-          final UpgradeFinalizer.StatusAndMessages progress =
-              omClient.queryUpgradeFinalizationProgress(
-                  upgradeClientID, false, false);
-          return isDone(progress.status());
+          try {
+            final UpgradeFinalizer.StatusAndMessages progress =
+                omClient.queryUpgradeFinalizationProgress(
+                    upgradeClientID, false, false);
+            return isDone(progress.status());
+          } catch (IOException e) {
+            Assert.fail("Unexpected exception while waiting for "
+                + "the OM upgrade to finalize. " + e.getMessage());
+            return false;
+          }
         });
   }
 

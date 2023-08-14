@@ -638,7 +638,14 @@ public class TestOzoneFileSystem {
     if (!enabledFileSystemPaths) {
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .until(() -> fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0);
+          .until(() -> {
+            try {
+              return fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0;
+            } catch (IOException e) {
+              Assert.fail("listStatus() failed.");
+              return false;
+            }
+          });
     }
 
     FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
@@ -662,11 +669,18 @@ public class TestOzoneFileSystem {
             .build();
     OpenKeySession session = writeClient.openKey(keyArgs);
     writeClient.commitKey(keyArgs, session.getId());
-    // Wait until the filestatus is updated
+    // Wait until the file status is updated
     if (!enabledFileSystemPaths) {
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .until(() -> fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0);
+          .until(() -> {
+            try {
+              return fs.listStatus(ROOT, EXCLUDE_TRASH).length != 0;
+            } catch (IOException e) {
+              Assert.fail("listStatus() failed.");
+              return false;
+            }
+          });
     }
     FileStatus[] fileStatuses = fs.listStatus(ROOT, EXCLUDE_TRASH);
     // the number of immediate children of root is 1
@@ -1657,7 +1671,14 @@ public class TestOzoneFileSystem {
     // Wait until the TrashEmptier purges the key
     await().atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(1))
-        .until(() -> !o3fs.exists(trashPath));
+        .until(() -> {
+          try {
+            return !o3fs.exists(trashPath);
+          } catch (IOException e) {
+            Assert.fail("Delete from trash failed.");
+            return false;
+          }
+        });
 
     // userTrash path will contain the checkpoint folder
     FileStatus[] statusList = fs.listStatus(userTrash);
@@ -1666,7 +1687,14 @@ public class TestOzoneFileSystem {
     // wait for deletion of checkpoint dir
     await().atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(1))
-        .until(() -> o3fs.listStatus(userTrash).length == 0);
+        .until(() -> {
+          try {
+            return o3fs.listStatus(userTrash).length == 0;
+          } catch (IOException e) {
+            Assert.fail("Delete from trash failed.");
+            return false;
+          }
+        });
   }
 
   @Test

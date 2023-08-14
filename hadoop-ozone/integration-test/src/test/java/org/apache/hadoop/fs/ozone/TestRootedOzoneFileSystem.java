@@ -1993,8 +1993,14 @@ public class TestRootedOzoneFileSystem {
     // Wait until the TrashEmptier purges the keys
     await().atMost(Duration.ofMinutes(3))
         .pollInterval(Duration.ofSeconds(1))
-        .ignoreException(IOException.class)
-        .until(() -> !ofs.exists(trashPath) && !ofs.exists(trashPath2));
+        .until(() -> {
+          try {
+            return !ofs.exists(trashPath) && !ofs.exists(trashPath2);
+          } catch (IOException e) {
+            Assert.fail("Delete from trash failed.");
+            return false;
+          }
+        });
 
     if (isBucketFSOptimized) {
       Assert.assertTrue(getOMMetrics()
@@ -2011,9 +2017,15 @@ public class TestRootedOzoneFileSystem {
     // wait for deletion of checkpoint dir
     await().atMost(Duration.ofMinutes(2))
         .pollInterval(Duration.ofSeconds(1))
-        .ignoreException(IOException.class)
-        .until(() -> ofs.listStatus(userTrash).length == 0 &&
-            ofs.listStatus(userTrash2).length == 0);
+        .until(() -> {
+          try {
+            return ofs.listStatus(userTrash).length == 0 &&
+                ofs.listStatus(userTrash2).length == 0;
+          } catch (IOException e) {
+            Assert.fail("Delete from trash failed.");
+            return false;
+          }
+        });
 
     // This condition should succeed once the checkpoint directory is deleted
     if (isBucketFSOptimized) {

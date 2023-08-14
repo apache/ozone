@@ -138,7 +138,9 @@ public class TestKeyPurging {
     await().atMost(Duration.ofSeconds(10))
         .pollInterval(Duration.ofSeconds(1))
         .untilAsserted(() -> Assert.assertTrue(
-            keyDeletingService.getRunCount().get() >= NUM_KEYS));
+            keyDeletingService.getDeletedKeyCount().get() >= NUM_KEYS));
+
+    Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
 
     await().atMost(Duration.ofSeconds(10))
         .pollInterval(Duration.ofSeconds(1))

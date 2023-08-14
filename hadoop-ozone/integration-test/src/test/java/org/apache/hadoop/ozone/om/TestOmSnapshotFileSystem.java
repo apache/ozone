@@ -494,8 +494,14 @@ public class TestOmSnapshotFileSystem {
     if (!enabledFileSystemPaths) {
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .ignoreException(IOException.class)
-          .until(() -> fs.listStatus(parent).length != 0);
+          .until(() -> {
+            try {
+              return fs.listStatus(parent).length != 0;
+            } catch (IOException e) {
+              Assert.fail("listStatus() failed.");
+              return false;
+            }
+          });
     }
 
     String snapshotKeyPrefix = createSnapshot();
@@ -518,8 +524,14 @@ public class TestOmSnapshotFileSystem {
     if (!enabledFileSystemPaths) {
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .ignoreException(IOException.class)
-          .until(() -> fs.listStatus(parent).length != 0);
+          .until(() -> {
+            try {
+              return fs.listStatus(parent).length != 0;
+            } catch (IOException e) {
+              Assert.fail("listStatus() failed.");
+              return false;
+            }
+          });
     }
 
     String snapshotKeyPrefix = createSnapshot();
@@ -547,8 +559,14 @@ public class TestOmSnapshotFileSystem {
     if (!enabledFileSystemPaths) {
       await().atMost(Duration.ofSeconds(120))
           .pollInterval(Duration.ofSeconds(1))
-          .ignoreException(IOException.class)
-          .until(() -> fs.listStatus(parent).length != 0);
+          .until(() -> {
+            try {
+              return fs.listStatus(parent).length != 0;
+            } catch (IOException e) {
+              Assert.fail("listStatus() failed.");
+              return false;
+            }
+          });
     }
 
     String snapshotKeyPrefix = createSnapshot();

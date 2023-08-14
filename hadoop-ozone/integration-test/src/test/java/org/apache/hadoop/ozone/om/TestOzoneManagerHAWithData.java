@@ -34,6 +34,7 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,7 +49,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
@@ -351,9 +352,17 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
     }
+
     await().atMost(Duration.ofSeconds(100))
         .pollInterval(Duration.ofSeconds(1))
-        .until(() -> ozoneManager.getRatisSnapshotIndex() > 0);
+        .until(() -> {
+          try {
+            return ozoneManager.getRatisSnapshotIndex() > 0;
+          } catch (IOException ex) {
+            fail("Test failed during transactionInfo read.");
+            return false;
+          }
+        });
 
     // The current lastAppliedLogIndex on the state machine should be greater
     // than or equal to the saved snapshot index.
@@ -374,7 +383,14 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     await().atMost(Duration.ofSeconds(100))
         .pollInterval(Duration.ofSeconds(1))
-        .until(() -> ozoneManager.getRatisSnapshotIndex() > 0);
+        .until(() -> {
+          try {
+            return ozoneManager.getRatisSnapshotIndex() > 0;
+          } catch (IOException ex) {
+            fail("Test failed during transactionInfo read.");
+            return false;
+          }
+        });
 
     // The new snapshot index must be greater than the previous snapshot index
     long ratisSnapshotIndexNew = ozoneManager.getRatisSnapshotIndex();

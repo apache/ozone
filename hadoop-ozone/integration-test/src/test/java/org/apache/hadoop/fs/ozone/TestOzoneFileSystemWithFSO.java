@@ -564,9 +564,14 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // wait for DB updates
     await().atMost(Duration.ofSeconds(120))
         .pollInterval(Duration.ofSeconds(1))
-        .ignoreException(IOException.class)
-        .untilAsserted(() -> Assert.assertTrue(
-            omMgr.getOpenKeyTable(getBucketLayout()).isEmpty()));
+        .until(() -> {
+          try {
+            return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
+          } catch (IOException e) {
+            Assert.fail("DB failure.");
+            return false;
+          }
+        });
   }
 
   /**

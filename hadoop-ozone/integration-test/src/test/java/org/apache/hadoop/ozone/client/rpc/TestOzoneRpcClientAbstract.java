@@ -1960,8 +1960,14 @@ public abstract class TestOzoneRpcClientAbstract {
 
     await().atMost(Duration.ofSeconds(100))
         .pollInterval(Duration.ofSeconds(1))
-        .ignoreException(IOException.class)
-        .until(() -> scm.getContainerInfo(containerID).getState() == CLOSING);
+        .until(() -> {
+          try {
+            return scm.getContainerInfo(containerID).getState() == CLOSING;
+          } catch (IOException e) {
+            fail("Failed to get container info. " + e.getMessage());
+            return false;
+          }
+        });
 
     // Try reading keyName2
     try {

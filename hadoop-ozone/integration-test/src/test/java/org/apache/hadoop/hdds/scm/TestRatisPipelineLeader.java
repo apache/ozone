@@ -56,8 +56,6 @@ import org.slf4j.event.Level;
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestRatisPipelineLeader.class);
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -78,7 +76,8 @@ public class TestRatisPipelineLeader {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
+  @Test
+  @Timeout(unit = TimeUnit.MILLISECONDS, value = 120000)
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
@@ -92,8 +91,14 @@ public class TestRatisPipelineLeader {
     // Verify correct leader info populated
     await().atMost(Duration.ofSeconds(20))
         .pollInterval(Duration.ofMillis(200))
-        .ignoreException(IOException.class)
-        .until(() -> verifyLeaderInfo(ratisPipeline));
+        .until(() -> {
+          try {
+            return verifyLeaderInfo(ratisPipeline);
+          } catch (IOException e) {
+            Assertions.fail("Failed verifying the leader info.");
+            return false;
+          }
+        });
 
     // Verify client connects to Leader without NotLeaderException
     final Logger log = LoggerFactory.getLogger(
@@ -137,8 +142,14 @@ public class TestRatisPipelineLeader {
 
     await().atMost(Duration.ofSeconds(20))
         .pollInterval(Duration.ofMillis(200))
-        .ignoreException(IOException.class)
-        .until(() -> verifyLeaderInfo(ratisPipeline));
+        .until(() -> {
+          try {
+            return verifyLeaderInfo(ratisPipeline);
+          } catch (IOException e) {
+            Assertions.fail("Failed getting leader info.");
+            return false;
+          }
+        });
   }
 
   private boolean verifyLeaderInfo(Pipeline ratisPipeline) throws IOException {

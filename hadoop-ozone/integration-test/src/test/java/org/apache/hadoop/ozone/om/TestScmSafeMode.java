@@ -206,10 +206,16 @@ public class TestScmSafeMode {
     // Test 3: SCM should be out of safe mode.
     await().atMost(Duration.ofSeconds(5))
         .pollInterval(Duration.ofMillis(100))
-        .ignoreException(IOException.class)
-        .until(() -> !cluster.getStorageContainerManager()
-            .getClientProtocolServer()
-            .inSafeMode());
+        .until(() -> {
+          try {
+            return !cluster.getStorageContainerManager()
+                .getClientProtocolServer()
+                .inSafeMode();
+          } catch (IOException e) {
+            Assert.fail("Cluster.");
+            return false;
+          }
+        });
   }
 
   @Test(timeout = 300_000)
