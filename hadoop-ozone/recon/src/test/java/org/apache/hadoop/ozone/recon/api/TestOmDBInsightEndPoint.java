@@ -240,7 +240,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(6L,
         openKeysSummary.get("totalOpenKeys"));
     Assertions.assertEquals(300L,
-        openKeysSummary.get("totalUnreplicatedDataSize"));
+        openKeysSummary.get("totalReplicatedDataSize"));
     Assertions.assertEquals(100L,
         openKeysSummary.get("totalUnreplicatedDataSize"));
 
@@ -268,7 +268,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals(0L,
         openKeysSummary.get("totalOpenKeys"));
     Assertions.assertEquals(0L,
-        openKeysSummary.get("totalUnreplicatedDataSize"));
+        openKeysSummary.get("totalReplicatedDataSize"));
     Assertions.assertEquals(0L,
         openKeysSummary.get("totalUnreplicatedDataSize"));
   }
