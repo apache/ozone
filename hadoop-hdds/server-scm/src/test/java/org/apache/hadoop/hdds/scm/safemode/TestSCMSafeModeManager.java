@@ -127,6 +127,7 @@ public class TestSCMSafeModeManager {
     // Currently, only considered containers which are not in open state.
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
@@ -160,6 +161,7 @@ public class TestSCMSafeModeManager {
     // container list
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
