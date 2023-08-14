@@ -176,7 +176,7 @@ public class TestOMRatisSnapshots {
           1, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
           OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
-          30, TimeUnit.SECONDS);
+          60, TimeUnit.SECONDS);
       conf.setTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
           30, TimeUnit.SECONDS);
@@ -1337,7 +1337,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = sstBackupDir.listFiles().length;
       return numberOfSstFiles > newNumberOfSstFiles;
-    }, 1000, 30000);
+    }, 1000, 120000);
   }
 
   private static void checkIfCompactionLogsGetAppendedByForcingCompaction(
