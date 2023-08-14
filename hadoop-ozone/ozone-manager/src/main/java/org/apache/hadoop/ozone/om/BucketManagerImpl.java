@@ -78,11 +78,13 @@ public class BucketManagerImpl implements BucketManager {
         final String dbVolumeKey = metadataManager.getVolumeKey(volumeName);
         if (metadataManager.getVolumeTable().get(dbVolumeKey) == null) {
           // Parent volume doesn't exist, throw VOLUME_NOT_FOUND
-          throw new OMException("Volume not found when getting bucket info",
+          throw new OMException(
+              "Volume " + volumeName + " not found when getting bucket info",
               VOLUME_NOT_FOUND);
         } else {
           // Parent volume exists, throw BUCKET_NOT_FOUND
-          throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
+          throw new OMException("Bucket " + bucketName + " not found",
+              BUCKET_NOT_FOUND);
         }
       }
 

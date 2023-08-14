@@ -65,6 +65,9 @@ public class LinkBucketHandler extends Handler {
         .setSourceVolume(source.getVolumeName())
         .setSourceBucket(source.getBucketName());
 
+    // Validate Source Volume and Source Bucket
+    address.ensureVolumeAndBucketExist(client);
+
     String volumeName = target.getVolumeName();
     String bucketName = target.getBucketName();
 

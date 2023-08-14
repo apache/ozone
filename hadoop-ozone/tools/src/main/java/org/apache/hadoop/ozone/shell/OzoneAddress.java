@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -474,6 +476,36 @@ public class OzoneAddress {
       // Depending on operation is on volume or bucket
       throw new OzoneClientException(
             "Volume name is missing.");
+    }
+  }
+
+  /**
+   * Validate if volume and bucket exists.
+   * @param rpcClient the rpc client
+   * @throws IOException
+   */
+  public void ensureVolumeAndBucketExist(OzoneClient rpcClient)
+      throws IOException {
+    OzoneVolume volume;
+    ensureVolumeExists(rpcClient);
+    volume = rpcClient.getObjectStore().getVolume(volumeName);
+    try {
+      volume.getBucket(bucketName);
+    } catch (OMException ex) {
+      throw ex;
+    }
+  }
+
+  /**
+   * Validate if volume exists.
+   * @param rpcClient the rpc client
+   * @throws IOException
+   */
+  public void ensureVolumeExists(OzoneClient rpcClient) throws IOException {
+    try {
+      rpcClient.getObjectStore().getVolume(volumeName);
+    } catch (OMException ex) {
+      throw ex;
     }
   }
 }

@@ -85,6 +85,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -1659,5 +1660,62 @@ public class TestOzoneShellHA {
     omExecution = assertThrows(OMException.class,
         () -> client.getObjectStore().getVolume(volume1));
     assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+  }
+
+  @Test
+  public void testInValidSourceVolumeAndBucketForLinkedBucket()
+      throws Exception {
+    // create linked bucket under invalid source volume
+    // and invalid source bucket. It will fail as imaginaryvol1 not found
+    out.reset();
+    Assert.assertThrows(ExecutionException.class, () -> execute(ozoneShell,
+        new String[]{"bucket", "link", "/imaginaryvol1/imaginarybuck",
+            "/volume1/bucketlink"}));
+
+    // Create volume imaginaryvol1
+    //out.reset();
+    execute(ozoneShell, new String[]{"volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + "imaginaryvol1"});
+
+    // Try creating linked bucket again, failed as imaginarybuck not found
+    Assert.assertThrows(ExecutionException.class, () -> execute(ozoneShell,
+        new String[]{"bucket", "link", "/imaginaryvol1/imaginarybuck",
+            "/volume1/bucketlink"}));
+
+    // Create bucket imaginarybuck
+    execute(ozoneShell, new String[]{"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + "imaginaryvol1/imaginarybuck"});
+
+    // Create volume volume1
+    execute(ozoneShell, new String[]{"volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + "volume1"});
+
+    // Try creating linked bucket again and this time it will be success
+    execute(ozoneShell,
+        new String[]{"bucket", "link", "/imaginaryvol1/imaginarybuck",
+            "/volume1/bucketlink"});
+
+    // ozone sh bucket list
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        parseOutputIntoArrayList();
+    Assert.assertTrue(bucketListOut.size() == 1);
+
+    // Clean up
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"bucket", "delete", "/volume1/bucketlink"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"bucket", "delete", "/imaginaryvol1/imaginarybuck"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"volume", "delete", "/volume1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"volume", "delete", "/imaginaryvol1"});
+    out.reset();
   }
 }
