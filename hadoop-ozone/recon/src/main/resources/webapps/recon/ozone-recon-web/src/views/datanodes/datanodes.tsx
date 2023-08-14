@@ -322,7 +322,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   }
 
   _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const selectedColumns = (selected as IOption[]);
+    const selectedColumns = (selected == null ? [] : selected as IOption[]);
     this.setState({
       selectedColumns
     });
