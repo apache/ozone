@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.HashMap;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -60,7 +62,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
-  private static final Logger LOG =
+  @VisibleForTesting
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequestWithFSO.class);
 
   public OMKeyCommitRequestWithFSO(OMRequest omRequest,
@@ -98,11 +101,15 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     Result result;
     boolean isHSync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();
+
     if (isHSync) {
       omMetrics.incNumKeyHSyncs();
     } else {
       omMetrics.incNumKeyCommits();
     }
+
+    LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+        isHSync, volumeName, bucketName, keyName);
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -199,7 +206,16 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
-        oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+
+        // Remove any block from oldVerKeyInfo that share the same container ID
+        // and local ID with omKeyInfo blocks'.
+        // Otherwise, it causes data loss once those shared blocks are added
+        // to deletedTable and processed by KeyDeletingService for deletion.
+        filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
+
+        if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
+          oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+        }
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -226,6 +242,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // Add to cache of open key table and key table.
       if (!isHSync) {
+        // If isHSync = false, put a tombstone in OpenKeyTable cache,
+        // indicating the key is removed from OpenKeyTable.
+        // So that this key can't be committed again.
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
             dbOpenFileKey, null, fileName, trxnLogIndex);
       }
@@ -254,6 +273,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
                 bucketName);
       }
     }
+
+    // Debug logging for any key commit operation, successful or not
+    LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
+        result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,

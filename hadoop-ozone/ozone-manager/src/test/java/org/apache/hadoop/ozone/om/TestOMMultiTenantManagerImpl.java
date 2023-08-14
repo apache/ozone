@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANG
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -38,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -140,10 +140,9 @@ public class TestOMMultiTenantManagerImpl {
       }
     }
 
-    LambdaTestUtils.intercept(IOException.class,
-        "Tenant 'tenant2' not found", () -> {
-          tenantManager.listUsersInTenant("tenant2", null);
-        });
+    IOException ioException = assertThrows(IOException.class,
+        () -> tenantManager.listUsersInTenant("tenant2", null));
+    assertEquals("Tenant 'tenant2' not found!", ioException.getMessage());
 
     assertTrue(tenantManager.listUsersInTenant(TENANT_ID, "abc")
         .getUserAccessIds().isEmpty());
@@ -152,7 +151,7 @@ public class TestOMMultiTenantManagerImpl {
   @Test
   public void testRevokeUserAccessId() throws Exception {
 
-    LambdaTestUtils.intercept(OMException.class, () ->
+    assertThrows(OMException.class, () ->
         tenantManager.getCacheOp()
             .revokeUserAccessId("unknown-AccessId1", TENANT_ID));
     assertEquals(1, tenantManager.getTenantCache().size());

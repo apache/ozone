@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -52,6 +51,7 @@ import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDon
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -91,10 +91,10 @@ public class TestMultiTenantVolume {
     cluster.shutdown();
   }
 
-  private static void expectFailurePreFinalization(VoidCallable eval)
-      throws Exception {
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization", eval);
+  private static void expectFailurePreFinalization(VoidCallable eval) {
+    OMException omException = assertThrows(OMException.class, eval::call);
+    assertTrue(omException.getMessage()
+        .contains("cannot be invoked before finalization"));
   }
 
   /**
