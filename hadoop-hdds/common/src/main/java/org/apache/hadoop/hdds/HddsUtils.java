@@ -446,6 +446,8 @@ public final class HddsUtils {
     case DeleteBlock:
     case PutBlock:
     case PutSmallFile:
+    case StreamInit:
+    case StreamWrite:
     default:
       return false;
     }

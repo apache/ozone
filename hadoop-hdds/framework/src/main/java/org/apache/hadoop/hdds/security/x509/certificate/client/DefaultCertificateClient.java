@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -56,6 +57,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -119,6 +122,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   private String rootCaCertId;
   private String component;
   private List<String> pemEncodedCACerts = null;
+  private Lock pemEncodedCACertsLock = new ReentrantLock();
   private KeyStoresFactory serverKeyStoresFactory;
   private KeyStoresFactory clientKeyStoresFactory;
 
@@ -405,7 +409,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       chain.add(lastInsertedCert);
       List<X509Certificate> caCertList =
           OzoneSecurityUtil.convertToX509(listCA());
-      while (!getAllRootCaCerts().contains(lastInsertedCert)) {
+      Set<X509Certificate> rootCaCertList = getAllRootCaCerts();
+      while (!rootCaCertList.isEmpty() &&
+          !rootCaCertList.contains(lastInsertedCert)) {
         Optional<X509Certificate> issuerOpt =
             getIssuerForCert(lastInsertedCert, caCertList);
         if (issuerOpt.isPresent()) {
@@ -610,10 +616,15 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         }
       }
 
-      codec.writeCertificate(certName,
-          pemEncodedCert);
+      codec.writeCertificate(certName, pemEncodedCert);
       if (addToCertMap) {
         certificateMap.put(cert.getSerialNumber().toString(), certificatePath);
+        if (caType == CAType.SUBORDINATE) {
+          caCertificates.add(cert);
+        }
+        if (caType == CAType.ROOT) {
+          rootCaCertificates.add(cert);
+        }
       }
     } catch (IOException | java.security.cert.CertificateException e) {
       throw new CertificateException("Error while storing certificate.", e,
@@ -901,20 +912,31 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   @Override
-  public synchronized List<String> getCAList() {
-    return pemEncodedCACerts;
-  }
-
-  @Override
-  public synchronized List<String> listCA() throws IOException {
-    if (pemEncodedCACerts == null) {
-      updateCAList();
+  public List<String> getCAList() {
+    pemEncodedCACertsLock.lock();
+    try {
+      return pemEncodedCACerts;
+    } finally {
+      pemEncodedCACertsLock.unlock();
     }
-    return pemEncodedCACerts;
   }
 
   @Override
-  public synchronized List<String> updateCAList() throws IOException {
+  public List<String> listCA() throws IOException {
+    pemEncodedCACertsLock.lock();
+    try {
+      if (pemEncodedCACerts == null) {
+        updateCAList();
+      }
+      return pemEncodedCACerts;
+    } finally {
+      pemEncodedCACertsLock.unlock();
+    }
+  }
+
+  @Override
+  public List<String> updateCAList() throws IOException {
+    pemEncodedCACertsLock.lock();
     try {
       pemEncodedCACerts = getScmSecureClient().listCACertificate();
       return pemEncodedCACerts;
@@ -922,6 +944,8 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       getLogger().error("Error during updating CA list", e);
       throw new CertificateException("Error during updating CA list", e,
           CERTIFICATE_ERROR);
+    } finally {
+      pemEncodedCACertsLock.unlock();
     }
   }
 
@@ -953,6 +977,18 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public void registerNotificationReceiver(CertificateNotification receiver) {
     synchronized (notificationReceivers) {
       notificationReceivers.add(receiver);
+    }
+  }
+
+  /**
+   * Notify all certificate renewal receivers that the certificate is renewed.
+   *
+   */
+  protected void notifyNotificationReceivers(String oldCaCertId,
+      String newCaCertId) {
+    synchronized (notificationReceivers) {
+      notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
+          this, oldCaCertId, newCaCertId));
     }
   }
 
@@ -1196,9 +1232,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     getLogger().info("Reset and reloaded key and all certificates for new " +
         "certificate {}.", newCertId);
 
-    // notify notification receivers
-    notificationReceivers.forEach(r -> r.notifyCertificateRenewed(
-        this, oldCaCertId, newCertId));
+    notifyNotificationReceivers(oldCaCertId, newCertId);
   }
 
   public SecurityConfig getSecurityConfig() {
@@ -1387,8 +1421,9 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public synchronized void setCACertificate(X509Certificate cert)
       throws Exception {
     caCertId = cert.getSerialNumber().toString();
+    String pemCert = CertificateCodec.getPEMEncodedString(cert);
     certificateMap.put(caCertId,
-        CertificateCodec.getCertPathFromPemEncodedString(
-            CertificateCodec.getPEMEncodedString(cert)));
+        CertificateCodec.getCertPathFromPemEncodedString(pemCert));
+    pemEncodedCACerts = Arrays.asList(pemCert);
   }
 }

@@ -406,6 +406,61 @@ public class TestReplicationManager {
         commandsSent.iterator().next().getValue().getType());
   }
 
+  /**
+   * When there is Quasi Closed Replica with incorrect sequence id
+   * for a Closed container, it's treated as unhealthy and deleted.
+   * The deletion should happen only after we re-replicate a healthy
+   * replica.
+   */
+  @Test
+  public void testClosedContainerWithQuasiClosedReplicaWithWrongSequence()
+      throws IOException, NodeNotFoundException {
+    final RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    final long sequenceId = 101;
+
+    final ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    final ContainerReplica replicaOne = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId);
+    final ContainerReplica replicaTwo = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId);
+
+    final ContainerReplica quasiCloseReplica = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED, sequenceId - 5);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(replicaOne);
+    replicas.add(replicaTwo);
+    replicas.add(quasiCloseReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    // Add the third CLOSED replica
+    replicas.add(createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId));
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+  }
+
   @Test
   public void testHealthyContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,

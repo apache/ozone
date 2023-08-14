@@ -36,16 +36,17 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,13 +61,12 @@ public class TestSCMInstallSnapshot {
   private static OzoneConfiguration conf;
 
   @BeforeAll
-  public static void setup() throws Exception {
+  static void setup(@TempDir Path tempDir) throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
-    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
-            GenericTestUtils.getRandomizedTempPath() + "/snapshot");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR, tempDir.toString());
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)

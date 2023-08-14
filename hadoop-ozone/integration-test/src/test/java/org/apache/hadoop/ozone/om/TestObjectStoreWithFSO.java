@@ -375,7 +375,7 @@ public class TestObjectStoreWithFSO {
    *                    |
    *                    a
    *                    |
-   *      -----------------------------------
+   *      --------------------------------------
    *     |              |                       |
    *     b1             b2                      b3
    *    -----           --------               ----------
@@ -454,11 +454,16 @@ public class TestObjectStoreWithFSO {
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Intermediate level keyPrefix - 3rd level
+    // Without trailing slash
     ozoneKeyIterator =
         ozoneBucket.listKeys("a/b2/d1", null);
     expectedKeys = new LinkedList<>();
     expectedKeys.add("a/b2/d1/");
     expectedKeys.add("a/b2/d1/d11.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+    // With trailing slash
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b2/d1/", null);
     checkKeyList(ozoneKeyIterator, expectedKeys);
 
     // Boundary of a level
@@ -472,6 +477,21 @@ public class TestObjectStoreWithFSO {
     ozoneKeyIterator =
         ozoneBucket.listKeys("a/b3/e3", "a/b3/e3/e31.tx");
     expectedKeys = new LinkedList<>();
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Key level, prefix=key case
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("a/b1/c1/c1.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("a/b1/c1/c1.tx");
+    checkKeyList(ozoneKeyIterator, expectedKeys);
+
+    // Key directly under bucket
+    createTestKey(ozoneBucket, "key1.tx", "key1");
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("key1.tx");
+    expectedKeys = new LinkedList<>();
+    expectedKeys.add("key1.tx");
     checkKeyList(ozoneKeyIterator, expectedKeys);
   }
 

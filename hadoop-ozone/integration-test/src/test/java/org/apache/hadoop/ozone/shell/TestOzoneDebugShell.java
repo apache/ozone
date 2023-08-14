@@ -31,16 +31,25 @@ import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
+import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +61,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
 /**
  * Test Ozone Debug shell.
@@ -117,6 +129,44 @@ public class TestOzoneDebugShell {
     exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
     Assertions.assertEquals(0, exitCode);
   }
+
+  @Test
+  public void testLdbCliForOzoneSnapshot() throws Exception {
+    StringWriter stdout = new StringWriter();
+    PrintWriter pstdout = new PrintWriter(stdout);
+    CommandLine cmd = new CommandLine(new RDBParser())
+        .addSubcommand(new DBScanner())
+        .setOut(pstdout);
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+
+    writeKey(volumeName, bucketName, keyName);
+
+    String snapshotName =
+        client.getObjectStore().createSnapshot(volumeName, bucketName, "snap1");
+    OzoneSnapshot snapshot =
+        client.getObjectStore().listSnapshot(volumeName, bucketName, null, null)
+            .next();
+    Assertions.assertEquals(snapshotName, snapshot.getName());
+    String dbPath = getSnapshotDBPath(snapshot.getCheckpointDir());
+    String snapshotCurrent = dbPath + OM_KEY_PREFIX + "CURRENT";
+    GenericTestUtils
+        .waitFor(() -> new File(snapshotCurrent).exists(), 1000, 120000);
+    String[] args =
+        new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
+    int exitCode = cmd.execute(args);
+    Assertions.assertEquals(0, exitCode);
+    String cmdOut = stdout.toString();
+    Assertions.assertTrue(cmdOut.contains(keyName));
+  }
+
+  private static String getSnapshotDBPath(String checkPointDir) {
+    return OMStorage.getOmDbDir(conf) +
+        OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
+        OM_DB_NAME + checkPointDir;
+  }
+
 
   private static void writeKey(String volumeName, String bucketName,
       String keyName) throws IOException {

@@ -100,8 +100,10 @@ public class RDBStore implements DBStore {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
-            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(), configuration);
+            DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
+            configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -217,7 +219,10 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     IOUtils.closeQuietly(checkPointManager);
-    IOUtils.closeQuietly(rocksDBCheckpointDiffer);
+    if (rocksDBCheckpointDiffer != null) {
+      RocksDBCheckpointDifferHolder
+          .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
+    }
     IOUtils.closeQuietly(db);
   }
 
