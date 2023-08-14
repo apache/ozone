@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -160,13 +161,15 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     // When volume is failed, the call to mark the container unhealthy should
     // be ignored.
     Mockito.when(mockVolume.isFailed()).thenReturn(true);
-    handler.markContainerUnhealthy(container);
+    handler.markContainerUnhealthy(container,
+        ContainerTestUtils.getUnhealthyScanResult());
     Mockito.verify(mockIcrSender, Mockito.never()).send(Mockito.any());
 
     // When volume is healthy, ICR should be sent when container is marked
     // unhealthy.
     Mockito.when(mockVolume.isFailed()).thenReturn(false);
-    handler.markContainerUnhealthy(container);
+    handler.markContainerUnhealthy(container,
+        ContainerTestUtils.getUnhealthyScanResult());
     Mockito.verify(mockIcrSender, Mockito.atMostOnce()).send(Mockito.any());
   }
 

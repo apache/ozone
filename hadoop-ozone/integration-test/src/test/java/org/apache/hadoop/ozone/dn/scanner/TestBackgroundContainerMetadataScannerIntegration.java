@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.dn.scanner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -45,6 +46,7 @@ public class TestBackgroundContainerMetadataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
   private final ContainerCorruptions corruption;
+  private final GenericTestUtils.LogCapturer logCapturer;
 
   @Parameterized.Parameters(name = "{0}")
   public static Collection<Object[]> supportedCorruptionTypes() {
@@ -81,6 +83,7 @@ public class TestBackgroundContainerMetadataScannerIntegration
   public TestBackgroundContainerMetadataScannerIntegration(
       ContainerCorruptions corruption) {
     this.corruption = corruption;
+    logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
   }
 
   /**
@@ -116,5 +119,6 @@ public class TestBackgroundContainerMetadataScannerIntegration
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.
     waitForScmToCloseContainer(openContainerID);
+    corruption.assertLogged(logCapturer);
   }
 }

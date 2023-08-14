@@ -306,6 +306,7 @@ public class TestContainerKeyMapperTask {
         OMUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+        .setValue(omKeyInfo)
         .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
         .build();
 
@@ -448,6 +449,7 @@ public class TestContainerKeyMapperTask {
         OMUpdateEventBuilder<String, OmKeyInfo>()
         .setKey(omKey)
         .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+        .setValue(omKeyInfo)
         .setTable(
             omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
                 .getName())

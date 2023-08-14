@@ -384,14 +384,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       certClient = dnCertClient;
     }
     CertificateClient.InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      certClient.close();
-      LOG.info("Re-initialize certificate client.");
-      certClient = new DNCertificateClient(secConf,
-          createScmSecurityClient(),
-          datanodeDetails, null, this::saveNewCertId, this::terminateDatanode);
-      response = certClient.init();
-    }
     LOG.info("Init response: {}", response);
     switch (response) {
     case SUCCESS:

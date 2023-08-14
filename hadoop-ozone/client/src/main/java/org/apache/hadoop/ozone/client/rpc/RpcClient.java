@@ -885,14 +885,21 @@ public class RpcClient implements ClientProtocol {
     final String volumeName = tenantArgs.getVolumeName();
     verifyVolumeName(volumeName);
 
+    final boolean forceCreationWhenVolumeExists =
+        tenantArgs.getForceCreationWhenVolumeExists();
+
     OmTenantArgs.Builder builder = OmTenantArgs.newBuilder();
     builder.setTenantId(tenantId);
     builder.setVolumeName(volumeName);
-    // TODO: Add more fields
-    // TODO: Include OmVolumeArgs in (Om)TenantArgs as well for volume creation?
+    builder.setForceCreationWhenVolumeExists(
+        tenantArgs.getForceCreationWhenVolumeExists());
 
-    LOG.info("Creating Tenant: '{}', with new volume: '{}'",
-        tenantId, volumeName);
+    // TODO: Add more fields. e.g. include OmVolumeArgs in (Om)TenantArgs
+    //  as well for customized volume creation.
+
+    LOG.info("Creating Tenant: '{}', with volume: '{}', "
+            + "forceCreationWhenVolumeExists: {}",
+        tenantId, volumeName, forceCreationWhenVolumeExists);
 
     ozoneManagerClient.createTenant(builder.build());
   }
@@ -980,6 +987,19 @@ public class RpcClient implements ClientProtocol {
     ozoneManagerClient.deleteSnapshot(volumeName, bucketName, snapshotName);
   }
 
+  /**
+   * Create an image of the current compaction log DAG in the OM.
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
+   */
+  @Override
+  public String printCompactionLogDag(String fileNamePrefix,
+                                      String graphType) throws IOException {
+    return ozoneManagerClient.printCompactionLogDag(fileNamePrefix, graphType);
+  }
+
   @Override
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
@@ -987,14 +1007,16 @@ public class RpcClient implements ClientProtocol {
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff)
       throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.snapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff);
+        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+        disableNativeDiff);
   }
 
   @Override
@@ -2188,16 +2210,23 @@ public class RpcClient implements ClientProtocol {
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
       KeyOutputStream keyOutputStream)
       throws IOException {
+    boolean enableHsync = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
             openKey.getOpenVersion());
     final OzoneOutputStream out = createSecureOutputStream(
         openKey, keyOutputStream, keyOutputStream);
-    return out != null ? out : new OzoneOutputStream(keyOutputStream);
+    return out != null ? out : new OzoneOutputStream(
+        keyOutputStream, enableHsync);
   }
 
   private OzoneOutputStream createSecureOutputStream(OpenKeySession openKey,
       OutputStream keyOutputStream, Syncable syncable) throws IOException {
+    boolean enableHsync = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
     final FileEncryptionInfo feInfo =
         openKey.getKeyInfo().getFileEncryptionInfo();
     if (feInfo != null) {
@@ -2206,14 +2235,14 @@ public class RpcClient implements ClientProtocol {
           new CryptoOutputStream(keyOutputStream,
               OzoneKMSUtil.getCryptoCodec(conf, feInfo),
               decrypted.getMaterial(), feInfo.getIV());
-      return new OzoneOutputStream(cryptoOut);
+      return new OzoneOutputStream(cryptoOut, enableHsync);
     } else {
       try {
         final GDPRSymmetricKey gk = getGDPRSymmetricKey(
             openKey.getKeyInfo().getMetadata(), Cipher.ENCRYPT_MODE);
         if (gk != null) {
           return new OzoneOutputStream(new CipherOutputStream(
-              keyOutputStream, gk.getCipher()), syncable);
+              keyOutputStream, gk.getCipher()), syncable, enableHsync);
         }
       }  catch (Exception ex) {
         throw new IOException(ex);

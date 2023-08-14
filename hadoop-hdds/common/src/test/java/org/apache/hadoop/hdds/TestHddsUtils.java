@@ -30,7 +30,6 @@ import java.util.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
@@ -44,8 +43,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Testing HddsUtils.
@@ -70,7 +69,7 @@ public class TestHddsUtils {
   }
 
   @Test
-  public void validatePath() throws Exception {
+  public void validatePath() {
     HddsUtils.validatePath(Paths.get("/"), Paths.get("/"));
     HddsUtils.validatePath(Paths.get("/a"), Paths.get("/"));
     HddsUtils.validatePath(Paths.get("/a"), Paths.get("/a"));
@@ -78,13 +77,13 @@ public class TestHddsUtils {
     HddsUtils.validatePath(Paths.get("/a/b/c"), Paths.get("/a"));
     HddsUtils.validatePath(Paths.get("/a/../a/b"), Paths.get("/a"));
 
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.validatePath(Paths.get("/b/c"), Paths.get("/a")));
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.validatePath(Paths.get("/"), Paths.get("/a")));
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.validatePath(Paths.get("/a/.."), Paths.get("/a")));
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.validatePath(Paths.get("/a/../b"), Paths.get("/a")));
   }
 
@@ -154,39 +153,27 @@ public class TestHddsUtils {
 
     // Verify empty value
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "");
-    try {
-      getSCMAddressForDatanodes(conf);
-      fail("Empty value should cause an IllegalArgumentException");
-    } catch (Exception e) {
-      assertTrue(e instanceof IllegalArgumentException);
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "Empty value should cause an IllegalArgumentException");
 
     // Verify invalid hostname
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "s..x..:1234");
-    try {
-      getSCMAddressForDatanodes(conf);
-      fail("An invalid hostname should cause an IllegalArgumentException");
-    } catch (Exception e) {
-      assertTrue(e instanceof IllegalArgumentException);
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid hostname should cause an IllegalArgumentException");
 
     // Verify invalid port
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm:xyz");
-    try {
-      getSCMAddressForDatanodes(conf);
-      fail("An invalid port should cause an IllegalArgumentException");
-    } catch (Exception e) {
-      assertTrue(e instanceof IllegalArgumentException);
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid port should cause an IllegalArgumentException");
 
     // Verify a mixed case (valid and invalid value both appears)
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234, scm:xyz");
-    try {
-      getSCMAddressForDatanodes(conf);
-      fail("An invalid value should cause an IllegalArgumentException");
-    } catch (Exception e) {
-      assertTrue(e instanceof IllegalArgumentException);
-    }
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid value should cause an IllegalArgumentException");
   }
 
 

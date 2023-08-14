@@ -2022,6 +2022,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
+    <value>100000000</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Max size of SST files in OM Ratis Snapshot tarball.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.snapshot.provider.socket.timeout</name>
     <value>5000s</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
@@ -2269,6 +2277,13 @@
     </description>
   </property>
   <property>
+    <name>hdds.x509.ca.rotation.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is disabled.
+    </description>
+  </property>
+  <property>
     <name>hdds.x509.rootca.certificate.polling.interval</name>
     <value>PT2h</value>
     <description>Interval to use for polling in certificate clients for a new
@@ -2277,6 +2292,14 @@
       certificate was generated. Once there is a change, the system
       automatically adds the new root ca to the clients'
       trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.expired.certificate.check.interval</name>
+    <value>P1D</value>
+    <description>Interval to use for removing expired certificates. A background
+      task to remove expired certificates from the scm metadata store is
+      scheduled to run at the rate this configuration option specifies.
     </description>
   </property>
   <property>
@@ -3354,6 +3377,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.snapshot.checkpoint.dir.creation.poll.timeout</name>
+    <value>20s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+      Unit defaults to millisecond if a unit is not specified.
+    </description>
+  </property>
+  <property>
     <name>ozone.sst.filtering.service.timeout</name>
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
@@ -3958,6 +3990,15 @@
     <tag>OZONE, OM</tag>
     <description>
       Flag to always perform full snapshot diff (can be slow) without using the optimised compaction DAG.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
     </description>
   </property>
 

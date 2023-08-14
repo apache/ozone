@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.ozone;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.minikdc.MiniKdc;
@@ -35,6 +37,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,10 +48,15 @@ import java.io.UnsupportedEncodingException;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static java.time.Duration.between;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
@@ -59,6 +67,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig.parseRotateDuration;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
@@ -219,6 +228,100 @@ public final class TestBlockTokensCLI {
     return null;
   }
 
+  private boolean isForceFlagPresent(String[] args) {
+    for (String arg : args) {
+      if (arg.equals("--force")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Test
+  public void testRotateKeySCMAdminCommandWithForceFlag()
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 100, 1000);
+    InetSocketAddress address = cluster.getScmLeader().getClientRpcAddress();
+    String hostPort = address.getHostName() + ":" + address.getPort();
+
+    testRotateKeySCMAdminCommandUtil(createArgsForCommand(
+        new String[]{"scm", "rotate", "--scm", hostPort, "--force"}));
+  }
+
+  @Test
+  public void testRotateKeySCMAdminCommandWithoutForceFlag()
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() -> cluster.getScmLeader() != null, 100, 1000);
+    InetSocketAddress address = cluster.getScmLeader().getClientRpcAddress();
+    String hostPort = address.getHostName() + ":" + address.getPort();
+
+    testRotateKeySCMAdminCommandUtil(
+        createArgsForCommand(new String[]{"scm", "rotate", "--scm", hostPort}));
+  }
+
+  public void testRotateKeySCMAdminCommandUtil(String[] args) {
+    // Get the initial secret key.
+    String initialKey =
+        getScmSecretKeyManager().getCurrentSecretKey().toString();
+
+    // Assert that both initial key and subsequent key are the same before
+    // rotating.
+    String currentKey =
+        getScmSecretKeyManager().getCurrentSecretKey().toString();
+    Assertions.assertEquals(initialKey, currentKey);
+
+    // Rotate the secret key.
+    ozoneAdmin.execute(args);
+
+    // Get the new secret key.
+    String newKey =
+        getScmSecretKeyManager().getCurrentSecretKey().toString();
+
+    // Assert that the old key and new key are not the same after rotating if
+    // either:
+    // 1. The rotation duration has surpassed, or
+    // 2. The --force flag has been passed.
+    // Otherwise, both keys should be the same.
+    if (isForceFlagPresent(args) ||
+        shouldRotate(getScmSecretKeyManager().getCurrentSecretKey())) {
+      Assertions.assertNotEquals(initialKey, newKey);
+    } else {
+      Assertions.assertEquals(initialKey, newKey);
+    }
+  }
+
+  private String getSetConfStringFromConf(String key) {
+    return String.format("--set=%s=%s", key, conf.get(key));
+  }
+
+  public boolean shouldRotate(ManagedSecretKey currentKey) {
+    Duration established = between(currentKey.getCreationTime(), Instant.now());
+    return established.compareTo(parseRotateDuration(conf)) >= 0;
+  }
+
+  /**
+   * Since ScmAdmin relies on ScmOption to generate configurations, it uses the
+   * default configuration obtained from
+   * {@link org.apache.hadoop.hdds.scm.cli.ScmOption#createScmClient(
+   * OzoneConfiguration)} using createOzoneConfiguration().
+   * In the absence of a better way to pass these configurations via integration
+   * tests in the ozone admin shell, this method handles the passing of kerberos
+   * and SCM HA configurations by creating strings in the "--set=key=value"
+   * format.
+   */
+  private String[] createArgsForCommand(String[] additionalArgs) {
+    OzoneConfiguration defaultConf = ozoneAdmin.createOzoneConfiguration();
+    Map<String, String> diff = Maps.difference(defaultConf.getOzoneProperties(),
+        conf.getOzoneProperties()).entriesOnlyOnRight();
+    String[] args = new String[diff.size() + additionalArgs.length];
+    int i = 0;
+    for (Map.Entry<String, String> entry : diff.entrySet()) {
+      args[i++] = getSetConfStringFromConf(entry.getKey());
+    }
+    System.arraycopy(additionalArgs, 0, args, i, additionalArgs.length);
+    return args;
+  }
+
   private static void startCluster()
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
@@ -229,7 +332,7 @@ public final class TestBlockTokensCLI {
         .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
-        .setNumOfOzoneManagers(1);
+        .setNumOfOzoneManagers(3);
 
     cluster = (MiniOzoneHAClusterImpl) builder.build();
     cluster.waitForClusterToBeReady();

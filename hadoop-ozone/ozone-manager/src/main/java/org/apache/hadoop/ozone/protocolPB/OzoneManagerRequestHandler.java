@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -86,6 +85,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RefetchSecretKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
@@ -338,6 +339,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         SetSafeModeResponse setSafeModeResponse =
             setSafeMode(request.getSetSafeModeRequest());
         responseBuilder.setSetSafeModeResponse(setSafeModeResponse);
+        break;
+      case PrintCompactionLogDag:
+        PrintCompactionLogDagResponse printCompactionLogDagResponse =
+            printCompactionLogDag(request.getPrintCompactionLogDagRequest());
+        responseBuilder
+            .setPrintCompactionLogDagResponse(printCompactionLogDagResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -374,7 +382,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private DBUpdatesResponse getOMDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
 
     DBUpdatesResponse.Builder builder = DBUpdatesResponse
         .newBuilder();
@@ -1266,7 +1274,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             snapshotDiffRequest.getToSnapshot(),
             snapshotDiffRequest.getToken(),
             snapshotDiffRequest.getPageSize(),
-            snapshotDiffRequest.getForceFullDiff());
+            snapshotDiffRequest.getForceFullDiff(),
+            snapshotDiffRequest.getDisableNativeDiff());
 
     SnapshotDiffResponse.Builder builder = SnapshotDiffResponse.newBuilder()
         .setJobStatus(response.getJobStatus().toProtobuf())
@@ -1321,6 +1330,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return builder.build();
   }
 
+  private PrintCompactionLogDagResponse printCompactionLogDag(
+      PrintCompactionLogDagRequest printCompactionLogDagRequest)
+      throws IOException {
+    String message = impl.printCompactionLogDag(
+        printCompactionLogDagRequest.getFileNamePrefix(),
+        printCompactionLogDagRequest.getGraphType());
+    return PrintCompactionLogDagResponse.newBuilder()
+        .setMessage(message)
+        .build();
+  }
 
   public OzoneManager getOzoneManager() {
     return impl;

@@ -192,6 +192,7 @@ import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecretKeyEnable;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -279,7 +280,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ReplicationManager replicationManager;
 
   private SCMSafeModeManager scmSafeModeManager;
-  private CertificateClient scmCertificateClient;
+  private SCMCertificateClient scmCertificateClient;
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
@@ -910,7 +911,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (securityConfig.isContainerTokenEnabled()) {
       containerTokenMgr = createContainerTokenSecretManager();
     }
-    rootCARotationManager = new RootCARotationManager(this);
+    if (securityConfig.isAutoCARotationEnabled()) {
+      rootCARotationManager = new RootCARotationManager(this);
+    }
   }
 
   /**
@@ -951,15 +954,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public CertificateClient getScmCertificateClient() {
     return scmCertificateClient;
-  }
-
-  @VisibleForTesting
-  public void setScmCertificateClient(CertificateClient client)
-      throws IOException {
-    if (scmCertificateClient != null) {
-      scmCertificateClient.close();
-    }
-    scmCertificateClient = client;
   }
 
   public Clock getSystemClock() {
@@ -1540,6 +1534,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     // At this point leader is not known
     scmHAMetricsUpdate(null);
+
+    if (scmCertificateClient != null) {
+      // In case root CA certificate is rotated during this SCM is offline
+      // period, fetch the new root CA list from leader SCM and refresh ratis
+      // server's tlsConfig.
+      scmCertificateClient.refreshCACertificates();
+    }
   }
 
   /**
@@ -2142,12 +2143,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new IOException("Cannot remove current leader.");
     }
 
-    if (rootCARotationManager != null &&
-        rootCARotationManager.isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
-          " Please try the operation later again."),
-          ResultCodes.CA_ROTATION_IN_PROGRESS);
-    }
+    checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
+        "removePeerFromHARing");
 
     Preconditions.checkNotNull(getScmHAManager().getRatisServer()
         .getDivision().getGroup());
@@ -2178,7 +2175,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
-  @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }

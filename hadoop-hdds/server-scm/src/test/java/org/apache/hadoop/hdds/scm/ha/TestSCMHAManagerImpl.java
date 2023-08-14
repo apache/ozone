@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneOffset;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -49,8 +49,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -66,17 +66,14 @@ import static org.mockito.Mockito.when;
  */
 class TestSCMHAManagerImpl {
 
-  private String storageBaseDir;
+  @TempDir
+  private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
-  private final int waitForClusterToBeReadyTimeout = 10000;
 
   @BeforeEach
-  public void setup() throws IOException, InterruptedException,
+  void setup() throws IOException, InterruptedException,
       TimeoutException {
-    storageBaseDir = GenericTestUtils.getTempPath(
-        TestSCMHAManagerImpl.class.getSimpleName() + "-" +
-            UUID.randomUUID());
     clusterID = UUID.randomUUID().toString();
     OzoneConfiguration conf = getConfig("scm1", 9894);
     final StorageContainerManager scm = getMockStorageContainerManager(conf);
@@ -92,10 +89,10 @@ class TestSCMHAManagerImpl {
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, storageBaseDir
-        + File.separator + scmId + File.separator + "ratis");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageBaseDir
-        + File.separator + scmId + File.separator + "metadata");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
+        storageBaseDir.resolve(scmId).resolve("ratis").toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        storageBaseDir.resolve(scmId).resolve("metadata").toString());
     conf.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, String.valueOf(ratisPort));
     return conf;
   }
@@ -104,13 +101,12 @@ class TestSCMHAManagerImpl {
       throws TimeoutException,
       InterruptedException {
     GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
-          1000, waitForClusterToBeReadyTimeout);
+          1000, 10000);
   }
 
   @AfterEach
   public void cleanup() throws IOException {
     primarySCMHAManager.stop();
-    FileUtils.deleteDirectory(new File(storageBaseDir));
   }
 
   @Test
@@ -135,26 +131,12 @@ class TestSCMHAManagerImpl {
     }
   }
 
-  private StorageContainerManager testsetup() throws Exception {
-    OzoneConfiguration config = new OzoneConfiguration();
-    config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
-    configurator.setScmContext(SCMContext.emptyContext());
-    configurator.setSCMHAManager(primarySCMHAManager);
-    StorageContainerManager scm = HddsTestUtils.getScm(config, configurator);
-
-    return scm;
-  }
   @Test
   public void testHARingRemovalErrors() throws IOException,
       AuthenticationException {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageBaseDir.toString());
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());

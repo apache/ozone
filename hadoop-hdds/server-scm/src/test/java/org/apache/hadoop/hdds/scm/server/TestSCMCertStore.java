@@ -23,11 +23,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.CertInfo;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CRLApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCRLApprover;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -48,6 +48,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -265,10 +266,8 @@ public class TestSCMCertStore {
   }
 
   private X509Certificate generateX509Cert() throws Exception {
-    return CertificateCodec.getX509Certificate(
-        CertificateCodec.getPEMEncodedString(
-            KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
-        "SHA256withRSA")));
+    return KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
+            "SHA256withRSA");
   }
 
   private long getTableSize(Table<?, ?> table) throws IOException {
@@ -311,11 +310,36 @@ public class TestSCMCertStore {
 
   }
 
+  @Test
+  public void testRemoveAllCertificates() throws Exception {
+    X509Certificate scmCert = CertificateTestUtils.createSelfSignedCert(
+        keyPair, "1", Duration.ofDays(1), BigInteger.valueOf(1));
+    X509Certificate expiredScmCert = CertificateTestUtils.createSelfSignedCert(
+        keyPair, "2", Duration.ofNanos(1), BigInteger.valueOf(2));
+    X509Certificate nonScmCert = CertificateTestUtils.createSelfSignedCert(
+        keyPair, "3", Duration.ofDays(1), BigInteger.valueOf(3));
+    X509Certificate expiredNonScmCert =
+        CertificateTestUtils.createSelfSignedCert(
+            keyPair, "4", Duration.ofNanos(1), BigInteger.valueOf(4));
+    scmCertStore.storeValidCertificate(
+        scmCert.getSerialNumber(), scmCert, SCM);
+    scmCertStore.storeValidCertificate(
+        expiredScmCert.getSerialNumber(), expiredScmCert, SCM);
+    scmCertStore.storeValidCertificate(
+        nonScmCert.getSerialNumber(), nonScmCert, OM);
+    scmCertStore.storeValidCertificate(
+        expiredNonScmCert.getSerialNumber(), expiredNonScmCert, OM);
+    //Listing OM certs still lists SCM certificates as well
+    checkListCerts(OM, 4);
+    checkListCerts(SCM, 2);
+    scmCertStore.removeAllExpiredCertificates();
+    checkListCerts(OM, 2);
+    checkListCerts(SCM, 1);
+  }
 
   private void checkListCerts(NodeType role, int expected) throws Exception {
     List<X509Certificate> certificateList = scmCertStore.listCertificate(role,
         BigInteger.valueOf(0), 10, VALID_CERTS);
     Assertions.assertEquals(expected, certificateList.size());
   }
-
 }

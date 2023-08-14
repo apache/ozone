@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.util.concurrent.MoreExecutors;
@@ -91,12 +92,16 @@ public class StorageVolumeChecker {
 
   private final ExecutorService checkVolumeResultHandlerExecutorService;
 
+  private final DatanodeConfiguration dnConf;
+
   /**
    * An executor for periodic disk checks.
    */
   private final ScheduledExecutorService diskCheckerservice;
-  private final ScheduledFuture<?> periodicDiskChecker;
+  private ScheduledFuture<?> periodicDiskChecker;
   private final List<VolumeSet> registeredVolumeSets;
+
+  private final AtomicBoolean started;
 
   /**
    * @param conf  Configuration object.
@@ -106,7 +111,7 @@ public class StorageVolumeChecker {
 
     this.timer = timer;
 
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf = conf.getObject(DatanodeConfiguration.class);
 
     maxAllowedTimeForCheckMs = dnConf.getDiskCheckTimeout().toMillis();
 
@@ -137,12 +142,18 @@ public class StorageVolumeChecker {
           return t;
         });
 
-    long periodicDiskCheckIntervalMinutes =
-        dnConf.getPeriodicDiskCheckIntervalMinutes();
-    this.periodicDiskChecker =
-        diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
-            periodicDiskCheckIntervalMinutes, periodicDiskCheckIntervalMinutes,
-            TimeUnit.MINUTES);
+    started = new AtomicBoolean(false);
+  }
+
+  public void start() {
+    if (started.compareAndSet(false, true)) {
+      long periodicDiskCheckIntervalMinutes =
+          dnConf.getPeriodicDiskCheckIntervalMinutes();
+      periodicDiskChecker =
+          diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
+              periodicDiskCheckIntervalMinutes,
+              periodicDiskCheckIntervalMinutes, TimeUnit.MINUTES);
+    }
   }
 
   public synchronized void registerVolumeSet(VolumeSet volumeSet) {
@@ -384,15 +395,17 @@ public class StorageVolumeChecker {
    * of the parameters.
    */
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
-    periodicDiskChecker.cancel(true);
-    diskCheckerservice.shutdownNow();
-    checkVolumeResultHandlerExecutorService.shutdownNow();
-    try {
-      delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
-    } catch (InterruptedException e) {
-      LOG.warn("{} interrupted during shutdown.",
-          this.getClass().getSimpleName());
-      Thread.currentThread().interrupt();
+    if (started.compareAndSet(true, false)) {
+      periodicDiskChecker.cancel(true);
+      diskCheckerservice.shutdownNow();
+      checkVolumeResultHandlerExecutorService.shutdownNow();
+      try {
+        delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
+      } catch (InterruptedException e) {
+        LOG.warn("{} interrupted during shutdown.",
+            this.getClass().getSimpleName());
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

@@ -66,6 +66,7 @@ public final class RocksDiffUtils {
     if (StringUtils.isNotBlank(bucket)) {
       builder.append(OM_KEY_PREFIX).append(bucket);
     }
+    builder.append(OM_KEY_PREFIX);
     return builder.toString();
   }
 

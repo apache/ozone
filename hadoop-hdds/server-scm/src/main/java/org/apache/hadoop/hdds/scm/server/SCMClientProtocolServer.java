@@ -113,6 +113,7 @@ import java.util.stream.Stream;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
@@ -131,14 +132,14 @@ public class SCMClientProtocolServer implements
   private final RPC.Server clientRpcServer;
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
+  private final OzoneConfiguration config;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
 
-  public SCMClientProtocolServer(
-      OzoneConfiguration conf,
+  public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm,
-      ReconfigurationHandler reconfigurationHandler
-  ) throws IOException {
+      ReconfigurationHandler reconfigurationHandler) throws IOException {
     this.scm = scm;
+    this.config = conf;
     final int handlerCount =
         conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
             OZONE_SCM_HANDLER_COUNT_DEFAULT);
@@ -683,15 +684,29 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    if (type != null) {
+      auditMap.put("replicationType", type.toString());
+    }
+    if (factor != null) {
+      auditMap.put("replicationFactor", factor.toString());
+    }
+    if (nodePool != null && !nodePool.getNodesList().isEmpty()) {
+      List<String> nodeIpAddresses = new ArrayList<>();
+      for (HddsProtos.Node node : nodePool.getNodesList()) {
+        nodeIpAddresses.add(node.getNodeID().getIpAddress());
+      }
+      auditMap.put("nodePool", String.join(", ", nodeIpAddresses));
+    }
     try {
       Pipeline result = scm.getPipelineManager().createPipeline(
           ReplicationConfig.fromProtoTypeAndFactor(type, factor));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.CREATE_PIPELINE, null));
+          SCMAction.CREATE_PIPELINE, auditMap));
       return result;
     } catch (SCMException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.CREATE_PIPELINE, null, e));
+          SCMAction.CREATE_PIPELINE, auditMap, e));
       throw e;
     }
   }
@@ -713,14 +728,16 @@ public class SCMClientProtocolServer implements
   @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("pipelineID", pipelineID.getId());
     try {
       scm.getPipelineManager().activatePipeline(
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.ACTIVATE_PIPELINE, null));
+          SCMAction.ACTIVATE_PIPELINE, auditMap));
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.ACTIVATE_PIPELINE, null, ex));
+          SCMAction.ACTIVATE_PIPELINE, auditMap, ex));
       throw ex;
     }
   }
@@ -728,15 +745,17 @@ public class SCMClientProtocolServer implements
   @Override
   public void deactivatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("pipelineID", pipelineID.getId());
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
       scm.getPipelineManager().deactivatePipeline(
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.DEACTIVATE_PIPELINE, null));
+          SCMAction.DEACTIVATE_PIPELINE, auditMap));
     } catch (Exception ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.DEACTIVATE_PIPELINE, null, ex));
+          SCMAction.DEACTIVATE_PIPELINE, auditMap, ex));
       throw ex;
     }
   }
@@ -803,15 +822,11 @@ public class SCMClientProtocolServer implements
       throw new SCMException("SCM HA not enabled.", ResultCodes.INTERNAL_ERROR);
     }
 
-    if (scm.getRootCARotationManager() != null &&
-        scm.getRootCARotationManager().isRotationInProgress()) {
-      throw new SCMException(("Root CA and Sub CA rotation is in-progress." +
-          " Please try the operation later again."),
-          ResultCodes.CA_ROTATION_IN_PROGRESS);
-    }
+    checkIfCertSignRequestAllowed(scm.getRootCARotationManager(),
+        false, config, "transferLeadership");
 
     boolean auditSuccess = true;
-    final Map<String, String> auditMap = Maps.newHashMap();
+    Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("newLeaderId", newLeaderId);
     try {
       SCMRatisServer scmRatisServer = scm.getScmHAManager().getRatisServer();
@@ -851,18 +866,21 @@ public class SCMClientProtocolServer implements
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
     List<DeletedBlocksTransactionInfo> result;
+    Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("count", String.valueOf(count));
+    auditMap.put("startTxId", String.valueOf(startTxId));
     try {
       result = scm.getScmBlockManager().getDeletedBlockLog()
           .getFailedTransactions(count, startTxId).stream()
           .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
           .collect(Collectors.toList());
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null));
+          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap));
       return result;
     } catch (IOException ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(
-              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, null, ex)
+              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex)
       );
       throw ex;
     }
@@ -997,20 +1015,25 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser(), false);
     ContainerBalancerConfiguration cbc =
         scm.getConfiguration().getObject(ContainerBalancerConfiguration.class);
+    Map<String, String> auditMap = Maps.newHashMap();
     if (threshold.isPresent()) {
       double tsd = threshold.get();
+      auditMap.put("threshold", String.valueOf(tsd));
       Preconditions.checkState(tsd >= 0.0D && tsd < 100.0D,
           "threshold should be specified in range [0.0, 100.0).");
       cbc.setThreshold(tsd);
     }
     if (maxSizeToMovePerIterationInGB.isPresent()) {
       long mstm = maxSizeToMovePerIterationInGB.get();
+      auditMap.put("maxSizeToMovePerIterationInGB", String.valueOf(mstm));
       Preconditions.checkState(mstm > 0,
           "maxSizeToMovePerIterationInGB must be positive.");
       cbc.setMaxSizeToMovePerIteration(mstm * OzoneConsts.GB);
     }
     if (maxDatanodesPercentageToInvolvePerIteration.isPresent()) {
       int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
+      auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
+          String.valueOf(mdti));
       Preconditions.checkState(mdti >= 0,
           "maxDatanodesPercentageToInvolvePerIteration must be " +
               "greater than equal to zero.");
@@ -1021,6 +1044,7 @@ public class SCMClientProtocolServer implements
     }
     if (iterations.isPresent()) {
       int i = iterations.get();
+      auditMap.put("iterations", String.valueOf(i));
       Preconditions.checkState(i > 0 || i == -1,
           "number of iterations must be positive or" +
               " -1 (for running container balancer infinitely).");
@@ -1029,6 +1053,7 @@ public class SCMClientProtocolServer implements
 
     if (maxSizeEnteringTarget.isPresent()) {
       long mset = maxSizeEnteringTarget.get();
+      auditMap.put("maxSizeEnteringTarget", String.valueOf(mset));
       Preconditions.checkState(mset > 0,
           "maxSizeEnteringTarget must be " +
               "greater than zero.");
@@ -1037,6 +1062,7 @@ public class SCMClientProtocolServer implements
 
     if (maxSizeLeavingSource.isPresent()) {
       long msls = maxSizeLeavingSource.get();
+      auditMap.put("maxSizeLeavingSource", String.valueOf(msls));
       Preconditions.checkState(msls > 0,
           "maxSizeLeavingSource must be " +
               "greater than zero.");
@@ -1049,14 +1075,14 @@ public class SCMClientProtocolServer implements
     } catch (IllegalContainerBalancerStateException | IOException |
         InvalidContainerBalancerConfigurationException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.START_CONTAINER_BALANCER, null, e));
+          SCMAction.START_CONTAINER_BALANCER, auditMap, e));
       return StartContainerBalancerResponseProto.newBuilder()
           .setStart(false)
           .setMessage(e.getMessage())
           .build();
     }
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-        SCMAction.START_CONTAINER_BALANCER, null));
+        SCMAction.START_CONTAINER_BALANCER, auditMap));
     return StartContainerBalancerResponseProto.newBuilder()
         .setStart(true)
         .build();
