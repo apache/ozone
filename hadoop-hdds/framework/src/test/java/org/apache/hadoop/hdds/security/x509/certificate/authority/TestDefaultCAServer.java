@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.LambdaTestUtils;
 
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -296,14 +295,15 @@ public class TestDefaultCAServer {
     assertTrue(revoked.isDone());
 
     // Revoking empty list of certificates should throw an error.
-    LambdaTestUtils.intercept(ExecutionException.class, "Certificates " +
-        "cannot be null",
+    ExecutionException execution = assertThrows(ExecutionException.class,
         () -> {
           Future<Optional<Long>> result =
               testCA.revokeCertificates(Collections.emptyList(),
               CRLReason.lookup(CRLReason.keyCompromise), now);
           result.get();
         });
+    assertTrue(execution.getCause().getMessage()
+        .contains("Certificates cannot be null"));
   }
 
   @Test
@@ -332,14 +332,15 @@ public class TestDefaultCAServer {
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
 
-    LambdaTestUtils.intercept(ExecutionException.class, "ScmId and " +
-            "ClusterId in CSR subject are incorrect",
+    ExecutionException execution = assertThrows(ExecutionException.class,
         () -> {
           Future<CertPath> holder =
               testCA.requestCertificate(csrString,
                   CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
           holder.get();
         });
+    assertTrue(execution.getCause().getMessage()
+        .contains("ScmId and ClusterId in CSR subject are incorrect"));
   }
 
   @Test

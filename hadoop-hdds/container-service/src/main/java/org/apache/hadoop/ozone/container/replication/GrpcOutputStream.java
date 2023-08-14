@@ -38,6 +38,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOutputStream.class);
   public static final int READY_WAIT_TIME_IN_MS = 10;
+  // retry count 5 * 6000 for wait of 5 minute
+  public static final int READY_RETRY_COUNT = 30000;
 
   private final CallStreamObserver<T> streamObserver;
 
@@ -109,11 +111,14 @@ abstract class GrpcOutputStream<T> extends OutputStream {
   @Override
   public void close() throws IOException {
     if (!closed.getAndSet(true)) {
-      flushBuffer(true);
-      LOG.info("Sent {} bytes for container {}",
-          writtenBytes, containerId);
-      streamObserver.onCompleted();
-      buffer.close();
+      try {
+        flushBuffer(true);
+        LOG.info("Sent {} bytes for container {}",
+            writtenBytes, containerId);
+        streamObserver.onCompleted();
+      } finally {
+        buffer.close();
+      }
     }
   }
 
@@ -129,7 +134,7 @@ abstract class GrpcOutputStream<T> extends OutputStream {
     return streamObserver;
   }
 
-  private void flushBuffer(boolean eof) {
+  private void flushBuffer(boolean eof) throws IOException {
     waitUntilReady();
     int length = buffer.size();
     if (length > 0) {
@@ -146,16 +151,27 @@ abstract class GrpcOutputStream<T> extends OutputStream {
    * Handling back pressure of the stream, delay putting more messages to
    * the stream until it's ready.
    */
-  private void waitUntilReady() {
-    while (!streamObserver.isReady()) {
-      LOG.debug("Stream is not ready, backoff");
-      try {
-        Thread.sleep(READY_WAIT_TIME_IN_MS);
-      } catch (InterruptedException e) {
-        LOG.error("InterruptedException while waiting for channel ready", e);
-        Thread.currentThread().interrupt();
-        break;
+  private void waitUntilReady() throws IOException {
+    int count = 0;
+    try {
+      while (!streamObserver.isReady() && count < READY_RETRY_COUNT) {
+        LOG.debug("Stream is not ready, backoff");
+        try {
+          Thread.sleep(READY_WAIT_TIME_IN_MS);
+          count++;
+        } catch (InterruptedException e) {
+          LOG.error("InterruptedException while waiting for channel ready", e);
+          Thread.currentThread().interrupt();
+          break;
+        }
       }
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+
+    if (count >= READY_RETRY_COUNT) {
+      throw new IOException("Channel is not ready after "
+          + (count * READY_WAIT_TIME_IN_MS) + "ms");
     }
   }
 

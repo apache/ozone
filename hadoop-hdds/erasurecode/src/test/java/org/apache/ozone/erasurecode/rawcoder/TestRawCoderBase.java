@@ -20,11 +20,13 @@ package org.apache.ozone.erasurecode.rawcoder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.ECChunk;
 import org.apache.ozone.erasurecode.TestCoderBase;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Raw coder test base with utilities.
@@ -127,14 +129,15 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     encoder.release();
     final ECChunk[] data = prepareDataChunksForEncoding();
     final ECChunk[] parity = prepareParityChunksForEncoding();
-    LambdaTestUtils.intercept(IOException.class, "closed",
+    IOException ioException = assertThrows(IOException.class,
         () -> encoder.encode(data, parity));
-
+    assertTrue(ioException.getMessage().contains("closed"));
     decoder.release();
     final ECChunk[] in = prepareInputChunksForDecoding(data, parity);
     final ECChunk[] out = prepareOutputChunksForDecoding();
-    LambdaTestUtils.intercept(IOException.class, "closed",
+    ioException = assertThrows(IOException.class,
         () -> decoder.decode(in, getErasedIndexesForDecoding(), out));
+    assertTrue(ioException.getMessage().contains("closed"));
   }
 
   @Test
