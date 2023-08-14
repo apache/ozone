@@ -80,6 +80,7 @@ import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -1079,7 +1080,7 @@ public class TestOzoneShellHA {
     OzoneBucket bucket = volume.getBucket("bucket1");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
       Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      Assert.assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
 
@@ -1095,7 +1096,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
-      Assert.assertFalse(out.getOutputStream().getClass().getName()
+      assertFalse(out.getOutputStream().getClass().getName()
           .equals(ECKeyOutputStream.class.getName()));
     }
 
@@ -1113,7 +1114,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
-      Assert.assertFalse(out.getOutputStream().getClass().getName()
+      assertFalse(out.getOutputStream().getClass().getName()
           .equals(ECKeyOutputStream.class.getName()));
     }
   }
@@ -1673,5 +1674,65 @@ public class TestOzoneShellHA {
     // volume1 should not exist
     LambdaTestUtils.intercept(OMException.class,
         "VOLUME_NOT_FOUND", () -> client.getObjectStore().getVolume(volume1));
+  }
+
+  @Test
+  public void testLinkedAndNonLinkedBucketMetaData()
+      throws Exception {
+    String volumeName = "volume1";
+    // Create volume volume1
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+        OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[]{"bucket", "create", "o3://" + omServiceId +
+        OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // ozone sh bucket list
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListOut.size() == 1);
+    boolean link =
+        String.valueOf(bucketListOut.get(0).get("link")).equals("false");
+    assertTrue(link);
+
+   // Create linked bucket under volume1
+    out.reset();
+    execute(ozoneShell, new String[]{"bucket", "link", "/volume1/bucket1",
+        "/volume1/link-to-bucket1"});
+
+    // ozone sh bucket list under volume1 and this should give both linked
+    // and non-linked buckets
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListLinked.size() == 2);
+    link = String.valueOf(bucketListLinked.get(1).get("link")).equals("true");
+    assertTrue(link);
+
+    // Clean up
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "delete", "/volume1/bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"bucket", "delete", "/volume1/link-to-bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"volume", "delete", "/volume1"});
+    out.reset();
   }
 }
