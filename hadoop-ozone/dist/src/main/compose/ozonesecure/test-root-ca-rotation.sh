@@ -41,7 +41,7 @@ wait_for_execute_command scm 30 "jps | grep StorageContainerManagerStarter |  se
 # wait and verify root CA is rotated
 wait_for_root_certificate scm 180 2
 execute_robot_test datanode kinit.robot
-wait_for_execute_command datanode 30 "ozone admin cert list --role=scm | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/om/certs/ROOTCA-{}.crt | xargs find"
+wait_for_execute_command datanode 30 "ozone admin cert list --role=scm | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/dn/certs/ROOTCA-{}.crt | xargs find"
 
 # We need to wait here for the new certificate in OM as well, because it might
 # get to the OM later, and the client will not trust the DataNode with the new
