@@ -114,8 +114,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     axios.all([
       axios.get('/api/v1/clusterState'),
       axios.get('/api/v1/task/status'),
-      axios.get('/api/v1/keys/open?limit=0'),
-      axios.get('/api/v1/keys/deletePending?limit=1'),
+      axios.get('/api/v1/keys/open/summary'),
+      axios.get('/api/v1/keys/deletePending/summary'),
     ]).then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
@@ -140,12 +140,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
         lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
-        openSummarytotalUnrepSize: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalUnreplicatedDataSize,
-        openSummarytotalRepSize: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalReplicatedDataSize,
-        openSummarytotalOpenKeys: openResponse.data && openResponse.data.keysSummary && openResponse.data.keysSummary.totalOpenKeys,
-        deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalUnreplicatedDataSize,
-        deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalReplicatedDataSize,
-        deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.keysSummary && deletePendingResponse.data.keysSummary.totalDeletedKeys
+        openSummarytotalUnrepSize: openResponse.data  && openResponse.data.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse.data && openResponse.data.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse.data && openResponse.data.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.totalDeletedKeys
       });
     })).catch(error => {
       this.setState({
