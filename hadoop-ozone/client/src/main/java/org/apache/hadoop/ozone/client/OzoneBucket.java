@@ -1450,14 +1450,16 @@ public class OzoneBucket extends WithMetadata {
       }
 
       if (status != null) {
-        OmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName =
-              OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
+        // not required to addKeyPrefix
+        // case-3) if the keyPrefix corresponds to a file and not a dir,
+        // prefix should not be added to avoid duplicate entry
+        if (!status.isDirectory()) {
+          return;
         }
+        OmKeyInfo keyInfo = status.getKeyInfo();
+        // add trailing slash to represent directory
+        String keyName =
+            OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
 
         // removeStartKey - as the startKey is a placeholder, which is
         // managed internally to traverse leaf node's sub-paths.

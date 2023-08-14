@@ -23,18 +23,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * HTTP Response wrapped for keys insights.
  */
 public class KeyInsightInfoResponse {
-
-  /** Keys summary. Includes aggregated information about the keys. */
-  @JsonProperty("keysSummary")
-  private Map<String, Long> keysSummary;
 
   /** last key sent. */
   @JsonProperty("lastKey")
@@ -81,15 +75,6 @@ public class KeyInsightInfoResponse {
     fsoKeyInfoList = new ArrayList<>();
     repeatedOmKeyInfoList = new ArrayList<>();
     deletedDirInfoList = new ArrayList<>();
-    keysSummary = new HashMap<>();
-  }
-
-  public Map<String, Long> getKeysSummary() {
-    return keysSummary;
-  }
-
-  public void setKeysSummary(Map<String, Long> keysSummary) {
-    this.keysSummary = keysSummary;
   }
 
   public String getLastKey() {
