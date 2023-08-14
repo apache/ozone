@@ -272,7 +272,7 @@ public class TestSCMUpdateServiceGrpcServer {
 
       revokeCertNow(certIds.get(5));
       server.notifyCrlUpdate();
-      await().atMost(Duration.ofSeconds(2))
+      await().atMost(Duration.ofSeconds(5))
           .pollInterval(Duration.ofMillis(100))
           .untilAsserted(() ->
               Assertions.assertEquals(5, client.getUpdateCount()));

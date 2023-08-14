@@ -513,7 +513,7 @@ public class TestBlockManager {
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList());
     // block should be allocated in different pipelines
-    await().atMost(Duration.ofSeconds(3))
+    await().atMost(Duration.ofSeconds(1))
         .pollInterval(Duration.ofMillis(100))
         .ignoreException(IOException.class)
         .until(() -> {

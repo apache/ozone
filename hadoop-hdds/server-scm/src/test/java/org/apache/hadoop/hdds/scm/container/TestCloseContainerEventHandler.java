@@ -161,7 +161,7 @@ public class TestCloseContainerEventHandler {
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
     // wait for event to happen
-    await().atMost(Duration.ofSeconds(timeoutInMs * 3))
+    await().atMost(Duration.ofMillis(timeoutInMs * 3))
         .pollInterval(Duration.ofMillis(1000))
         .ignoreExceptions()
         .until(() -> {

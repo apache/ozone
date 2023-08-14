@@ -573,7 +573,7 @@ public class TestSCMSafeModeManager {
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(dnContainers));
 
-    await().atMost(Duration.ofSeconds(20))
+    await().atMost(Duration.ofSeconds(18))
         .pollInterval(Duration.ofMillis(100))
         .untilAsserted(() -> assertEquals(expectedThreshold,
             scmSafeModeManager.getCurrentContainerThreshold()));
