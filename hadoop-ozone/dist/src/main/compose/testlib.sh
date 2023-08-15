@@ -216,7 +216,7 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
   done
 }
 

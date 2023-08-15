@@ -83,8 +83,8 @@ public class RatisOverReplicationHandler
 
     // We are going to check for over replication, so we should filter out any
     // replicas that are not in a HEALTHY state. This is because a replica can
-    // be healthy, stale or dead. If it is dead is will be quickly removed from
-    // scm. If it is state, there is a good chance the DN is offline and the
+    // be healthy, stale or dead. If it is dead it will be quickly removed from
+    // scm. If it is stale, there is a good chance the DN is offline and the
     // replica will go away soon. So, if we have a container that is over
     // replicated with a HEALTHY and STALE replica, and we decide to delete the
     // HEALTHY one, and then the STALE ones goes away, we will lose them both.

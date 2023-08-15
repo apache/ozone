@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,7 +30,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.Before;
@@ -72,13 +73,14 @@ public class TestOMLayoutFeatureAspect {
     when(methodSignature.toShortString()).thenReturn("ecMethod");
     when(joinPoint.getSignature()).thenReturn(methodSignature);
 
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization",
+    OMException omException = assertThrows(OMException.class,
         () -> aspect.checkLayoutFeature(joinPoint));
+    assertTrue(omException.getMessage()
+        .contains("cannot be invoked before finalization"));
   }
 
   @Test
-  public void testPreExecuteLayoutCheck() throws Exception {
+  public void testPreExecuteLayoutCheck() {
 
     OzoneManager om = mock(OzoneManager.class);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
@@ -93,8 +95,9 @@ public class TestOMLayoutFeatureAspect {
     when(joinPoint.getArgs()).thenReturn(new Object[]{om});
     when(joinPoint.getTarget()).thenReturn(mockOmRequest);
 
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization",
+    OMException omException = assertThrows(OMException.class,
         () -> aspect.beforeRequestApplyTxn(joinPoint));
+    assertTrue(omException.getMessage()
+        .contains("cannot be invoked before finalization"));
   }
 }

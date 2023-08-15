@@ -152,6 +152,8 @@ public final class ReplicationSupervisor {
       }
 
       if (executor == null) {
+        LOG.info("Initializing replication supervisor with thread count = {}",
+            replicationConfig.getReplicationMaxStreams());
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(),

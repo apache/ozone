@@ -85,6 +85,7 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
+        .setSstFiltered(false)
         .build();
   }
 
