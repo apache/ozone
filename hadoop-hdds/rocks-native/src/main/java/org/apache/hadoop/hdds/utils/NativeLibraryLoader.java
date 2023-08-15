@@ -139,7 +139,7 @@ public class NativeLibraryLoader {
       // create a temporary file to copy the library to
       final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
           new File(Optional.ofNullable(System.getProperty(NATIVE_LIB_TMP_DIR))
-              .orElse("")));
+              .orElse("")).getAbsoluteFile());
       if (!temp.exists()) {
         return Optional.empty();
       } else {
