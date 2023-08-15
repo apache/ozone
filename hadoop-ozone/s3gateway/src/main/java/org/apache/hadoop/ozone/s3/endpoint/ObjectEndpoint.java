@@ -44,7 +44,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -246,7 +245,8 @@ public class ObjectEndpoint extends EndpointBase {
           .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
               OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
           bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      if (length == 0 && canCreateDirectory) {
+      if (canCreateDirectory &&
+          (length == 0 || hasTrailingSlash(keyPath))) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
@@ -255,13 +255,6 @@ public class ObjectEndpoint extends EndpointBase {
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
         body = new SignedChunksInputStream(body);
-
-        if (IOUtils.toString(body, StandardCharsets.UTF_8).isEmpty() &&
-            canCreateDirectory) {
-          s3GAction = S3GAction.CREATE_DIRECTORY;
-          createDirectory(volume.getName(), bucketName, keyPath);
-          return Response.ok().status(HttpStatus.SC_OK).build();
-        }
       }
 
       // Normal put object
@@ -327,6 +320,10 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCreateKeySuccessStats(startNanos);
       }
     }
+  }
+
+  private static boolean hasTrailingSlash(String keyPath) {
+    return keyPath.charAt(keyPath.length() - 1) == '/';
   }
 
   private void createDirectory(String volumeName,
