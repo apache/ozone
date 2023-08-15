@@ -29,8 +29,8 @@
   "/heatmap/readaccess?startDate=*&path=*&entityType=key": "/keyHeatmap",
   "/heatmap/readaccess?startDate=*&path=*&entityType=volume": "/heatmap",
   "/features/disabledFeatures": "/disabledFeatures",
-  "/keys/open?limit=0": "/keysOpenSummary",
-  "/keys/deletePending?limit=1": "/keysdeletePendingSummary",
+  "/keys/open/summary": "/keysOpenSummary",
+  "/keys/deletePending/summary": "/keysdeletePendingSummary",
 
   "/containers/mismatch?limit=*&prevKey=11&missingIn=OM" : "/omMismatch1",
   "/containers/mismatch?limit=*&prevKey=21&missingIn=OM" : "/omMismatch2",

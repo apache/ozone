@@ -584,8 +584,6 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
 
-  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
-
   /**
    * Name of the SST file backup directory placed under metadata dir.
    * Can be made configurable later.

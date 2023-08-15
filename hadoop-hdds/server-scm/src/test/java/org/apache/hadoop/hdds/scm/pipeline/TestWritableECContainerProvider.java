@@ -474,6 +474,43 @@ public class TestWritableECContainerProvider {
     }
   }
 
+  /**
+   * Suppose there's a closed container but its pipeline is still open. This
+   * pipeline is also present in the excludeList. Such a pipeline should not
+   * be included in the count of open pipelines and should be closed.
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-9142">...</a>
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testExcludedOpenPipelineWithClosedContainerIsClosed(
+      PipelineChoosePolicy policy) throws IOException {
+    int nodeCount = nodeManager.getNodeCount(
+        org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy());
+    providerConf.setMinimumPipelines(nodeCount);
+    provider = createSubject(policy);
+    Set<ContainerInfo> allocated = assertDistinctContainers(nodeCount);
+    assertEquals(nodeCount, allocated.size());
+
+    ExcludeList excludeList = new ExcludeList();
+    // close all of these containers
+    for (ContainerInfo container : allocated) {
+      // Remove the container from the pipeline to simulate closing the
+      // container
+      pipelineManager.removeContainerFromPipeline(
+          container.getPipelineID(), container.containerID());
+      excludeList.addPipeline(container.getPipelineID());
+    }
+
+    // expecting a new container to be created
+    ContainerInfo containerInfo = provider.getContainer(1, repConfig, OWNER,
+        excludeList);
+    assertFalse(allocated.contains(containerInfo));
+    for (ContainerInfo c : allocated) {
+      Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
+      assertEquals(CLOSED, pipeline.getPipelineState());
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("policies")
   public void testExcludedNodesPassedToCreatePipelineIfProvided(

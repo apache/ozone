@@ -125,6 +125,13 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return builder.build();
   }
 
+  @Override
+  public String toString() {
+    return "RepeatedOmKeyInfo{" +
+        "omKeyInfoList=" + omKeyInfoList +
+        '}';
+  }
+
   /**
    * Builder of RepeatedOmKeyInfo.
    */
