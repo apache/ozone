@@ -81,6 +81,13 @@ public class OmKeyLocationInfoGroup {
   }
 
   /**
+   * @return Raw internal locationVersionMap.
+   */
+  public Map<Long, List<OmKeyLocationInfo>> getLocationVersionMap() {
+    return locationVersionMap;
+  }
+
+  /**
    * Return only the blocks that are created in the most recent version.
    *
    * @return the list of blocks that are created in the latest version.
@@ -182,7 +189,12 @@ public class OmKeyLocationInfoGroup {
     sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for (OmKeyLocationInfo kli: kliList) {
-        sb.append(kli.getLocalID()).append(" || ");
+        sb.append("conID ").append(kli.getContainerID());
+        sb.append(" ");
+        sb.append("locID ").append(kli.getLocalID());
+        sb.append(" ");
+        sb.append("bcsID ").append(kli.getBlockCommitSequenceId());
+        sb.append(" || ");
       }
     }
     return sb.toString();

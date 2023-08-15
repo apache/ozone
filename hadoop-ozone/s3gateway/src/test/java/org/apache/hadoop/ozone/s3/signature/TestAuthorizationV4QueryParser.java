@@ -27,9 +27,10 @@ import java.util.Map;
 import org.apache.kerby.util.Hex;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
+
+import static org.junit.Assert.assertThrows;
 
 /**
  * Tests for {@link AuthorizationV4QueryParser}.
@@ -40,7 +41,7 @@ public class TestAuthorizationV4QueryParser {
       StringToSignProducer.TIME_FORMATTER);
 
   @Test
-  public void testInvalidAlgorithm() throws Exception {
+  public void testInvalidAlgorithm() {
 
     // Missing algorithm
     Map<String, String> parameters = new HashMap<>();
@@ -51,17 +52,17 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty algorithm
     parameters.put("X-Amz-Algorithm", "");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid Algorithm
     parameters.put("X-Amz-Algorithm", "AWS4-ZAVC-HJUA123");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
 
@@ -77,42 +78,42 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty date
     parameters.put("X-Amz-Date", "");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid date format
     parameters.put("X-Amz-Date", ZonedDateTime.now().toString());
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Valid date, Missing expires
     parameters.put("X-Amz-Date", DATETIME);
     parameters.remove("X-Amz-Expires");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty expires
     parameters.put("X-Amz-Expires", "");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid expires
     parameters.put("X-Amz-Expires", "0");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
     parameters.put("X-Amz-Expires", "604801");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Expired request
     parameters.put("X-Amz-Date", "20160801T083241Z");
     parameters.put("X-Amz-Expires", "10000");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
   }
@@ -155,50 +156,50 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty AWS region
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2F%2Fs3%2Faws4_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty AWS request
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2F");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid aws request
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty aws service
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2F%2Faws4_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty date
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F%2Fus-east-1%2Fs3%2Faws4_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid date format
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE%2F2013-05-24%2F"
             + "us-east-1%2Fs3%2Faws4_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // No URL encoding
     parameters.put("X-Amz-Credential",
         "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
 
@@ -214,12 +215,12 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty Signed Headers
     parameters.put("X-Amz-SignedHeaders", "");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
 
@@ -235,13 +236,13 @@ public class TestAuthorizationV4QueryParser {
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature", "");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid Signature
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404%");
-    LambdaTestUtils.intercept(MalformedResourceException.class, "",
+    assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
 

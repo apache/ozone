@@ -20,6 +20,8 @@
 package org.apache.hadoop.hdds.security.x509.keys;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +43,6 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -178,15 +179,17 @@ public class TestKeyCodec {
     pemWriter.writeKey(kp);
 
     // Assert that rewriting of keys throws exception with valid messages.
-    LambdaTestUtils
-        .intercept(IOException.class, "Private Key file already exists.",
+    IOException ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
+    assertTrue(ioException.getMessage()
+        .contains("Private Key file already exists."));
     FileUtils.deleteQuietly(Paths.get(
         secConfig.getKeyLocation(component).toString() + "/" + secConfig
             .getPrivateKeyFileName()).toFile());
-    LambdaTestUtils
-        .intercept(IOException.class, "Public Key file already exists.",
+    ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
+    assertTrue(ioException.getMessage()
+        .contains("Public Key file already exists."));
     FileUtils.deleteQuietly(Paths.get(
         secConfig.getKeyLocation(component).toString() + "/" + secConfig
             .getPublicKeyFileName()).toFile());
@@ -200,8 +203,6 @@ public class TestKeyCodec {
 
   /**
    * Assert key rewrite fails in non Posix file system.
-   *
-   * @throws IOException - on I/O failure.
    */
   @Test
   public void testWriteKeyInNonPosixFS()
@@ -211,13 +212,14 @@ public class TestKeyCodec {
     pemWriter.setIsPosixFileSystem(() -> false);
 
     // Assert key rewrite fails in non Posix file system.
-    LambdaTestUtils
-        .intercept(IOException.class, "Unsupported File System for pem file.",
+    IOException ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
+    assertTrue(ioException.getMessage()
+        .contains("Unsupported File System for pem file."));
   }
 
   @Test
-  public void testReadWritePublicKeywithoutArgs()
+  public void testReadWritePublicKeyWithoutArgs()
       throws NoSuchProviderException, NoSuchAlgorithmException, IOException,
       InvalidKeySpecException {
 
@@ -227,6 +229,5 @@ public class TestKeyCodec {
 
     PublicKey pubKey = keycodec.readPublicKey();
     Assertions.assertNotNull(pubKey);
-
   }
 }
