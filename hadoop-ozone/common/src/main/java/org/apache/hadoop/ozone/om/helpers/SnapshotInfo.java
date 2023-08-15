@@ -613,6 +613,7 @@ public final class SnapshotInfo implements Auditable {
         snapshotPath.equals(that.snapshotPath) &&
         checkpointDir.equals(that.checkpointDir) &&
         Objects.equals(deepClean, that.deepClean) &&
+        Objects.equals(sstFiltered, that.sstFiltered) &&
         Objects.equals(referencedSize, that.referencedSize);
   }
 
@@ -622,6 +623,6 @@ public final class SnapshotInfo implements Auditable {
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
-        deepClean, referencedSize);
+        deepClean, sstFiltered, referencedSize);
   }
 }

@@ -1211,7 +1211,7 @@ public class BasicRootedOzoneClientAdapterImpl
     Path path = new Path(pathStr);
     return new FileStatusAdapter(
         ozoneSnapshot.getReferencedSize(), ozoneSnapshot.getReferencedSize(),
-        path, true, (short)0, 0L,
+        path, true, (short) 0, 0L,
         ozoneSnapshot.getCreationTime(), 0L,
         FsPermission.getDirDefault().toShort(),
         owner, group, null, new BlockLocation[0],
