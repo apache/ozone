@@ -45,7 +45,7 @@ public class S3SecretEndpointBase implements Auditor {
   private OzoneClient client;
 
   protected static final AuditLogger AUDIT =
-          new AuditLogger(AuditLoggerType.S3GLOGGER);
+      new AuditLogger(AuditLoggerType.S3GLOGGER);
 
   protected String shortNameFromRequest() {
     return context.getSecurityContext().getUserPrincipal().getName();

@@ -80,7 +80,7 @@ public abstract class EndpointBase implements Auditor {
   private ContainerRequestContext context;
 
   private Set<String> excludeMetadataFields =
-          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
