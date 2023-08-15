@@ -41,7 +41,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL;
 
 /**
  * Http server to provide S3-compatible API.
@@ -75,7 +75,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
         Map<String, String> params = new HashMap<>();
 
         String principalInConf =
-            conf.get(OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
+            conf.get(OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL);
         if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
               principalInConf, conf.get(OZONE_S3G_HTTP_BIND_HOST_KEY)));

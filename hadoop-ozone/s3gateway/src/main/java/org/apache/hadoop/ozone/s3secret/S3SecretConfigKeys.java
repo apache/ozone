@@ -31,8 +31,7 @@ public final class S3SecretConfigKeys {
       OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "type";
   public static final String OZONE_S3G_SECRET_KEYTAB_FILE =
       OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
-  public static final String
-      OZONE_S3G_SECRET_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
+  public static final String OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL =
       OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
 
   /**
