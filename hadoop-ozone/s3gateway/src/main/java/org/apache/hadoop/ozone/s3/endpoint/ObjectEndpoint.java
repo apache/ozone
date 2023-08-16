@@ -252,15 +252,14 @@ public class ObjectEndpoint extends EndpointBase {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
-      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
-          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
-        body = new SignedChunksInputStream(body);
-      }
-
       // Normal put object
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(headers.getRequestHeaders());
 
+      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+        body = new SignedChunksInputStream(body);
+      }
       long putLength = 0;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
         getMetrics().updatePutKeyMetadataStats(startNanos);
