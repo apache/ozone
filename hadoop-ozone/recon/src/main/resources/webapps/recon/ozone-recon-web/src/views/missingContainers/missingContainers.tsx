@@ -315,6 +315,9 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         showDataFetchError(error.toString());
       });
     }
+    else{
+      cancelRowExpandSignal && cancelRowExpandSignal.abort();
+    }
   };
 
   expandedRowRender = (record: IContainerResponse) => {
@@ -369,7 +372,8 @@ export class MissingContainers extends React.Component<Record<string, object>, I
         columns={this.searchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerID'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}/>
+        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
+        onExpandedRowsChange={this.onRowExpandChange}/>
     }
 
     return (

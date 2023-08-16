@@ -392,7 +392,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
-    cancelSignal && cancelSignal.abort("Request cancelled because Datanode view changed");
+    cancelSignal && cancelSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

@@ -104,7 +104,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       cancelQuotaSignal,
       cancelSummarySignal,
       cancelPieSignal
-    ], "Cancelling metadata request because new path entered");
+    ]);
 
     if (!this.state.inputPath) {
       this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
@@ -248,7 +248,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       cancelSummarySignal,
       cancelQuotaSignal,
       cancelKeyMetadataSignal
-    ], "Request cancelled because DiskUsage view changed");
+    ]);
   }
 
   clickPieSection(e, curPath: string): void {

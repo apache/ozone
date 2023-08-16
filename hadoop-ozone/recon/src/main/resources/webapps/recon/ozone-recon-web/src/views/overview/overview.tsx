@@ -120,7 +120,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     cancelRequests([
       cancelOMDBSyncSignal,
       cancelOverviewSignal
-    ], "Request cancelled because data was updated");
+    ]);
 
     const { requests, controller } = AxiosAllGetHelper([
       '/api/v1/clusterState',
@@ -206,7 +206,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     cancelRequests([
       cancelOMDBSyncSignal,
       cancelOverviewSignal
-    ], "Request cancelled because Overview view changed");
+    ]);
   }
 
   render() {

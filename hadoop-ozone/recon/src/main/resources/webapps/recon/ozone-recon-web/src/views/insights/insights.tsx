@@ -268,7 +268,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
   }
 
   componentWillUnmount(): void {
-    cancelInsightSignal && cancelInsightSignal.abort("Request cancelled because Insights view changed"); 
+    cancelInsightSignal && cancelInsightSignal.abort(); 
   }
 
   render() {

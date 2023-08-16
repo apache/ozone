@@ -18,7 +18,6 @@
 
 import axios, { AxiosResponse } from "axios";
 
-
 export const AxiosGetHelper = (
   url: string,
   controller: AbortController,
@@ -55,8 +54,8 @@ export const AxiosAllGetHelper = (
   }
 }
 
-export const cancelRequests = (cancelSignal: AbortController[], message: string | undefined = undefined) => {
+export const cancelRequests = (cancelSignal: AbortController[]) => {
   cancelSignal.forEach((signal) => {
-    signal && signal.abort(message);
+    signal && signal.abort();
   });
 }

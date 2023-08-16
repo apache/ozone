@@ -186,7 +186,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
     this.setState({
       activeLoading: true
     });
-    const { request, controller } = AxiosGetHelper('/api/v1/pipelines', cancelPipelineSignal, "Cancelled Pipeline request because new data was requested");
+    const { request, controller } = AxiosGetHelper('/api/v1/pipelines', cancelPipelineSignal);
     cancelPipelineSignal = controller;
 
     request.then((response: IAxiosResponse<IPipelinesResponse>) => {
@@ -217,7 +217,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
     this.autoReload.stopPolling();
     cancelRequests([
       cancelPipelineSignal
-    ], "Request cancelled because Pipeline view changed")
+    ])
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

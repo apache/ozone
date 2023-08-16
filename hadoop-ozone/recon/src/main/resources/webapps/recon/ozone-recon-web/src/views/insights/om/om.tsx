@@ -455,11 +455,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   componentWillUnmount(): void {
-    cancelMismatchedEndpointToken && cancelMismatchedEndpointToken.cancel("Request cancelled because OM DB view changed");
-    cancelOpenKeysToken && cancelOpenKeysToken.cancel("Request cancelled because OM DB view changed");
-    cancelDeletePendingToken && cancelDeletePendingToken.cancel("Request cancelled because OM DB view changed");
-    cancelDeletedKeysToken && cancelDeletedKeysToken.cancel("Request cancelled because OM DB view changed");
-    cancelRowExpandToken && cancelRowExpandToken.cancel("Request cancelled because OM DB view changed");
+    cancelMismatchedEndpointSignal && cancelMismatchedEndpointSignal.abort();
+    cancelOpenKeysSignal && cancelOpenKeysSignal.abort();
+    cancelDeletePendingSignal && cancelDeletePendingSignal.abort();
+    cancelDeletedKeysSignal && cancelDeletedKeysSignal.abort();
+    cancelRowExpandSignal && cancelRowExpandSignal.abort();
   }
 
   fetchMismatchContainers = (limit: number, prevKeyMismatch: number, mismatchMissingState: any) => {
@@ -476,7 +476,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
       cancelRowExpandSignal
-    ], "Tab view shifted");
+    ]);
 
     const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${mismatchMissingState}`
     const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
@@ -530,7 +530,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
       cancelRowExpandSignal
-    ], "Tab view shifted");
+    ]);
 
     let openKeysEndpoint;
     if (prevKeyOpen === "") {
@@ -598,7 +598,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
       cancelRowExpandSignal
-    ], "Tab view shifted");
+    ]);
 
     keysPendingExpanded =[];
     let deletePendingKeysEndpoint;
@@ -725,7 +725,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
       cancelRowExpandSignal
-    ], "Tab view shifted");
+    ]);
 
     const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`;
     const { request, controller } = AxiosGetHelper(deletedKeysEndpoint, cancelDeletedKeysSignal);
@@ -931,8 +931,17 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        showDataFetchError(error.toString());
+        if (error.name === "CanceledError") {
+          showDataFetchError(cancelRowExpandSignal.signal.reason)
+        }
+        else {
+          console.log(error);
+          showDataFetchError(error.toString());
+        }
       });
+    }
+    else {
+      cancelRowExpandSignal && cancelRowExpandSignal.abort()
     }
   };
 

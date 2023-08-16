@@ -208,7 +208,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
   }
 
   componentWillUnmount(): void {
-    cancelHeatmapSignal && cancelHeatmapSignal.cancel("Request cancelled because HeatMap view changed")
+    cancelHeatmapSignal && cancelHeatmapSignal.abort("Request cancelled because HeatMap view changed")
   }
 
   onChange = (date: any[]) => {
