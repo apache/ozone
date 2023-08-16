@@ -21,7 +21,10 @@ package org.apache.hadoop.ozone.s3secret;
 import java.io.IOException;
 import java.security.Principal;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.SecurityContext;
+import javax.ws.rs.core.UriInfo;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -53,6 +56,8 @@ public class TestSecretGenerate {
   @Mock
   private ContainerRequestContext context;
   @Mock
+  private UriInfo uriInfo;
+  @Mock
   private SecurityContext securityContext;
   @Mock
   private Principal principal;
@@ -67,6 +72,10 @@ public class TestSecretGenerate {
     when(principal.getName()).thenReturn(USER_NAME);
     when(securityContext.getUserPrincipal()).thenReturn(principal);
     when(context.getSecurityContext()).thenReturn(securityContext);
+
+    when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(context.getUriInfo()).thenReturn(uriInfo);
 
     endpoint = new S3SecretGenerateEndpoint();
     endpoint.setClient(client);
