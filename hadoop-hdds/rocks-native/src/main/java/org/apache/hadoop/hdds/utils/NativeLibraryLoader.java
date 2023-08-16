@@ -78,7 +78,7 @@ public class NativeLibraryLoader {
     return OS.startsWith("linux");
   }
 
-  private static String getLibOsSuffix() {
+  static String getLibOsSuffix() {
     if (isMac()) {
       return ".dylib";
     } else if (isWindows()) {
@@ -126,6 +126,11 @@ public class NativeLibraryLoader {
     return isLibraryLoaded(libraryName);
   }
 
+  // Added function to make this testable.
+  static String getSystemProperty(String property) {
+    return System.getProperty(property);
+  }
+
   private Optional<File> copyResourceFromJarToTemp(final String libraryName)
       throws IOException {
     final String libraryFileName = getJniLibraryFileName(libraryName);
@@ -138,7 +143,7 @@ public class NativeLibraryLoader {
 
       // create a temporary file to copy the library to
       final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
-          new File(Optional.ofNullable(System.getProperty(NATIVE_LIB_TMP_DIR))
+          new File(Optional.ofNullable(getSystemProperty(NATIVE_LIB_TMP_DIR))
               .orElse("")).getAbsoluteFile());
       if (!temp.exists()) {
         return Optional.empty();
