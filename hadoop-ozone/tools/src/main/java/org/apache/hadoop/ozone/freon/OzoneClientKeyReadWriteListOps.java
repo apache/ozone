@@ -244,7 +244,7 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
     int tmp = ThreadLocalRandom.current().nextInt(1, 101);
     if (tmp <= percentageRead) {
       return TaskType.READ_TASK;
-    } else if (percentageRead < tmp && tmp <= percentageRead + percentageList) {
+    } else if (tmp > percentageRead && tmp <= percentageRead + percentageList) {
       return TaskType.LIST_TASK;
     } else {
       return TaskType.WRITE_TASK;
