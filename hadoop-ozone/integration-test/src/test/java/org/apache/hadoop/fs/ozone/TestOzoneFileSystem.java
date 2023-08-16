@@ -39,8 +39,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.fs.SaveSpaceUsageToFile;
-import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -77,7 +75,6 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -85,10 +82,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -103,7 +98,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -807,13 +801,21 @@ public class TestOzoneFileSystem {
     if (fileStatuses == null) {
       return;
     }
-
-    for (FileStatus fStatus : fileStatuses) {
-      fs.delete(fStatus.getPath(), true);
-    }
+    deleteRootRecursively(fileStatuses);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
+      if (fileStatuses.length > 0) {
+        // Retry to delete
+        deleteRootRecursively(fileStatuses);
+      }
+      fileStatuses = fs.listStatus(ROOT);
       Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+    }
+  }
+
+  private static void deleteRootRecursively(FileStatus[] fileStatuses) throws IOException {
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
     }
   }
 

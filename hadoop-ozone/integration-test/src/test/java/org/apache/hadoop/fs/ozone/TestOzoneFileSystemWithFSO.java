@@ -38,7 +38,6 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -49,7 +48,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.concurrent.TimeoutException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -64,7 +62,6 @@ import static org.junit.Assert.fail;
  *
  */
 @RunWith(Parameterized.class)
-@Isolated
 public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Parameterized.Parameters
