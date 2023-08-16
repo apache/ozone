@@ -231,11 +231,9 @@ public class TestOzoneFileSystem {
   @After
   public void cleanup() {
     try {
-      FileStatus[] fileStatuses = fs.listStatus(ROOT);
-      for (FileStatus fileStatus : fileStatuses) {
-        fs.delete(fileStatus.getPath(), true);
-      }
+      deleteRootDir();
     } catch (IOException ex) {
+      LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
   }
@@ -726,7 +724,7 @@ public class TestOzoneFileSystem {
    */
   @Test
   public void testListStatusOnLargeDirectory() throws Exception {
-    deleteRootDir(); // cleanup
+    //deleteRootDir(); // cleanup
     Set<String> paths = new TreeSet<>();
     int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
     for (int i = 0; i < numDirs; i++) {
@@ -1299,7 +1297,7 @@ public class TestOzoneFileSystem {
    */
   @Test
   public void testRenameFile() throws Exception {
-    final String root = "/root1";
+    final String root = "/root";
     Path rootPath = new Path(fs.getUri().toString() + root);
     fs.mkdirs(rootPath);
 
@@ -1320,7 +1318,6 @@ public class TestOzoneFileSystem {
       assertEquals("Renamed failed", 1, fStatus.length);
       assertEquals("Wrong path name!", file1Destin, fStatus[0].getPath());
     }
-    fs.delete(rootPath, true);
   }
 
   /**
