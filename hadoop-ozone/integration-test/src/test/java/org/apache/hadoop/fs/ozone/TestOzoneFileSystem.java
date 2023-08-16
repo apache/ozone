@@ -801,24 +801,33 @@ public class TestOzoneFileSystem {
     if (fileStatuses == null) {
       return;
     }
-    deleteRootRecursively(fileStatuses);
+    String deleted = deleteRootRecursively(fileStatuses);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      if (fileStatuses.length > 0) {
+      /*if (fileStatuses.length > 0) {
         // Retry to delete
         deleteRootRecursively(fileStatuses);
-      }
-      Thread.sleep(1000);
+      }*/
       fileStatuses = fs.listStatus(ROOT);
-      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+      StringBuilder sb = new StringBuilder();
+      for (FileStatus fStatus : fileStatuses) {
+        sb.append(fStatus.toString());
+      }
+
+      Assert.assertEquals(
+          "Delete root failed! Left: " + sb.toString() + "deleted : " + deleted,
+          0, fileStatuses.length);
     }
   }
 
-  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+  private static String deleteRootRecursively(FileStatus[] fileStatuses)
       throws IOException {
+    StringBuilder sb = new StringBuilder();
     for (FileStatus fStatus : fileStatuses) {
+      sb.append(fStatus.toString());
       fs.delete(fStatus.getPath(), true);
     }
+    return sb.toString();
   }
 
   /**
