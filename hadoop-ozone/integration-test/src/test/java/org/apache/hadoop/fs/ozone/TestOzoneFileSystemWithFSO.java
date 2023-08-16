@@ -90,7 +90,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     super.cleanup();
     try {
       deleteRootDir();
-    } catch (IOException | InterruptedException | TimeoutException e) {
+    } catch (IOException e) {
       LOG.info("Failed to cleanup DB tables.", e);
       fail("Failed to cleanup DB tables." + e.getMessage());
     }

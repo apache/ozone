@@ -803,8 +803,7 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir()
-      throws IOException, InterruptedException, TimeoutException {
+  protected void deleteRootDir() throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
@@ -814,9 +813,6 @@ public class TestOzoneFileSystem {
     for (FileStatus fStatus : fileStatuses) {
       fs.delete(fStatus.getPath(), true);
     }
-    Duration shortWait = Duration.ofMillis(1000);
-    Instant expired = Instant.now().plus(shortWait);
-    waitFor(() -> Instant.now().isAfter(expired), 10, 1000);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
       Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
