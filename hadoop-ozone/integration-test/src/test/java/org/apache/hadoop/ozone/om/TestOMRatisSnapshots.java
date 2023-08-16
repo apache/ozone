@@ -1103,14 +1103,11 @@ public class TestOMRatisSnapshots {
     // Create some snapshots, each with new keys
     int keyIncrement = 10;
     String snapshotNamePrefix = "snapshot";
-    String snapshotName = "";
-    List<String> keys = new ArrayList<>();
-    SnapshotInfo snapshotInfo = null;
     for (int snapshotCount = 0; snapshotCount < 10;
          snapshotCount++) {
-      snapshotName = snapshotNamePrefix + snapshotCount;
-      keys = writeKeys(keyIncrement);
-      snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
+      String snapshotName = snapshotNamePrefix + snapshotCount;
+      writeKeys(keyIncrement);
+      createOzoneSnapshot(leaderOM, snapshotName);
     }
 
     // Get the latest db checkpoint from the leader OM.
