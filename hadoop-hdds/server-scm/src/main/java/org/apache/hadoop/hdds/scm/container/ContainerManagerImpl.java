@@ -172,23 +172,26 @@ public class ContainerManagerImpl implements ContainerManager {
   public ContainerInfo allocateContainer(
       final ReplicationConfig replicationConfig, final String owner)
       throws IOException {
-    lock.lock();
-    // Acquire pipeline manager lock, to avoid any updates to pipeline
-    // while allocate container happens. This is to avoid scenario like
-    // mentioned in HDDS-5655.
-    pipelineManager.acquireReadLock();
     List<Pipeline> pipelines;
     Pipeline pipeline;
     ContainerInfo containerInfo = null;
     try {
-      pipelines = pipelineManager
-          .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-      if (!pipelines.isEmpty()) {
-        pipeline = pipelines.get(random.nextInt(pipelines.size()));
-        containerInfo = createContainer(pipeline, owner);
+      lock.lock();
+      try {
+        // Acquire pipeline manager lock, to avoid any updates to pipeline
+        // while allocate container happens. This is to avoid scenario like
+        // mentioned in HDDS-5655.
+        pipelineManager.acquireReadLock();
+        pipelines = pipelineManager
+            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+        if (!pipelines.isEmpty()) {
+          pipeline = pipelines.get(random.nextInt(pipelines.size()));
+          containerInfo = createContainer(pipeline, owner);
+        }
+      } finally {
+        pipelineManager.releaseReadLock();
       }
     } finally {
-      pipelineManager.releaseReadLock();
       lock.unlock();
     }
 
@@ -202,21 +205,25 @@ public class ContainerManagerImpl implements ContainerManager {
             " matching pipeline for replicationConfig: " + replicationConfig
             + ", State:PipelineState.OPEN", e);
       }
-      lock.lock();
-      pipelineManager.acquireReadLock();
+
       try {
-        pipelines = pipelineManager
-            .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
-        if (!pipelines.isEmpty()) {
-          pipeline = pipelines.get(random.nextInt(pipelines.size()));
-          containerInfo = createContainer(pipeline, owner);
-        } else {
-          throw new IOException("Could not allocate container. Cannot get any" +
-              " matching pipeline for replicationConfig: " + replicationConfig
-              + ", State:PipelineState.OPEN");
+        lock.lock();
+        try {
+          pipelineManager.acquireReadLock();
+          pipelines = pipelineManager
+              .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+          if (!pipelines.isEmpty()) {
+            pipeline = pipelines.get(random.nextInt(pipelines.size()));
+            containerInfo = createContainer(pipeline, owner);
+          } else {
+            throw new IOException("Could not allocate container. Cannot get " +
+                " any matching pipeline for replicationConfig: " +
+                replicationConfig + ", State:PipelineState.OPEN");
+          }
+        } finally {
+          pipelineManager.releaseReadLock();
         }
       } finally {
-        pipelineManager.releaseReadLock();
         lock.unlock();
       }
     }
