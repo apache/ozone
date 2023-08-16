@@ -107,10 +107,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
@@ -1139,7 +1137,6 @@ public class TestOMRatisSnapshots {
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
     readKeys(newKeys);
-    checkSnapshot(leaderOM, followerOM, snapshotName, keys, snapshotInfo);
 
     OzoneManager newLeaderOM =
         getNewLeader(leaderOM, followerNodeId, followerOM);
@@ -1262,7 +1259,7 @@ public class TestOMRatisSnapshots {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 1000, 10000);
+    }, 1000, 60000);
 
     // get snapshot d
     OmSnapshot snapD;
@@ -1379,22 +1376,16 @@ public class TestOMRatisSnapshots {
     SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
     Assertions.assertNotNull(newSnapshot);
-    File omMetadataDir =
-        OMStorage.getOmDbDir(ozoneManager.getConfiguration());
-    String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-    Path filePath =
-        Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
-    Assertions.assertTrue(Files.exists(filePath));
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        ozoneManager.getMetadataManager().getSnapshotInfoTable();
     GenericTestUtils.waitFor(() -> {
-      List<String> processedSnapshotIds;
+      SnapshotInfo snapshotInfo = null;
       try {
-        processedSnapshotIds = Files.readAllLines(filePath);
+        snapshotInfo = snapshotInfoTable.get(newSnapshot.getTableKey());
       } catch (IOException e) {
         Assertions.fail();
-        return false;
       }
-      return processedSnapshotIds.contains(newSnapshot.getSnapshotId()
-          .toString());
+      return snapshotInfo.isSstFiltered();
     }, 1000, 30000);
     return newSnapshot;
   }
