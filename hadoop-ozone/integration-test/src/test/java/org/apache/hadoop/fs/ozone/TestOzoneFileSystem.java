@@ -226,7 +226,7 @@ public class TestOzoneFileSystem {
   public void cleanup() {
     try {
       deleteRootDir();
-    } catch (IOException ex) {
+    } catch (IOException | InterruptedException ex) {
       LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
@@ -795,7 +795,7 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir() throws IOException {
+  protected void deleteRootDir() throws IOException, InterruptedException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
@@ -808,12 +808,14 @@ public class TestOzoneFileSystem {
         // Retry to delete
         deleteRootRecursively(fileStatuses);
       }
+      Thread.sleep(1000);
       fileStatuses = fs.listStatus(ROOT);
       Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
     }
   }
 
-  private static void deleteRootRecursively(FileStatus[] fileStatuses) throws IOException {
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+      throws IOException {
     for (FileStatus fStatus : fileStatuses) {
       fs.delete(fStatus.getPath(), true);
     }
