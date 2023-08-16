@@ -158,6 +158,12 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   }
 
   @Test
+  public void testCreateFileInheritParentDefaultAcls()
+      throws Exception {
+    super.testCreateFileInheritParentDefaultAcls();
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithSnapshotReservedWord()
       throws Exception {
     String[] validPaths = {
