@@ -23,7 +23,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Scanner;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -153,9 +152,8 @@ public final class TestDataUtil {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
-        String uuid = UUID.randomUUID().toString();
-        String volumeName = "volume" + uuid;//RandomStringUtils.randomNumeric(5);
-        String bucketName = "bucket" + uuid;//RandomStringUtils.randomNumeric(5);
+        String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+        String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
         return createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
       } catch (OMException e) {
