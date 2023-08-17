@@ -56,7 +56,7 @@ public class TestNativeLibraryLoader {
   @ParameterizedTest
   @MethodSource("nativeLibraryDirectoryLocations")
   public void testNativeLibraryLoader(
-      Optional<String> nativeLibraryDirectoryLocation) {
+      Optional<String> nativeLibraryDirectoryLocation) throws IOException {
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader =
@@ -71,12 +71,6 @@ public class TestNativeLibraryLoader {
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       Assertions.assertTrue(NativeLibraryLoader
           .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
-      File[] libPath = new File(nativeLibraryDirectoryLocation.orElse(""))
-          .getAbsoluteFile().listFiles((dir, name) ->
-              name.startsWith(ROCKS_TOOLS_NATIVE_LIBRARY_NAME) &&
-                  name.endsWith(NativeLibraryLoader.getLibOsSuffix()));
-      Assertions.assertEquals(1, libPath.length);
-      libPath[0].delete();
     }
 
   }

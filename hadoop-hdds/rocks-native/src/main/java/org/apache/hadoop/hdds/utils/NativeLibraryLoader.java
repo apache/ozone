@@ -79,8 +79,7 @@ public class NativeLibraryLoader {
     return OS.startsWith("linux");
   }
 
-  @VisibleForTesting
-  static String getLibOsSuffix() {
+  private static String getLibOsSuffix() {
     if (isMac()) {
       return ".dylib";
     } else if (isWindows()) {
