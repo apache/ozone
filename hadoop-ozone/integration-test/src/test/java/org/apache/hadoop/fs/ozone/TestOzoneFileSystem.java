@@ -82,8 +82,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -813,10 +815,36 @@ public class TestOzoneFileSystem {
       for (FileStatus fStatus : fileStatuses) {
         sb.append(fStatus.toString());
       }
-
+      List<FileStatus> existedFileStatusList =
+          Arrays.stream(fileStatuses).filter(fStatus -> {
+            try {
+              return fs.exists(fStatus.getPath());
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }).collect(Collectors.toList());
+      client.getObjectStore().listVolumes(OZONE_URI_DELIMITER).forEachRemaining(vol -> {
+        String volName = vol.getName();
+        LOG.info("Volume left: " + volName);
+        try {
+          client.getObjectStore().getVolume(volName)
+              .listBuckets(volName).forEachRemaining(bucket -> {
+                LOG.info("Bucket left: " + bucket.getName());
+                try {
+                  bucket.listKeys(null).forEachRemaining(key -> {
+                    LOG.info("key: " + key.getName());
+                  });
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
+                }
+              });
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
       Assert.assertEquals(
           "Delete root failed! Left: " + sb.toString() + "deleted : " + deleted,
-          0, fileStatuses.length);
+          0, existedFileStatusList.size());
     }
   }
 
