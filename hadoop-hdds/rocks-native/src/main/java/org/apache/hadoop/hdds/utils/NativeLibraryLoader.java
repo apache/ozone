@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +79,7 @@ public class NativeLibraryLoader {
     return OS.startsWith("linux");
   }
 
+  @VisibleForTesting
   static String getLibOsSuffix() {
     if (isMac()) {
       return ".dylib";
@@ -127,6 +129,7 @@ public class NativeLibraryLoader {
   }
 
   // Added function to make this testable.
+  @VisibleForTesting
   static String getSystemProperty(String property) {
     return System.getProperty(property);
   }
