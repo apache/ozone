@@ -51,6 +51,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * In-memory ozone bucket for testing.
@@ -291,8 +293,12 @@ public class OzoneBucketStub extends OzoneBucket {
     return new OzoneInputStream(new ByteArrayInputStream(keyContents.get(key)));
   }
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(OzoneBucketStub.class);
   @Override
   public OzoneKeyDetails getKey(String key) throws IOException {
+    LOG.info("tej key is-"+key);
+    LOG.info("tej keydetails-"+keyDetails.toString());
     if (keyDetails.containsKey(key)) {
       return keyDetails.get(key);
     } else {

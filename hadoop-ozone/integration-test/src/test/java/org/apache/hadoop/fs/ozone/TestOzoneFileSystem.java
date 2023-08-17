@@ -1574,6 +1574,34 @@ public class TestOzoneFileSystem {
   }
 
   @Test
+  public void testGetKeys()
+      throws IOException {
+    OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(client, bucketLayout);
+    String rootPath = String
+        .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+            bucket.getVolumeName());
+    // Set the fs.defaultFS and start the filesystem
+    Configuration conf = new OzoneConfiguration(cluster.getConf());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // Set the number of keys to be processed during batch operate.
+    OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
+
+    o3FS.mkdirs(new Path(rootPath, "a/"));
+    o3FS.mkdirs(new Path(rootPath, "a/b/"));
+    o3FS.mkdirs(new Path(rootPath, "a/b/c/"));
+    o3FS.createFile(new Path(rootPath, "a/b/c/key")).build().close();
+    Assert.assertEquals("a/b/c/key",
+        bucket.getKey("a/b/c/key").getName());
+    Assert.assertEquals("a/b/c/",
+        bucket.getKey("a/b/c/").getName());
+    Assert.assertEquals("a/b/c",
+        bucket.getKey("a/b/c").getName());
+    Assert.assertEquals("a/b",
+        bucket.getKey("a/b/").getName());
+  }
+
+  @Test
   public void testGetTrashRoots() throws IOException {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path userTrash = new Path(TRASH_ROOT, username);
