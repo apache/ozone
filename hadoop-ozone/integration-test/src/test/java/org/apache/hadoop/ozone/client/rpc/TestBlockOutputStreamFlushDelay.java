@@ -125,7 +125,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Test
   public void testBufferCaching() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -163,11 +163,11 @@ public class TestBlockOutputStreamFlushDelay {
     Assert.assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
     Assert.assertEquals(0, blockOutputStream.getTotalAckDataLength());
     Assert.assertEquals(pendingWriteChunkCount,
-        XceiverClientManager.getXceiverClientMetrics()
+        XceiverClientManager.getMetrics()
             .getPendingContainerOpCountMetrics(
                 ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(pendingPutBlockCount,
-        XceiverClientManager.getXceiverClientMetrics()
+        XceiverClientManager.getMetrics()
             .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
 
     // commitIndex2FlushedData Map will be empty here
@@ -230,7 +230,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Test
   public void testFlushChunk() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -326,7 +326,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Flaky("HDDS-7875")
   public void testMultiChunkWrite() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -422,7 +422,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Flaky("HDDS-7875")
   public void testMultiChunkWrite2() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -499,7 +499,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Flaky("HDDS-7875")
   public void testFullBufferCondition() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -599,7 +599,7 @@ public class TestBlockOutputStreamFlushDelay {
   @Test
   public void testWriteWithExceedingMaxBufferLimit() throws Exception {
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(

@@ -194,7 +194,7 @@ public class TestBlockDataStreamOutput {
   public void testPutBlockAtBoundary() throws Exception {
     int dataLength = 500;
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     long putBlockCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.PutBlock);
     long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
@@ -234,7 +234,7 @@ public class TestBlockDataStreamOutput {
   public void testMinPacketSize() throws Exception {
     String keyName = getKeyName();
     XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+        XceiverClientManager.getMetrics();
     OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);

@@ -120,8 +120,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   private void createBlockReader() {
     if (reconstructionReader) {
-      XceiverClientManager.getXceiverClientMetrics()
-          .incECReconstructionTotal();
+      XceiverClientManager.getMetrics().incECReconstructionTotal();
     }
     blockReader = ecBlockInputStreamFactory.create(reconstructionReader,
         failedLocations, repConfig, blockInfo, verifyChecksum,
@@ -168,8 +167,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
         // If we get an error from the reconstruction reader, there
         // is nothing left to try. It will re-try until it has insufficient
         // locations internally, so if an error comes here, just re-throw it.
-        XceiverClientManager.getXceiverClientMetrics()
-            .incECReconstructionFailsTotal();
+        XceiverClientManager.getMetrics().incECReconstructionFailsTotal();
         throw e;
       }
       if (e instanceof BadDataLocationException) {

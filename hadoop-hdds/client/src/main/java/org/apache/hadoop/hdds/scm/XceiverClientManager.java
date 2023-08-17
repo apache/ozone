@@ -123,11 +123,17 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
+    metrics = createXceiverClientMetrics();
   }
 
   @VisibleForTesting
   public Cache<String, XceiverClientSpi> getClientCache() {
     return clientCache;
+  }
+
+  @VisibleForTesting
+  public static XceiverClientMetrics getMetrics() {
+    return metrics;
   }
 
   /**
@@ -295,9 +301,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
   }
 
   /**
-   * Get xceiver client metric.
+   * Initialize xceiver client metrics.
    */
-  public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
+  public static synchronized XceiverClientMetrics createXceiverClientMetrics() {
     if (metrics == null) {
       metrics = XceiverClientMetrics.create();
     }

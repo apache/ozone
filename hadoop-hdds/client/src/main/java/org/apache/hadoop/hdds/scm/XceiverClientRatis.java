@@ -105,7 +105,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
 
   private final XceiverClientMetrics metrics
-      = XceiverClientManager.getXceiverClientMetrics();
+      = XceiverClientManager.getMetrics();
 
   /**
    * Constructs a client.

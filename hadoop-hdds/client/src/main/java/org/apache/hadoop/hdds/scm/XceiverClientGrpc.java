@@ -122,7 +122,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.secConfig = new SecurityConfig(config);
     this.semaphore =
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
-    this.metrics = XceiverClientManager.getXceiverClientMetrics();
+    this.metrics = XceiverClientManager.getMetrics();
     this.channels = new HashMap<>();
     this.asyncStubs = new HashMap<>();
     this.topologyAwareRead = config.getBoolean(

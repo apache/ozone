@@ -188,7 +188,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     ioException = new AtomicReference<>(null);
     checksum = new Checksum(config.getChecksumType(),
         config.getBytesPerChecksum());
-    metrics = XceiverClientManager.getXceiverClientMetrics();
+    metrics = XceiverClientManager.getMetrics();
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
