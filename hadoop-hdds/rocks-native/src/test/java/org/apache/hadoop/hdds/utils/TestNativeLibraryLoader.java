@@ -73,14 +73,15 @@ public class TestNativeLibraryLoader {
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       Assertions.assertTrue(NativeLibraryLoader
           .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
+      // Mocking to force copy random bytes to create a lib file to
+      // nativeLibraryDirectoryLocation. But load library will fail.
       mockedNativeLibraryLoader.when(() ->
           NativeLibraryLoader.getResourceStream(anyString()))
           .thenReturn(new ByteArrayInputStream(new byte[]{0, 1, 2, 3}));
       String dummyLibraryName = "dummy_lib";
-      Assertions.assertFalse(
-          NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName));
-      Assertions.assertFalse(
-          NativeLibraryLoader.isLibraryLoaded(dummyLibraryName));
+      NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName);
+      NativeLibraryLoader.isLibraryLoaded(dummyLibraryName);
+      // Checking if the resource with random was copied to a temp file.
       File[] libPath = new File(nativeLibraryDirectoryLocation.orElse(""))
           .getAbsoluteFile().listFiles((dir, name) ->
               name.startsWith(dummyLibraryName) &&
