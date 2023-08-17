@@ -68,7 +68,10 @@ public class TestOmSnapshotInfo {
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
         .setSstFiltered(false)
-        .setReferencedSize(10000L)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
         .build();
   }
 
@@ -88,7 +91,10 @@ public class TestOmSnapshotInfo {
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
         .setSstFiltered(false)
-        .setReferencedSize(10000L)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
         .build();
   }
 
@@ -126,6 +132,13 @@ public class TestOmSnapshotInfo {
         snapshotInfoEntryActual.getSstFiltered());
     Assert.assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
         snapshotInfoEntryActual.getReferencedSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedReplicatedSize(),
+        snapshotInfoEntryActual.getReferencedReplicatedSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveSize(),
+        snapshotInfoEntryActual.getExclusiveSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
+        snapshotInfoEntryActual.getExclusiveReplicatedSize());
+
     Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
@@ -155,6 +168,13 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.isSstFiltered());
     Assert.assertEquals(snapshotInfoExpected.getReferencedSize(),
         snapshotInfoActual.getReferencedSize());
+    Assert.assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),
+        snapshotInfoActual.getReferencedReplicatedSize());
+    Assert.assertEquals(snapshotInfoExpected.getExclusiveSize(),
+        snapshotInfoActual.getExclusiveSize());
+    Assert.assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
+        snapshotInfoActual.getExclusiveReplicatedSize());
+
     Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 

@@ -35,6 +35,9 @@ public class OzoneSnapshot {
   private final String snapshotPath; // snapshot mask
   private final String checkpointDir;
   private final long referencedSize;
+  private final long referencedReplicatedSize;
+  private final long exclusiveSize;
+  private final long exclusiveReplicatedSize;
 
   /**
    * Constructs OzoneSnapshot from SnapshotInfo.
@@ -48,6 +51,9 @@ public class OzoneSnapshot {
    * @param snapshotPath   Path of the snapshot.
    * @param checkpointDir  Snapshot checkpoint directory.
    * @param referencedSize Snapshot referenced size.
+   * @param referencedReplicatedSize Snapshot referenced size after replication.
+   * @param exclusiveSize  Snapshot exclusive size.
+   * @param exclusiveReplicatedSize  Snapshot exclusive size after replication.
    */
   @SuppressWarnings("parameternumber")
   public OzoneSnapshot(String volumeName,
@@ -58,7 +64,10 @@ public class OzoneSnapshot {
                        UUID snapshotId,
                        String snapshotPath,
                        String checkpointDir,
-                       long referencedSize) {
+                       long referencedSize,
+                       long referencedReplicatedSize,
+                       long exclusiveSize,
+                       long exclusiveReplicatedSize) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = name;
@@ -68,6 +77,9 @@ public class OzoneSnapshot {
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
     this.referencedSize = referencedSize;
+    this.referencedReplicatedSize = referencedReplicatedSize;
+    this.exclusiveSize = exclusiveSize;
+    this.exclusiveReplicatedSize = exclusiveReplicatedSize;
   }
 
   /**
@@ -149,6 +161,27 @@ public class OzoneSnapshot {
     return referencedSize;
   }
 
+  /**
+   * @return Reference size after replication/EC of the snapshot
+   */
+  public long getReferencedReplicatedSize() {
+    return referencedReplicatedSize;
+  }
+
+  /**
+   * @return Exclusive size of the snapshot.
+   */
+  public long getExclusiveSize() {
+    return exclusiveSize;
+  }
+
+  /**
+   * @return Exclusive size after replication/EC of the snapshot.
+   */
+  public long getExclusiveReplicatedSize() {
+    return exclusiveReplicatedSize;
+  }
+
   public static OzoneSnapshot fromSnapshotInfo(SnapshotInfo snapshotInfo) {
     return new OzoneSnapshot(
         snapshotInfo.getVolumeName(),
@@ -159,6 +192,10 @@ public class OzoneSnapshot {
         snapshotInfo.getSnapshotId(),
         snapshotInfo.getSnapshotPath(),
         snapshotInfo.getCheckpointDir(),
-        snapshotInfo.getReferencedSize());
+        snapshotInfo.getReferencedSize(),
+        snapshotInfo.getReferencedReplicatedSize(),
+        snapshotInfo.getExclusiveSize(),
+        snapshotInfo.getExclusiveReplicatedSize()
+    );
   }
 }

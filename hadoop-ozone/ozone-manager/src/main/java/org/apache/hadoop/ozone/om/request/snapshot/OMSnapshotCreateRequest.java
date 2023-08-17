@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -165,7 +166,18 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // Snapshot referenced size should be bucket's used bytes
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
-      snapshotInfo.setReferencedSize(omBucketInfo.getUsedBytes());
+      snapshotInfo.setReferencedReplicatedSize(omBucketInfo.getUsedBytes());
+
+      // Snapshot referenced size in this case is an *estimate* inferred from
+      // the bucket default replication policy right now.
+      // This may well not be the actual sum of all key data sizes in this
+      // bucket because each key can have its own replication policy,
+      // depending on the client at the time of writing it.
+      // And we are NOT doing O(n) walk over the keyTable (fileTable) here
+      // because it is a design goal of CreateSnapshot to be an O(1) operation.
+      // TODO: Assign actual data size once we have the pre-replicated key size
+      //  counter in OmBucketInfo.
+      snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
       addSnapshotInfoToSnapshotChainAndCache(omMetadataManager,
           transactionLogIndex);
@@ -303,4 +315,16 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
 
     return value != null ? value.getCacheValue() : null;
   }
+
+  /**
+   * Estimate the sum data sizes of all keys in the bucket by dividing
+   * bucket used size (w/ replication) by the replication factor of the bucket.
+   * @param bucketInfo OmBucketInfo
+   */
+  private long estimateBucketDataSize(OmBucketInfo bucketInfo) {
+    return QuotaUtil.getDataSize(
+        bucketInfo.getUsedBytes(),
+        bucketInfo.getDefaultReplicationConfig().getReplicationConfig());
+  }
+
 }
