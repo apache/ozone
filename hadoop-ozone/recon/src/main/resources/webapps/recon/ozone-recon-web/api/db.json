@@ -1346,7 +1346,7 @@
     "subPathCount": 5,
     "subPaths": [
       {
-        "path": "/vol1",
+        "path": "/vol1cloudera-health-monitoring-ozone-basic-canary-volume",
         "size": 50000,
         "sizeWithReplica": 150000
       },

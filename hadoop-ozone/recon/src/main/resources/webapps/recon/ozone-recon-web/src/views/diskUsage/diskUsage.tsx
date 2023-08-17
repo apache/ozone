@@ -202,7 +202,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
           labels: pathLabels,
           text: sizeStr,
           textinfo: 'label',
-          hovertemplate: 'Percentage: %{customdata}%<br>Total Data Size: %{text}<extra></extra>'
+          hovertemplate: 'Percentage: %{customdata}%<br>Total Data Size: %{text}<br> Name: %{label} <extra></extra>'
         }]
       });
     }).catch(error => {
