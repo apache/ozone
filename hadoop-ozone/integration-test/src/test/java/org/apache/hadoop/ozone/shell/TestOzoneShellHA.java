@@ -85,6 +85,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -1659,5 +1660,65 @@ public class TestOzoneShellHA {
     omExecution = assertThrows(OMException.class,
         () -> client.getObjectStore().getVolume(volume1));
     assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+  }
+
+  @Test
+  public void testLinkedAndNonLinkedBucketMetaData()
+      throws Exception {
+    String volumeName = "volume1";
+    // Create volume volume1
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[] {"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // ozone sh bucket list
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListOut.size() == 1);
+    boolean link =
+        String.valueOf(bucketListOut.get(0).get("link")).equals("false");
+    assertTrue(link);
+
+    // Create linked bucket under volume1
+    out.reset();
+    execute(ozoneShell, new String[]{"bucket", "link", "/volume1/bucket1",
+        "/volume1/link-to-bucket1"});
+
+    // ozone sh bucket list under volume1 and this should give both linked
+    // and non-linked buckets
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListLinked.size() == 2);
+    link = String.valueOf(bucketListLinked.get(1).get("link")).equals("true");
+    assertTrue(link);
+
+    // Clean up
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "delete", "/volume1/bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"bucket", "delete", "/volume1/link-to-bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"volume", "delete", "/volume1"});
+    out.reset();
   }
 }
