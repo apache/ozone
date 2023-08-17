@@ -25,7 +25,6 @@ import java.math.BigInteger;
 import java.security.cert.CRLException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
-import java.time.Instant;
 import java.util.ArrayList;
 
 import java.util.List;
@@ -223,33 +222,41 @@ public final class SCMCertStore implements CertificateStore {
   }
 
   @Override
-  public void removeAllExpiredCertificates() throws IOException {
+  public List<X509Certificate> removeAllExpiredCertificates()
+      throws IOException {
+    List<X509Certificate> removedCerts = new ArrayList<>();
     lock.lock();
     try (BatchOperation batchOperation =
              scmMetadataStore.getBatchHandler().initBatchOperation()) {
-      addExpiredCertsToBeRemoved(batchOperation,
-          scmMetadataStore.getValidCertsTable());
-      addExpiredCertsToBeRemoved(batchOperation,
-          scmMetadataStore.getValidSCMCertsTable());
+      removedCerts.addAll(addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidCertsTable()));
+      removedCerts.addAll(addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidSCMCertsTable()));
       scmMetadataStore.getStore().commitBatchOperation(batchOperation);
     } finally {
       lock.unlock();
     }
+    return removedCerts;
   }
 
-  private void addExpiredCertsToBeRemoved(BatchOperation batchOperation,
-      Table<BigInteger, X509Certificate> certTable) throws IOException {
+  private List<X509Certificate> addExpiredCertsToBeRemoved(
+      BatchOperation batchOperation, Table<BigInteger,
+      X509Certificate> certTable) throws IOException {
+    List<X509Certificate> removedCerts = new ArrayList<>();
     try (TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
         X509Certificate>> certsIterator = certTable.iterator()) {
-      Instant now = Instant.now();
+      Date now = new Date();
       while (certsIterator.hasNext()) {
         Table.KeyValue<BigInteger, X509Certificate> certEntry =
             certsIterator.next();
-        if (certEntry.getValue().getNotAfter().toInstant().isBefore(now)) {
+        X509Certificate cert = certEntry.getValue();
+        if (cert.getNotAfter().before(now)) {
+          removedCerts.add(cert);
           certTable.deleteWithBatch(batchOperation, certEntry.getKey());
         }
       }
     }
+    return removedCerts;
   }
 
   @Override

@@ -116,8 +116,7 @@ public class WritableECContainerProvider
       }
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
-        repConfig, Pipeline.PipelineState.OPEN,
-        excludeList.getDatanodes(), excludeList.getPipelineIds());
+        repConfig, Pipeline.PipelineState.OPEN);
     final int pipelineCount = existingPipelines.size();
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
@@ -143,7 +142,7 @@ public class WritableECContainerProvider
             pipelineManager.closePipeline(pipeline, true);
             openPipelineCount--;
           } else {
-            if (containerIsExcluded(containerInfo, excludeList)) {
+            if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
               containerInfo.updateLastUsedTime();
@@ -213,9 +212,32 @@ public class WritableECContainerProvider
     return container;
   }
 
-  private boolean containerIsExcluded(ContainerInfo container,
+  /**
+   * Checks if the specified pipeline is excluded. It's excluded if the
+   * specified excludeList contains the specified container associated with
+   * this pipeline, or if it contains this pipeline, or if it contains any
+   * Datanode that is a part of this pipeline.
+   * @param pipeline Pipeline to check
+   * @param container Container associated with this pipeline
+   * @param excludeList Objects to exclude
+   * @return true if excluded, else false
+   */
+  private boolean pipelineIsExcluded(Pipeline pipeline, ContainerInfo container,
       ExcludeList excludeList) {
-    return excludeList.getContainerIds().contains(container.containerID());
+    if (excludeList.getContainerIds().contains(container.containerID())) {
+      return true;
+    }
+    if (excludeList.getPipelineIds().contains(pipeline.getId())) {
+      return true;
+    }
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (excludeList.getDatanodes().contains(dn)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private ContainerInfo getContainerFromPipeline(Pipeline pipeline)

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -45,6 +46,7 @@ import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -69,6 +71,9 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
@@ -81,6 +86,11 @@ public class BucketEndpoint extends EndpointBase {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketEndpoint.class);
+
+  private boolean listKeysShallowEnabled;
+
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -133,18 +143,19 @@ public class BucketEndpoint extends EndpointBase {
         startAfter = marker;
       }
 
+      // If continuation token and start after both are provided, then we
+      // ignore start After
+      String prevKey = continueToken != null ? decodedToken.getLastKey()
+          : startAfter;
+
+      // If shallow is true, only list immediate children
+      // delimited by OZONE_URI_DELIMITER
+      boolean shallow = listKeysShallowEnabled
+          && OZONE_URI_DELIMITER.equals(delimiter);
+
       OzoneBucket bucket = getBucket(bucketName);
-      if (startAfter != null && continueToken != null) {
-        // If continuation token and start after both are provided, then we
-        // ignore start After
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-      } else if (startAfter != null && continueToken == null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, startAfter);
-      } else if (startAfter == null && continueToken != null) {
-        ozoneKeyIterator = bucket.listKeys(prefix, decodedToken.getLastKey());
-      } else {
-        ozoneKeyIterator = bucket.listKeys(prefix);
-      }
+      ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
+
     } catch (OMException ex) {
       AUDIT.logReadFailure(
           buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
@@ -701,6 +712,8 @@ public class BucketEndpoint extends EndpointBase {
 
   @Override
   public void init() {
-
+    listKeysShallowEnabled = ozoneConfiguration.getBoolean(
+        OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
+        OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
   }
 }
