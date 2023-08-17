@@ -209,9 +209,9 @@ public class TestOMSnapshotCreateRequest {
             .getOMResponse()
             .getCreateSnapshotResponse()
             .getSnapshotInfo();
-    // Check that new proto fields are explicitly set
-    assertTrue(snapshotInfoProto.hasReferencedSize());
-    assertTrue(snapshotInfoProto.hasReferencedReplicatedSize());
+
+    assertEquals(1000L, snapshotInfoProto.getReferencedSize());
+    assertEquals(3000L, snapshotInfoProto.getReferencedReplicatedSize());
 
     SnapshotInfo snapshotInfoFromProto = getFromProtobuf(snapshotInfoProto);
 

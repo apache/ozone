@@ -549,6 +549,7 @@ public final class OMRequestTestUtils {
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
+            .setUsedBytes(3000L)
     );
   }
 
