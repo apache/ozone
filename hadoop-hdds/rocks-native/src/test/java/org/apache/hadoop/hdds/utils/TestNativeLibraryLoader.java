@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 import static org.apache.hadoop.hdds.utils.NativeLibraryLoader.NATIVE_LIB_TMP_DIR;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 
 /**
@@ -71,6 +73,20 @@ public class TestNativeLibraryLoader {
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       Assertions.assertTrue(NativeLibraryLoader
           .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
+      mockedNativeLibraryLoader.when(() ->
+          NativeLibraryLoader.getResourceStream(anyString()))
+          .thenReturn(new ByteArrayInputStream(new byte[]{0, 1, 2, 3}));
+      String dummyLibraryName = "dummy_lib";
+      Assertions.assertFalse(
+          NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName));
+      Assertions.assertFalse(
+          NativeLibraryLoader.isLibraryLoaded(dummyLibraryName));
+      File[] libPath = new File(nativeLibraryDirectoryLocation.orElse(""))
+          .getAbsoluteFile().listFiles((dir, name) ->
+              name.startsWith(dummyLibraryName) &&
+                  name.endsWith(NativeLibraryLoader.getLibOsSuffix()));
+      Assertions.assertEquals(1, libPath.length);
+      Assertions.assertTrue(libPath[0].delete());
     }
 
   }
