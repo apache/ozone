@@ -1382,17 +1382,16 @@ public class SnapshotDiffManager implements AutoCloseable {
                 oldParentIdPathMap, oldKeyName);
             // Check if block location is same or not. If it is not same,
             // key must have been overridden as well.
-            boolean isObjectModified = false;
-            if (isObjectModified(
+            boolean isObjectModified = isObjectModified(
                 keyPrefix + codecRegistry.asObject(oldKeyName, String.class),
                 keyPrefix + codecRegistry.asObject(newKeyName, String.class),
                 isDirectoryObject ? fsDirTable : fsTable,
-                isDirectoryObject ? tsDirTable : tsTable)) {
+                isDirectoryObject ? tsDirTable : tsTable);
+            if (isObjectModified) {
               // Here, oldKey name is returned as modified. Modified key name is
               // based on base snapshot (from snapshot).
               modifyDiffs.add(codecRegistry.asRawData(
                   SnapshotDiffReportOzone.getDiffReportEntry(MODIFY, oldKey)));
-              isObjectModified = true;
             }
             if (!isObjectModified || !Arrays.equals(oldKeyName, newKeyName)) {
               String newKey = resolveBucketRelativePath(isFSOBucket,
