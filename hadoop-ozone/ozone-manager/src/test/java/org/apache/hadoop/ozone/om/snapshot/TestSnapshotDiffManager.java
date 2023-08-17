@@ -690,7 +690,7 @@ public class TestSnapshotDiffManager {
           new StubbedPersistentMap<>();
       PersistentMap<byte[], byte[]> newObjectIdKeyMap =
           new SnapshotTestUtils.StubbedPersistentMap<>();
-      PersistentMap<byte[], byte[]> objectIdsToCheck =
+      PersistentMap<byte[], Boolean> objectIdsToCheck =
           new SnapshotTestUtils.StubbedPersistentMap<>();
 
       Set<Long> oldParentIds = Sets.newHashSet();
@@ -733,11 +733,11 @@ public class TestSnapshotDiffManager {
         assertEquals(12, newObjectIdCnt);
       }
 
-      try (ClosableIterator<Entry<byte[], byte[]>>
+      try (ClosableIterator<Entry<byte[], Boolean>>
                objectIdsToCheckIter = objectIdsToCheck.iterator()) {
         int objectIdCnt = 0;
         while (objectIdsToCheckIter.hasNext()) {
-          Entry<byte[], byte[]> entry = objectIdsToCheckIter.next();
+          Entry<byte[], Boolean> entry = objectIdsToCheckIter.next();
           byte[] v = entry.getKey();
           long objectId = codecRegistry.asObject(v, Long.class);
           assertEquals(0, objectId % 2);
@@ -756,7 +756,7 @@ public class TestSnapshotDiffManager {
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> newObjectIdKeyMap =
         new StubbedPersistentMap<>();
-    PersistentMap<byte[], byte[]> objectIdToDiffObject =
+    PersistentMap<byte[], Boolean> objectIdToIsDirMap =
         new SnapshotTestUtils.StubbedPersistentMap<>();
     Map<Long, SnapshotDiffReport.DiffType> diffMap = new HashMap<>();
     LongStream.range(0, 100).forEach(objectId -> {
@@ -779,7 +779,7 @@ public class TestSnapshotDiffManager {
           newObjectIdKeyMap.put(objectIdVal, renamedKeyBytes);
           diffMap.put(objectId, SnapshotDiffReport.DiffType.RENAME);
         }
-        objectIdToDiffObject.put(objectIdVal, new byte[] {(byte)0});
+        objectIdToIsDirMap.put(objectIdVal, false);
         if (objectId >= 50 && objectId <= 100 ||
             objectId >= 0 && objectId <= 25 && objectId % 4 > 2) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.DELETE);
@@ -836,7 +836,7 @@ public class TestSnapshotDiffManager {
 
       long totalDiffEntries = spy.generateDiffReport("jobId",
           fromSnapTable, toSnapTable, null, null,
-          objectIdToDiffObject, oldObjectIdKeyMap, newObjectIdKeyMap,
+          objectIdToIsDirMap, oldObjectIdKeyMap, newObjectIdKeyMap,
           volumeName, bucketName, fromSnapName, toSnapName, false,
           Optional.empty(), Optional.empty(), tablePrefixes);
 
@@ -1196,7 +1196,7 @@ public class TestSnapshotDiffManager {
 
   @Test
   public void testGenerateDiffReportWhenThereInEntry() {
-    PersistentMap<byte[], byte[]> objectIdToIsDirectory =
+    PersistentMap<byte[], Boolean> objectIdToIsDirectoryMap =
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> oldObjIdToKeyMap =
         new StubbedPersistentMap<>();
@@ -1207,7 +1207,7 @@ public class TestSnapshotDiffManager {
         keyInfoTable,
         null,
         null,
-        objectIdToIsDirectory,
+        objectIdToIsDirectoryMap,
         oldObjIdToKeyMap,
         newObjIdToKeyMap,
         "volume",
@@ -1229,14 +1229,14 @@ public class TestSnapshotDiffManager {
     String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
     String toSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
 
-    PersistentMap<byte[], byte[]> objectIdToIsDirectory =
+    PersistentMap<byte[], Boolean> objectIdToIsDirectoryMap =
         new SnapshotTestUtils.StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> oldObjIdToKeyMap =
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> newObjIdToKeyMap =
         new StubbedPersistentMap<>();
-    objectIdToIsDirectory.put(codecRegistry.asRawData("randomKey"),
-        new byte[] {0});
+    objectIdToIsDirectoryMap.put(codecRegistry.asRawData("randomKey"),
+        false);
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     doReturn(true).when(spy)
@@ -1249,7 +1249,7 @@ public class TestSnapshotDiffManager {
             keyInfoTable,
             null,
             null,
-            objectIdToIsDirectory,
+            objectIdToIsDirectoryMap,
             oldObjIdToKeyMap,
             newObjIdToKeyMap,
             volumeName,
