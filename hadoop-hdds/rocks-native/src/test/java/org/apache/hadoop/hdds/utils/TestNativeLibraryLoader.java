@@ -82,12 +82,15 @@ public class TestNativeLibraryLoader {
       NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName);
       NativeLibraryLoader.isLibraryLoaded(dummyLibraryName);
       // Checking if the resource with random was copied to a temp file.
-      File[] libPath = new File(nativeLibraryDirectoryLocation.orElse(""))
+      Optional<File[]> libPath = Optional.ofNullable(
+          new File(nativeLibraryDirectoryLocation.orElse(""))
           .getAbsoluteFile().listFiles((dir, name) ->
               name.startsWith(dummyLibraryName) &&
-                  name.endsWith(NativeLibraryLoader.getLibOsSuffix()));
-      Assertions.assertEquals(1, libPath.length);
-      Assertions.assertTrue(libPath[0].delete());
+                  name.endsWith(NativeLibraryLoader.getLibOsSuffix())));
+      Assertions.assertEquals(1, libPath.map(paths -> paths.length)
+          .orElse(0));
+      Assertions.assertTrue(libPath.map(paths -> paths[0].delete())
+          .orElse(false));
     }
 
   }
