@@ -204,17 +204,23 @@ public class TestOMSnapshotCreateRequest {
     assertEquals(OK, omResponse.getStatus());
 
     // verify table data with response data.
-    SnapshotInfo snapshotInfoFromProto = getFromProtobuf(omClientResponse
-        .getOMResponse()
-        .getCreateSnapshotResponse()
-        .getSnapshotInfo()
-    );
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto =
+        omClientResponse
+            .getOMResponse()
+            .getCreateSnapshotResponse()
+            .getSnapshotInfo();
+    // Check that new proto fields are explicitly set
+    assertTrue(snapshotInfoProto.hasReferencedSize());
+    assertTrue(snapshotInfoProto.hasReferencedReplicatedSize());
+
+    SnapshotInfo snapshotInfoFromProto = getFromProtobuf(snapshotInfoProto);
 
     // Get value form cache
     SnapshotInfo snapshotInfoInCache =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfoInCache);
     assertEquals(snapshotInfoFromProto, snapshotInfoInCache);
+
     assertEquals(0, omMetrics.getNumSnapshotCreateFails());
     assertEquals(1, omMetrics.getNumSnapshotActive());
     assertEquals(1, omMetrics.getNumSnapshotCreates());

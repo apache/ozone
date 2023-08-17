@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -172,8 +175,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // the bucket default replication policy right now.
       // This may well not be the actual sum of all key data sizes in this
       // bucket because each key can have its own replication policy,
-      // depending on the client at the time of writing it.
-      // And we are NOT doing O(n) walk over the keyTable (fileTable) here
+      // depending on the choice of the client at the time of writing that key.
+      // And we will NOT do an O(n) walk over the keyTable (fileTable) here
       // because it is a design goal of CreateSnapshot to be an O(1) operation.
       // TODO: Assign actual data size once we have the pre-replicated key size
       //  counter in OmBucketInfo.
@@ -317,14 +320,26 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   }
 
   /**
-   * Estimate the sum data sizes of all keys in the bucket by dividing
+   * Estimate the sum of data sizes of all keys in the bucket by dividing
    * bucket used size (w/ replication) by the replication factor of the bucket.
    * @param bucketInfo OmBucketInfo
    */
   private long estimateBucketDataSize(OmBucketInfo bucketInfo) {
-    return QuotaUtil.getDataSize(
-        bucketInfo.getUsedBytes(),
-        bucketInfo.getDefaultReplicationConfig().getReplicationConfig());
+    DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
+    final ReplicationConfig rc;
+    if (defRC == null) {
+      // Note: A lot of tests are not setting bucket DefaultReplicationConfig,
+      //  sometimes intentionally.
+      //  Fall back to config default and print warning level log.
+      rc = ReplicationConfig.getDefault(new OzoneConfiguration());
+      LOG.warn("DefaultReplicationConfig is not correctly set in " +
+          "OmBucketInfo for volume '{}' bucket '{}'. " +
+          "Falling back to config default '{}'",
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName(), rc);
+    } else {
+      rc = defRC.getReplicationConfig();
+    }
+    return QuotaUtil.getDataSize(bucketInfo.getUsedBytes(), rc);
   }
 
 }

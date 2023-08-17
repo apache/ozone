@@ -60,7 +60,7 @@ public final class QuotaUtil {
               + partialFirstChunk * rc.getParity();
       return dataSize + replicationOverhead;
     } else {
-      LOG.warn("Unknown replication type {}. Returning original data size.",
+      LOG.warn("Unknown replication type '{}'. Returning original data size.",
           repConfig.getReplicationType());
       return dataSize;
     }
@@ -82,11 +82,11 @@ public final class QuotaUtil {
       return replicatedSize / ratisReplicationFactor;
     } else if (repConfig.getReplicationType() == EC) {
       ECReplicationConfig rc = (ECReplicationConfig) repConfig;
-      // Because for EC we don't know if keys have partial chunks or not,
-      // we assume no partial chunks so as to return an estimate.
+      // In the case of EC, we won't know if keys have partial chunks or not,
+      // so we assume no partial chunks as an estimate.
       return replicatedSize * rc.getData() / rc.getRequiredNodes();
     } else {
-      LOG.warn("Unknown replication type {}. Returning replicatedSize.",
+      LOG.warn("Unknown replication type '{}'. Returning replicatedSize.",
           repConfig.getReplicationType());
       return replicatedSize;
     }
