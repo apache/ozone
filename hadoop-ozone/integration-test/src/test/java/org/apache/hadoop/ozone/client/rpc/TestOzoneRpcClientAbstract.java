@@ -2973,6 +2973,35 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testMultipartPartNumberExceedingAllowedRange() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String sampleData = "sample Value";
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName);
+    assertNotNull(multipartInfo);
+    String uploadID = multipartInfo.getUploadID();
+
+    // Multipart part number must be an integer between 1 and 10000. So the
+    // part number 1, 5000, 10000 will succeed,
+    // the part number 0, 10001 will fail.
+    bucket.createMultipartKey(keyName, sampleData.length(), 1, uploadID);
+    bucket.createMultipartKey(keyName, sampleData.length(), 5000, uploadID);
+    bucket.createMultipartKey(keyName, sampleData.length(), 10000, uploadID);
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART, () ->
+        bucket.createMultipartKey(
+            keyName, sampleData.length(), 0, uploadID));
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART, () ->
+        bucket.createMultipartKey(
+            keyName, sampleData.length(), 10001, uploadID));
+  }
+
+  @Test
   public void testAbortUploadFail() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

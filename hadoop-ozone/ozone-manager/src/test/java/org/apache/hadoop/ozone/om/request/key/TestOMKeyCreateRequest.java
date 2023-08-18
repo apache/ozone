@@ -21,14 +21,17 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -656,6 +659,78 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assert.assertTrue(ex.getMessage().contains(
         "Cannot create key under path reserved for snapshot: "
             + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+  }
+
+  @Test
+  public void testKeyCreateInheritParentDefaultAcls()
+      throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
+    acls.add(OzoneAcl.parseAcl("user:noInherit:rw"));
+    acls.add(OzoneAcl.parseAcl("group:newGroup:rwl[DEFAULT]"));
+
+    // create bucket with DEFAULT acls
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setBucketLayout(getBucketLayout())
+            .setAcls(acls));
+
+    // Verify bucket has DEFAULT acls.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
+        .get(bucketKey).getAcls();
+    Assert.assertEquals(acls, bucketAcls);
+
+    // create file inherit bucket DEFAULT acls
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(false, 0));
+
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+    checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
+        omKeyCreateRequest.getBucketLayout());
+
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+
+    verifyKeyInheritAcls(omKeyInfo.getAcls(), bucketAcls);
+
+  }
+
+  /**
+   * Leaf file has ACCESS scope acls which inherited
+   * from parent DEFAULT acls.
+   */
+  private void verifyKeyInheritAcls(List<OzoneAcl> keyAcls,
+      List<OzoneAcl> bucketAcls) {
+
+    List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
+        .collect(Collectors.toList());
+
+    OzoneAcl parentAccessAcl = bucketAcls.stream()
+        .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.ACCESS)
+        .findAny().orElse(null);
+
+    // Should inherit parent DEFAULT Acls
+    Assert.assertEquals("Failed to inherit parent DEFAULT acls!,",
+        parentDefaultAcl.stream()
+            .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
+            .collect(Collectors.toList()), keyAcls);
+
+    // Should not inherit parent ACCESS Acls
+    Assert.assertFalse(keyAcls.contains(parentAccessAcl));
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
