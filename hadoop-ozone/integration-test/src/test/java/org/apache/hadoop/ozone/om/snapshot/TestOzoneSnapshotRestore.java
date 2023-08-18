@@ -92,6 +92,10 @@ public class TestOzoneSnapshotRestore {
     );
   }
 
+  static {
+    counter = new AtomicInteger();
+  }
+
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -126,7 +130,6 @@ public class TestOzoneSnapshotRestore {
     // stop the deletion services so that keys can still be read
     keyManager.stop();
     OMStorage.getOmDbDir(leaderConfig);
-    counter = new AtomicInteger();
 
   }
 
@@ -370,8 +373,8 @@ public class TestOzoneSnapshotRestore {
 
     // delete all keys in bucket before restoring from snapshot
     deleteKeys(buck);
-    int delKeyCount = keyCount(buck, "key-");
-    Assertions.assertEquals(0, delKeyCount);
+    int keyCountAfterDelete = keyCount(buck, "key-");
+    Assertions.assertEquals(0, keyCountAfterDelete);
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix[9];
