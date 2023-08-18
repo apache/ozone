@@ -900,18 +900,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return true if the volume is empty
    */
   @Override
-  public boolean isVolumeEmpty(String volume) throws IOException {
+  public boolean isVolumeEmpty(String volume) {
     String volumePrefix = getVolumeKey(volume + OM_KEY_PREFIX);
-
-    // First check in bucket table cache.
-    if (isKeyPresentInTableCache(volumePrefix, bucketTable)) {
-      return false;
-    }
-
-    if (isKeyPresentInTable(volumePrefix, bucketTable)) {
-      return false; // we found at least one key with this vol/
-    }
-    return true;
+    return !isKeyPresentInTableCache(volumePrefix, bucketTable);
   }
 
   /**

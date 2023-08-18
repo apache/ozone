@@ -1721,4 +1721,51 @@ public class TestOzoneShellHA {
         new String[]{"volume", "delete", "/volume1"});
     out.reset();
   }
+
+  @Test
+  public void testVolumeDeleteWithMultipleBuckets()
+      throws Exception {
+    String volume1 = "vol1";
+
+    // Create volume vol1
+    // Create bucket bucketfso with layout FILE_SYSTEM_OPTIMIZED
+    // Insert some keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        "/bucketfso",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create 100 more buckets inside vol1
+    for (int i = 0; i < 100; i++) {
+      String[] args = new String[] {"bucket", "create", "--layout",
+          BucketLayout.FILE_SYSTEM_OPTIMIZED.toString(),
+          volume1 + "/bucket" + i};
+      execute(ozoneShell, args);
+      out.reset();
+    }
+
+    // Try volume delete without recursive
+    // It should fail as volume is not empty
+    final String[] args1 = new String[] {"volume", "delete", volume1};
+    ExecutionException exception = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args1));
+    OMException omExecution = (OMException) exception.getCause();
+    assertEquals(VOLUME_NOT_EMPTY, omExecution.getResult());
+    out.reset();
+
+    // vol1 should still exist
+    assertEquals(client.getObjectStore().getVolume(volume1)
+        .getName(), volume1);
+
+    // Delete vol1 recursively
+    String[] args =
+        new String[] {"volume", "delete", volume1, "-r", "--yes"};
+
+    execute(ozoneShell, args);
+    out.reset();
+
+    // volume1 should not exist
+    omExecution = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1));
+    assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+  }
 }
