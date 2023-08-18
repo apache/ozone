@@ -58,7 +58,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -259,6 +258,8 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     }
   }
 
+  // TODO: clean up: Do we this test after
+  //  testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge?
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 3, 4})
   public void testSnapshotChainCleanup(int index) throws Exception {
@@ -331,49 +332,72 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
   private static Stream<Arguments> snapshotPurgeCases() {
     return Stream.of(
-        Arguments.of(0, true),
-        Arguments.of(1,  true),
-        Arguments.of(2,  true),
-        Arguments.of(3,  true),
-        Arguments.of(4,  true),
-        Arguments.of(5,  true),
-        Arguments.of(6,  true),
-        Arguments.of(7,  true),
-        Arguments.of(8,  true),
-        Arguments.of(0,  false),
-        Arguments.of(1,  false),
-        Arguments.of(2,  false),
-        Arguments.of(3,  false),
-        Arguments.of(4,  false),
-        Arguments.of(5,  false),
-        Arguments.of(6,  false),
-        Arguments.of(7,  false),
-        Arguments.of(8,  false)
+        Arguments.of("Single bucket: purge first snapshot.",
+            1, 5, 0, 0, true),
+        Arguments.of("Single bucket: purge snapshot at index 2.",
+            1, 5, 2, 2, true),
+        Arguments.of("Single bucket: purge snapshots from index 1 to 3.",
+            1, 5, 1, 3, true),
+        Arguments.of("Single bucket: purge last snapshot.",
+            1, 5, 4, 4, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge first snapshot.", 3, 5, 0, 0, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge first 5 snapshots.", 3, 5, 0, 4, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge snapshot at index 7.", 3, 5, 7, 7, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge snapshots from index 5 to 9.", 3, 5, 5, 9, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge snapshots from index 3 to 12.", 3, 5, 3, 12, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge last 5 snapshots.", 3, 5, 10, 14, true),
+        Arguments.of("Multiple buckets (keys are created in bucket order): " +
+            "purge last snapshot.", 3, 5, 14, 14, true),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge first snapshot.", 3, 5, 0, 0, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge first 5 snapshots.", 3, 5, 0, 5, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge snapshot at index 7.", 3, 5, 7, 7, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge snapshots from index 5 to 9.", 3, 5, 5, 9, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge snapshots from index 3 to 12.", 3, 5, 3, 12, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge last 5 snapshots.", 3, 5, 10, 14, false),
+        Arguments.of("Multiple buckets (keys are not created in bucket " +
+            "order): purge last snapshot.", 3, 5, 14, 14, false)
     );
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{0}")
   @MethodSource("snapshotPurgeCases")
   public void testSnapshotChainInSnapshotInfoTableAfterSnapshotPurge(
-      int purgeIndex,
+      String description,
+      int numberOfBuckets,
+      int numberOfKeysPerBucket,
+      int fromIndex,
+      int toIndex,
       boolean createInBucketOrder) throws Exception {
-    List<String> buckets = Arrays.asList(
-        "buck-1-" + UUID.randomUUID(),
-        "buck-2-" + UUID.randomUUID(),
-        "buck-3-" + UUID.randomUUID()
-    );
+    SnapshotChainManager chainManager =
+        ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager();
+    int totalKeys = numberOfBuckets * numberOfKeysPerBucket;
 
-    for (String bucket : buckets) {
-      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
+    List<String> buckets = new ArrayList<>();
+    for (int i = 0; i < numberOfBuckets; i++) {
+      String bucketNameLocal = "bucket-" + UUID.randomUUID();
+      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketNameLocal,
           omMetadataManager);
+      buckets.add(bucketNameLocal);
     }
 
     List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
 
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
+    for (int i = 0; i < numberOfBuckets; i++) {
+      for (int j = 0; j < numberOfKeysPerBucket; j++) {
         int bucketIndex = createInBucketOrder ? i : j;
-        String bucket = buckets.get(bucketIndex % 3);
+        String bucket = buckets.get(bucketIndex % numberOfBuckets);
         String snapshotName = UUID.randomUUID().toString();
         createSnapshotCheckpoint(volumeName, bucket, snapshotName);
         String snapshotTableKey =
@@ -384,33 +408,44 @@ public class TestOMSnapshotPurgeRequestAndResponse {
       }
     }
 
+    long numberOfSnapshotBeforePurge = omMetadataManager
+        .countRowsInTable(omMetadataManager.getSnapshotInfoTable());
+    assertEquals(totalKeys, numberOfSnapshotBeforePurge);
+    assertEquals(totalKeys, chainManager.getGlobalSnapshotChain().size());
+
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(snapshotInfoList);
 
-    SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(purgeIndex);
+    List<String> purgeSnapshotKeys = new ArrayList<>();
+    for (int i = fromIndex; i <= toIndex; i++) {
+      SnapshotInfo purgeSnapshotInfo = snapshotInfoList.get(i);
+      String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
+          purgeSnapshotInfo.getBucketName(),
+          purgeSnapshotInfo.getName());
+      purgeSnapshotKeys.add(purgeSnapshotKey);
+    }
 
-    String purgeSnapshotKey = SnapshotInfo.getTableKey(volumeName,
-        purgeSnapshotInfo.getBucketName(),
-        purgeSnapshotInfo.getName());
-
-    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
-        Collections.singletonList(purgeSnapshotKey));
+    OMRequest snapshotPurgeRequest = createPurgeKeysRequest(purgeSnapshotKeys);
     purgeSnapshots(snapshotPurgeRequest);
 
     List<SnapshotInfo> snapshotInfoListAfterPurge = new ArrayList<>();
-    for (int i = 0; i < 9; i++) {
-      if (i == purgeIndex) {
-        // Ignoring purgeIndex because snapshot at purgeIndex has been purged.
-        continue;
+    for (int i = 0; i < totalKeys; i++) {
+      if (i < fromIndex || i > toIndex) {
+        SnapshotInfo info = snapshotInfoList.get(i);
+        String snapshotKey = SnapshotInfo.getTableKey(volumeName,
+            info.getBucketName(), info.getName());
+        snapshotInfoListAfterPurge.add(
+            omMetadataManager.getSnapshotInfoTable().get(snapshotKey));
       }
-
-      SnapshotInfo info = snapshotInfoList.get(i);
-      String snapshotKey = SnapshotInfo.getTableKey(volumeName,
-          info.getBucketName(),
-          info.getName());
-
-      snapshotInfoListAfterPurge.add(
-          omMetadataManager.getSnapshotInfoTable().get(snapshotKey));
     }
+
+    long expectNumberOfSnapshotAfterPurge = totalKeys -
+        (toIndex - fromIndex + 1);
+    long actualNumberOfSnapshotAfterPurge = omMetadataManager
+        .countRowsInTable(omMetadataManager.getSnapshotInfoTable());
+    assertEquals(expectNumberOfSnapshotAfterPurge,
+        actualNumberOfSnapshotAfterPurge);
+    assertEquals(expectNumberOfSnapshotAfterPurge, chainManager
+        .getGlobalSnapshotChain().size());
     validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
         snapshotInfoListAfterPurge);
   }
