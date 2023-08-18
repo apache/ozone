@@ -810,6 +810,7 @@ public class TestOzoneFileSystem {
         // Retry to delete
         deleteRootRecursively(fileStatuses);
       }*/
+      Thread.sleep(100);
       fileStatuses = fs.listStatus(ROOT);
       StringBuilder sb = new StringBuilder();
       for (FileStatus fStatus : fileStatuses) {
@@ -823,26 +824,6 @@ public class TestOzoneFileSystem {
               throw new RuntimeException(e);
             }
           }).collect(Collectors.toList());
-      client.getObjectStore().listVolumes(OZONE_URI_DELIMITER)
-          .forEachRemaining(vol -> {
-            String volName = vol.getName();
-            LOG.info("Volume left: " + volName);
-            try {
-              client.getObjectStore().getVolume(volName)
-                  .listBuckets(volName).forEachRemaining(bucket -> {
-                    LOG.info("Bucket left: " + bucket.getName());
-                    try {
-                      bucket.listKeys(null).forEachRemaining(key -> {
-                        LOG.info("key: " + key.getName());
-                      });
-                    } catch (IOException e) {
-                      throw new RuntimeException(e);
-                    }
-                  });
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          });
       Assert.assertEquals(
           "Delete root failed! Left: " + sb.toString() + "deleted : " + deleted,
           0, fileStatuses.length);
