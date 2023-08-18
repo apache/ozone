@@ -810,7 +810,7 @@ public class TestOzoneFileSystem {
         // Retry to delete
         deleteRootRecursively(fileStatuses);
       }*/
-      //Thread.sleep(100);
+      Thread.sleep(100);
       fileStatuses = fs.listStatus(ROOT);
       StringBuilder sb = new StringBuilder();
       for (FileStatus fStatus : fileStatuses) {
