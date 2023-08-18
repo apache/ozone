@@ -19,10 +19,6 @@ Resource            ../commonlib.robot
 Test Timeout        2 minutes
 
 *** Keywords ***
-Kinit admin
-    Pass Execution If       '${SECURITY_ENABLED}'=='false'       This is for secured environment
-    Wait Until Keyword Succeeds      2min       10sec      Execute      kinit -k om/om@EXAMPLE.COM -t /etc/security/keytabs/om.keytab
-
 Verify output
     [arguments]    ${output}
     Should contain         ${output}           awsAccessKey
@@ -30,13 +26,11 @@ Verify output
 
 *** Test Cases ***
 Without OM service ID
-    Kinit admin
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
     ${output} =            Execute             ozone s3 getsecret -u testuser2
     Verify output          ${output}
 
 With OM service ID
-    Kinit admin
     Pass Execution If      '${OM_HA_PARAM}' == '${EMPTY}'          duplicate test in non-HA env.
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
     ${output} =            Execute             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
