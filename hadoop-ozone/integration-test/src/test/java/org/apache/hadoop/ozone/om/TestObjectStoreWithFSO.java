@@ -140,40 +140,25 @@ public class TestObjectStoreWithFSO {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir() throws IOException, InterruptedException {
+  protected void deleteRootDir() throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
-    String deleted = deleteRootRecursively(fileStatuses);
+    deleteRootRecursively(fileStatuses);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      /*if (fileStatuses.length > 0) {
-        // Retry to delete
-        deleteRootRecursively(fileStatuses);
-      }*/
-      Thread.sleep(100);
-      fileStatuses = fs.listStatus(ROOT);
-      StringBuilder sb = new StringBuilder();
-      for (FileStatus fStatus : fileStatuses) {
-        sb.append(fStatus.toString());
-      }
-
       Assert.assertEquals(
-          "Delete root failed! Left: " + sb.toString() + "deleted : " + deleted,
-          0, fileStatuses.length);
+          "Delete root failed!", 0, fileStatuses.length);
     }
   }
 
-  private static String deleteRootRecursively(FileStatus[] fileStatuses)
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
       throws IOException {
-    StringBuilder sb = new StringBuilder();
     for (FileStatus fStatus : fileStatuses) {
-      sb.append(fStatus.toString());
       fs.delete(fStatus.getPath(), true);
     }
-    return sb.toString();
   }
 
   @Test

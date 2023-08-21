@@ -82,10 +82,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -168,7 +166,7 @@ public class TestOzoneFileSystem {
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
   private static OzoneManagerProtocol writeClient;
-  public static FileSystem fs;
+  private static FileSystem fs;
   private static OzoneFileSystem o3fs;
   private static OzoneBucket ozoneBucket;
   private static String volumeName;
@@ -803,41 +801,19 @@ public class TestOzoneFileSystem {
     if (fileStatuses == null) {
       return;
     }
-    String deleted = deleteRootRecursively(fileStatuses);
+    deleteRootRecursively(fileStatuses);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      /*if (fileStatuses.length > 0) {
-        // Retry to delete
-        deleteRootRecursively(fileStatuses);
-      }*/
-      Thread.sleep(100);
-      fileStatuses = fs.listStatus(ROOT);
-      StringBuilder sb = new StringBuilder();
-      for (FileStatus fStatus : fileStatuses) {
-        sb.append(fStatus.toString());
-      }
-      List<FileStatus> existedFileStatusList =
-          Arrays.stream(fileStatuses).filter(fStatus -> {
-            try {
-              return fs.exists(fStatus.getPath());
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }).collect(Collectors.toList());
       Assert.assertEquals(
-          "Delete root failed! Left: " + sb.toString() + "deleted : " + deleted,
-          0, fileStatuses.length);
+          "Delete root failed!", 0, fileStatuses.length);
     }
   }
 
-  private static String deleteRootRecursively(FileStatus[] fileStatuses)
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
       throws IOException {
-    StringBuilder sb = new StringBuilder();
     for (FileStatus fStatus : fileStatuses) {
-      sb.append(fStatus.toString());
       fs.delete(fStatus.getPath(), true);
     }
-    return sb.toString();
   }
 
   /**
