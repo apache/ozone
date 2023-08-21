@@ -678,7 +678,7 @@ public final class OzoneManagerDoubleBuffer {
     isRunning.set(true);
   }
 
-  void awaitFlush() throws InterruptedException {
+  public void awaitFlush() throws InterruptedException {
     flushNotifier.await();
   }
 

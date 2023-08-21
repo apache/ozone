@@ -231,15 +231,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "openFileTable" + "UnReplicatedDataSize", 50L);
 
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
-    KeyInsightInfoResponse keyInsightInfoResp = (KeyInsightInfoResponse)
-        openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Map<String, Long> summary = keyInsightInfoResp.getKeysSummary();
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    Map<String, Long> openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
     // Assert that the key prefix format is accepted in the global stats
-    Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
-    Assertions.assertEquals(300L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(100L, summary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(6L,
+        openKeysSummary.get("totalOpenKeys"));
+    Assertions.assertEquals(300L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(100L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
 
     // Delete the previous records and Update the new value for valid key prefix
     statsDao.deleteById("openKeyTable" + "Count",
@@ -256,15 +259,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         3L);
 
     openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
-    keyInsightInfoResp = (KeyInsightInfoResponse)
-        openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    summary = keyInsightInfoResp.getKeysSummary();
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
     // Assert that the key format is not accepted in the global stats
-    Assertions.assertEquals(0L, summary.get("totalOpenKeys"));
-    Assertions.assertEquals(0L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(0L, summary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalOpenKeys"));
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
   }
 
   @Test
@@ -292,25 +298,33 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
-    KeyInsightInfoResponse keyInsightInfoResp =
-        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Map<String, Long> summary = keyInsightInfoResp.getKeysSummary();
-    Assertions.assertEquals(60L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(20L, summary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    Map<String, Long> openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
+
+    Assertions.assertEquals(60L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(20L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(6L,
+        openKeysSummary.get("totalOpenKeys"));
 
     // Call the API of Deleted keys to get the response
     Response deletedKeyInfoResp =
-        omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
-    keyInsightInfoResp =
-        (KeyInsightInfoResponse) deletedKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    summary = keyInsightInfoResp.getKeysSummary();
-    Assertions.assertEquals(30L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(10L, summary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(3L, summary.get("totalDeletedKeys"));
+        omdbInsightEndpoint.getDeletedKeySummary();
+    Assertions.assertNotNull(deletedKeyInfoResp);
+
+    Map<String, Long> deletedKeysSummary = (Map<String, Long>)
+        deletedKeyInfoResp.getEntity();
+
+    Assertions.assertEquals(30L,
+        deletedKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(10L,
+        deletedKeysSummary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(3L,
+        deletedKeysSummary.get("totalDeletedKeys"));
   }
 
   private void insertGlobalStatsRecords(GlobalStatsDao statsDao,

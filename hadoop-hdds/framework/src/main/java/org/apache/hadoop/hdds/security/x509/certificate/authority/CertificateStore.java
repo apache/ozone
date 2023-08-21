@@ -109,10 +109,11 @@ public interface CertificateStore {
   /**
    * Deletes all non-revoked expired certificates from the store.
    *
+   * @return The list of removed expired certificates
    * @throws IOException - on failure
    */
   @Replicate
-  void removeAllExpiredCertificates() throws IOException;
+  List<X509Certificate> removeAllExpiredCertificates() throws IOException;
 
   /**
    * Retrieves a Certificate based on the Serial number of that certificate.
