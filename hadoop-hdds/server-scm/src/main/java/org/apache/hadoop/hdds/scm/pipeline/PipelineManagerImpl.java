@@ -415,6 +415,9 @@ public class PipelineManagerImpl implements PipelineManager {
         // pipeline to get created
         closePipeline(pipeline, true);
       }
+    } catch (PipelineNotFoundException e) {
+      LOG.warn("Pipeline {} not found when removing container {}",
+          pipelineID, containerID, e);
     } finally {
       releaseWriteLock();
     }
