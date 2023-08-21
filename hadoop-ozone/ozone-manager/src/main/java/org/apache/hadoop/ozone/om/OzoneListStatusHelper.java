@@ -288,7 +288,7 @@ public class OzoneListStatusHelper {
     private final Object value;
 
     HeapEntry(EntryType entryType, String key, Object value) {
-      Preconditions.checkArgument(
+      Preconditions.checkArgument(value == null ||
           value instanceof OmDirectoryInfo ||
               value instanceof OmKeyInfo);
       this.entryType = entryType;
