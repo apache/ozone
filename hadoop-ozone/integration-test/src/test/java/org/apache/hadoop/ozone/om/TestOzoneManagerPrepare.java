@@ -18,6 +18,11 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,7 +55,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.Assert;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -151,8 +155,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Shut down one OM.
     cluster.stopOzoneManager(shutdownOMIndex);
     OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
-    Assert.assertFalse(downedOM.isRunning());
-    Assert.assertEquals(runningOms.remove(shutdownOMIndex), downedOM);
+    assertFalse(downedOM.isRunning());
+    assertEquals(runningOms.remove(shutdownOMIndex), downedOM);
 
     // Write keys with the remaining OMs up.
     String volumeName2 = VOLUME + UUID.randomUUID().toString();
@@ -222,10 +226,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     for (int i : Arrays.asList(1, 2)) {
       cluster.stopOzoneManager(i);
       OzoneManager downedOM = cluster.getOzoneManager(i);
-      Assert.assertFalse(downedOM.isRunning());
+      assertFalse(downedOM.isRunning());
     }
 
-    LambdaTestUtils.intercept(IOException.class,
+    assertThrows(IOException.class,
         () -> clientProtocol.getOzoneManagerClient().prepareOzoneManager(
             PREPARE_FLUSH_WAIT_TIMEOUT_SECONDS,
             PREPARE_FLUSH_INTERVAL_SECONDS));
@@ -278,14 +282,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
           // If no exception is thrown, the volume should be created.
           future.get();
           String volumeName = VOLUME + i;
-          Assert.assertTrue(clientProtocol.listVolumes(volumeName, "", 1)
+          assertTrue(clientProtocol.listVolumes(volumeName, "", 1)
               .stream()
               .anyMatch((vol) -> vol.getName().equals(volumeName)));
         } catch (ExecutionException ex) {
           Throwable cause = ex.getCause();
-          Assert.assertTrue(cause instanceof OMException);
-          Assert.assertEquals(
-              OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
+          assertTrue(cause instanceof OMException);
+          assertEquals(
+              NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
               ((OMException) cause).getResult());
         }
       }
@@ -474,14 +478,10 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     clientProtocol.listVolumes(VOLUME, "", 100);
 
     // Submitting write request should fail.
-    try {
-      clientProtocol.createVolume("vol");
-      Assert.fail("Write request should fail when OM is in prepare mode.");
-    } catch (OMException ex) {
-      Assert.assertEquals(
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
-          ex.getResult());
-    }
+    OMException omException = assertThrows(OMException.class,
+        () -> clientProtocol.createVolume("vol"));
+    assertEquals(NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
+        omException.getResult());
   }
 
   private void assertClusterNotPrepared() throws Exception {

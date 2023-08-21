@@ -2693,13 +2693,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
-      if (!allowListAllVolumes) {
-        // Only admin can list all volumes when disallowed in config
-        if (isAclEnabled) {
-          omMetadataReader.checkAcls(ResourceType.VOLUME,
-              StoreType.OZONE, ACLType.LIST,
-              OzoneConsts.OZONE_ROOT, null, null);
-        }
+      if (isAclEnabled) {
+        omMetadataReader.checkAcls(ResourceType.VOLUME,
+            StoreType.OZONE, ACLType.LIST,
+            OzoneConsts.OZONE_ROOT, null, null);
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
@@ -4711,5 +4708,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  /**
+   * Wait until both buffers are flushed.  This is used in cases like
+   * "follower bootstrap tarball creation" where the rocksDb for the active
+   * fs needs to synchronized with the rocksdb's for the snapshots.
+   */
+  public void awaitDoubleBufferFlush() throws InterruptedException {
+    if (isRatisEnabled()) {
+      getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+    } else {
+      getOmServerProtocol().awaitDoubleBufferFlush();
+    }
   }
 }

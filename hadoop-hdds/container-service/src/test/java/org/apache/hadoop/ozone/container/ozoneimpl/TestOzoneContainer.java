@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -70,6 +69,7 @@ import java.util.ArrayList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 /**
  * This class is used to test OzoneContainer.
@@ -122,7 +122,7 @@ public class TestOzoneContainer {
   }
 
   @After
-  public void cleanUp() throws Exception {
+  public void cleanUp() {
     BlockUtils.shutdownCache(conf);
 
     if (volumeSet != null) {
@@ -263,15 +263,11 @@ public class TestOzoneContainer {
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
 
-    // we expect an out of space Exception
-    StorageContainerException e = LambdaTestUtils.intercept(
+    StorageContainerException e = assertThrows(
         StorageContainerException.class,
         () -> keyValueContainer.
             create(volumeSet, volumeChoosingPolicy, clusterId)
     );
-    if (!DISK_OUT_OF_SPACE.equals(e.getResult())) {
-      LOG.info("Unexpected error during container creation", e);
-    }
     assertEquals(DISK_OUT_OF_SPACE, e.getResult());
   }
 

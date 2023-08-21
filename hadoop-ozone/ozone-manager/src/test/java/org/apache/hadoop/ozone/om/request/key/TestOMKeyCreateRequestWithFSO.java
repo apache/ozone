@@ -85,6 +85,12 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     }
   }
 
+  @Test
+  public void testKeyCreateInheritParentDefaultAcls()
+      throws Exception {
+    super.testKeyCreateInheritParentDefaultAcls();
+  }
+
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
