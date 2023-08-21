@@ -300,7 +300,7 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(null, true);
+    getScm().checkAdminAccess(getRemoteUser(), true);
 
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
@@ -321,6 +321,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
       long containerId, int clientVersion) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
 
     Set<ContainerReplica> replicas = getScm().getContainerManager()
@@ -344,7 +345,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(null, true);
+    getScm().checkAdminAccess(getRemoteUser(), true);
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
@@ -378,10 +379,12 @@ public class SCMClientProtocolServer implements
     List<ContainerWithPipeline> cpList = new ArrayList<>();
     for (Long containerID : containerIDs) {
       try {
+        getScm().checkAdminAccess(getRemoteUser(), true);
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
         //not found , just go ahead
+        LOG.error("IOException - Admin Access Failed: {}", ex);
       }
     }
     return cpList;
@@ -449,6 +452,7 @@ public class SCMClientProtocolServer implements
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -516,6 +520,7 @@ public class SCMClientProtocolServer implements
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -595,7 +600,7 @@ public class SCMClientProtocolServer implements
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
       throws IOException {
-
+    getScm().checkAdminAccess(getRemoteUser(), true);
     if (queryScope == HddsProtos.QueryScope.POOL) {
       throw new IllegalArgumentException("Not Supported yet");
     }
@@ -656,6 +661,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void closeContainer(long containerID) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
     final UserGroupInformation remoteUser = getRemoteUser();
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
@@ -684,6 +690,7 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
     Map<String, String> auditMap = Maps.newHashMap();
     if (type != null) {
       auditMap.put("replicationType", type.toString());
@@ -721,6 +728,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getPipelineManager().getPipeline(
         PipelineID.getFromProtobuf(pipelineID));
   }
@@ -731,6 +739,7 @@ public class SCMClientProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       scm.getPipelineManager().activatePipeline(
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -865,6 +874,7 @@ public class SCMClientProtocolServer implements
 
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     List<DeletedBlocksTransactionInfo> result;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("count", String.valueOf(count));
@@ -1221,12 +1231,14 @@ public class SCMClientProtocolServer implements
 
   @Override
   public long getContainerCount() throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers().size();
   }
 
   @Override
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers(state).size();
   }
 
@@ -1234,6 +1246,7 @@ public class SCMClientProtocolServer implements
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers(
         ContainerID.valueOf(startContainerID), count, state);
   }
@@ -1328,6 +1341,7 @@ public class SCMClientProtocolServer implements
         DecommissionScmResponseProto.newBuilder();
 
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       decommissionScmResponseBuilder
           .setSuccess(scm.removePeerFromHARing(scmId));
     } catch (IOException ex) {
