@@ -919,6 +919,11 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_PART) {
+        OS3Exception os3Exception = newError(
+            S3ErrorTable.INVALID_ARGUMENT, String.valueOf(partNumber), ex);
+        os3Exception.setErrorMessage(ex.getMessage());
+        throw os3Exception;
       }
       throw ex;
     }
