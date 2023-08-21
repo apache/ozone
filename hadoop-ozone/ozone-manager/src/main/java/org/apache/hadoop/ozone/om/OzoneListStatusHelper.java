@@ -51,6 +51,7 @@ import java.util.PriorityQueue;
 import java.util.NoSuchElementException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.stream.Collectors;
 
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.
@@ -218,7 +219,9 @@ public class OzoneListStatusHelper {
       }
     }
 
-    return map.values();
+    //return map.values();
+    return map.values().stream().filter(e -> e != null).collect(
+        Collectors.toList());
   }
 
   private String getDbKey(String key, OmKeyArgs args,
@@ -322,6 +325,9 @@ public class OzoneListStatusHelper {
         String bucketName,
         ReplicationConfig bucketReplication
     ) {
+      if (value == null) {
+        return null;
+      }
       OmKeyInfo keyInfo;
       if (entryType.isDir()) {
         Preconditions.checkArgument(value instanceof OmDirectoryInfo);
@@ -456,9 +462,9 @@ public class OzoneListStatusHelper {
         String cacheKey = entry.getKey().getCacheKey();
         Value cacheOmInfo = entry.getValue().getCacheValue();
         // cacheOmKeyInfo is null if an entry is deleted in cache
-        if (cacheOmInfo == null) {
+        /*if (cacheOmInfo == null) {
           continue;
-        }
+        }*/
 
         // Copy cache value to local copy and work on it
         if (cacheOmInfo instanceof CopyObject) {
