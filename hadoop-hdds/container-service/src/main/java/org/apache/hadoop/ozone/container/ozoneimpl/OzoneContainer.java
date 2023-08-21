@@ -290,8 +290,6 @@ public class OzoneContainer {
     // system properties set. These can inspect and possibly repair
     // containers as we iterate them here.
     ContainerInspectorUtil.load();
-    //TODO: diskchecker should be run before this, to see how disks are.
-    // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
       Thread thread = new Thread(new ContainerReader(volumeSet,
