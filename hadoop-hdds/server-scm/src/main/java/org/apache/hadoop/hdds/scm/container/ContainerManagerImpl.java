@@ -175,13 +175,13 @@ public class ContainerManagerImpl implements ContainerManager {
     List<Pipeline> pipelines;
     Pipeline pipeline;
     ContainerInfo containerInfo = null;
+    lock.lock();
     try {
-      lock.lock();
+      // Acquire pipeline manager lock, to avoid any updates to pipeline
+      // while allocate container happens. This is to avoid scenario like
+      // mentioned in HDDS-5655.
+      pipelineManager.acquireReadLock();
       try {
-        // Acquire pipeline manager lock, to avoid any updates to pipeline
-        // while allocate container happens. This is to avoid scenario like
-        // mentioned in HDDS-5655.
-        pipelineManager.acquireReadLock();
         pipelines = pipelineManager
             .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
         if (!pipelines.isEmpty()) {
@@ -206,10 +206,10 @@ public class ContainerManagerImpl implements ContainerManager {
             + ", State:PipelineState.OPEN", e);
       }
 
+      lock.lock();
       try {
-        lock.lock();
+        pipelineManager.acquireReadLock();
         try {
-          pipelineManager.acquireReadLock();
           pipelines = pipelineManager
               .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
           if (!pipelines.isEmpty()) {
