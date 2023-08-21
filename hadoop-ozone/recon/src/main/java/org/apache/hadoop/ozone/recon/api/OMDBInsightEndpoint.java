@@ -92,7 +92,6 @@ public class OMDBInsightEndpoint {
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
   private final GlobalStatsDao globalStatsDao;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
-  private Table<Long, NSSummary> nsSummaryTable;
 
 
   @Inject
@@ -106,7 +105,6 @@ public class OMDBInsightEndpoint {
     this.omMetadataManager = omMetadataManager;
     this.globalStatsDao = globalStatsDao;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
-    this.nsSummaryTable = reconNamespaceSummaryManager.getNSSummaryTable();
   }
 
   /**
@@ -558,7 +556,8 @@ public class OMDBInsightEndpoint {
 
     try {
       long convertedValue = Long.parseLong(directoryObjectId);
-      NSSummary nsSummary = nsSummaryTable.get(convertedValue);
+      NSSummary nsSummary =
+          reconNamespaceSummaryManager.getNSSummary(convertedValue);
       if (nsSummary != null) {
         return nsSummary.getSizeOfFiles();
       } else {
@@ -656,6 +655,6 @@ public class OMDBInsightEndpoint {
 
   @VisibleForTesting
   public Table<Long, NSSummary> getNsSummaryTable() {
-    return this.nsSummaryTable;
+    return this.reconNamespaceSummaryManager.getNSSummaryTable();
   }
 }
