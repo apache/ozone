@@ -159,7 +159,8 @@ public class RootEntityHandler extends EntityHandler {
           throws IOException {
     FileSizeDistributionResponse distResponse =
         new FileSizeDistributionResponse();
-    List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
+    List<OmBucketInfo> allBuckets = getOmMetadataManager()
+        .listBucketsUnderVolume(null);
     int[] fileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
 
     // accumulate file size distribution arrays from all buckets
