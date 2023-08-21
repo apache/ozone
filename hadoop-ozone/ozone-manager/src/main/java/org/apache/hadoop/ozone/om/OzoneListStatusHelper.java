@@ -219,7 +219,6 @@ public class OzoneListStatusHelper {
       }
     }
 
-    //return map.values();
     return map.values().stream().filter(e -> e != null).collect(
         Collectors.toList());
   }
