@@ -461,10 +461,6 @@ public class OzoneListStatusHelper {
             cacheIter.next();
         String cacheKey = entry.getKey().getCacheKey();
         Value cacheOmInfo = entry.getValue().getCacheValue();
-        // cacheOmKeyInfo is null if an entry is deleted in cache
-        /*if (cacheOmInfo == null) {
-          continue;
-        }*/
 
         // Copy cache value to local copy and work on it
         if (cacheOmInfo instanceof CopyObject) {
