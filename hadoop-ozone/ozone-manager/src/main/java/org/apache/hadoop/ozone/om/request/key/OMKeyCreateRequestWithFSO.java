@@ -142,17 +142,18 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             + " as there is already file in the given path", NOT_A_FILE);
       }
 
+      // do open key
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(volumeName, bucketName));
+
       // add all missing parents to dir table
       missingParentInfos =
-              OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-                      ozoneManager, keyArgs, pathInfoFSO, trxnLogIndex);
+          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
 
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
