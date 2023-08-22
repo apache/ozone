@@ -62,7 +62,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -84,6 +83,8 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -167,7 +168,6 @@ public class TestHddsDispatcher {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
-
   }
 
   @Test
@@ -238,11 +238,12 @@ public class TestHddsDispatcher {
           50, UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container2 = new KeyValueContainer(containerData2, conf);
-      LambdaTestUtils.intercept(StorageContainerException.class,
-          "Container creation failed, due to disk out of space",
-          () -> container2.create(volumeSet,
-              new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
-
+      StorageContainerException scException =
+          assertThrows(StorageContainerException.class,
+              () -> container2.create(volumeSet,
+                  new RoundRobinVolumeChoosingPolicy(), scmId.toString()));
+      assertEquals("Container creation failed, due to disk out of space",
+          scException.getMessage());
     } finally {
       volumeSet.shutdown();
       ContainerMetrics.remove();

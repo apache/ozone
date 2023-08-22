@@ -377,6 +377,10 @@ public final class OzoneConsts {
   // For Multipart upload
   public static final int OM_MULTIPART_MIN_SIZE = 5 * 1024 * 1024;
 
+  // refer to :
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
+  public static final int MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD = 10000;
+
   // GRPC block token metadata header and context key
   public static final String OZONE_BLOCK_TOKEN = "blocktoken";
   public static final Context.Key<UserGroupInformation> UGI_CTX_KEY =
@@ -583,8 +587,6 @@ public final class OzoneConsts {
 
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
-
-  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
 
   /**
    * Name of the SST file backup directory placed under metadata dir.

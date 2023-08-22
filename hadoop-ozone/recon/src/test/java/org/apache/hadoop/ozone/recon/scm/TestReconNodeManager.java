@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -51,7 +52,6 @@ import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -189,9 +189,9 @@ public class TestReconNodeManager {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     HddsProtos.Node node = mock(HddsProtos.Node.class);
 
-    LambdaTestUtils.intercept(NodeNotFoundException.class, () -> {
-      reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
-    });
+    assertThrows(NodeNotFoundException.class,
+        () -> reconNodeManager
+            .updateNodeOperationalStateFromScm(node, datanodeDetails));
 
     reconNodeManager.register(datanodeDetails, null, null);
     assertEquals(IN_SERVICE, reconNodeManager

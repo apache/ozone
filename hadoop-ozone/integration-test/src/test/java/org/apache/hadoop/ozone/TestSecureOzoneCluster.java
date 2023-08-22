@@ -107,7 +107,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.LambdaTestUtils;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -164,6 +163,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -388,9 +388,11 @@ public final class TestSecureOzoneCluster {
         // Get some random certificate, used serial id 100 which will be
         // unavailable as our serial id is time stamp. Serial id 1 is root CA,
         // and it is persisted in DB.
-        LambdaTestUtils.intercept(SCMSecurityException.class,
-            "Certificate not found",
+        SCMSecurityException securityException = assertThrows(
+            SCMSecurityException.class,
             () -> securityClient.getCertificate("100"));
+        assertTrue(securityException.getMessage()
+            .contains("Certificate not found"));
       }
 
       // Case 2: User without Kerberos credentials should fail.
@@ -400,10 +402,12 @@ public final class TestSecureOzoneCluster {
           getScmSecurityClient(conf, ugi)) {
 
         String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-        LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+        IOException ioException = assertThrows(IOException.class,
             securityClient::getCACertificate);
-        LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+        assertTrue(ioException.getMessage().contains(cannotAuthMessage));
+        assertThrows(IOException.class,
             () -> securityClient.getCertificate("1"));
+        assertTrue(ioException.getMessage().contains(cannotAuthMessage));
       }
     } finally {
       if (scm != null) {
@@ -426,9 +430,9 @@ public final class TestSecureOzoneCluster {
           testUserPrincipal, testUserKeytab.getCanonicalPath());
       StorageContainerLocationProtocol scmRpcClient =
           HAUtils.getScmContainerClient(conf, ugi);
-      LambdaTestUtils.intercept(IOException.class, "Access denied",
+      IOException ioException = assertThrows(IOException.class,
           scmRpcClient::forceExitSafeMode);
-
+      assertTrue(ioException.getMessage().contains("Access denied"));
 
       // Case 2: User without Kerberos credentials should fail.
       ugi = UserGroupInformation.createRemoteUser("test");
@@ -437,8 +441,9 @@ public final class TestSecureOzoneCluster {
           HAUtils.getScmContainerClient(conf, ugi);
 
       String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+      ioException = assertThrows(IOException.class,
           scmRpcClient::forceExitSafeMode);
+      assertTrue(ioException.getMessage().contains(cannotAuthMessage));
     } finally {
       if (scm != null) {
         scm.stop();
@@ -474,9 +479,10 @@ public final class TestSecureOzoneCluster {
     conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, "");
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
 
-    LambdaTestUtils.intercept(IOException.class,
-        "Running in secure mode, but config doesn't have a keytab",
+    IOException ioException = assertThrows(IOException.class,
         () -> HddsTestUtils.getScmSimple(conf));
+    assertTrue(ioException.getMessage()
+        .contains("Running in secure mode, but config doesn't have a keytab"));
 
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         "scm/_HOST@EXAMPLE.com");
@@ -488,22 +494,26 @@ public final class TestSecureOzoneCluster {
 
   }
 
-  private void testCommonKerberosFailures(Callable<?> test) throws Exception {
-    LambdaTestUtils.intercept(KerberosAuthException.class,
-        "failure to login: for principal:",
-        test);
+  private void testCommonKerberosFailures(Callable<?> test) {
+    KerberosAuthException kerberosAuthException = assertThrows(
+        KerberosAuthException.class, test::call);
+    assertTrue(kerberosAuthException.getMessage()
+        .contains("failure to login: for principal:"));
 
     String invalidValue = "OAuth2";
     conf.set(HADOOP_SECURITY_AUTHENTICATION, invalidValue);
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid attribute value for " + HADOOP_SECURITY_AUTHENTICATION
-            + " of " + invalidValue,
-        test);
+    IllegalArgumentException argumentException =
+        assertThrows(IllegalArgumentException.class, test::call);
+    assertTrue(argumentException.getMessage()
+        .contains("Invalid attribute value for " +
+                HADOOP_SECURITY_AUTHENTICATION + " of " + invalidValue));
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "KERBEROS_SSL");
-    LambdaTestUtils.intercept(AuthenticationException.class,
-        "KERBEROS_SSL authentication method not",
-        test);
+    AuthenticationException authException = assertThrows(
+        AuthenticationException.class,
+        test::call);
+    assertTrue(authException.getMessage()
+        .contains("KERBEROS_SSL authentication method not"));
   }
 
   /**
@@ -585,8 +595,9 @@ public final class TestSecureOzoneCluster {
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
     logs = LogCapturer.captureLogs(Client.LOG);
-    LambdaTestUtils.intercept(IOException.class, exMessage,
+    IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
+    assertTrue(ioException.getMessage().contains(exMessage));
     assertEquals("There should be no retry on AccessControlException", 1,
         StringUtils.countMatches(logs.getOutput(), exMessage));
   }
@@ -645,8 +656,7 @@ public final class TestSecureOzoneCluster {
       // Test failure of delegation renewal
       // 1. When token maxExpiryTime exceeds
       Thread.sleep(tokenMaxLifetime);
-      OMException ex = LambdaTestUtils.intercept(OMException.class,
-          "TOKEN_EXPIRED",
+      OMException ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(token));
       assertEquals(TOKEN_EXPIRED, ex.getResult());
       omLogs.clearOutput();
@@ -656,9 +666,9 @@ public final class TestSecureOzoneCluster {
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
           new Text("randomService"));
       assertNotNull(token2);
-      LambdaTestUtils.intercept(OMException.class,
-          "Delegation token renewal failed",
+      ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(token2));
+      assertTrue(ex.getMessage().contains("Delegation token renewal failed"));
       assertTrue(omLogs.getOutput().contains(" with non-matching " +
           "renewer randomService"));
       omLogs.clearOutput();
@@ -671,13 +681,11 @@ public final class TestSecureOzoneCluster {
       Token<OzoneTokenIdentifier> tamperedToken = new Token<>(
           tokenId.getBytes(), token2.getPassword(), token2.getKind(),
           token2.getService());
-      LambdaTestUtils.intercept(OMException.class,
-          "Delegation token renewal failed",
+      ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(tamperedToken));
-      assertTrue(omLogs.getOutput().contains("can't be found in " +
-          "cache"));
+      assertTrue(ex.getMessage().contains("Delegation token renewal failed"));
+      assertTrue(omLogs.getOutput().contains("can't be found in cache"));
       omLogs.clearOutput();
-
     } finally {
       IOUtils.closeQuietly(om);
     }
