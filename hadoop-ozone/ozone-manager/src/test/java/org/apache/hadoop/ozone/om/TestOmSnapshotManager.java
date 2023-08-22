@@ -309,7 +309,7 @@ public class TestOmSnapshotManager {
   /*
    * Test that exclude list is generated correctly.
    */
-  //@Test
+  @Test
   public void testExcludeUtilities() throws IOException {
     File noLinkFile = new File(followerSnapDir2, "noLink.sst");
 
@@ -325,14 +325,28 @@ public class TestOmSnapshotManager {
 
     // Confirm that the excluded list is normalized as expected.
     //  (Normalizing means matches the layout on the leader.)
-    Map<Path, Path> normalizedSet =
+    File leaderSstBackupDir = new File(leaderDir.toString(), "sstBackup");
+    Assert.assertTrue(leaderSstBackupDir.mkdirs());
+    File leaderCompactionLogDir = new File(leaderDir.toString(), "compactionLog");
+    Assert.assertTrue(leaderCompactionLogDir.mkdirs());
+    File leaderTmpDir = new File(leaderDir.toString(), "tmp");
+    Assert.assertTrue(leaderTmpDir.mkdirs());
+    OMDBCheckpointServlet.DirectoryData sstBackupDir = new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
+        leaderSstBackupDir.toString());
+    OMDBCheckpointServlet.DirectoryData compactionLogDir = new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
+        leaderCompactionLogDir.toString());
+
+    Map<Path, Path> normalizedMap =
         OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
-            leaderCheckpointDir.toPath(), null, null);
-    Set<Path> expectedNormalizedSet = new HashSet<>(Arrays.asList(
-        Paths.get(leaderSnapDir1.toString(), "s1.sst"),
-        Paths.get(leaderSnapDir2.toString(), "noLink.sst"),
-        Paths.get(leaderCheckpointDir.toString(), "f1.sst")));
-    Assert.assertEquals(expectedNormalizedSet, normalizedSet);
+        leaderCheckpointDir.toPath(), sstBackupDir, compactionLogDir);
+    Map<Path, Path> expectedMap = new HashMap<>();
+    Path s1 = Paths.get(leaderSnapDir1.toString(), "s1.sst");
+    Path noLink = Paths.get(leaderSnapDir2.toString(), "noLink.sst");
+    Path f1 = Paths.get(leaderCheckpointDir.toString(), "f1.sst");
+    expectedMap.put(s1, s1);
+    expectedMap.put(noLink, noLink);
+    expectedMap.put(f1, f1);
+    Assert.assertEquals(expectedMap, normalizedMap);
   }
 
   /*
@@ -340,7 +354,7 @@ public class TestOmSnapshotManager {
    * should be copied, linked, or excluded from the tarball entirely.
    * This test always passes in a null dest dir.
    */
-  //@Test
+  @Test
   public void testProcessFileWithNullDestDirParameter() throws IOException {
     Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());
     Assert.assertTrue(new File(testDir.toString(), "snap2").mkdirs());
@@ -369,7 +383,7 @@ public class TestOmSnapshotManager {
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
     Map<Path, Path> toExcludeFiles = new HashMap<>();
-    //        Collections.singletonList(excludeFile));
+    toExcludeFiles.put(excludeFile, excludeFile);
     Map<Path, Path> copyFiles = new HashMap<>();
     copyFiles.put(copyFile, copyFile);
     List<String> excluded = new ArrayList<>();
@@ -431,7 +445,7 @@ public class TestOmSnapshotManager {
    * should be copied, linked, or excluded from the tarball entirely.
    * This test always passes in a non-null dest dir.
    */
-  //@Test
+  @Test
   public void testProcessFileWithDestDirParameter() throws IOException {
     Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());
     Assert.assertTrue(new File(testDir.toString(), "snap2").mkdirs());
@@ -477,7 +491,7 @@ public class TestOmSnapshotManager {
 
     // Create test data structures.
     Map<Path, Path> toExcludeFiles = new HashMap<>();
-    //        Collections.singletonList(destExcludeFile));
+    toExcludeFiles.put(excludeFile, destExcludeFile);
     Map<Path, Path> copyFiles = new HashMap<>();
     copyFiles.put(copyFile, destCopyFile);
     List<String> excluded = new ArrayList<>();
