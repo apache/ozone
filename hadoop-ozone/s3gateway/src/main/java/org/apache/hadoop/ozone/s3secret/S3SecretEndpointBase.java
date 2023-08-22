@@ -47,7 +47,7 @@ public class S3SecretEndpointBase implements Auditor {
   protected static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
-  protected String shortNameFromRequest() {
+  protected String userNameFromRequest() {
     return context.getSecurityContext().getUserPrincipal().getName();
   }
 

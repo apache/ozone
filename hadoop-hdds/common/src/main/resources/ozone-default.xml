@@ -1798,6 +1798,40 @@
   </property>
 
   <property>
+    <name>ozone.s3g.secret.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The boolean which enables the Ozone S3Gateway Secret endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.type</name>
+    <value>simple</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.kerberos.principal</name>
+    <value>HTTP/_HOST@REALM</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description>The server principal used by Ozone S3Gateway Secret endpoint.
+      This is typically set to
+      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
+      HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.kerberos.keytab</name>
+    <value>/etc/security/keytabs/HTTP.keytab</value>
+    <tag>OZONE, S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description>The keytab file used by the S3Gateway Secret endpoint
+      to login as its service principal.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
     <tag>OZONE, OM</tag>

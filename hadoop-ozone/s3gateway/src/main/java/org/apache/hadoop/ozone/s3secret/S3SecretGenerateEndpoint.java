@@ -44,6 +44,6 @@ public class S3SecretGenerateEndpoint extends S3SecretEndpointBase {
   }
 
   private S3SecretValue generateS3Secret() throws IOException {
-    return getClient().getObjectStore().getS3Secret(shortNameFromRequest());
+    return getClient().getObjectStore().getS3Secret(userNameFromRequest());
   }
 }

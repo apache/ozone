@@ -41,7 +41,7 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
   }
 
   private void revokeSecret() throws IOException {
-    getClient().getObjectStore().revokeS3Secret(shortNameFromRequest());
+    getClient().getObjectStore().revokeS3Secret(userNameFromRequest());
   }
 
 }
