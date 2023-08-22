@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
@@ -66,6 +67,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
@@ -327,26 +329,26 @@ public class TestOmSnapshotManager {
     //  (Normalizing means matches the layout on the leader.)
     File leaderSstBackupDir = new File(leaderDir.toString(), "sstBackup");
     Assert.assertTrue(leaderSstBackupDir.mkdirs());
-    File leaderCompactionLogDir = new File(leaderDir.toString(), "compactionLog");
-    Assert.assertTrue(leaderCompactionLogDir.mkdirs());
     File leaderTmpDir = new File(leaderDir.toString(), "tmp");
     Assert.assertTrue(leaderTmpDir.mkdirs());
     OMDBCheckpointServlet.DirectoryData sstBackupDir = new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
         leaderSstBackupDir.toString());
-    OMDBCheckpointServlet.DirectoryData compactionLogDir = new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
-        leaderCompactionLogDir.toString());
-
+    Path srcSstBackup = Paths.get(sstBackupDir.getTmpDir().toString(), "backup.sst");
+    Path destSstBackup = Paths.get(sstBackupDir.getOriginalDir().toString(), "backup.sst");
+    truncateLength = leaderDir.toString().length() + 1;
+    existingSstList.add(truncateFileName(truncateLength, destSstBackup));
     Map<Path, Path> normalizedMap =
         OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
-        leaderCheckpointDir.toPath(), sstBackupDir, compactionLogDir);
-    Map<Path, Path> expectedMap = new HashMap<>();
+        leaderCheckpointDir.toPath(), sstBackupDir);
+    Map<Path, Path> expectedMap = new TreeMap<>();
     Path s1 = Paths.get(leaderSnapDir1.toString(), "s1.sst");
     Path noLink = Paths.get(leaderSnapDir2.toString(), "noLink.sst");
     Path f1 = Paths.get(leaderCheckpointDir.toString(), "f1.sst");
     expectedMap.put(s1, s1);
     expectedMap.put(noLink, noLink);
     expectedMap.put(f1, f1);
-    Assert.assertEquals(expectedMap, normalizedMap);
+    expectedMap.put(srcSstBackup, destSstBackup);
+    Assert.assertEquals(expectedMap, new TreeMap<>(normalizedMap));
   }
 
   /*

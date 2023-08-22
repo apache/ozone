@@ -166,7 +166,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           differ.getCompactionLogDir());
 
       Map<Path, Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation(), sstBackupDir, compactionLogDir);
+          checkpoint.getCheckpointLocation(), sstBackupDir);
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
           excludedList, sstBackupDir, compactionLogDir);
@@ -181,24 +181,20 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   // Format list from follower to match data on leader.
   @VisibleForTesting
   public static Map<Path, Path> normalizeExcludeList(List<String> toExcludeList,
-                                               Path checkpointLocation, DirectoryData sstBackupDir, DirectoryData compactionLogDir) {
+                                               Path checkpointLocation, DirectoryData sstBackupDir) {
     Map<Path, Path> paths = new HashMap<>();
     for (String s : toExcludeList) {
-      if (!s.startsWith(OM_SNAPSHOT_DIR)) {
+      Path metaDirPath = getMetaDirPath(checkpointLocation);
+      Path destPath = Paths.get(metaDirPath.toString(), s);
+      if (destPath.toString().startsWith(sstBackupDir.getOriginalDir().toString())) {
+        int truncateLength = sstBackupDir.getOriginalDir().toString().length() + 1;
+        Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
+        paths.put(srcPath, destPath);
+      } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
         paths.put(fixedPath, fixedPath);
       } else {
-        Path metaDirPath = getMetaDirPath(checkpointLocation);
-        Path destPath = Paths.get(metaDirPath.toString(), s);
-        Path srcPath = destPath;
-        if (destPath.toString().startsWith(sstBackupDir.getOriginalDir().toString())) {
-          int truncateLength = sstBackupDir.getOriginalDir().toString().length() + 1;
-          srcPath = Paths.get(sstBackupDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
-        } else if (destPath.toString().startsWith(compactionLogDir.getOriginalDir().toString())) {
-          int truncateLength = compactionLogDir.getOriginalDir().toString().length() + 1;
-          srcPath = Paths.get(compactionLogDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
-        }
-        paths.put(srcPath, destPath);
+        paths.put(destPath, destPath);
       }
     }
     return paths;
