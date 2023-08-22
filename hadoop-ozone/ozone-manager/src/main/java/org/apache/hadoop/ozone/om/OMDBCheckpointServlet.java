@@ -250,7 +250,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
 
   // Convenience class for keeping track of the tmp dirs.
-  private static class DirectoryData {
+  public static class DirectoryData {
     private final File originalDir;
     private final File tmpDir;
     DirectoryData(Path tmpdir, String dirStr) throws IOException {
@@ -506,6 +506,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         if (srcPath.toFile().exists() && OmSnapshotUtils.getINode(srcPath).equals(
             OmSnapshotUtils.getINode(file))) {
           return destPath;
+        } else {
+          LOG.info("gbjx: found non matching sst files: {}, {}", srcPath.toString(), file.toString());
         }
       }
     }
