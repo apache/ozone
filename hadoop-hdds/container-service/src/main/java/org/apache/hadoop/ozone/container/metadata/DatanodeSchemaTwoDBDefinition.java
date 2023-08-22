@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -28,13 +29,16 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
+import java.util.Map;
+
 /**
  * This class defines the RocksDB structure for datanodes following schema
  * version 2, where the block data, metadata, and transactions which are to be
  * deleted are put in their own separate column families.
  */
-public class DatanodeSchemaTwoDBDefinition extends
-        AbstractDatanodeDBDefinition {
+public class DatanodeSchemaTwoDBDefinition
+    extends AbstractDatanodeDBDefinition
+    implements DBDefinition.WithMapInterface {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
@@ -77,11 +81,16 @@ public class DatanodeSchemaTwoDBDefinition extends
     super(dbPath, config);
   }
 
+  private static final Map<String, DBColumnFamilyDefinition<?, ?>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
+          BLOCK_DATA,
+          METADATA,
+          DELETED_BLOCKS,
+          DELETE_TRANSACTION);
+
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily(),
-        getDeleteTransactionsColumnFamily()};
+  public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
+    return COLUMN_FAMILIES;
   }
 
   @Override

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.container.replication.health;
-
 /**
- * HDDS Container replicaton check classes.
+ * HDDS Container replication check classes.
  */
+package org.apache.hadoop.hdds.scm.container.replication.health;

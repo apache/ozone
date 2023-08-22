@@ -26,10 +26,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -39,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -92,7 +96,9 @@ public final class OMFileRequest {
     String dirNameFromDetails = omMetadataManager.getOzoneDirKey(volumeName,
         bucketName, keyName);
     List<String> missing = new ArrayList<>();
-    List<OzoneAcl> inheritAcls = new ArrayList<>();
+    // Get parent all acls including ACCESS and DEFAULT acls
+    // The logic of specific inherited acl should be when creating dir/file
+    List<OzoneAcl> acls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
 
     while (keyPath != null) {
@@ -122,11 +128,10 @@ public final class OMFileRequest {
           result = OMDirectoryResult.DIRECTORY_EXISTS;
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
-          inheritAcls = omMetadataManager.getKeyTable(
+          acls = omMetadataManager.getKeyTable(
               getBucketLayout(omMetadataManager, volumeName, bucketName))
               .get(dbDirKeyName).getAcls();
-          LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
-              + inheritAcls);
+          LOG.trace("Acls from parent {} are : {}", dbDirKeyName, acls);
         }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
@@ -136,26 +141,25 @@ public final class OMFileRequest {
 
       if (result != OMDirectoryResult.NONE) {
 
-        LOG.trace("verifyFiles in Path : " + "/" + volumeName
-            + "/" + bucketName + "/" + keyName + ":" + result);
-        return new OMPathInfo(missing, result, inheritAcls);
+        LOG.trace("verifyFiles in Path : /{}/{}/{} : {}",
+            volumeName, bucketName, keyName, result);
+        return new OMPathInfo(missing, result, acls);
       }
       keyPath = keyPath.getParent();
     }
 
-    if (inheritAcls.isEmpty()) {
+    if (acls.isEmpty()) {
       String bucketKey = omMetadataManager.getBucketKey(volumeName,
           bucketName);
-      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey)
+      acls = omMetadataManager.getBucketTable().get(bucketKey)
           .getAcls();
-      LOG.trace("Acls inherited from bucket " + bucketName + " are : "
-          + inheritAcls);
+      LOG.trace("Acls from bucket {} are : {}", bucketName, acls);
     }
 
-    LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
-        + keyName + ":" + result);
+    LOG.trace("verifyFiles in Path : /{}/{}/{} : {}",
+        volumeName, bucketName, keyName, result);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
+    return new OMPathInfo(missing, OMDirectoryResult.NONE, acls);
   }
 
   /**
@@ -191,8 +195,9 @@ public final class OMFileRequest {
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
 
-    // by default, inherit bucket ACLs
-    List<OzoneAcl> inheritAcls = omBucketInfo.getAcls();
+    // Get parent all acls including ACCESS and DEFAULT acls
+    // The logic of specific inherited acl should be when creating dir/file
+    List<OzoneAcl> acls = omBucketInfo.getAcls();
 
     long lastKnownParentId = omBucketInfo.getObjectID();
     String dbDirName = ""; // absolute path for trace logs
@@ -226,7 +231,7 @@ public final class OMFileRequest {
         if (elements.hasNext()) {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           lastKnownParentId = omDirInfo.getObjectID();
-          inheritAcls = omDirInfo.getAcls();
+          acls = omDirInfo.getAcls();
           continue;
         } else {
           // Checked all the sub-dirs till the leaf node.
@@ -257,22 +262,21 @@ public final class OMFileRequest {
       }
     }
 
-    LOG.trace("verifyFiles/Directories in Path : " + "/" + volumeName
-            + "/" + bucketName + "/" + keyName + ":" + result);
+    LOG.trace("verifyFiles/Directories in Path : /{}/{}/{} : {}",
+        volumeName, bucketName, keyName, result);
 
     if (result == OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH || result ==
             OMDirectoryResult.FILE_EXISTS) {
       return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
-              result, inheritAcls, fullKeyPath.toString());
+              result, acls, fullKeyPath.toString());
     }
 
     String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
             bucketName, dbDirName);
-    LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
-            + inheritAcls);
+    LOG.trace("Acls from parent {} are : {}", dbDirKeyName, acls);
 
     return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
-            result, inheritAcls);
+            result, acls);
   }
 
   /**
@@ -629,8 +633,10 @@ public final class OMFileRequest {
    */
   @Nullable
   public static OzoneFileStatus getOMKeyInfoIfExists(
-      OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
-      String keyName, long scmBlockSize) throws IOException {
+      OMMetadataManager omMetadataMgr,
+      String volumeName, String bucketName, String keyName,
+      long scmBlockSize, ReplicationConfig defaultReplication
+  ) throws IOException {
 
     OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
 
@@ -675,6 +681,11 @@ public final class OMFileRequest {
     if (omDirInfo != null) {
       OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
               keyName);
+      ReplicationConfig replicationConfig =
+          Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+              .map(DefaultReplicationConfig::getReplicationConfig)
+              .orElse(defaultReplication);
+      omKeyInfo.setReplicationConfig(replicationConfig);
       return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
     }
 
@@ -785,24 +796,27 @@ public final class OMFileRequest {
    * Check whether dst parent dir exists or not. If the parent exists, then the
    * source can be renamed to dst path.
    *
-   * @param volumeName  volume name
-   * @param bucketName  bucket name
-   * @param toKeyName   destination path
-   * @param metaMgr     metadata manager
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param toKeyName destination path
+   * @param ozoneManager
+   * @param metaMgr metadata manager
    * @return omDirectoryInfo object of destination path's parent
    * or null if parent is bucket
    * @throws IOException if the destination parent is not a directory.
    */
-  public static OmKeyInfo getKeyParentDir(String volumeName, String bucketName,
-      String toKeyName, OMMetadataManager metaMgr) throws IOException {
+  public static OmKeyInfo getKeyParentDir(
+      String volumeName, String bucketName, String toKeyName,
+      OzoneManager ozoneManager, OMMetadataManager metaMgr) throws IOException {
     int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
     // skip parent is root '/'
     if (totalDirsCount <= 1) {
       return null;
     }
     String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
-    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
-            volumeName, bucketName, toKeyParentDir, 0);
+    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(
+        metaMgr, volumeName, bucketName, toKeyParentDir, 0,
+        ozoneManager.getDefaultReplicationConfig());
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null) {
       throw new OMException(String.format(

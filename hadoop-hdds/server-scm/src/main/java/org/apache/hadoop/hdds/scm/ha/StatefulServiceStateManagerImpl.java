@@ -82,6 +82,17 @@ public final class StatefulServiceStateManagerImpl
   }
 
   /**
+   * Deletes the persisted configuration mapped to the specified serviceName.
+   * @param serviceName name of the {@link StatefulService}, obtained through
+   * {@link SCMService#getServiceName()}
+   * @throws IOException on failure
+   */
+  @Override
+  public void deleteConfiguration(String serviceName) throws IOException {
+    statefulServiceConfig.delete(serviceName);
+  }
+
+  /**
    * {@inheritDoc}
    */
   @Override

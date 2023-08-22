@@ -145,7 +145,7 @@ public class TestKeyPurging {
         () -> {
           try {
             return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
-                .size() == 0;
+                .getKeyBlocksList().size() == 0;
           } catch (IOException e) {
             return false;
           }

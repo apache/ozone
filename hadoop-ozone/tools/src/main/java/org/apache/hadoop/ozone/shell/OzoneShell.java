@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import java.util.function.Supplier;
-
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
@@ -41,7 +39,6 @@ public class OzoneShell extends Shell {
    * Main for the ozShell Command handling.
    *
    * @param argv - System Args Strings[]
-   * @throws Exception
    */
   public static void main(String[] argv) throws Exception {
     new OzoneShell().run(argv);
@@ -51,7 +48,7 @@ public class OzoneShell extends Shell {
   public int execute(String[] argv) {
     TracingUtil.initTracing("shell", createOzoneConfiguration());
     return TracingUtil.executeInNewSpan("main",
-        (Supplier<Integer>) () -> super.execute(argv));
+        () -> super.execute(argv));
   }
 
 }

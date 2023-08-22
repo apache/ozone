@@ -83,13 +83,13 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
@@ -121,6 +121,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -666,7 +668,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Disabled("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;
@@ -718,13 +719,13 @@ public class TestSCMNodeManager {
           "Expected to find 1 stale node");
       assertEquals(staleNode.getUuid(), staleNodeList.get(0).getUuid(),
           "Stale node is not the expected ID");
-      Thread.sleep(1000);
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(1,
           nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
               .get(HddsProtos.NodeState.STALE.name()).intValue());
 
+      Thread.sleep(1000);
       // heartbeat good nodes again.
       for (DatanodeDetails dn : nodeList) {
         nodeManager.processHeartbeat(dn, layoutInfo);
@@ -977,7 +978,7 @@ public class TestSCMNodeManager {
     }
     for (int i = 0; i < 5; i++) {
       nodeManager.addDatanodeCommand(node1.getUuid(),
-          new DeleteBlocksCommand(Collections.emptyList()));
+          new DeleteBlocksCommand(emptyList()));
     }
 
     Assertions.assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
@@ -1063,7 +1064,7 @@ public class TestSCMNodeManager {
     SCMCommand<?> createPipelineCommand =
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
+            HddsProtos.ReplicationFactor.THREE, emptyList());
 
     nodeManager.onMessage(
         new CommandForDatanode<>(datanode1, closeContainerCommand), null);
@@ -1525,7 +1526,7 @@ public class TestSCMNodeManager {
         StorageReportProto report = HddsTestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
         nodeManager.register(dn, HddsTestUtils.createNodeReport(
-            Arrays.asList(report), Collections.emptyList()), null);
+            Arrays.asList(report), emptyList()), null);
         nodeManager.processHeartbeat(dn, layoutInfo);
       }
       //TODO: wait for EventQueue to be processed
@@ -1578,7 +1579,7 @@ public class TestSCMNodeManager {
         failed = !failed;
       }
       nodeManager.register(dn, HddsTestUtils.createNodeReport(reports,
-          Collections.emptyList()), null);
+          emptyList()), null);
       LayoutVersionManager versionManager =
           nodeManager.getLayoutVersionManager();
       LayoutVersionProto layoutInfo = toLayoutVersionProto(
@@ -1635,7 +1636,7 @@ public class TestSCMNodeManager {
             .createStorageReport(dnId, storagePath, capacity, scmUsed,
                 remaining, null);
         NodeReportProto nodeReportProto = HddsTestUtils.createNodeReport(
-            Arrays.asList(report), Collections.emptyList());
+            Arrays.asList(report), emptyList());
         nodeReportHandler.onMessage(
             new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
             publisher);
@@ -1767,7 +1768,7 @@ public class TestSCMNodeManager {
 
       nodemanager
           .register(datanodeDetails, HddsTestUtils.createNodeReport(
-              Arrays.asList(report), Collections.emptyList()),
+              Arrays.asList(report), emptyList()),
                   HddsTestUtils.getRandomPipelineReports());
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
@@ -1811,25 +1812,6 @@ public class TestSCMNodeManager {
   public void testScmRegisterNodeWithHostname()
       throws IOException, InterruptedException, AuthenticationException {
     testScmRegisterNodeWithNetworkTopology(true);
-  }
-
-  /**
-   * Test getNodesByAddress when using IPs.
-   *
-   */
-  @Test
-  public void testgetNodesByAddressWithIpAddress()
-      throws IOException, InterruptedException, AuthenticationException {
-    testGetNodesByAddress(false);
-  }
-
-  /**
-   * Test getNodesByAddress when using hostnames.
-   */
-  @Test
-  public void testgetNodesByAddressWithHostname()
-      throws IOException, InterruptedException, AuthenticationException {
-    testGetNodesByAddress(true);
   }
 
   /**
@@ -1948,7 +1930,7 @@ public class TestSCMNodeManager {
               remaining, null);
 
       nodeManager.register(datanodeDetails, HddsTestUtils.createNodeReport(
-          Arrays.asList(report), Collections.emptyList()),
+          Arrays.asList(report), emptyList()),
           HddsTestUtils.getRandomPipelineReports());
 
       LayoutVersionManager versionManager =
@@ -1958,7 +1940,7 @@ public class TestSCMNodeManager {
           versionManager.getSoftwareLayoutVersion());
       nodeManager.register(datanodeDetails,
           HddsTestUtils.createNodeReport(Arrays.asList(report),
-              Collections.emptyList()),
+              emptyList()),
           HddsTestUtils.getRandomPipelineReports(), layoutInfo);
       nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       if (i == 5) {
@@ -1992,20 +1974,21 @@ public class TestSCMNodeManager {
   /**
    * Test add node into a 4-layer network topology during node register.
    */
-  private void testGetNodesByAddress(boolean useHostname)
-      throws IOException, InterruptedException, AuthenticationException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testGetNodesByAddress(boolean useHostname)
+      throws IOException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
+    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        useHostname);
 
     // create a set of hosts - note two hosts on "host1"
     String[] hostNames = {"host1", "host1", "host2", "host3", "host4"};
     String[] ipAddress =
         {"1.2.3.4", "1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7"};
 
-    if (useHostname) {
-      conf.set(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME, "true");
-    }
     final int nodeCount = hostNames.length;
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       for (int i = 0; i < nodeCount; i++) {
@@ -2070,7 +2053,7 @@ public class TestSCMNodeManager {
       assertEquals(hostName, returnedNode.getHostName());
       assertTrue(returnedNode.getNetworkLocation()
               .startsWith("/rack1/ng"));
-      assertTrue(returnedNode.getParent() != null);
+      assertNotNull(returnedNode.getParent());
 
       // test updating ip address and host name
       String updatedIpAddress = "2.3.4.5";
@@ -2091,7 +2074,10 @@ public class TestSCMNodeManager {
       assertEquals(updatedHostName, returnedUpdatedNode.getHostName());
       assertTrue(returnedUpdatedNode.getNetworkLocation()
               .startsWith("/rack1/ng"));
-      assertTrue(returnedUpdatedNode.getParent() != null);
+      assertNotNull(returnedUpdatedNode.getParent());
+
+      assertEquals(emptyList(), nodeManager.getNodesByAddress(hostName));
+      assertEquals(emptyList(), nodeManager.getNodesByAddress(ipAddress));
     }
   }
 }

@@ -46,6 +46,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -58,6 +59,7 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStr
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -98,7 +100,7 @@ public class TestRDBSnapshotProvider {
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
-      public void close() throws IOException {
+      public void close() {
       }
 
       @Override
@@ -235,5 +237,29 @@ public class TestRDBSnapshotProvider {
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  @Test
+  public void testCheckLeaderConsistency() throws IOException {
+    // Leader initialized to null at startup.
+    assertEquals(1, rdbSnapshotProvider.getInitCount());
+    File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
+        "file1.sst");
+    Files.write(dummyFile.toPath(),
+        "dummyData".getBytes(StandardCharsets.UTF_8));
+    assertTrue(dummyFile.exists());
+
+    // Set the leader.
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
+    assertFalse(dummyFile.exists());
+
+    // Confirm setting the same leader doesn't reinitialize.
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
+
+    // Confirm setting different leader does reinitialize.
+    rdbSnapshotProvider.checkLeaderConsistency("node2");
+    assertEquals(3, rdbSnapshotProvider.getInitCount());
   }
 }

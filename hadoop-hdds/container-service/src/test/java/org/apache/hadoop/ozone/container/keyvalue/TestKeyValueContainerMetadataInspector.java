@@ -46,6 +46,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.ozone.test.GenericTestUtils.toLog4j;
+
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
  */
@@ -499,7 +501,8 @@ public class TestKeyValueContainerMetadataInspector
     // parsed as json.
     GenericTestUtils.LogCapturer capturer =
         GenericTestUtils.LogCapturer.captureLogs(
-            KeyValueContainerMetadataInspector.REPORT_LOG, new PatternLayout());
+            toLog4j(KeyValueContainerMetadataInspector.REPORT_LOG),
+            new PatternLayout());
     KeyValueContainerUtil.parseKVContainerData(containerData, getConf());
     capturer.stopCapturing();
     String output = capturer.getOutput();

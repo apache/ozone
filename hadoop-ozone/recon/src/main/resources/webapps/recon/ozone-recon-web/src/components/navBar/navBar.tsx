@@ -22,15 +22,61 @@ import {Layout, Menu, Icon} from 'antd';
 import './navBar.less';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
+import axios from 'axios';
+import {showDataFetchError} from 'utils/common';
 
 const {Sider} = Layout;
 
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
+  isHeatmapAvailable: boolean;
+  isLoading: boolean;
 }
 
 class NavBar extends React.Component<INavBarProps> {
+  constructor(props = {}) {
+    super(props);
+    this.state = {
+      isHeatmapAvailable: false,
+      isLoading: false
+    };
+  }
+
+  componentDidMount(): void {
+    this.setState({
+      isLoading: true
+    });
+    this.fetchDisableFeatures();
+  }
+  
+  fetchDisableFeatures = () => {
+    this.setState({
+      isLoading: true
+    });
+
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    axios.get(disabledfeaturesEndpoint).then(response => {
+      const disabledFeaturesFlag = response.data && response.data.includes('HEATMAP');
+      // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
+      this.setState({
+        isLoading: false,
+        isHeatmapAvailable: !disabledFeaturesFlag
+      });
+    }).catch(error => {
+      this.setState({
+        isLoading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
+  refresh = () => {
+    console.log("refresh");
+    this.props.history.push('/Heatmap');
+    window.location.reload();
+    }
+
   render() {
     const {location} = this.props;
     return (
@@ -71,16 +117,36 @@ class NavBar extends React.Component<INavBarProps> {
             <span>Containers</span>
             <Link to='/Containers'/>
           </Menu.Item>
-          <Menu.Item key='/Insights'>
-            <Icon type='bar-chart'/>
-            <span>Insights</span>
-            <Link to='/Insights'/>
-          </Menu.Item>
+          <Menu.SubMenu
+            title={
+              <span><Icon type='bar-chart' />
+                <span>Insights</span>
+              </span>
+            }>
+              <Menu.Item key="/Insights">
+                <span><Icon type='bar-chart' /></span>
+                <span>Insights</span>
+                <Link to='/Insights' />
+              </Menu.Item>
+              <Menu.Item key="/Om">
+              <span> <Icon type="database"/></span>
+              <span>OM DB Insights</span>
+              <Link to='/Om' />
+              </Menu.Item>
+          </Menu.SubMenu>
           <Menu.Item key='/DiskUsage'>
             <Icon type='pie-chart'/>
             <span>Disk Usage</span>
             <Link to='/DiskUsage'/>
           </Menu.Item>
+          {
+            this.state.isHeatmapAvailable ?
+              <Menu.Item key='/Heatmap'>
+                <Icon type='bar-chart' />
+                <span>Heatmap</span>
+                <Link to='/Heatmap' onClick={this.refresh}/>
+              </Menu.Item> : ""
+          }
         </Menu>
       </Sider>
     );

@@ -32,6 +32,8 @@ import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+
 /**
  * Data scanner that full checks a volume. Each volume gets a separate thread.
  */
@@ -69,16 +71,27 @@ public class BackgroundContainerDataScanner extends
   }
 
   @Override
-  public void scanContainer(Container<?> c) throws IOException {
+  public void scanContainer(Container<?> c)
+      throws IOException, InterruptedException {
+    // There is one background container data scanner per volume.
+    // If the volume fails, its scanning thread should terminate.
+    if (volume.isFailed()) {
+      shutdown("The volume has failed.");
+      return;
+    }
+
     if (!shouldScan(c)) {
       return;
     }
     ContainerData containerData = c.getContainerData();
     long containerId = containerData.getContainerID();
     logScanStart(containerData);
-    if (!c.scanData(throttler, canceler)) {
+    ScanResult result = c.scanData(throttler, canceler);
+    if (!result.isHealthy()) {
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+          containerId, result.getException());
       metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(containerId);
+      controller.markContainerUnhealthy(containerId, result);
     }
 
     metrics.incNumContainersScanned();
@@ -111,8 +124,14 @@ public class BackgroundContainerDataScanner extends
 
   @Override
   public synchronized void shutdown() {
-    this.canceler.cancel(
-        String.format(NAME_FORMAT, volume) + " is shutting down");
+    shutdown("");
+  }
+
+  private synchronized void shutdown(String reason) {
+    String shutdownMessage = String.format(NAME_FORMAT, volume) + " is " +
+        "shutting down. " + reason;
+    LOG.info(shutdownMessage);
+    this.canceler.cancel(shutdownMessage);
     super.shutdown();
   }
 

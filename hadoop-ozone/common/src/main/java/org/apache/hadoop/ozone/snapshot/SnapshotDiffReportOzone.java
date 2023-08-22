@@ -205,6 +205,4 @@ public class SnapshotDiffReportOzone
   public void aggregate(SnapshotDiffReportOzone diffReport) {
     this.getDiffList().addAll(diffReport.getDiffList());
   }
-
-
 }

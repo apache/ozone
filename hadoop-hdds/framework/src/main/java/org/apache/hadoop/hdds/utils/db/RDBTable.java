@@ -167,10 +167,36 @@ class RDBTable implements Table<byte[], byte[]> {
     return val;
   }
 
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+    rdbMetrics.incNumDBKeyGetIfExistChecks();
+    final Supplier<Integer> value = db.keyMayExist(
+        family, key, outValue.duplicate());
+    if (value == null) {
+      return null; // definitely not exists
+    }
+    if (value.get() != null) {
+      // definitely exists, return value size.
+      return value.get();
+    }
+
+    // inconclusive: the key may or may not exist
+    rdbMetrics.incNumDBKeyGetIfExistGets();
+    final Integer val = get(key, outValue);
+    if (val == null) {
+      rdbMetrics.incNumDBKeyGetIfExistMisses();
+    }
+    return val;
+  }
+
   @Override
   public void delete(byte[] key) throws IOException {
     db.delete(family, key);
   }
+
+  public void delete(ByteBuffer key) throws IOException {
+    db.delete(family, key);
+  }
+
 
   @Override
   public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
@@ -191,14 +217,20 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
       throws IOException {
-    return new RDBStoreIterator(db.newIterator(family, false), this);
+    return iterator((byte[])null);
   }
 
   @Override
   public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
       throws IOException {
-    return new RDBStoreIterator(db.newIterator(family, false), this,
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
         prefix);
+  }
+
+  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
+      CodecBuffer prefix) throws IOException {
+    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+        this, prefix);
   }
 
   @Override

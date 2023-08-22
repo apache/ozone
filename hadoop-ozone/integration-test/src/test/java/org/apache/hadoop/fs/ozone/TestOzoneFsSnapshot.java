@@ -285,6 +285,65 @@ public class TestOzoneFsSnapshot {
     Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
   }
 
+  @Test
+  public void testSnapshotDeleteSuccess() throws Exception {
+    String snapshotName = createSnapshot();
+    // Delete the created snapshot
+    int res = ToolRunner.run(shell,
+        new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
+    // Asserts that delete request succeeded
+    Assertions.assertEquals(0, res);
+
+    // Wait for the snapshot to be marked deleted.
+    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+        .getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+
+    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
+        200, 10000);
+  }
+
+  private static Stream<Arguments> deleteSnapshotFailureScenarios() {
+    String invalidBucketPath = "/invalid/uri";
+    return Stream.of(
+            Arguments.of("1st case: invalid snapshot name",
+                    BUCKET_PATH,
+                    "testsnap",
+                    "Snapshot does not exist",
+                    1),
+            Arguments.of("2nd case: invalid bucekt path",
+                    invalidBucketPath,
+                    "testsnap",
+                    "No such file or directory",
+                    1),
+            Arguments.of("3rd case: snapshot name not passed",
+                    BUCKET_PATH,
+                    "",
+                    "snapshot name can't be null or empty",
+                    -1),
+            Arguments.of("4th case: all parameters are missing",
+                    "",
+                    "",
+                    "Can not create a Path from an empty string",
+                    -1)
+    );
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("deleteSnapshotFailureScenarios")
+  public void testSnapshotDeleteFailure(String description,
+                                        String paramBucketPath,
+                                        String snapshotName,
+                                        String expectedMessage,
+                                        int expectedResponse) throws Exception {
+    String errorMessage = execShellCommandAndGetOutput(expectedResponse,
+            new String[]{"-deleteSnapshot", paramBucketPath, snapshotName});
+
+    Assertions.assertTrue(errorMessage
+            .contains(expectedMessage), errorMessage);
+  }
+
   /**
    * Execute a shell command with provided arguments
    * and return a string of the output.

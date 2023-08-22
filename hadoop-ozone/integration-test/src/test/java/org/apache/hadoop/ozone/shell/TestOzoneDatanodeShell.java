@@ -63,7 +63,7 @@ public class TestOzoneDatanodeShell {
    */
   @BeforeClass
   public static void init() {
-    datanode = new TestHddsDatanodeService(false, new String[] {});
+    datanode = new TestHddsDatanodeService(new String[] {});
   }
   
   private void executeDatanode(HddsDatanodeService hdds, String[] args) {
@@ -138,8 +138,8 @@ public class TestOzoneDatanodeShell {
   }
 
   private static class TestHddsDatanodeService extends HddsDatanodeService {
-    TestHddsDatanodeService(boolean printBanner, String[] args) {
-      super(printBanner, args);
+    TestHddsDatanodeService(String[] args) {
+      super(args);
     }
 
     @Override

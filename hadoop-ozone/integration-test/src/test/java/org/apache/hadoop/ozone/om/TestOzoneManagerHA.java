@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -40,7 +41,6 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Timeout;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.time.Duration;
+import java.util.Iterator;
 import java.util.UUID;
 import java.util.HashMap;
 
@@ -60,9 +61,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Base class for Ozone Manager HA tests.
@@ -245,17 +250,17 @@ public abstract class TestOzoneManagerHA {
     objectStore.createVolume(volumeName, createVolumeArgs);
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
-    Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-    Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-    Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
+    assertEquals(volumeName, retVolumeinfo.getName());
+    assertEquals(userName, retVolumeinfo.getOwner());
+    assertEquals(adminName, retVolumeinfo.getAdmin());
 
     String bucketName = UUID.randomUUID().toString();
     retVolumeinfo.createBucket(bucketName);
 
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-    Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
+    assertEquals(bucketName, ozoneBucket.getName());
+    assertEquals(volumeName, ozoneBucket.getVolumeName());
 
     return ozoneBucket;
   }
@@ -278,26 +283,24 @@ public abstract class TestOzoneManagerHA {
     objectStore.createVolume(linkedVolName, createVolumeArgs);
     OzoneVolume linkedVolumeInfo = objectStore.getVolume(linkedVolName);
 
-    Assert.assertTrue(linkedVolumeInfo.getName().equals(linkedVolName));
-    Assert.assertTrue(linkedVolumeInfo.getOwner().equals(userName));
-    Assert.assertTrue(linkedVolumeInfo.getAdmin().equals(adminName));
+    assertEquals(linkedVolName, linkedVolumeInfo.getName());
+    assertEquals(userName, linkedVolumeInfo.getOwner());
+    assertEquals(adminName, linkedVolumeInfo.getAdmin());
 
     String linkedBucketName = UUID.randomUUID().toString();
     linkedVolumeInfo.createBucket(linkedBucketName, createBucketArgs);
 
     OzoneBucket linkedBucket = linkedVolumeInfo.getBucket(linkedBucketName);
 
-    Assert.assertTrue(linkedBucket.getName().equals(linkedBucketName));
-    Assert.assertTrue(linkedBucket.getVolumeName().equals(linkedVolName));
-    Assert.assertTrue(linkedBucket.isLink());
+    assertEquals(linkedBucketName, linkedBucket.getName());
+    assertEquals(linkedVolName, linkedBucket.getVolumeName());
+    assertTrue(linkedBucket.isLink());
 
     return linkedBucket;
   }
 
   /**
    * Stop the current leader OM.
-   *
-   * @throws Exception
    */
   protected void stopLeaderOM() {
     //Stop the leader OM.
@@ -332,9 +335,9 @@ public abstract class TestOzoneManagerHA {
       OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
       if (checkSuccess) {
-        Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-        Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-        Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
+        assertEquals(volumeName, retVolumeinfo.getName());
+        assertEquals(userName, retVolumeinfo.getOwner());
+        assertEquals(adminName, retVolumeinfo.getAdmin());
       } else {
         // Verify that the request failed
         fail("There is no quorum. Request should have failed");
@@ -383,16 +386,27 @@ public abstract class TestOzoneManagerHA {
 
     OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(keyName);
 
-    Assert.assertEquals(keyName, ozoneKeyDetails.getName());
-    Assert.assertEquals(ozoneBucket.getName(), ozoneKeyDetails.getBucketName());
-    Assert.assertEquals(ozoneBucket.getVolumeName(),
+    assertEquals(keyName, ozoneKeyDetails.getName());
+    assertEquals(ozoneBucket.getName(), ozoneKeyDetails.getBucketName());
+    assertEquals(ozoneBucket.getVolumeName(),
         ozoneKeyDetails.getVolumeName());
-    Assert.assertEquals(data.length(), ozoneKeyDetails.getDataSize());
+    assertEquals(data.length(), ozoneKeyDetails.getDataSize());
+    assertTrue(ozoneKeyDetails.isFile());
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[data.getBytes(UTF_8).length];
       ozoneInputStream.read(fileContent);
-      Assert.assertEquals(data, new String(fileContent, UTF_8));
+      assertEquals(data, new String(fileContent, UTF_8));
+    }
+
+    Iterator<? extends OzoneKey> iterator = ozoneBucket.listKeys("/");
+    while (iterator.hasNext()) {
+      OzoneKey ozoneKey = iterator.next();
+      if (!ozoneKey.getName().endsWith(OM_KEY_PREFIX)) {
+        assertTrue(ozoneKey.isFile());
+      } else {
+        assertFalse(ozoneKey.isFile());
+      }
     }
   }
 
@@ -411,9 +425,9 @@ public abstract class TestOzoneManagerHA {
 
       OzoneVolume retVolumeinfo = getObjectStore().getVolume(volumeName);
 
-      Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-      Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-      Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
+      assertEquals(volumeName, retVolumeinfo.getName());
+      assertEquals(userName, retVolumeinfo.getOwner());
+      assertEquals(adminName, retVolumeinfo.getAdmin());
 
       String bucketName = UUID.randomUUID().toString();
       String keyName = UUID.randomUUID().toString();
@@ -421,8 +435,8 @@ public abstract class TestOzoneManagerHA {
 
       OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-      Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-      Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
+      assertEquals(bucketName, ozoneBucket.getName());
+      assertEquals(volumeName, ozoneBucket.getVolumeName());
 
       String value = "random data";
       OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
@@ -434,7 +448,7 @@ public abstract class TestOzoneManagerHA {
       try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
         ozoneInputStream.read(fileContent);
-        Assert.assertEquals(value, new String(fileContent, UTF_8));
+        assertEquals(value, new String(fileContent, UTF_8));
       }
 
     } catch (IOException e) {

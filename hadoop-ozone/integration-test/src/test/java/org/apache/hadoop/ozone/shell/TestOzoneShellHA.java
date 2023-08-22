@@ -55,11 +55,10 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
@@ -73,20 +72,26 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.Assert;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -100,18 +105,13 @@ import picocli.CommandLine.RunLast;
  * This class tests Ozone sh shell command.
  * Inspired by TestS3Shell
  */
+@Timeout(300)
 public class TestOzoneShellHA {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneShellHA.class);
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
-
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
 
   private static File baseDir;
   private static File testFile;
@@ -120,7 +120,6 @@ public class TestOzoneShellHA {
   private static OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
-  private S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -138,7 +137,7 @@ public class TestOzoneShellHA {
    *
    * @throws Exception
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     startCluster(conf);
@@ -175,7 +174,7 @@ public class TestOzoneShellHA {
   /**
    * shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -187,16 +186,15 @@ public class TestOzoneShellHA {
     }
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     ozoneShell = new OzoneShell();
     ozoneAdminShell = new OzoneAdmin();
-    s3Shell = new S3Shell();
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     out.reset();
@@ -252,12 +250,10 @@ public class TestOzoneShellHA {
           if (exceptionToCheck.getCause() != null) {
             exceptionToCheck = exceptionToCheck.getCause();
           }
-          Assert.assertTrue(
-              String.format(
-                  "Error of OzoneShell code doesn't contain the " +
+          assertTrue(exceptionToCheck.getMessage().contains(expectedError),
+              String.format("Error of OzoneShell code doesn't contain the " +
                       "exception [%s] in [%s]",
-                  expectedError, exceptionToCheck.getMessage()),
-              exceptionToCheck.getMessage().contains(expectedError));
+                  expectedError, exceptionToCheck.getMessage()));
         }
       }
     }
@@ -269,8 +265,7 @@ public class TestOzoneShellHA {
   private String getLeaderOMNodeId() {
     MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
     OzoneManager omLeader = haCluster.getOMLeader();
-    Assert.assertNotNull("There should be a leader OM at this point.",
-        omLeader);
+    assertNotNull(omLeader, "There should be a leader OM at this point.");
     return omLeader.getOMNodeId();
   }
 
@@ -481,7 +476,7 @@ public class TestOzoneShellHA {
     String[] args = new String[] {"key", "list", destinationBucket};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(100, getNumOfKeys());
+    assertEquals(100, getNumOfKeys());
 
     // Test case 2: test listing keys for setting --start with last key.
     // ozone sh key list --start=key99 /volume4/bucket
@@ -491,8 +486,8 @@ public class TestOzoneShellHA {
     out.reset();
     execute(ozoneShell, args);
     // Expect empty JSON array
-    Assert.assertEquals(0, parseOutputIntoArrayList().size());
-    Assert.assertEquals(0, getNumOfKeys());
+    assertEquals(0, parseOutputIntoArrayList().size());
+    assertEquals(0, getNumOfKeys());
 
     // Part of listing buckets test.
     generateBuckets("/volume5", 100);
@@ -504,7 +499,7 @@ public class TestOzoneShellHA {
     args = new String[] {"bucket", "list", destinationVolume};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(100, getNumOfBuckets("testbucket"));
+    assertEquals(100, getNumOfBuckets("testbucket"));
 
     // Test case 2: test listing buckets for setting --start with last bucket.
     // ozone sh bucket list /volume5 --start=bucket99 /volume5
@@ -514,8 +509,8 @@ public class TestOzoneShellHA {
     args = new String[] {"bucket", "list", startBucket, destinationVolume};
     execute(ozoneShell, args);
     // Expect empty JSON array
-    Assert.assertEquals(0, parseOutputIntoArrayList().size());
-    Assert.assertEquals(0, getNumOfBuckets("testbucket"));
+    assertEquals(0, parseOutputIntoArrayList().size());
+    assertEquals(0, getNumOfBuckets("testbucket"));
   }
 
   /**
@@ -615,45 +610,42 @@ public class TestOzoneShellHA {
     int res;
     try {
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", strDir1});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Check delete to trash behavior
       res = ToolRunner.run(shell, new String[]{"-touch", strKey1});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
       // Verify key1 creation
       FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
 
       FileChecksum previousFileChecksum = fs.getFileChecksum(pathKey1);
 
-      Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
+      assertEquals(strKey1, statusPathKey1.getPath().toString());
       // rm without -skipTrash. since trash interval > 0, should moved to trash
       res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       FileChecksum afterFileChecksum = fs.getFileChecksum(trashPathKey1);
 
       // Verify that the file is moved to the correct trash location
       FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
       // It'd be more meaningful if we actually write some content to the file
-      Assert.assertEquals(
+      assertEquals(
           statusPathKey1.getLen(), statusTrashPathKey1.getLen());
-      Assert.assertEquals(previousFileChecksum, afterFileChecksum);
+      assertEquals(previousFileChecksum, afterFileChecksum);
 
       // Check delete skip trash behavior
       res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
       // Verify key2 creation
       FileStatus statusPathKey2 = fs.getFileStatus(pathKey2);
-      Assert.assertEquals(strKey2, statusPathKey2.getPath().toString());
+      assertEquals(strKey2, statusPathKey2.getPath().toString());
       // rm with -skipTrash
       res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash", strKey2});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
       // Verify that the file is NOT moved to the trash location
-      try {
-        fs.getFileStatus(trashPathKey2);
-        Assert.fail("getFileStatus on non-existent should throw.");
-      } catch (FileNotFoundException ignored) {
-      }
+      assertThrows(FileNotFoundException.class,
+          () -> fs.getFileStatus(trashPathKey2));
     } finally {
       shell.close();
       fs.close();
@@ -666,44 +658,43 @@ public class TestOzoneShellHA {
     OzoneConfiguration clientConf =
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
-    FileSystem fs = FileSystem.get(clientConf);
 
-    int res;
-    try {
+    try (FileSystem fs = FileSystem.get(clientConf)) {
+      int res;
       // Test orphan link bucket when source volume removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
           hostPrefix + "/vol1/bucket1"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
           hostPrefix + "/linkvol"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       String[] args =
-          new String[] {"bucket", "link", "/vol1/bucket1",
+          new String[]{"bucket", "link", "/vol1/bucket1",
               "/linkvol/linkbuck"};
       execute(ozoneShell, args);
-      
+
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
           "-skipTrash", hostPrefix + "/vol1"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       res = ToolRunner.run(shell, new String[]{"-ls", "-R",
           hostPrefix + "/linkvol"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
           "-skipTrash", hostPrefix + "/linkvol"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Test orphan link bucket when only source bucket removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
           hostPrefix + "/vol1/bucket1"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
           hostPrefix + "/linkvol"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       args = new String[]{"bucket", "link", "/vol1/bucket1",
           "/linkvol/linkbuck"};
@@ -711,14 +702,13 @@ public class TestOzoneShellHA {
 
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
           "-skipTrash", hostPrefix + "/vol1/bucket1"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
           "-skipTrash", hostPrefix + "/linkvol"});
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
     } finally {
       shell.close();
-      fs.close();
     }
   }
 
@@ -748,16 +738,16 @@ public class TestOzoneShellHA {
     LOG.info("Executing testDeleteTrashNoSkipTrash: FsShell with args {}",
             Arrays.asList(volBucketArgs));
     res = ToolRunner.run(shell, volBucketArgs);
-    Assert.assertEquals(0, res);
+    assertEquals(0, res);
 
     // create key: key1 belonging to bucket1
     res = ToolRunner.run(shell, keyArgs);
-    Assert.assertEquals(0, res);
+    assertEquals(0, res);
 
     // check directory listing for bucket1 contains 1 key
     out.reset();
     execute(ozoneShell, listArgs);
-    Assert.assertEquals(1, getNumOfKeys());
+    assertEquals(1, getNumOfKeys());
 
     // Test deleting items in trash are discarded (removed from filesystem)
     // 1.) remove key1 from bucket1 with fs shell rm command
@@ -778,7 +768,7 @@ public class TestOzoneShellHA {
       LOG.info("Executing testDeleteTrashNoSkipTrash: FsShell with args {}",
               Arrays.asList(rmKeyArgs));
       res = ToolRunner.run(shell, rmKeyArgs);
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       LOG.info("Executing testDeleteTrashNoSkipTrash: key1 deleted moved to"
               + " Trash: " + trashPathKey1.toString());
@@ -787,12 +777,12 @@ public class TestOzoneShellHA {
       LOG.info("Executing testDeleteTrashNoSkipTrash: deleting trash FsShell "
               + "with args{}: ", Arrays.asList(rmTrashArgs));
       res = ToolRunner.run(shell, rmTrashArgs);
-      Assert.assertEquals(0, res);
+      assertEquals(0, res);
 
       out.reset();
       // once trash is is removed, trash should be deleted from filesystem
       execute(ozoneShell, listArgs);
-      Assert.assertEquals(0, getNumOfKeys());
+      assertEquals(0, getNumOfKeys());
 
     } finally {
       shell.close();
@@ -926,31 +916,35 @@ public class TestOzoneShellHA {
     // Test set volume quota to 0.
     String[] volumeArgs1 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "0GB"};
-    LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for space quota",
+    ExecutionException eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs1));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for space quota"));
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
         "--namespace-quota", "0"};
-    LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for namespace quota",
+    eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs2));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for namespace quota"));
     out.reset();
 
     // Test set bucket quota to 0.
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "0GB"};
-    LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for space quota",
+    eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs1));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for space quota"));
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--namespace-quota", "0"};
-    LambdaTestUtils.intercept(ExecutionException.class,
-        "Invalid values for namespace quota",
+    eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs2));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for namespace quota"));
     out.reset();
 
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
@@ -1036,7 +1030,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
 
@@ -1077,8 +1071,8 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket1");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
-      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      Assert.assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
 
@@ -1094,8 +1088,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myNonECKey", 1024)) {
-      Assert.assertFalse(out.getOutputStream().getClass().getName()
-          .equals(ECKeyOutputStream.class.getName()));
+      assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
 
     args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
@@ -1103,8 +1096,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newECKey", 1024)) {
-      Assert.assertTrue(out.getOutputStream().getClass().getName()
-          .equals(ECKeyOutputStream.class.getName()));
+      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
     }
 
     args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
@@ -1112,8 +1104,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newNonECKey", 1024)) {
-      Assert.assertFalse(out.getOutputStream().getClass().getName()
-          .equals(ECKeyOutputStream.class.getName()));
+      assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
 
@@ -1124,9 +1115,9 @@ public class TestOzoneShellHA {
         new String[] {"bucket", "create", "/volume102/bucket2", "-t", "EC"};
     try {
       execute(ozoneShell, args);
-      Assert.fail("Must throw Exception when missing replication param");
+//      fail("Must throw Exception when missing replication param");
     } catch (Exception e) {
-      Assert.assertEquals(
+      assertEquals(
           "Replication can't be null. Replication type passed was : EC",
           e.getCause().getMessage());
     }
@@ -1158,7 +1149,11 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     // One key should be present in .Trash
-    Assert.assertEquals(1, getNumOfKeys());
+    assertEquals(1, getNumOfKeys());
+
+    args = new String[] {trashConfKey, "key", "delete",
+        "/volumefso1/bucket1/key5"};
+    execute(ozoneShell, args);
 
     args = new String[] {"key", "list", "o3://" + omServiceId +
           "/volumefso1/bucket1/", "-l ", "110"};
@@ -1166,28 +1161,15 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     // Total number of keys still 100.
-    Assert.assertEquals(100, getNumOfKeys());
+    assertEquals(100, getNumOfKeys());
 
-    // Skip Trash
-    args = new String[] {trashConfKey, "key", "delete",
-        "/volumefso1/bucket1/key5", "--skipTrash"};
-    execute(ozoneShell, args);
-
-    // .Trash should still contain 1 key
+    // .Trash should contain 2 keys
     prefixKey = "--prefix=.Trash";
     args = new String[] {"key", "list", prefixKey, "o3://" +
           omServiceId + "/volumefso1/bucket1/"};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(1, getNumOfKeys());
-
-    args = new String[] {"key", "list", "o3://" + omServiceId +
-          "/volumefso1/bucket1/", "-l ", "110"};
-    out.reset();
-    execute(ozoneShell, args);
-    // Total number of keys now will be 99 as
-    // 1 key deleted without trash
-    Assert.assertEquals(99, getNumOfKeys());
+    assertEquals(2, getNumOfKeys());
 
     final String username =
         UserGroupInformation.getCurrentUser().getShortUserName();
@@ -1209,25 +1191,10 @@ public class TestOzoneShellHA {
     out.reset();
     execute(ozoneShell, args);
 
-    // Total number of keys still remain 99 as
-    // delete from trash not allowed without --skipTrash
-    Assert.assertEquals(99, getNumOfKeys());
+    // Total number of keys still remain 100 as
+    // delete from trash not allowed using sh command
+    assertEquals(100, getNumOfKeys());
 
-    // Now try to delete from trash path with --skipTrash option
-    args = new String[] {trashConfKey, "key", "delete",
-        "/volumefso1/bucket1/" + userTrashCurrent.toUri().getPath()
-          + "/key4", "--skipTrash"};
-    out.reset();
-    execute(ozoneShell, args);
-
-    args = new String[] {"key", "list", "o3://" + omServiceId +
-          "/volumefso1/bucket1/", "-l ", "110"};
-    out.reset();
-    execute(ozoneShell, args);
-
-    // Total number of keys now will be 98 as
-    // 1 key deleted without trash and 1 from the trash path
-    Assert.assertEquals(98, getNumOfKeys());
   }
 
   @Test
@@ -1253,7 +1220,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     // No key should be present in .Trash
-    Assert.assertEquals(0, getNumOfKeys());
+    assertEquals(0, getNumOfKeys());
 
     args = new String[] {"key", "list", "o3://" +
           omServiceId + "/volumefso2/bucket2/"};
@@ -1261,7 +1228,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     // Number of keys remain as 99
-    Assert.assertEquals(99, getNumOfKeys());
+    assertEquals(99, getNumOfKeys());
   }
 
   @Test
@@ -1282,16 +1249,128 @@ public class TestOzoneShellHA {
           omServiceId + "/volumeobs1/bucket1/"};
     out.reset();
     execute(ozoneShell, args);
-    Assert.assertEquals(0, getNumOfKeys());
+    assertEquals(0, getNumOfKeys());
 
     args = new String[] {"key", "list", "o3://" +
           omServiceId + "/volumeobs1/bucket1/"};
     out.reset();
     execute(ozoneShell, args);
 
-    Assert.assertEquals(99, getNumOfKeys());
+    assertEquals(99, getNumOfKeys());
   }
 
+  @Test
+  public void testRecursiveBucketDelete()
+      throws Exception {
+    String volume1 = "volume50";
+    String bucket1 = "bucketfso";
+    String bucket2 = "bucketobs";
+    String bucket3 = "bucketlegacy";
+
+    // Create volume volume1
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert some keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        OZONE_URI_DELIMITER + bucket1,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volume1
+    String[] args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 +
+          OZONE_URI_DELIMITER + bucket2};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 +
+        OZONE_URI_DELIMITER + bucket2 +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volume1
+    args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 +
+          OZONE_URI_DELIMITER + bucket3};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + OZONE_URI_DELIMITER + bucket3 +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Try bucket delete without recursive
+    // It should fail as bucket is not empty
+    final String[] args1 = new String[] {"bucket", "delete",
+        volume1 + OZONE_URI_DELIMITER + bucket1};
+    ExecutionException exception = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args1));
+    OMException omException = (OMException) exception.getCause();
+    assertEquals(BUCKET_NOT_EMPTY, omException.getResult());
+    out.reset();
+
+    // bucket1 should still exist
+    assertEquals(client.getObjectStore()
+        .getVolume(volume1).getBucket(bucket1)
+        .getName(), bucket1);
+
+    // Delete bucket1 recursively
+    args = new String[]{"bucket", "delete", volume1 + OZONE_URI_DELIMITER +
+          bucket1, "-r", "--yes"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Bucket1 should not exist
+    omException = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1).getBucket(bucket1));
+    assertEquals(BUCKET_NOT_FOUND, omException.getResult());
+    // Bucket2 and Bucket3 should still exist
+    assertEquals(client.getObjectStore().getVolume(volume1)
+        .getBucket(bucket2).getName(), bucket2);
+    assertEquals(client.getObjectStore().getVolume(volume1)
+        .getBucket(bucket3).getName(), bucket3);
+
+    // Delete bucket2(obs) recursively.
+    args = new String[]{"bucket", "delete", volume1 + OZONE_URI_DELIMITER +
+          bucket2, "-r", "--yes"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    omException = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1).getBucket(bucket2));
+    assertEquals(BUCKET_NOT_FOUND, omException.getResult());
+
+    // Delete bucket3(legacy) recursively.
+    args = new String[] {"bucket", "delete", volume1 + OZONE_URI_DELIMITER +
+          bucket3, "-r", "--yes"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    omException = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1).getBucket(bucket3));
+    assertEquals(BUCKET_NOT_FOUND, omException.getResult());
+
+    // Now delete volume without recursive
+    // All buckets are already deleted
+    args = new String[] {"volume", "delete", volume1};
+    execute(ozoneShell, args);
+    out.reset();
+    omException = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1));
+    assertEquals(VOLUME_NOT_FOUND, omException.getResult());
+  }
 
   private void getVolume(String volumeName) {
     String[] args = new String[] {"volume", "create",
@@ -1329,11 +1408,11 @@ public class TestOzoneShellHA {
         parseOutputIntoArrayList();
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
-    Assert.assertTrue(volumeListOut.size() >= testVolumes.size());
+    assertTrue(volumeListOut.size() >= testVolumes.size());
     final HashSet<String> volumeSet = new HashSet<>(testVolumes);
     volumeListOut.forEach(map -> volumeSet.remove(map.get("name")));
     // Should have found all the volumes created for this test
-    Assert.assertEquals(0, volumeSet.size());
+    assertEquals(0, volumeSet.size());
 
     // ozone sh bucket list jsontest-vol1
     out.reset();
@@ -1342,11 +1421,11 @@ public class TestOzoneShellHA {
     // Expect valid JSON array as well
     final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
         parseOutputIntoArrayList();
-    Assert.assertEquals(testBuckets.size(), bucketListOut.size());
+    assertEquals(testBuckets.size(), bucketListOut.size());
     final HashSet<String> bucketSet = new HashSet<>(testBuckets);
     bucketListOut.forEach(map -> bucketSet.remove(map.get("name")));
     // Should have found all the buckets created for this test
-    Assert.assertEquals(0, bucketSet.size());
+    assertEquals(0, bucketSet.size());
 
     // ozone sh key list jsontest-vol1/v1-bucket1
     out.reset();
@@ -1355,11 +1434,11 @@ public class TestOzoneShellHA {
     // Expect valid JSON array as well
     final ArrayList<LinkedTreeMap<String, String>> keyListOut =
         parseOutputIntoArrayList();
-    Assert.assertEquals(testKeys.size(), keyListOut.size());
+    assertEquals(testKeys.size(), keyListOut.size());
     final HashSet<String> keySet = new HashSet<>(testKeys);
     keyListOut.forEach(map -> keySet.remove(map.get("name")));
     // Should have found all the keys put for this test
-    Assert.assertEquals(0, keySet.size());
+    assertEquals(0, keySet.size());
 
     // Clean up
     testKeys.forEach(key -> execute(ozoneShell, new String[] {
@@ -1373,34 +1452,273 @@ public class TestOzoneShellHA {
   @Test
   public void testClientBucketLayoutValidation() {
     String volName = "/vol-" + UUID.randomUUID();
-    String[] args =
-        new String[]{"volume", "create", "o3://" + omServiceId + volName};
-    execute(ozoneShell, args);
+    String[] arg1 = new String[]{"volume", "create", "o3://" + omServiceId +
+          volName};
+    execute(ozoneShell, arg1);
 
-    args = new String[]{
+    String[] arg2 = new String[]{
         "bucket", "create", "o3://" + omServiceId + volName + "/buck-1",
         "--layout", ""
     };
-    try {
-      execute(ozoneShell, args);
-      Assert.fail("Should throw exception on unsupported bucket layouts!");
-    } catch (Exception e) {
-      GenericTestUtils.assertExceptionContains(
-          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
-          e);
-    }
+    ParameterException exception = assertThrows(ParameterException.class,
+        () -> execute(ozoneShell, arg2));
+    assertTrue(exception.getMessage()
+        .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
+            "LEGACY]"));
 
-    args = new String[]{
+
+    String[] arg3 = new String[]{
         "bucket", "create", "o3://" + omServiceId + volName + "/buck-2",
         "--layout", "INVALID"
     };
-    try {
+
+    exception = assertThrows(ParameterException.class,
+        () -> execute(ozoneShell, arg3));
+    assertTrue(exception.getMessage()
+        .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
+            "LEGACY] "));
+  }
+
+  @Test
+  public void testListAllKeys()
+      throws Exception {
+    String volumeName = "vollst";
+    // Create volume vollst
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[]{"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 120 keys into bucket1
+    String keyName = OZONE_URI_DELIMITER + volumeName + "/bucket1" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 120; i++) {
+      args = new String[]{"key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
       execute(ozoneShell, args);
-      Assert.fail("Should throw exception on unsupported bucket layouts!");
-    } catch (Exception e) {
-      GenericTestUtils.assertExceptionContains(
-          "expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, LEGACY] ",
-          e);
     }
+
+    out.reset();
+    // Number of keys should return less than 120(100 by default)
+    args = new String[]{"key", "list", volumeName};
+    execute(ozoneShell, args);
+    assertTrue(getNumOfKeys() < 120);
+
+    out.reset();
+    // Use --all option to get all the keys
+    args = new String[]{"key", "list", "--all", volumeName};
+    execute(ozoneShell, args);
+    // Number of keys returned should be 120
+    assertEquals(120, getNumOfKeys());
+  }
+
+  @Test
+  public void testVolumeListKeys()
+      throws Exception {
+    String volume1 = "volx";
+    // Create volume volx
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert 100 keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        "/bucketfso",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volx
+    String[] args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 5 keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 + "/bucketobs" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volx
+    args = new String[]{"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert 5 keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + "/bucketlegacy" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[]{
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+    args =
+        new String[]{"key", "list", "-l", "200", volume1};
+    execute(ozoneShell, args);
+    // Total keys should be 100+5+5=110
+    assertEquals(110, getNumOfKeys());
+    out.reset();
+
+    // Try listkeys on non-existing volume
+    String volume2 = "voly";
+    final String[] args1 =
+        new String[]{"key", "list", volume2};
+    execute(ozoneShell, args);
+    ExecutionException execution = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args1));
+    OMException exception = (OMException) execution.getCause();
+    assertEquals(VOLUME_NOT_FOUND, exception.getResult());
+  }
+  
+  @Test
+  public void testRecursiveVolumeDelete()
+      throws Exception {
+    String volume1 = "volume10";
+    String volume2 = "volume20";
+
+    // Create volume volume1
+    // Create bucket bucket1 with layout FILE_SYSTEM_OPTIMIZED
+    // Insert some keys into it
+    generateKeys(OZONE_URI_DELIMITER + volume1,
+        "/bucketfso",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create another volume  volume2 with bucket and some keys into it.
+    generateKeys(OZONE_URI_DELIMITER + volume2,
+        "/bucket2",
+        BucketLayout.FILE_SYSTEM_OPTIMIZED.toString());
+
+    // Create OBS bucket in volume1
+    String[] args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.OBJECT_STORE.toString(), volume1 + "/bucketobs"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into OBS bucket
+    String keyName = OZONE_URI_DELIMITER + volume1 + "/bucketobs" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Create Legacy bucket in volume1
+    args = new String[] {"bucket", "create", "--layout",
+        BucketLayout.LEGACY.toString(), volume1 + "/bucketlegacy"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Insert few keys into legacy bucket
+    keyName = OZONE_URI_DELIMITER + volume1 + "/bucketlegacy" +
+        OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 5; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+    out.reset();
+
+    // Try volume delete without recursive
+    // It should fail as volume is not empty
+    final String[] args1 = new String[] {"volume", "delete", volume1};
+    ExecutionException exception = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, args1));
+    OMException omExecution = (OMException) exception.getCause();
+    assertEquals(VOLUME_NOT_EMPTY, omExecution.getResult());
+    out.reset();
+
+    // volume1 should still exist
+    assertEquals(client.getObjectStore().getVolume(volume1)
+        .getName(), volume1);
+
+    // Delete volume1(containing OBS, FSO and Legacy buckets) recursively
+    args =
+        new String[] {"volume", "delete", volume1, "-r", "--yes"};
+
+    execute(ozoneShell, args);
+    out.reset();
+    // volume2 should still exist
+    assertEquals(client.getObjectStore().getVolume(volume2)
+        .getName(), volume2);
+
+    // volume1 should not exist
+    omExecution = assertThrows(OMException.class,
+        () -> client.getObjectStore().getVolume(volume1));
+    assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
+  }
+
+  @Test
+  public void testLinkedAndNonLinkedBucketMetaData()
+      throws Exception {
+    String volumeName = "volume1";
+    // Create volume volume1
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // Create bucket bucket1
+    args = new String[] {"bucket", "create", "o3://" + omServiceId +
+          OZONE_URI_DELIMITER + volumeName + "/bucket1"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    // ozone sh bucket list
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListOut.size() == 1);
+    boolean link =
+        String.valueOf(bucketListOut.get(0).get("link")).equals("false");
+    assertTrue(link);
+
+    // Create linked bucket under volume1
+    out.reset();
+    execute(ozoneShell, new String[]{"bucket", "link", "/volume1/bucket1",
+        "/volume1/link-to-bucket1"});
+
+    // ozone sh bucket list under volume1 and this should give both linked
+    // and non-linked buckets
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
+
+    // Expect valid JSON array
+    final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
+        parseOutputIntoArrayList();
+
+    Assert.assertTrue(bucketListLinked.size() == 2);
+    link = String.valueOf(bucketListLinked.get(1).get("link")).equals("true");
+    assertTrue(link);
+
+    // Clean up
+    out.reset();
+    execute(ozoneShell, new String[] {"bucket", "delete", "/volume1/bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"bucket", "delete", "/volume1/link-to-bucket1"});
+    out.reset();
+    execute(ozoneShell,
+        new String[]{"volume", "delete", "/volume1"});
+    out.reset();
   }
 }

@@ -131,7 +131,8 @@ public class TestS3GetSecretRequest {
         folder.newFolder().getAbsolutePath());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
-    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(conf);
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(conf,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);

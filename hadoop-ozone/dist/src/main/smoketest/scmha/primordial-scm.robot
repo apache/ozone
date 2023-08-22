@@ -53,7 +53,7 @@ Verify SCM4 Certificate
     ${root_ca_cert_split} =     Split String                                 ${root_ca_cert}
     ${root_ca_cert_subject} =   Strip String                                 ${root_ca_cert_split[3]}
 
-    ${output} =             Execute                 ozone admin cert list
+    ${output} =             Execute                 ozone admin cert list -c 1000000
     ${scm4_cert} =          Get Lines Containing String                      ${output}           scm4.org
     ${scm4_cert_split} =    Split String                                     ${scm4_cert}
     ${scm4_cert_issuer} =   Strip String                                     ${scm4_cert_split[4]}

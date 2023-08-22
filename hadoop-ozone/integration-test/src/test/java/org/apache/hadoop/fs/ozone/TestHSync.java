@@ -19,12 +19,15 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -41,6 +44,8 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -51,9 +56,17 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -61,7 +74,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -69,6 +84,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,6 +133,11 @@ public class TestHSync {
 
     // create a volume and a bucket to be used by OzoneFileSystem
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+
+    // Enable DEBUG level logging for relevant classes
+    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
   }
 
   @AfterAll
@@ -124,6 +145,52 @@ public class TestHSync {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @Test
+  public void testKeyHSyncThenClose() throws Exception {
+    // Check that deletedTable should not have keys with the same block as in
+    // keyTable's when a key is hsync()'ed then close()'d.
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    String data = "random data";
+    final Path file = new Path(dir, "file-hsync-then-close");
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.write(data.getBytes(UTF_8), 0, data.length());
+        outputStream.hsync();
+      }
+    }
+
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+    // Wait for double buffer to trigger all pending addToDBBatch(),
+    // including OMKeyCommitResponse(WithFSO)'s that writes to deletedTable.
+    ozoneManager.awaitDoubleBufferFlush();
+
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    // deletedTable should not have an entry for file at all in this case
+    try (TableIterator<String,
+        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+        tableIter = metadataManager.getDeletedTable().iterator()) {
+      while (tableIter.hasNext()) {
+        Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
+        String key = kv.getKey();
+        if (key.startsWith(file.toString())) {
+          RepeatedOmKeyInfo val = kv.getValue();
+          LOG.error("Unexpected deletedTable entry: key = {}, val = {}",
+              key, val);
+          Assertions.fail("deletedTable should not have such entry. key = " +
+              key);
+        }
+      }
     }
   }
 
@@ -156,6 +223,59 @@ public class TestHSync {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
         runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
+  public void testUncommittedBlocks() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    final byte[] data = new byte[1];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "file");
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.hsync();
+        outputStream.write(data);
+        outputStream.hsync();
+        assertTrue(cluster.getOzoneManager().getMetadataManager()
+            .getDeletedTable().isEmpty());
+      }
+    }
+  }
+
+  @Test
+  public void testOverwriteHSyncFile() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "fileoverwrite");
+      try (FSDataOutputStream os = fs.create(file, false)) {
+        os.hsync();
+        UserGroupInformation ugi = UserGroupInformation.createUserForTesting(
+            "user2", new String[] {"group1"});
+        assertThrows(FileAlreadyExistsException.class,
+            () -> ugi.doAs((PrivilegedExceptionAction<Void>) () -> {
+              try (FSDataOutputStream os1 = fs.create(file, false)) {
+                os1.hsync();
+              }
+              return null;
+            }));
+        os.hsync();
       }
     }
   }
@@ -358,6 +478,34 @@ public class TestHSync {
     testEncryptedStreamCapabilities(true);
   }
 
+  @Test
+  public void testDisableHsync() throws Exception {
+    // When hsync is disabled, client does not throw exception.
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    final byte[] data = new byte[1];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      final Path file = new Path(dir, "file_hsync_disable");
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        outputStream.hsync();
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(file));
+      }
+    } finally {
+      // re-enable the feature flag
+      CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    }
+  }
+
   private void testEncryptedStreamCapabilities(boolean isEC) throws IOException,
       GeneralSecurityException {
     KeyOutputStream kos;
@@ -373,7 +521,7 @@ public class TestHSync {
     when(codec.createEncryptor()).thenReturn(encryptor);
     CryptoOutputStream cos =
         new CryptoOutputStream(kos, codec, new byte[0], new byte[0]);
-    OzoneOutputStream oos = new OzoneOutputStream(cos);
+    OzoneOutputStream oos = new OzoneOutputStream(cos, true);
     OzoneFSOutputStream ofso = new OzoneFSOutputStream(oos);
 
     try (CapableOzoneFSOutputStream cofsos =

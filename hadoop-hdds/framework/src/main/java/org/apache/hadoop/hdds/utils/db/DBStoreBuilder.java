@@ -105,6 +105,7 @@ public final class DBStoreBuilder {
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
+  private Integer maxNumberOfOpenFiles = null;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -182,6 +183,12 @@ public final class DBStoreBuilder {
     }
   }
 
+  private void setDBOptionsProps(ManagedDBOptions dbOptions) {
+    if (maxNumberOfOpenFiles != null) {
+      dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
+    }
+  }
+
   /**
    * Builds a DBStore instance and returns that.
    *
@@ -200,7 +207,7 @@ public final class DBStoreBuilder {
       if (rocksDBOption == null) {
         rocksDBOption = getDefaultDBOptions(tableConfigs);
       }
-
+      setDBOptionsProps(rocksDBOption);
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
@@ -289,6 +296,11 @@ public final class DBStoreBuilder {
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
     setDefaultCFOptions(prof.getColumnFamilyOptions());
+    return this;
+  }
+
+  public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
+    this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
     return this;
   }
 

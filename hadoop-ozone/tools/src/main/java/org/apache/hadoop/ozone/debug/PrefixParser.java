@@ -130,7 +130,7 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
 
     OmMetadataManagerImpl metadataManager =
-        new OmMetadataManagerImpl(conf);
+        new OmMetadataManagerImpl(conf, null);
     metadataManager.start(conf);
 
     org.apache.hadoop.fs.Path effectivePath =
