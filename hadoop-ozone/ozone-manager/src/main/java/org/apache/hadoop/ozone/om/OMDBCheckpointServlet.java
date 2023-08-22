@@ -159,11 +159,17 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       // Files to be excluded from tarball
-      Set<Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation());
+      RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
+      DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+          differ.getSSTBackupDir());
+      DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+          differ.getCompactionLogDir());
+
+      Map<Path, Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
+          checkpoint.getCheckpointLocation(), sstBackupDir, compactionLogDir);
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
-          excludedList, tmpdir);
+          excludedList, sstBackupDir, compactionLogDir);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
           completed, checkpoint.getCheckpointLocation());
     } catch (Exception e) {
@@ -174,18 +180,25 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   // Format list from follower to match data on leader.
   @VisibleForTesting
-  public static Set<Path> normalizeExcludeList(List<String> toExcludeList,
-                                               Path checkpointLocation) {
-    Set<Path> paths = new HashSet<>();
+  public static Map<Path, Path> normalizeExcludeList(List<String> toExcludeList,
+                                               Path checkpointLocation, DirectoryData sstBackupDir, DirectoryData compactionLogDir) {
+    Map<Path, Path> paths = new HashMap<>();
     for (String s : toExcludeList) {
       if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
-        paths.add(fixedPath);
+        paths.put(fixedPath, fixedPath);
       } else {
-        Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
-        paths.add(
-            Paths.get(metaDirPath.toString(),
-                s));
+        Path metaDirPath = getMetaDirPath(checkpointLocation);
+        Path destPath = Paths.get(metaDirPath.toString(), s);
+        Path srcPath = destPath;
+        if (destPath.toString().startsWith(sstBackupDir.getOriginalDir().toString())) {
+          int truncateLength = sstBackupDir.getOriginalDir().toString().length() + 1;
+          srcPath = Paths.get(sstBackupDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
+        } else if (destPath.toString().startsWith(compactionLogDir.getOriginalDir().toString())) {
+          int truncateLength = compactionLogDir.getOriginalDir().toString().length() + 1;
+          srcPath = Paths.get(compactionLogDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
+        }
+        paths.put(srcPath, destPath);
       }
     }
     return paths;
@@ -260,10 +273,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Map<Path, Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
-                                  Set<Path> toExcludeFiles,
+                                  Map<Path, Path> toExcludeFiles,
                                   boolean includeSnapshotData,
                                   List<String> excluded,
-                                  Path tmpdir)
+                                  DirectoryData sstBackupDir,
+                                  DirectoryData compactionLogDir)
       throws IOException {
 
     maxTotalSstSize = getConf().getLong(
@@ -296,12 +310,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         snapshotPaths, excluded, copySize, null)) {
       return false;
     }
-    RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
-    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-        differ.getSSTBackupDir());
-    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-        differ.getCompactionLogDir());
-
     // Process the tmp sst compaction dir.
     if (!processDir(sstBackupDir.getTmpDir().toPath(), copyFiles, hardLinkFiles,
         toExcludeFiles, new HashSet<>(), excluded, copySize,
@@ -360,7 +368,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean processDir(Path dir, Map<Path, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
-                          Set<Path> toExcludeFiles,
+                          Map<Path, Path> toExcludeFiles,
                           Set<Path> snapshotPaths,
                           List<String> excluded,
                           AtomicLong copySize,
@@ -437,7 +445,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   @VisibleForTesting
   public static long processFile(Path file, Map<Path, Path> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
-                                 Set<Path> toExcludeFiles,
+                                 Map<Path, Path> toExcludeFiles,
                                  List<String> excluded,
                                  Path destDir)
       throws IOException {
@@ -455,7 +463,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), filename.toString());
     }
-    if (toExcludeFiles.contains(destFile)) {
+    if (toExcludeFiles.containsKey(file)) {
       excluded.add(destFile.toString());
     } else {
       Path fileNamePath = file.getFileName();
@@ -465,12 +473,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       String fileName = fileNamePath.toString();
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
         // If same as existing excluded file, add a link for it.
-        Path linkPath = findLinkPath(toExcludeFiles, fileName);
+        Path linkPath = findLinkPath(toExcludeFiles, file, fileName);
         if (linkPath != null) {
           hardLinkFiles.put(destFile, linkPath);
         } else {
           // If already in tarball add a link for it.
-          linkPath = findLinkPath(copyFiles.values(), fileName);
+          linkPath = findLinkPath(copyFiles, file, fileName);
           if (linkPath != null) {
             hardLinkFiles.put(destFile, linkPath);
           } else {
@@ -488,12 +496,17 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   // If fileName exists in "files" parameter,
-  // it should be linked to path in files.
-  private static Path findLinkPath(Collection<Path> files, String fileName) {
-    for (Path p: files) {
-      Path file = p.getFileName();
-      if ((file != null) && file.toString().equals(fileName)) {
-        return p;
+  // it should be linked to dest path in files.
+  private static Path findLinkPath(Map<Path, Path> files, Path file, String fileName)
+      throws IOException {
+    for (Map.Entry<Path, Path> entry: files.entrySet()) {
+      Path srcPath = entry.getKey();
+      Path destPath = entry.getValue();
+      if (srcPath.toString().endsWith(fileName)) {
+        if (srcPath.toFile().exists() && OmSnapshotUtils.getINode(srcPath).equals(
+            OmSnapshotUtils.getINode(file))) {
+          return destPath;
+        }
       }
     }
     return null;
@@ -513,7 +526,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       boolean completed,
       Path checkpointLocation)
       throws IOException {
-    Path metaDirPath = getVerifiedCheckPointPath(checkpointLocation);
+    Path metaDirPath = getMetaDirPath(checkpointLocation);
     int truncateLength = metaDirPath.toString().length() + 1;
 
     Map<Path, Path> filteredCopyFiles = completed ? copyFiles :
@@ -555,7 +568,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @NotNull
-  private static Path getVerifiedCheckPointPath(Path checkpointLocation) {
+  private static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbug else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();

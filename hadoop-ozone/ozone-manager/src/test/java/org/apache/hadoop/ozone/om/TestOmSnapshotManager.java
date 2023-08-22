@@ -356,12 +356,10 @@ public class TestOmSnapshotManager {
         "dummyData".getBytes(StandardCharsets.UTF_8));
     Path linkToExcludedFile = Paths.get(testDir.toString(),
         "snap2/excludeFile.sst");
-    Files.write(linkToExcludedFile,
-        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(linkToExcludedFile, excludeFile);
     Path linkToCopiedFile = Paths.get(testDir.toString(),
         "snap2/copyfile.sst");
-    Files.write(linkToCopiedFile,
-        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(linkToCopiedFile, copyFile);
     Path addToCopiedFiles = Paths.get(testDir.toString(),
         "snap1/copyfile2.sst");
     Files.write(addToCopiedFiles,
@@ -459,14 +457,12 @@ public class TestOmSnapshotManager {
         "snap2/excludeFile.sst");
     Path destLinkToExcludedFile = Paths.get(destDir.toString(),
         "snap2/excludeFile.sst");
-    Files.write(linkToExcludedFile,
-        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(linkToExcludedFile, excludeFile);
     Path linkToCopiedFile = Paths.get(testDir.toString(),
         "snap2/copyfile.sst");
     Path destLinkToCopiedFile = Paths.get(destDir.toString(),
         "snap2/copyfile.sst");
-    Files.write(linkToCopiedFile,
-        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Files.createLink(linkToCopiedFile, copyFile);
     Path addToCopiedFiles = Paths.get(testDir.toString(),
         "snap1/copyfile2.sst");
     Path destAddToCopiedFiles = Paths.get(destDir.toString(),
