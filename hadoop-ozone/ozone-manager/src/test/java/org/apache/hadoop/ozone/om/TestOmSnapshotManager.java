@@ -451,6 +451,7 @@ public class TestOmSnapshotManager {
   public void testProcessFileWithDestDirParameter() throws IOException {
     Assert.assertTrue(new File(testDir.toString(), "snap1").mkdirs());
     Assert.assertTrue(new File(testDir.toString(), "snap2").mkdirs());
+    Assert.assertTrue(new File(testDir.toString(), "snap3").mkdirs());
     Path destDir = Paths.get(testDir.toString(), "destDir");
     Assert.assertTrue(new File(destDir.toString()).mkdirs());
 
@@ -461,6 +462,12 @@ public class TestOmSnapshotManager {
         "snap1/copyfile.sst");
     Files.write(copyFile,
         "dummyData".getBytes(StandardCharsets.UTF_8));
+    Path sameNameAsCopyFile = Paths.get(testDir.toString(),
+        "snap3/copyFile.sst");
+    Files.write(sameNameAsCopyFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Path destSameNameAsCopyFile = Paths.get(destDir.toString(),
+        "snap3/copyFile.sst");
     long expectedFileSize = Files.size(copyFile);
     Path excludeFile = Paths.get(testDir.toString(),
         "snap1/excludeFile.sst");
@@ -473,6 +480,12 @@ public class TestOmSnapshotManager {
     Path destLinkToExcludedFile = Paths.get(destDir.toString(),
         "snap2/excludeFile.sst");
     Files.createLink(linkToExcludedFile, excludeFile);
+    Path sameNameAsExcludeFile = Paths.get(testDir.toString(),
+        "snap3/excludeFile.sst");
+    Files.write(sameNameAsExcludeFile,
+        "dummyData".getBytes(StandardCharsets.UTF_8));
+    Path destSameNameAsExcludeFile = Paths.get(destDir.toString(),
+        "snap3/excludeFile.sst");
     Path linkToCopiedFile = Paths.get(testDir.toString(),
         "snap2/copyfile.sst");
     Path destLinkToCopiedFile = Paths.get(destDir.toString(),
@@ -521,6 +534,30 @@ public class TestOmSnapshotManager {
         destExcludeFile);
     Assert.assertEquals(fileSize, 0);
     hardLinkFiles = new HashMap<>();
+
+    // Confirm the file with same name as excluded file gets copied.
+    fileSize = processFile(sameNameAsExcludeFile, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded, destSameNameAsExcludeFile.getParent());
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 2);
+    Assert.assertEquals(hardLinkFiles.size(), 0);
+    Assert.assertEquals(copyFiles.get(sameNameAsExcludeFile), destSameNameAsExcludeFile);
+    Assert.assertEquals(fileSize, expectedFileSize);
+    copyFiles = new HashMap<>();
+    copyFiles.put(copyFile, destCopyFile);
+
+
+    // Confirm the file with same name as copy file gets copied.
+    fileSize = processFile(sameNameAsCopyFile, copyFiles, hardLinkFiles,
+        toExcludeFiles, excluded, destSameNameAsCopyFile.getParent());
+    Assert.assertEquals(excluded.size(), 0);
+    Assert.assertEquals(copyFiles.size(), 2);
+    Assert.assertEquals(hardLinkFiles.size(), 0);
+    Assert.assertEquals(copyFiles.get(sameNameAsCopyFile), destSameNameAsCopyFile);
+    Assert.assertEquals(fileSize, expectedFileSize);
+    copyFiles = new HashMap<>();
+    copyFiles.put(copyFile, destCopyFile);
+
 
     // Confirm the linkToCopiedFile gets added as a link.
     fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles,
