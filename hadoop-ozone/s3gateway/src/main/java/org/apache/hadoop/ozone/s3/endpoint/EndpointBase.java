@@ -290,8 +290,7 @@ public abstract class EndpointBase implements Auditor {
 
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
-          throw new IllegalArgumentException("Illegal user defined metadata." +
-              " Combined size cannot exceed 2KB.");
+          throw newError(S3ErrorTable.METADATA_TOO_LARGE, key);
         }
         customMetadata.put(mapKey, value);
       }

@@ -78,7 +78,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                    Time.now(), true);
 
     // add key to openFileTable
     String fileName = OzoneFSUtils.getFileName(keyName);
