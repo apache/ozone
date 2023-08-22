@@ -45,7 +45,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -326,9 +325,9 @@ public class TestOmSnapshotManager {
 
     // Confirm that the excluded list is normalized as expected.
     //  (Normalizing means matches the layout on the leader.)
-    Set<Path> normalizedSet =
+    Map<Path, Path> normalizedSet =
         OMDBCheckpointServlet.normalizeExcludeList(existingSstList,
-            leaderCheckpointDir.toPath());
+            leaderCheckpointDir.toPath(), null, null);
     Set<Path> expectedNormalizedSet = new HashSet<>(Arrays.asList(
         Paths.get(leaderSnapDir1.toString(), "s1.sst"),
         Paths.get(leaderSnapDir2.toString(), "noLink.sst"),
@@ -369,8 +368,8 @@ public class TestOmSnapshotManager {
     Files.write(addNonSstToCopiedFiles,
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
-    Set<Path> toExcludeFiles = new HashSet<>(
-        Collections.singletonList(excludeFile));
+    Map<Path, Path> toExcludeFiles = new HashMap<>();
+    //        Collections.singletonList(excludeFile));
     Map<Path, Path> copyFiles = new HashMap<>();
     copyFiles.put(copyFile, copyFile);
     List<String> excluded = new ArrayList<>();
@@ -477,8 +476,8 @@ public class TestOmSnapshotManager {
         "dummyData".getBytes(StandardCharsets.UTF_8));
 
     // Create test data structures.
-    Set<Path> toExcludeFiles = new HashSet<>(
-        Collections.singletonList(destExcludeFile));
+    Map<Path, Path> toExcludeFiles = new HashMap<>();
+    //        Collections.singletonList(destExcludeFile));
     Map<Path, Path> copyFiles = new HashMap<>();
     copyFiles.put(copyFile, destCopyFile);
     List<String> excluded = new ArrayList<>();
