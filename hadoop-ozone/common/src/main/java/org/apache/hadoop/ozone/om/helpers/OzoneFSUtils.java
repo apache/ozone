@@ -284,4 +284,12 @@ public final class OzoneFSUtils {
   public static String generateUniqueTempSnapshotName() {
     return "temp" + UUID.randomUUID() + SnapshotInfo.generateName(Time.now());
   }
+
+  public static Path trimPathToDepth(Path path, int maxDepth) {
+    Path res = path;
+    while (res.depth() > maxDepth) {
+      res = res.getParent();
+    }
+    return res;
+  }
 }
