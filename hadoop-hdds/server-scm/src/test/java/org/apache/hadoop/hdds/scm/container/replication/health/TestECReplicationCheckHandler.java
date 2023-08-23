@@ -82,7 +82,7 @@ public class TestECReplicationCheckHandler {
     Mockito.when(placementPolicy.validateContainerPlacement(
         anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
-    healthCheck = new ECReplicationCheckHandler(placementPolicy);
+    healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
     report = new ReplicationManagerReport();
