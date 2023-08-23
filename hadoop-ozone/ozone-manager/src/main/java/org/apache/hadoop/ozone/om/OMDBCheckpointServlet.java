@@ -246,7 +246,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
 
   // Convenience class for keeping track of the tmp dirs.
-  public static class DirectoryData {
+  static class DirectoryData {
     private final File originalDir;
     private final File tmpDir;
     DirectoryData(Path tmpdir, String dirStr) throws IOException {
@@ -499,11 +499,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Path srcPath = entry.getKey();
       Path destPath = entry.getValue();
       if (srcPath.toString().endsWith(fileName)) {
-        if (srcPath.toFile().exists() && OmSnapshotUtils.getINode(srcPath).equals(
-            OmSnapshotUtils.getINode(file))) {
-          return destPath;
-        } else {
-          LOG.info("gbjx: found non matching sst files: {}, {}", srcPath.toString(), file.toString());
+        if (srcPath.toFile().exists()) {
+          if (OmSnapshotUtils.getINode(srcPath).equals(
+              OmSnapshotUtils.getINode(file))) {
+            return destPath;
+          } else {
+            LOG.info("gbjx2: found non matching sst files: {}, {}",
+                srcPath, file.toString());
+          }
         }
       }
     }
@@ -567,7 +570,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @NotNull
   private static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of findbug else below getParent()
+    // This check is done to take care of find-bug else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
     if (null == locationParent) {
