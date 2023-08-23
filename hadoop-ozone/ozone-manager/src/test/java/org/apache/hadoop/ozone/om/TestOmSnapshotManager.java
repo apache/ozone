@@ -331,10 +331,13 @@ public class TestOmSnapshotManager {
     Assert.assertTrue(leaderSstBackupDir.mkdirs());
     File leaderTmpDir = new File(leaderDir.toString(), "tmp");
     Assert.assertTrue(leaderTmpDir.mkdirs());
-    OMDBCheckpointServlet.DirectoryData sstBackupDir = new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
+    OMDBCheckpointServlet.DirectoryData sstBackupDir =
+        new OMDBCheckpointServlet.DirectoryData(leaderTmpDir.toPath(),
         leaderSstBackupDir.toString());
-    Path srcSstBackup = Paths.get(sstBackupDir.getTmpDir().toString(), "backup.sst");
-    Path destSstBackup = Paths.get(sstBackupDir.getOriginalDir().toString(), "backup.sst");
+    Path srcSstBackup = Paths.get(sstBackupDir.getTmpDir().toString(),
+        "backup.sst");
+    Path destSstBackup = Paths.get(sstBackupDir.getOriginalDir().toString(),
+        "backup.sst");
     truncateLength = leaderDir.toString().length() + 1;
     existingSstList.add(truncateFileName(truncateLength, destSstBackup));
     Map<Path, Path> normalizedMap =
@@ -541,7 +544,8 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertEquals(hardLinkFiles.size(), 0);
-    Assert.assertEquals(copyFiles.get(sameNameAsExcludeFile), destSameNameAsExcludeFile);
+    Assert.assertEquals(copyFiles.get(sameNameAsExcludeFile),
+        destSameNameAsExcludeFile);
     Assert.assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
     copyFiles.put(copyFile, destCopyFile);
@@ -553,7 +557,8 @@ public class TestOmSnapshotManager {
     Assert.assertEquals(excluded.size(), 0);
     Assert.assertEquals(copyFiles.size(), 2);
     Assert.assertEquals(hardLinkFiles.size(), 0);
-    Assert.assertEquals(copyFiles.get(sameNameAsCopyFile), destSameNameAsCopyFile);
+    Assert.assertEquals(copyFiles.get(sameNameAsCopyFile),
+        destSameNameAsCopyFile);
     Assert.assertEquals(fileSize, expectedFileSize);
     copyFiles = new HashMap<>();
     copyFiles.put(copyFile, destCopyFile);

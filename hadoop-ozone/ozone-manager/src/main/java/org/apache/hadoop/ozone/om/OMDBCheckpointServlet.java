@@ -159,7 +159,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       // Files to be excluded from tarball
-      RocksDBCheckpointDiffer differ
+      RocksDBCheckpointDiffer differ =
           getDbStore().getRocksDBCheckpointDiffer();
       DirectoryData sstBackupDir = new DirectoryData(tmpdir,
           differ.getSSTBackupDir());
@@ -186,23 +186,28 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
    * @param  checkpointLocation -  location of checkpoint for this tarball
    * @param  sstBackupDir - location info about sstBackupDir
    * @return A Map of src and dest paths for the entries in the toExcludeList.
-   *         Formatted in a manner analagous to the copyFiles data structure
+   *         Formatted in a manner analogous to the copyFiles data structure
    *         described above.  Because this structure only points to sst files,
    *         the implementation ignores the compactionLog dir, (which doesn't
    *         include sst files.)
    */
   @VisibleForTesting
-  public static Map<Path, Path> normalizeExcludeList(List<String> toExcludeList,
-                                               Path checkpointLocation, DirectoryData sstBackupDir) {
+  public static Map<Path, Path> normalizeExcludeList(
+      List<String> toExcludeList,
+      Path checkpointLocation,
+      DirectoryData sstBackupDir) {
     Map<Path, Path> paths = new HashMap<>();
     for (String s : toExcludeList) {
       Path metaDirPath = getMetaDirPath(checkpointLocation);
       Path destPath = Paths.get(metaDirPath.toString(), s);
-      if (destPath.toString().startsWith(sstBackupDir.getOriginalDir().toString())) {
+      if (destPath.toString().startsWith(
+          sstBackupDir.getOriginalDir().toString())) {
         // The source of the sstBackupDir is a temporary directory and needs
         // to be adjusted accordingly.
-        int truncateLength = sstBackupDir.getOriginalDir().toString().length() + 1;
-        Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
+        int truncateLength =
+            sstBackupDir.getOriginalDir().toString().length() + 1;
+        Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(),
+            truncateFileName(truncateLength, destPath));
         paths.put(srcPath, destPath);
       } else if (!s.startsWith(OM_SNAPSHOT_DIR)) {
         Path fixedPath = Paths.get(checkpointLocation.toString(), s);
@@ -280,6 +285,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Map<Path, Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
@@ -463,32 +469,28 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Path destFile = file;
 
     // findbugs nonsense
-    Path filename = file.getFileName();
-    if (filename == null) {
+    Path fileNamePath = file.getFileName();
+    if (fileNamePath == null) {
       throw new IOException("file has no filename:" + file);
     }
+    String fileName = fileNamePath.toString();
 
     // if the dest dir is not null then the file needs to be copied/linked
     // to the dest dir on the follower.
     if (destDir != null) {
-      destFile = Paths.get(destDir.toString(), filename.toString());
+      destFile = Paths.get(destDir.toString(), fileName);
     }
     if (toExcludeFiles.containsKey(file)) {
       excluded.add(destFile.toString());
     } else {
-      Path fileNamePath = file.getFileName();
-      if (fileNamePath == null) {
-        throw new NullPointerException("Bad file: " + file);
-      }
-      String fileName = fileNamePath.toString();
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
         // If same as existing excluded file, add a link for it.
-        Path linkPath = findLinkPath(toExcludeFiles, file, fileName);
+        Path linkPath = findLinkPath(toExcludeFiles, file);
         if (linkPath != null) {
           hardLinkFiles.put(destFile, linkPath);
         } else {
           // If already in tarball add a link for it.
-          linkPath = findLinkPath(copyFiles, file, fileName);
+          linkPath = findLinkPath(copyFiles, file);
           if (linkPath != null) {
             hardLinkFiles.put(destFile, linkPath);
           } else {
@@ -506,15 +508,23 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   /**
-   * Find a valide hard link path for file.  If fileName exists in
-   * "files" parameter, it should be linked to dest path in files.
+   * Find a valid hard link path for file.  If fileName exists in
+   * "files" parameter, file should be linked to the corresponding
+   * dest path in files.
    * @param files - Map of src/dest path to files available for
    * linking.
    * @param  file - File to be linked.
    * @return dest path of file to be linked to.
    */
-  private static Path findLinkPath(Map<Path, Path> files, Path file, String fileName)
+  private static Path findLinkPath(Map<Path, Path> files, Path file)
       throws IOException {
+    // findbugs nonsense
+    Path fileNamePath = file.getFileName();
+    if (fileNamePath == null) {
+      throw new IOException("file has no filename:" + file);
+    }
+    String fileName = fileNamePath.toString();
+
     for (Map.Entry<Path, Path> entry: files.entrySet()) {
       Path srcPath = entry.getKey();
       Path destPath = entry.getValue();
@@ -528,7 +538,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             return destPath;
           } else {
             LOG.info("Found non linked sst files with the same name: {}, {}",
-                srcPath, file.toString());
+                srcPath, file);
           }
         }
       }
@@ -593,7 +603,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @NotNull
   private static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of findbug else below getParent()
+    // This check is done to take care of findbugs else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
     if (null == locationParent) {
