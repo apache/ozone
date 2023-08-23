@@ -390,7 +390,7 @@ public class TestPipelineManagerImpl {
       Assertions.assertEquals(1, pipelineManager
           .getContainersInPipeline(ratisPipeline.getId()).size());
       Assertions.assertEquals(1, pipelineManager
-          .getContainersInPipeline(ratisPipeline.getId()).size());
+          .getContainersInPipeline(ecPipeline.getId()).size());
 
       // Remove the container from the Ratis pipeline - this should leave the
       // pipeline in the OPEN state
