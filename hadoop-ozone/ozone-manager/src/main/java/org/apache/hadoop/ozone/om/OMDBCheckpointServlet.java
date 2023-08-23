@@ -159,7 +159,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       // Files to be excluded from tarball
-      RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
+      RocksDBCheckpointDiffer differ
+          getDbStore().getRocksDBCheckpointDiffer();
       DirectoryData sstBackupDir = new DirectoryData(tmpdir,
           differ.getSSTBackupDir());
       DirectoryData compactionLogDir = new DirectoryData(tmpdir,
@@ -178,7 +179,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  // Format list from follower to match data on leader.
+  /**
+   * Format the list of excluded sst files from follower to match data
+   * on leader.
+   * @param  toExcludeList - list of excluded sst files from follower
+   * @param  checkpointLocation -  location of checkpoint for this tarball
+   * @param  sstBackupDir - location info about sstBackupDir
+   * @return A Map of src and dest paths for the entries in the toExcludeList.
+   *         Formatted in a manner analagous to the copyFiles data structure
+   *         described above.  Because this structure only points to sst files,
+   *         the implementation ignores the compactionLog dir, (which doesn't
+   *         include sst files.)
+   */
   @VisibleForTesting
   public static Map<Path, Path> normalizeExcludeList(List<String> toExcludeList,
                                                Path checkpointLocation, DirectoryData sstBackupDir) {
@@ -187,6 +199,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Path metaDirPath = getMetaDirPath(checkpointLocation);
       Path destPath = Paths.get(metaDirPath.toString(), s);
       if (destPath.toString().startsWith(sstBackupDir.getOriginalDir().toString())) {
+        // The source of the sstBackupDir is a temporary directory and needs
+        // to be adjusted accordingly.
         int truncateLength = sstBackupDir.getOriginalDir().toString().length() + 1;
         Path srcPath = Paths.get(sstBackupDir.getTmpDir().toString(), truncateFileName(truncateLength, destPath));
         paths.put(srcPath, destPath);
@@ -491,8 +505,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     return fileSize;
   }
 
-  // If fileName exists in "files" parameter,
-  // it should be linked to dest path in files.
+  /**
+   * Find a valide hard link path for file.  If fileName exists in
+   * "files" parameter, it should be linked to dest path in files.
+   * @param files - Map of src/dest path to files available for
+   * linking.
+   * @param  file - File to be linked.
+   * @return dest path of file to be linked to.
+   */
   private static Path findLinkPath(Map<Path, Path> files, Path file, String fileName)
       throws IOException {
     for (Map.Entry<Path, Path> entry: files.entrySet()) {
@@ -500,11 +520,14 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Path destPath = entry.getValue();
       if (srcPath.toString().endsWith(fileName)) {
         if (srcPath.toFile().exists()) {
+          // If the files are hard linked to each other
+          // Note comparison must be done against srcPath, because
+          // destPath may only exist on Follower.
           if (OmSnapshotUtils.getINode(srcPath).equals(
               OmSnapshotUtils.getINode(file))) {
             return destPath;
           } else {
-            LOG.info("Found non matching sst files: {}, {}",
+            LOG.info("Found non linked sst files with the same name: {}, {}",
                 srcPath, file.toString());
           }
         }
@@ -570,7 +593,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
   @NotNull
   private static Path getMetaDirPath(Path checkpointLocation) {
-    // This check is done to take care of find-bug else below getParent()
+    // This check is done to take care of findbug else below getParent()
     // should not be null.
     Path locationParent = checkpointLocation.getParent();
     if (null == locationParent) {
