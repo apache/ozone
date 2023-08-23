@@ -504,7 +504,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
               OmSnapshotUtils.getINode(file))) {
             return destPath;
           } else {
-            LOG.info("gbjx2: found non matching sst files: {}, {}",
+            LOG.info("Found non matching sst files: {}, {}",
                 srcPath, file.toString());
           }
         }
