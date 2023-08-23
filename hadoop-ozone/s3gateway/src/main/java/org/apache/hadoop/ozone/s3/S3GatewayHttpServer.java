@@ -38,10 +38,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_KEYTAB_FILE;
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL;
+import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT;
 
 /**
  * Http server to provide S3-compatible API.
@@ -66,8 +68,10 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   private void addSecretAuthentication(MutableConfigurationSource conf)
       throws IOException {
 
-    if (conf.getBoolean(OZONE_S3G_SECRET_HTTP_ENABLED_KEY, false)) {
-      String authType = conf.get(OZONE_S3G_SECRET_HTTP_AUTH_TYPE, "simple");
+    if (conf.getBoolean(OZONE_S3G_SECRET_HTTP_ENABLED_KEY,
+        OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT)) {
+      String authType = conf.get(OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY,
+          OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT);
 
       if (UserGroupInformation.isSecurityEnabled()
           && authType.equals("kerberos")) {
@@ -75,12 +79,12 @@ public class S3GatewayHttpServer extends BaseHttpServer {
         Map<String, String> params = new HashMap<>();
 
         String principalInConf =
-            conf.get(OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL);
+            conf.get(OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
         if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
               principalInConf, conf.get(OZONE_S3G_HTTP_BIND_HOST_KEY)));
         }
-        String httpKeytab = conf.get(OZONE_S3G_SECRET_KEYTAB_FILE);
+        String httpKeytab = conf.get(OZONE_S3G_KEYTAB_FILE);
         if (!Strings.isNullOrEmpty(httpKeytab)) {
           params.put("kerberos.keytab", httpKeytab);
         }
@@ -140,12 +144,12 @@ public class S3GatewayHttpServer extends BaseHttpServer {
 
   @Override
   protected String getKeytabFile() {
-    return S3GatewayConfigKeys.OZONE_S3G_KEYTAB_FILE;
+    return OZONE_S3G_KEYTAB_FILE;
   }
 
   @Override
   protected String getSpnegoPrincipal() {
-    return S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
+    return OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL;
   }
 
   @Override

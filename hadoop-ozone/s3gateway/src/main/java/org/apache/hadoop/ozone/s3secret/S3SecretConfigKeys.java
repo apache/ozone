@@ -25,14 +25,14 @@ package org.apache.hadoop.ozone.s3secret;
 public final class S3SecretConfigKeys {
   public static final String OZONE_S3G_SECRET_HTTP_ENABLED_KEY =
       "ozone.s3g.secret.http.enabled";
+  public static final boolean OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT =
+      false;
   public static final String OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.s3g.secret.http.auth.";
-  public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE =
+  public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY =
       OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "type";
-  public static final String OZONE_S3G_SECRET_KEYTAB_FILE =
-      OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
-  public static final String OZONE_S3G_SECRET_HTTP_KERBEROS_PRINCIPAL =
-      OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
+  public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT =
+      "simple";
 
   /**
    * Never constructed.

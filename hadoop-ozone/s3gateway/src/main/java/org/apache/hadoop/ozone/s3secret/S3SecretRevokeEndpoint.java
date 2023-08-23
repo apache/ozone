@@ -19,11 +19,16 @@
 package org.apache.hadoop.ozone.s3secret;
 
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
  * Revoke secret endpoint.
@@ -32,12 +37,29 @@ import java.io.IOException;
 @S3SecretEnabled
 public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
 
+  private static final Logger LOG =
+          LoggerFactory.getLogger(S3SecretRevokeEndpoint.class);
+
+
   @GET
   public Response get() throws IOException {
-    revokeSecret();
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        S3GAction.REVOKE_SECRET, getAuditParameters()));
-    return Response.ok().build();
+    try {
+      revokeSecret();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          S3GAction.REVOKE_SECRET, getAuditParameters()));
+      return Response.ok().build();
+    } catch (OMException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          S3GAction.REVOKE_SECRET, getAuditParameters(), e));
+      if (e.getResult() == OMException.ResultCodes.S3_SECRET_NOT_FOUND) {
+        return Response.status(NOT_FOUND.getStatusCode(),
+            OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
+            .build();
+      } else {
+        LOG.error("Can't execute revoke secret request: ", e);
+        return Response.serverError().build();
+      }
+    }
   }
 
   private void revokeSecret() throws IOException {
