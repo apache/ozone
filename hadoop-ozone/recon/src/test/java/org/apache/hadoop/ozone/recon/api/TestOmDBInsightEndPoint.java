@@ -58,6 +58,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
@@ -82,6 +84,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
+  private Set<Long> generatedIds = new HashSet<>();
+
+  private long generateUniqueRandomLong() {
+    long newValue;
+    do {
+      newValue = random.nextLong();
+    } while (generatedIds.contains(newValue));
+
+    generatedIds.add(newValue);
+    return newValue;
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -591,6 +604,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setFile(isFile)
+        .setObjectID(generateUniqueRandomLong())
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(random.nextLong())
@@ -717,11 +731,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Prepare NS summary data and populate the table
     Table<Long, NSSummary> table = omdbInsightEndpoint.getNsSummaryTable();
     // Set size of files to 5 for directory object id 1
-    table.put(1L, getNsSummary(5L));
+    table.put(omKeyInfo1.getObjectID(), getNsSummary(5L));
     // Set size of files to 6 for directory object id 2
-    table.put(2L, getNsSummary(6L));
+    table.put(omKeyInfo2.getObjectID(), getNsSummary(6L));
     // Set size of files to 7 for directory object id 3
-    table.put(3L, getNsSummary(7L));
+    table.put(omKeyInfo3.getObjectID(), getNsSummary(7L));
 
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse keyInsightInfoResp =

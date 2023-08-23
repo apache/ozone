@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -42,8 +43,15 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
+import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -52,6 +60,7 @@ import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.core.Response;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -93,6 +102,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .includeRecon(true)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -147,6 +157,11 @@ public class TestDirectoryDeletingServiceWithFSO {
     Table<String, OmDirectoryInfo> dirTable =
         cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
 
+    try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
+             iterator = dirTable.iterator()) {
+      String dirName = iterator.next().getValue().getName();
+      System.out.println(dirName);
+    }
 
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
@@ -315,6 +330,19 @@ public class TestDirectoryDeletingServiceWithFSO {
     Path root = new Path("/rootDir2");
     // Create  parent dir from root.
     fs.mkdirs(root);
+
+    OMMetadataManager metadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+
+    try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
+        .iterator()) {
+      // Print out the key and value
+      Table.KeyValue<String, OmKeyInfo> kv =
+          (Table.KeyValue<String, OmKeyInfo>) it.next();
+      LOG.info("Key: {}, Value: {}", kv.getKey(), kv.getValue());
+
+    }
+
 
     // Added 10 sub files inside root dir
     for (int i = 0; i < 5; i++) {

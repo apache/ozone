@@ -502,7 +502,7 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(key);
         keyEntityInfo.setPath(omKeyInfo.getKeyName());
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(fetchSizeForDeletedDirectory(key));
+        keyEntityInfo.setSize(fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
@@ -529,47 +529,25 @@ public class OMDBInsightEndpoint {
   }
 
   /**
-   * Fetches the size of a deleted directory identified by the given path.
-   * The size is obtained from the NSSummary table using the directory objectID.
-   * The path is expected to be in the format :-
-   * "/volumeId/bucketId/parentId/dirName/dirObjectId".
+   * Given an object ID, return total data size (no replication)
+   * under this object. Note:- This method is RECURSIVE.
    *
-   * @param path The path of the deleted directory.
-   * @return The size of the deleted directory.
-   * @throws IOException If an I/O error occurs while retrieving the size.
+   * @param objectId the object's ID
+   * @return total used data size in bytes
+   * @throws IOException ioEx
    */
-  public long fetchSizeForDeletedDirectory(String path)
+  protected long fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
-    if (Strings.isNullOrEmpty(path)) {
-      LOG.error("Invalid path: Path is null or empty");
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary == null) {
       return 0L;
     }
-
-    String[] parts = path.split("/");
-    if (parts.length != 6) {
-      LOG.error("Invalid path format: {}", path);
-      return 0L;
+    long totalSize = nsSummary.getSizeOfFiles();
+    for (long childId : nsSummary.getChildDir()) {
+      totalSize += fetchSizeForDeletedDirectory(childId);
     }
-    /* DB key in DeletedDirectoryTable =>
-                      "/volumeId/bucketId/parentId/dirName/dirObjectId" */
-    String directoryObjectId = parts[5];
-
-    try {
-      long convertedValue = Long.parseLong(directoryObjectId);
-      NSSummary nsSummary =
-          reconNamespaceSummaryManager.getNSSummary(convertedValue);
-      if (nsSummary != null) {
-        return nsSummary.getSizeOfFiles();
-      } else {
-        LOG.error("NSSummary not found for directory: {}", path);
-      }
-    } catch (NumberFormatException e) {
-      // Handle parsing error if the last string is not a valid long value
-      LOG.error("Invalid last string format: {}", directoryObjectId);
-    }
-    return 0L;
+    return totalSize;
   }
-
 
   /** This method retrieves set of directories pending for deletion.
    *
