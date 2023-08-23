@@ -128,7 +128,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       3 is not considered over replicated because its second copy is unhealthy.
       */
       if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        int val = decommissionIndexes
+        int val = unHealthyIndexes
             .getOrDefault(replica.getReplicaIndex(), 0);
         unHealthyIndexes.put(replica.getReplicaIndex(), val + 1);
         continue;
