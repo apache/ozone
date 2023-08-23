@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -502,7 +501,8 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(key);
         keyEntityInfo.setPath(omKeyInfo.getKeyName());
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
+        keyEntityInfo.setSize(
+            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
