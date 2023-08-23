@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1004,11 +1005,20 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replication,
             Map<String, String> metadata) throws IOException {
     long copyLength;
-    try (OzoneOutputStream dest =
-                 getClientProtocol().createKey(
-        volume.getName(), destBucket, destKey, srcKeyLen,
-        replication, metadata)) {
-      copyLength = IOUtils.copyLarge(src, dest);
+    if (datastreamEnabled && !((replication != null &&
+        replication.getReplicationType() == EC)) &&
+        srcKeyLen > datastreamMinLength) {
+      try (OzoneDataStreamOutput dest = getClientProtocol()
+          .createStreamKey(volume.getName(), destBucket, destKey, srcKeyLen,
+              replication, metadata)) {
+        copyLength = IOUtils.copyLarge(src, dest);
+      }
+    } else {
+      try (OzoneOutputStream dest = getClientProtocol()
+          .createKey(volume.getName(), destBucket, destKey, srcKeyLen,
+              replication, metadata)) {
+        copyLength = IOUtils.copyLarge(src, dest);
+      }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
   }
