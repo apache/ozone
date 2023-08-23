@@ -208,6 +208,10 @@ public class TestReconInsightsForDeletedDirectories {
       }
     }
 
+    if (directoryObjectId == null) {
+      fail("directoryObjectId is null. Test case cannot proceed.");
+    }
+
     // Retrieve Namespace Summary for dir1 from Recon.
     ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
         (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
