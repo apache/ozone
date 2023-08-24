@@ -142,7 +142,6 @@ public class TestReconInsightsForDeletedDirectories {
 
   /**
    * Test case for verifying directory deletion and namespace summary updates.
-   * Three cases are tested:
    *
    *      dir1
    *      ├── file1
@@ -154,7 +153,6 @@ public class TestReconInsightsForDeletedDirectories {
   public void testGetDeletedDirectoryInfo()
       throws Exception {
 
-    // CASE-1
     // Create a directory structure with 10 files in dir1.
     Path dir1 = new Path("/dir1");
     fs.mkdirs(dir1);
@@ -337,10 +335,13 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 1000.
     Assert.assertEquals(3, entity.getUnreplicatedDataSize());
+
+    // Cleanup the tables.
+    cleanupTables();
   }
 
   /**
-   * Directory Structure:
+   * Directory and File Hierarchy.
    *
    *    largeDirectory
    *    ├── subdir1
@@ -397,6 +398,9 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 100.
     Assert.assertEquals(100, entity.getUnreplicatedDataSize());
+
+    // Cleanup the tables.
+    cleanupTables();
   }
 
   private void createLargeDirectory(Path dir, int numSubdirs,
