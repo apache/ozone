@@ -279,7 +279,12 @@ public class TestHddsClientUtils {
     invalidNames.add("test<string>");
     invalidNames.add("10%3=1");
     invalidNames.add("photo[0201]");
-    invalidNames.add("what?");
+    invalidNames.add("square_right]");
+    invalidNames.add("my\\file");
+    invalidNames.add("for}");
+    invalidNames.add("{curly-left");
+    invalidNames.add("\"hi\"");
+    invalidNames.add("\\\\~`");
 
     for (String name : invalidNames) {
       try {
