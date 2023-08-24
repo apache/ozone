@@ -55,7 +55,7 @@ export class DetailPanel extends React.Component<IRightDrawerProps> {
           title={`Metadata Summary for ${path}`}
           placement='right'
           width='40%'
-          closable={false}
+          closable={true}
           visible={visible}
           getContainer={false}
           style={{position: 'absolute'}}
