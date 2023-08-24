@@ -277,6 +277,41 @@ public class TestECReplicationCheckHandler {
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
+
+  @Test
+  public void testUnderReplicatedAndUnhealthy() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+    replicas.addAll(createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 3),
+        Pair.of(IN_SERVICE, 4)));
+    ContainerCheckRequest request = requestBuilder
+        .setContainerReplicas(replicas)
+        .setContainerInfo(container)
+        .build();
+
+    UnderReplicatedHealthResult result = (UnderReplicatedHealthResult)
+        healthCheck.checkHealth(request);
+    assertEquals(HealthState.UNDER_REPLICATED, result.getHealthState());
+    assertEquals(-1, result.getRemainingRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+    assertFalse(result.underReplicatedDueToOutOfService());
+    assertTrue(result.isUnrecoverable());
+    assertFalse(result.isMissing());
+
+    assertTrue(healthCheck.handle(request));
+    // Unrecoverable so not added to the queue
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
   }
 
   @Test

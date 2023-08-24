@@ -76,8 +76,16 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       if (underHealth.isUnrecoverable()) {
-        report.incrementAndSample(
-            ReplicationManagerReport.HealthState.MISSING, containerID);
+        if (underHealth.isMissing()) {
+          report.incrementAndSample(
+              ReplicationManagerReport.HealthState.MISSING, containerID);
+        } else {
+          // A container which is unrecoverable but not missing must have too
+          // many unhealthy replicas. Therefore it is UNHEALTHY rather than
+          // missing.
+          report.incrementAndSample(
+              ReplicationManagerReport.HealthState.UNHEALTHY, containerID);
+        }
       } else {
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
@@ -88,9 +96,10 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         request.getReplicationQueue().enqueue(underHealth);
       }
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
-          + "is [{}]. isUnrecoverable is [{}]. hasUnreplicatedOfflineIndexes "
-          + "is [{}]", container, underHealth.isReplicatedOkAfterPending(),
-          underHealth.isUnrecoverable(),
+          + "is [{}]. isUnrecoverable is [{}]. isMissing is [{}]. "
+          + "hasUnreplicatedOfflineIndexes is [{}]",
+          container, underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable(), underHealth.isMissing(),
           underHealth.hasUnreplicatedOfflineIndexes());
       return true;
     } else if (health.getHealthState()
@@ -160,6 +169,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           || replicaCount.maintenanceOnlyIndexes(true).size() > 0) {
         result.setHasUnReplicatedOfflineIndexes(true);
       }
+      result.setIsMissing(replicaCount.isMissing());
       return result;
     }
 
