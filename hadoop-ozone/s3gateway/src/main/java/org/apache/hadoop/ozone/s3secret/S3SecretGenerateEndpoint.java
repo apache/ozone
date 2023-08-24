@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.s3secret;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
-import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -32,8 +32,8 @@ import java.io.IOException;
 @Path("/secret/generate")
 @S3SecretEnabled
 public class S3SecretGenerateEndpoint extends S3SecretEndpointBase {
-  @GET
-  public Response get() throws IOException {
+  @POST
+  public Response generate() throws IOException {
     S3SecretResponse s3SecretResponse = new S3SecretResponse();
     S3SecretValue s3SecretValue = generateS3Secret();
     s3SecretResponse.setAwsSecret(s3SecretValue.getAwsSecret());

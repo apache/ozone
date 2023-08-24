@@ -32,7 +32,7 @@ public final class S3SecretConfigKeys {
   public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY =
       OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "type";
   public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT =
-      "simple";
+      "kerberos";
 
   /**
    * Never constructed.

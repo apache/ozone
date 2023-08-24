@@ -84,7 +84,8 @@ public class TestSecretGenerate {
 
   @Test
   void testSecretGenerate() throws IOException {
-    S3SecretResponse response = (S3SecretResponse) endpoint.get().getEntity();
+    S3SecretResponse response =
+            (S3SecretResponse) endpoint.generate().getEntity();
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(USER_NAME, response.getAwsAccessKey());
   }

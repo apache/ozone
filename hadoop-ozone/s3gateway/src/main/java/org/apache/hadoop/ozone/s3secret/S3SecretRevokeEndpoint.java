@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
@@ -41,8 +41,8 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
           LoggerFactory.getLogger(S3SecretRevokeEndpoint.class);
 
 
-  @GET
-  public Response get() throws IOException {
+  @POST
+  public Response revoke() throws IOException {
     try {
       revokeSecret();
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(

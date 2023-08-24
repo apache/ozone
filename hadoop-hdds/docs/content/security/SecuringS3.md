@@ -45,7 +45,7 @@ ozone s3 getsecret
 * Or by sending request to /secret/generate S3 REST endpoint.
 
 ```bash
-curl --negotiate -u : https://localhost:9879/secret/generate
+curl -X POST --negotiate -u : https://localhost:9879/secret/generate
 ```
 
 This command will talk to ozone, validate the user via Kerberos and generate

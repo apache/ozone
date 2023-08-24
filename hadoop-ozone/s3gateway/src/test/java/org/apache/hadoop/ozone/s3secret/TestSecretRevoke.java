@@ -88,17 +88,17 @@ public class TestSecretRevoke {
 
   @Test
   void testSecretRevoke() throws IOException {
-    endpoint.get();
+    endpoint.revoke();
     verify(objectStore, times(1)).revokeS3Secret(eq(USER_NAME));
   }
 
   @Test
   void testSecretSequentialRevokes() throws IOException {
-    Response firstResponse = endpoint.get();
+    Response firstResponse = endpoint.revoke();
     assertEquals(OK.getStatusCode(), firstResponse.getStatus());
     doThrow(new OMException(S3_SECRET_NOT_FOUND))
         .when(objectStore).revokeS3Secret(any());
-    Response secondResponse = endpoint.get();
+    Response secondResponse = endpoint.revoke();
     assertEquals(NOT_FOUND.getStatusCode(), secondResponse.getStatus());
   }
 
@@ -106,7 +106,7 @@ public class TestSecretRevoke {
   void testSecretRevokesHandlesException() throws IOException {
     doThrow(new OMException(ACCESS_DENIED))
         .when(objectStore).revokeS3Secret(any());
-    Response response = endpoint.get();
+    Response response = endpoint.revoke();
     assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
   }
 }
