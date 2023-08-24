@@ -1304,7 +1304,7 @@ public class TestOMRatisSnapshots {
         compactionLogsDir, numberOfLogFiles, contentLength,
         currentCompactionLog);
 
-    // TODO: create Jira to fix and re-enable this test
+    // TODO: https://issues.apache.org/jira/browse/HDDS-9209
     // checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(snapshotNamePrefix,
