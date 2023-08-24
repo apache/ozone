@@ -99,7 +99,7 @@ public class BlockDeletingService extends BackgroundService {
       return containerData;
     }
 
-    public Long getBlocks() {
+    public Long getNumBlocksToDelete() {
       return numBlocksToDelete;
     }
 
@@ -130,7 +130,7 @@ public class BlockDeletingService extends BackgroundService {
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
-        totalBlocks += containerBlockInfo.getBlocks();
+        totalBlocks += containerBlockInfo.getNumBlocksToDelete();
       }
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());

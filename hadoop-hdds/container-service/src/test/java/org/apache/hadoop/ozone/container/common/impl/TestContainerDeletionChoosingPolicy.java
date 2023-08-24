@@ -119,7 +119,7 @@ public class TestContainerDeletionChoosingPolicy {
 
     long totPendingBlocks = 0;
     for (ContainerBlockInfo pr : result0) {
-      totPendingBlocks += pr.getBlocks();
+      totPendingBlocks += pr.getNumBlocksToDelete();
     }
     Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 
@@ -191,7 +191,7 @@ public class TestContainerDeletionChoosingPolicy {
         .chooseContainerForBlockDeletion(blockLimitPerInterval, deletionPolicy);
     long totPendingBlocks = 0;
     for (ContainerBlockInfo pr : result0) {
-      totPendingBlocks += pr.getBlocks();
+      totPendingBlocks += pr.getNumBlocksToDelete();
     }
     Assert.assertTrue(totPendingBlocks >= blockLimitPerInterval);
 

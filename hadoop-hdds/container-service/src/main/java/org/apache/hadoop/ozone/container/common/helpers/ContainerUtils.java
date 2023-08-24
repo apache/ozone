@@ -335,7 +335,10 @@ public final class ContainerUtils {
           .getNumPendingDeletionBlocks();
     } else {
       // If another ContainerType is available later, implement it
-      return 0L;
+      throw new IllegalArgumentException(
+          "getPendingDeletionBlocks for ContainerType: " +
+              containerData.getContainerType() +
+              " not support.");
     }
   }
 }

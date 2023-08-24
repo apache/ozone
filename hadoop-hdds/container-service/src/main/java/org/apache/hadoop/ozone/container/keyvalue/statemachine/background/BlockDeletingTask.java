@@ -80,7 +80,7 @@ public class BlockDeletingTask implements BackgroundTask {
     this.priority = priority;
     this.containerData =
         (KeyValueContainerData) containerBlockInfo.getContainerData();
-    this.blocksToDelete = containerBlockInfo.getBlocks();
+    this.blocksToDelete = containerBlockInfo.getNumBlocksToDelete();
   }
 
   private static class ContainerBackgroundTaskResult
