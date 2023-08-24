@@ -280,16 +280,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   }
 
   @Override
-  public int getOpenContainersNo() {
-    return 0;
-    // TODO : FIX ME : The open container being a single number does not make
-    // sense.
-    // We have to get open containers by Replication Type and Replication
-    // factor. Hence returning 0 for now.
-    // containers.get(HddsProtos.LifeCycleState.OPEN).size();
-  }
-
-  @Override
   public SCMBlockDeletingService getSCMBlockDeletingService() {
     return this.blockDeletingService;
   }

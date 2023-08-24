@@ -817,10 +817,29 @@ public class ObjectEndpoint extends EndpointBase {
         body = new SignedChunksInputStream(body);
       }
 
+      copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+      String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
+      final OzoneBucket ozoneBucket = volume.getBucket(bucket);
+      ReplicationConfig replicationConfig =
+          getReplicationConfig(ozoneBucket, storageType);
+
+      boolean enableEC = false;
+      if ((replicationConfig != null &&
+          replicationConfig.getReplicationType()  == EC) ||
+          ozoneBucket.getReplicationConfig() instanceof ECReplicationConfig) {
+        enableEC = true;
+      }
+
       try {
+        if (datastreamEnabled && !enableEC && copyHeader == null) {
+          getMetrics().updatePutKeyMetadataStats(startNanos);
+          return ObjectEndpointStreaming
+              .createMultipartKey(ozoneBucket, key, length, partNumber,
+                  uploadID, chunkSize, body);
+        }
         ozoneOutputStream = getClientProtocol().createMultipartKey(
             volume.getName(), bucket, key, length, partNumber, uploadID);
-        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+
         if (copyHeader != null) {
           Pair<String, String> result = parseSourceHeader(copyHeader);
 
@@ -900,6 +919,11 @@ public class ObjectEndpoint extends EndpointBase {
         throw newError(NO_SUCH_UPLOAD, uploadID, ex);
       } else if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucket + "/" + key, ex);
+      } else if (ex.getResult() == ResultCodes.INVALID_PART) {
+        OS3Exception os3Exception = newError(
+            S3ErrorTable.INVALID_ARGUMENT, String.valueOf(partNumber), ex);
+        os3Exception.setErrorMessage(ex.getMessage());
+        throw os3Exception;
       }
       throw ex;
     }
@@ -1122,7 +1146,8 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  static boolean checkCopySourceModificationTime(Long lastModificationTime,
+  public static boolean checkCopySourceModificationTime(
+      Long lastModificationTime,
       String copySourceIfModifiedSinceStr,
       String copySourceIfUnmodifiedSinceStr) {
     long copySourceIfModifiedSince = Long.MIN_VALUE;
@@ -1146,5 +1171,10 @@ public class ObjectEndpoint extends EndpointBase {
   @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public boolean isDatastreamEnabled() {
+    return datastreamEnabled;
   }
 }

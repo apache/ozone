@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:cert-rotation
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -23,7 +23,7 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
-export COMPOSE_FILE=docker-compose.yaml:root-ca-rotation.yaml
+export COMPOSE_FILE=docker-compose.yaml:scm-decommission.yaml:root-ca-rotation.yaml
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
@@ -45,6 +45,7 @@ wait_for_execute_command scm1.org 240 "ozone admin cert info 2"
 # transfer leader to scm2.org
 execute_robot_test scm1.org scmha/scm-leader-transfer.robot
 wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | sed 's/StorageContainerManagerStarter//' | xargs | xargs -I {} jstack {} | grep 'RootCARotationManager-Inactive'"
+execute_robot_test scm1.org -v PREFIX:"rootca" certrotation/root-ca-rotation-client-checks.robot
 
 # verify om operations
 execute_commands_in_container scm1.org "ozone sh volume create /r-v1 && ozone sh bucket create /r-v1/r-b1"
@@ -64,6 +65,11 @@ wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm | grep sc
 
 # wait for next root CA rotation
 wait_for_execute_command scm4.org 240 "ozone admin cert info 4"
+
+wait_for_execute_command om1 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
+wait_for_execute_command om2 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
+wait_for_execute_command om3 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
+execute_robot_test scm4.org -v PREFIX:"rootca2" certrotation/root-ca-rotation-client-checks.robot
 
 #transfer leader to scm4.org
 execute_robot_test scm4.org -v "TARGET_SCM:scm4.org" scmha/scm-leader-transfer.robot

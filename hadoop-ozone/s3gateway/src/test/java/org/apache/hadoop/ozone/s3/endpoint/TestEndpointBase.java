@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.Assert;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -95,12 +94,13 @@ public class TestEndpointBase {
       public void init() { }
     };
 
-    Exception exception = Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> endpointBase.getCustomMetadataFromHeaders(s3requestHeaders));
-    Assert.assertEquals(
-            "Illegal user defined metadata. Combined size cannot exceed 2KB.",
-            exception.getMessage());
+    try {
+      endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
+      Assert.fail("getCustomMetadataFromHeaders should fail. " +
+          "Expected OS3Exception not thrown");
+    } catch (OS3Exception ex) {
+      Assert.assertTrue(ex.getCode().contains("MetadataTooLarge"));
+    }
   }
 
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
 
@@ -156,8 +158,9 @@ public class TestHddsDatanodeService {
     KeyValueContainer container = ContainerTestUtils
         .addContainerToDeletedDir(
             hddsVolume, clusterId, conf, schemaVersion);
-    assertTrue(container.getContainerFile().exists());
-    assertTrue(container.getContainerDBFile().exists());
+    Path containerTmpPath = KeyValueContainerUtil.getTmpDirectoryPath(
+        container.getContainerData(), hddsVolume);
+    assertTrue(containerTmpPath.toFile().exists());
     File[] deletedContainersAfterShutdown =
         hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);

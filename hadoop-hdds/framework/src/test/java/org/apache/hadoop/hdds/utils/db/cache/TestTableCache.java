@@ -36,7 +36,7 @@ import org.slf4j.event.Level;
  */
 public class TestTableCache {
 
-  private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
+  private TableCache<String, String> tableCache;
 
   @BeforeAll
   public static void setLogLevel() {

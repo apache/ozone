@@ -20,31 +20,35 @@ package org.apache.hadoop.hdds.tracing;
 import io.jaegertracing.internal.JaegerSpanContext;
 import io.jaegertracing.internal.exceptions.EmptyTracerStateStringException;
 import io.jaegertracing.internal.exceptions.MalformedTracerStateStringException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TestStringCodec {
 
   @Test
-  void testExtract() throws Exception {
+  void testExtract() {
     StringCodec codec = new StringCodec();
 
-    LambdaTestUtils.intercept(EmptyTracerStateStringException.class,
+    assertThrows(EmptyTracerStateStringException.class,
         () -> codec.extract(null));
 
     StringBuilder sb = new StringBuilder().append("123");
-    LambdaTestUtils.intercept(MalformedTracerStateStringException.class,
-        "String does not match tracer state format",
-        () -> codec.extract(sb));
+    MalformedTracerStateStringException malformedException =
+        assertThrows(MalformedTracerStateStringException.class,
+            () -> codec.extract(sb));
+    assertEquals("String does not match tracer state format: 123",
+        malformedException.getMessage());
 
     sb.append(":456:789");
-    LambdaTestUtils.intercept(MalformedTracerStateStringException.class,
-        "String does not match tracer state format",
-        () -> codec.extract(sb));
-    sb.append(":66");
+    malformedException =
+        assertThrows(MalformedTracerStateStringException.class,
+            () -> codec.extract(sb));
+    assertEquals("String does not match tracer state format: 123:456:789",
+        malformedException.getMessage());
 
+    sb.append(":66");
     JaegerSpanContext context = codec.extract(sb);
     StringBuilder injected = new StringBuilder();
     codec.inject(context, injected);

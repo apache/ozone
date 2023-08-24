@@ -821,12 +821,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
-
-    // Check snapshot creation time
-    if (fromSnapInfo.getCreationTime() > toSnapInfo.getCreationTime()) {
-      throw new IOException("fromSnapshot:" + fromSnapInfo.getName() +
-          " should be older than to toSnapshot:" + toSnapInfo.getName());
-    }
   }
 
   private int getIndexFromToken(final String token) throws IOException {

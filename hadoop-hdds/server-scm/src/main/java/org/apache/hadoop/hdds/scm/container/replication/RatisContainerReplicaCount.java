@@ -137,8 +137,16 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     for (ContainerReplica cr : replicas) {
       HddsProtos.NodeOperationalState state =
           cr.getDatanodeDetails().getPersistedOpState();
+
+      /*
+       * When there is Quasi Closed Replica with incorrect sequence id
+       * for a Closed container, it's treated as unhealthy.
+       */
       boolean unhealthy =
-          cr.getState() == ContainerReplicaProto.State.UNHEALTHY;
+          cr.getState() == ContainerReplicaProto.State.UNHEALTHY ||
+              (cr.getState() == ContainerReplicaProto.State.QUASI_CLOSED &&
+                  container.getState() == HddsProtos.LifeCycleState.CLOSED &&
+                  container.getSequenceId() != cr.getSequenceId());
 
       if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         if (unhealthy) {

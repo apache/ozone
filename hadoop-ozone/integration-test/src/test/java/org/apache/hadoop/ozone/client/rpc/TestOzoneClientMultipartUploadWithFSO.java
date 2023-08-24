@@ -407,6 +407,26 @@ public class TestOzoneClientMultipartUploadWithFSO {
   }
 
   @Test
+  public void testMultipartPartNumberExceedingAllowedRange() throws Exception {
+    String uploadID = initiateMultipartUpload(bucket, keyName,
+        RATIS, ONE);
+    byte[] data = "data".getBytes(UTF_8);
+
+    // Multipart part number must be an integer between 1 and 10000. So the
+    // part number 1, 5000, 10000 will succeed,
+    // the part number 0, 10001 will fail.
+    bucket.createMultipartKey(keyName, data.length, 1, uploadID);
+    bucket.createMultipartKey(keyName, data.length, 5000, uploadID);
+    bucket.createMultipartKey(keyName, data.length, 10000, uploadID);
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
+        () -> bucket.createMultipartKey(
+            keyName, data.length, 0, uploadID));
+    OzoneTestUtils.expectOmException(OMException.ResultCodes.INVALID_PART,
+        () -> bucket.createMultipartKey(
+            keyName, data.length, 10001, uploadID));
+  }
+
+  @Test
   public void testCommitPartAfterCompleteUpload() throws Exception {
     String parentDir = "a/b/c/d/";
     keyName = parentDir + UUID.randomUUID().toString();

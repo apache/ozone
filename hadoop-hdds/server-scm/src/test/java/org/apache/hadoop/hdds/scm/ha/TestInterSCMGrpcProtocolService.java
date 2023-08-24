@@ -19,38 +19,18 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
-import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
-import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.SubjectKeyIdentifier;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.cert.X509ExtensionUtils;
-import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.DigestCalculator;
-import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.operator.bc.BcDigestCalculatorProvider;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -64,22 +44,17 @@ import javax.net.ssl.X509TrustManager;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -225,8 +200,8 @@ public class TestInterSCMGrpcProtocolService {
   private SCMCertificateClient setupCertificateClientForMTLS(
       OzoneConfiguration conf
   ) throws Exception {
-    KeyPair serviceKeys = aKeyPair(conf);
-    KeyPair clientKeys = aKeyPair(conf);
+    KeyPair serviceKeys = CertificateTestUtils.aKeyPair(conf);
+    KeyPair clientKeys = CertificateTestUtils.aKeyPair(conf);
 
     serviceCert = createSelfSignedCert(serviceKeys, "service");
     clientCert = createSelfSignedCert(clientKeys, "client");
@@ -287,11 +262,6 @@ public class TestInterSCMGrpcProtocolService {
     return keyManager;
   }
 
-  private KeyPair aKeyPair(ConfigurationSource conf)
-      throws NoSuchProviderException, NoSuchAlgorithmException {
-    return new HDDSKeyGenerator(new SecurityConfig(conf)).generateKey();
-  }
-
   private OzoneConfiguration setupConfiguration(int port) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, port);
@@ -300,61 +270,5 @@ public class TestInterSCMGrpcProtocolService {
     return conf;
   }
 
-
-  private static final String HASH_ALGO = "SHA256WithRSA";
-
-  private X509Certificate createSelfSignedCert(KeyPair keys, String commonName)
-      throws Exception {
-    final Instant now = Instant.now();
-    final Date notBefore = Date.from(now);
-    final Date notAfter = Date.from(now.plus(Duration.ofDays(1)));
-    final ContentSigner contentSigner =
-        new JcaContentSignerBuilder(HASH_ALGO).build(keys.getPrivate());
-    final X500Name x500Name = new X500Name("CN=" + commonName);
-
-    SubjectKeyIdentifier keyId = subjectKeyIdOf(keys);
-    AuthorityKeyIdentifier authorityKeyId = authorityKeyIdOf(keys);
-    BasicConstraints constraints = new BasicConstraints(true);
-
-    final X509v3CertificateBuilder certificateBuilder =
-        new JcaX509v3CertificateBuilder(
-            x500Name,
-            BigInteger.valueOf(keys.getPublic().hashCode()),
-            notBefore,
-            notAfter,
-            x500Name,
-            keys.getPublic()
-        );
-    certificateBuilder
-        .addExtension(Extension.subjectKeyIdentifier, false, keyId)
-        .addExtension(Extension.authorityKeyIdentifier, false, authorityKeyId)
-        .addExtension(Extension.basicConstraints, true, constraints);
-
-    return new JcaX509CertificateConverter()
-        .setProvider(new BouncyCastleProvider())
-        .getCertificate(certificateBuilder.build(contentSigner));
-  }
-
-  private SubjectKeyIdentifier subjectKeyIdOf(KeyPair keys) throws Exception {
-    return extensionUtil().createSubjectKeyIdentifier(pubKeyInfo(keys));
-  }
-
-  private AuthorityKeyIdentifier authorityKeyIdOf(KeyPair keys)
-      throws Exception {
-    return extensionUtil().createAuthorityKeyIdentifier(pubKeyInfo(keys));
-  }
-
-  private SubjectPublicKeyInfo pubKeyInfo(KeyPair keys) {
-    return SubjectPublicKeyInfo.getInstance(keys.getPublic().getEncoded());
-  }
-
-  private X509ExtensionUtils extensionUtil()
-      throws OperatorCreationException {
-    DigestCalculator digest =
-        new BcDigestCalculatorProvider()
-            .get(new AlgorithmIdentifier(OIWObjectIdentifiers.idSHA1));
-
-    return new X509ExtensionUtils(digest);
-  }
 
 }

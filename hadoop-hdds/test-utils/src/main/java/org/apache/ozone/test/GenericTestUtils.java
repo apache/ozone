@@ -31,16 +31,12 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
@@ -49,6 +45,8 @@ import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -145,7 +143,8 @@ public abstract class GenericTestUtils {
    */
   @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
-    return getTempPath(RandomStringUtils.randomAlphanumeric(10));
+    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
+        + "-" + randomAlphanumeric(10));
   }
 
   /**
@@ -312,48 +311,40 @@ public abstract class GenericTestUtils {
   /**
    * Class to capture logs for doing assertions.
    */
-  public static final class LogCapturer {
-    private StringWriter sw = new StringWriter();
-    private WriterAppender appender;
-    private Logger logger;
+  public abstract static class LogCapturer {
+    private final StringWriter sw = new StringWriter();
+
+    public static LogCapturer captureLogs(Logger logger) {
+      return new Log4j1Capturer(logger);
+    }
+
+    public static LogCapturer captureLogs(Logger logger, Layout layout) {
+      return new Log4j1Capturer(logger, layout);
+    }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
-      return new LogCapturer(toLog4j(logger), getDefaultLayout());
+      return new Log4j1Capturer(toLog4j(logger));
     }
 
-    public static LogCapturer captureLogs(org.slf4j.Logger logger,
-        Layout layout) {
-      return new LogCapturer(toLog4j(logger), layout);
-    }
-
-    private static Layout getDefaultLayout() {
-      Appender defaultAppender = Logger.getRootLogger().getAppender("stdout");
-      if (defaultAppender == null) {
-        defaultAppender = Logger.getRootLogger().getAppender("console");
-      }
-      return (defaultAppender == null) ? new PatternLayout() :
-          defaultAppender.getLayout();
-    }
-
-    private LogCapturer(Logger logger, Layout layout) {
-      this.logger = logger;
-      this.appender = new WriterAppender(layout, sw);
-      logger.addAppender(this.appender);
+    // TODO: let Log4j2Capturer capture only specific logger's logs
+    public static LogCapturer log4j2(String ignoredLoggerName) {
+      return Log4j2Capturer.getInstance();
     }
 
     public String getOutput() {
-      return sw.toString();
+      return writer().toString();
     }
 
-    public void stopCapturing() {
-      logger.removeAppender(appender);
+    public abstract void stopCapturing();
+
+    protected StringWriter writer() {
+      return sw;
     }
 
     public void clearOutput() {
-      sw.getBuffer().setLength(0);
+      writer().getBuffer().setLength(0);
     }
   }
-
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());

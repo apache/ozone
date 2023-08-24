@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevoke
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -87,8 +88,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
   /**
    * Helper method to wrap the request and send the message.
    */
-  private SCMSecurityResponse submitRequest(
-      SCMSecurityProtocolProtos.Type type,
+  private SCMSecurityResponse submitRequest(Type type,
       Consumer<Builder> builderConsumer) throws IOException {
     final SCMSecurityResponse response;
     try {
@@ -436,5 +436,15 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
         builder -> builder.setGetAllRootCaCertificatesRequestProto(protoIns))
         .getAllRootCaCertificatesResponseProto()
         .getAllX509RootCaCertificatesList();
+  }
+
+  @Override
+  public List<String> removeExpiredCertificates() throws IOException {
+    SCMRemoveExpiredCertificatesRequestProto protoIns =
+        SCMRemoveExpiredCertificatesRequestProto.getDefaultInstance();
+    return submitRequest(Type.RemoveExpiredCertificates,
+        builder -> builder.setRemoveExpiredCertificatesRequestProto(protoIns))
+        .getRemoveExpiredCertificatesResponseProto()
+        .getRemovedExpiredCertificatesList();
   }
 }

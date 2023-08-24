@@ -22,20 +22,25 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -141,7 +146,7 @@ public class TestOMSnapshotDAG {
 
   private DifferSnapshotInfo getDifferSnapshotInfo(
       OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      String snapshotName) throws IOException {
+      String snapshotName, ManagedRocksDB snapshotDB) throws IOException {
 
     final String dbKey = getSnapshotDBKey(volumeName, bucketName, snapshotName);
     final SnapshotInfo snapshotInfo =
@@ -152,7 +157,8 @@ public class TestOMSnapshotDAG {
     // persisted at the time of snapshot creation, as the snapshot generation
     return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
-        getTablePrefixes(omMetadataManager, volumeName, bucketName));
+        getTablePrefixes(omMetadataManager, volumeName, bucketName),
+        snapshotDB);
   }
 
   private Map<String, String> getTablePrefixes(
@@ -224,13 +230,23 @@ public class TestOMSnapshotDAG {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
-
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB1 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB2 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap2"));
     DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap1");
+        volumeName, bucketName, "snap1",
+        ((RDBStore)((OmSnapshot)snapDB1.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     DifferSnapshotInfo snap2 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap2");
+        volumeName, bucketName, "snap2", ((RDBStore)((OmSnapshot)snapDB2.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
 
-    // RocksDB does checkpointing in a separate thread, wait for it
+      // RocksDB does checkpointing in a separate thread, wait for it
     final File checkpointSnap1 = new File(snap1.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap1::exists, 2000, 20000);
     final File checkpointSnap2 = new File(snap2.getDbPath());
@@ -246,9 +262,14 @@ public class TestOMSnapshotDAG {
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
-
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB3 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap3"));
     DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap3");
+        volumeName, bucketName, "snap3",
+        ((RDBStore)((OmSnapshot)snapDB3.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
@@ -260,10 +281,33 @@ public class TestOMSnapshotDAG {
     // Same snapshot. Result should be empty list
     List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
     Assertions.assertTrue(sstDiffList22.isEmpty());
-
+    snapDB1.close();
+    snapDB2.close();
+    snapDB3.close();
     // Test DAG reconstruction by restarting OM. Then do the same diffs again
     cluster.restartOzoneManager();
-
+    ozoneManager = cluster.getOzoneManager();
+    omMetadataManager = ozoneManager.getMetadataManager();
+    snapDB1 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+    snapDB2 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap2"));
+    snap1 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap1",
+        ((RDBStore)((OmSnapshot)snapDB1.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
+    snap2 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap2", ((RDBStore)((OmSnapshot)snapDB2.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
+    snapDB3 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap3"));
+    snap3 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap3",
+        ((RDBStore)((OmSnapshot)snapDB3.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
     Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
 
@@ -272,6 +316,9 @@ public class TestOMSnapshotDAG {
 
     List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
     Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
+    snapDB1.close();
+    snapDB2.close();
+    snapDB3.close();
   }
 
   @Test

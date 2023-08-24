@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
@@ -101,8 +100,10 @@ public class RDBStore implements DBStore {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
-            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(), configuration);
+            DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
+            configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -218,7 +219,10 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     IOUtils.closeQuietly(checkPointManager);
-    IOUtils.closeQuietly(rocksDBCheckpointDiffer);
+    if (rocksDBCheckpointDiffer != null) {
+      RocksDBCheckpointDifferHolder
+          .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
+    }
     IOUtils.closeQuietly(db);
   }
 
@@ -442,7 +446,6 @@ public class RDBStore implements DBStore {
     return db.isClosed();
   }
 
-  @VisibleForTesting
   public RocksDatabase getDb() {
     return db;
   }
