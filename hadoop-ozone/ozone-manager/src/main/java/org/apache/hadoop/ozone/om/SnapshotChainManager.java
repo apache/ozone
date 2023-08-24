@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -429,5 +430,16 @@ public class SnapshotChainManager {
   public LinkedHashMap<UUID, SnapshotChainInfo> getSnapshotChainPath(
       String path) {
     return snapshotChainByPath.get(path);
+  }
+
+  @VisibleForTesting
+  public Map<UUID, SnapshotChainInfo> getGlobalSnapshotChain() {
+    return globalSnapshotChain;
+  }
+
+  @VisibleForTesting
+  public Map<String,
+      LinkedHashMap<UUID, SnapshotChainInfo>> getSnapshotChainByPath() {
+    return snapshotChainByPath;
   }
 }
