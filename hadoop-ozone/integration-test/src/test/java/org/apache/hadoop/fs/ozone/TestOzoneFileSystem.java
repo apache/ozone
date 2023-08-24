@@ -1625,7 +1625,6 @@ public class TestOzoneFileSystem {
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.write(1);
     }
-
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
