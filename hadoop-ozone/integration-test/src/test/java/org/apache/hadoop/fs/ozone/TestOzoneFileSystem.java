@@ -802,6 +802,7 @@ public class TestOzoneFileSystem {
       return;
     }
     deleteRootRecursively(fileStatuses);
+    Thread.sleep(500);
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
       Assert.assertEquals(
