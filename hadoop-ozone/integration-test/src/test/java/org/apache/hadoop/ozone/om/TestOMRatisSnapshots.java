@@ -1241,8 +1241,9 @@ public class TestOMRatisSnapshots {
     SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
         snapshotNamePrefix + RandomStringUtils.randomNumeric(5));
 
-    File sstBackupDir = getSstBackupDir(newLeaderOM);
-    int numberOfSstFiles = sstBackupDir.listFiles().length;
+    // TODO: https://issues.apache.org/jira/browse/HDDS-9209
+    // File sstBackupDir = getSstBackupDir(newLeaderOM);
+    // int numberOfSstFiles = sstBackupDir.listFiles().length;
 
     // delete snapshot c
     client.getObjectStore()
