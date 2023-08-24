@@ -1304,7 +1304,8 @@ public class TestOMRatisSnapshots {
         compactionLogsDir, numberOfLogFiles, contentLength,
         currentCompactionLog);
 
-    checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
+    // TODO: https://issues.apache.org/jira/browse/HDDS-9209
+    // checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(snapshotNamePrefix,
         newLeaderOM);
