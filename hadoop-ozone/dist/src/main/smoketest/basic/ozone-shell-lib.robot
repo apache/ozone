@@ -214,11 +214,13 @@ Test native authorizer
 
     Execute         ozone sh volume removeacl ${protocol}${server}/${volume} -a group:root:a
     Execute         kdestroy
-    Run Keyword     Kinit test user     testuser2    testuser2.keytab
+    Run Keyword     Kinit test user     testuser    testuser.keytab
     ${result} =     Execute And Ignore Error         ozone sh bucket list ${protocol}${server}/${volume}
                     Should contain      ${result}    PERMISSION_DENIED
     ${result} =     Execute And Ignore Error         ozone sh key list ${protocol}${server}/${volume}/bb1
                     Should contain      ${result}    PERMISSION_DENIED
+    Execute         kdestroy
+    Run Keyword     Kinit test user     testuser2    testuser2.keytab
     ${result} =     Execute And Ignore Error         ozone sh volume addacl ${protocol}${server}/${volume} -a user:testuser2:xy
                     Should contain      ${result}    PERMISSION_DENIED User testuser2 doesn't have WRITE_ACL permission to access volume
     Execute         kdestroy
