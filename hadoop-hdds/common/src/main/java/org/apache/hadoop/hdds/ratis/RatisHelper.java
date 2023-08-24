@@ -92,7 +92,7 @@ public final class RatisHelper {
   }
 
   public static JvmPauseMonitor newJvmPauseMonitor(String name) {
-    return new JvmPauseMonitor(name, extraSleep -> { });
+    return JvmPauseMonitor.newBuilder().setName(name).build();
   }
 
   private static String toRaftPeerIdString(DatanodeDetails id) {

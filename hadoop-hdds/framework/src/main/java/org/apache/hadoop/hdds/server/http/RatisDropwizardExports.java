@@ -27,8 +27,9 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
+import org.apache.ratis.metrics.MetricRegistryInfo;
 import org.apache.ratis.metrics.RatisMetricRegistry;
+import org.apache.ratis.metrics.dropwizard3.RatisMetricsUtils;
 
 import java.util.Map;
 
@@ -52,8 +53,9 @@ public class RatisDropwizardExports extends DropwizardExports {
     //All the Ratis metrics (registered from now) will be published via JMX and
     //via the prometheus exporter (used by the /prom servlet
     List<MetricReporter> ratisReporterList = new ArrayList<>();
-    ratisReporterList.add(new MetricReporter(MetricsReporting.jmxReporter(),
-        MetricsReporting.stopJmxReporter()));
+    ratisReporterList.add(new MetricReporter(
+        RatisMetricsUtils.jmxReporter(),
+        RatisMetricsUtils.stopJmxReporter()));
     Consumer<RatisMetricRegistry> reporter
         = r1 -> registerDropwizard(r1, ratisMetricsMap, checkStopped);
     Consumer<RatisMetricRegistry> stopper
@@ -88,6 +90,12 @@ public class RatisDropwizardExports extends DropwizardExports {
     MetricRegistries.global().clear();
   }
 
+  static String getName(MetricRegistryInfo info) {
+    return MetricRegistry.name(info.getApplicationName(),
+        info.getMetricsComponentName(),
+        info.getPrefix());
+  }
+
   private static void registerDropwizard(RatisMetricRegistry registry,
       Map<String, RatisDropwizardExports> ratisMetricsMap,
       BooleanSupplier checkStopped) {
@@ -96,8 +104,8 @@ public class RatisDropwizardExports extends DropwizardExports {
     }
     
     RatisDropwizardExports rde = new RatisDropwizardExports(
-        registry.getDropWizardMetricRegistry());
-    String name = registry.getMetricRegistryInfo().getName();
+        RatisMetricsUtils.getDropWizardMetricRegistry(registry));
+    final String name = getName(registry.getMetricRegistryInfo());
     if (null == ratisMetricsMap.putIfAbsent(name, rde)) {
       // new rde is added for the name, so need register
       CollectorRegistry.defaultRegistry.register(rde);
@@ -106,7 +114,7 @@ public class RatisDropwizardExports extends DropwizardExports {
 
   private static void deregisterDropwizard(RatisMetricRegistry registry,
       Map<String, RatisDropwizardExports> ratisMetricsMap) {
-    String name = registry.getMetricRegistryInfo().getName();
+    final String name = getName(registry.getMetricRegistryInfo());
     Collector c = ratisMetricsMap.remove(name);
     if (c != null) {
       CollectorRegistry.defaultRegistry.unregister(c);

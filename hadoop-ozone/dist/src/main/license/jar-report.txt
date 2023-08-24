@@ -239,7 +239,8 @@ share/ozone/lib/ranger-plugins-cred.jar
 share/ozone/lib/ratis-client.jar
 share/ozone/lib/ratis-common.jar
 share/ozone/lib/ratis-grpc.jar
-share/ozone/lib/ratis-metrics.jar
+share/ozone/lib/ratis-metrics-api.jar
+share/ozone/lib/ratis-metrics-dropwizard3.jar
 share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar

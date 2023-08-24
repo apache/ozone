@@ -209,37 +209,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </dependency>
 
       <dependency>
-        <groupId>org.apache.ratis</groupId>
-        <artifactId>ratis-proto-shaded</artifactId>
-        <version>${ratis.version}</version>
-      </dependency>
-      <dependency>
-        <artifactId>ratis-common</artifactId>
-        <groupId>org.apache.ratis</groupId>
-        <version>${ratis.version}</version>
-      </dependency>
-      <dependency>
-        <artifactId>ratis-client</artifactId>
-        <groupId>org.apache.ratis</groupId>
-        <version>${ratis.version}</version>
-      </dependency>
-      <dependency>
-        <artifactId>ratis-server</artifactId>
-        <groupId>org.apache.ratis</groupId>
-        <version>${ratis.version}</version>
-      </dependency>
-      <dependency>
-        <artifactId>ratis-netty</artifactId>
-        <groupId>org.apache.ratis</groupId>
-        <version>${ratis.version}</version>
-      </dependency>
-      <dependency>
-        <artifactId>ratis-grpc</artifactId>
-        <groupId>org.apache.ratis</groupId>
-        <version>${ratis.version}</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>

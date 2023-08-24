@@ -84,6 +84,7 @@ import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
@@ -172,6 +173,7 @@ public final class OzoneManagerRatisServer {
         .setProperties(serverProperties)
         .setParameters(parameters)
         .setStateMachine(omStateMachine)
+        .setOption(RaftStorage.StartupOption.RECOVER)
         .build();
   }
 
