@@ -285,6 +285,8 @@ public class TestHddsClientUtils {
     invalidNames.add("{curly-left");
     invalidNames.add("\"hi\"");
     invalidNames.add("\\\\~`");
+    invalidNames.add("Code`");
+
 
     for (String name : invalidNames) {
       try {
