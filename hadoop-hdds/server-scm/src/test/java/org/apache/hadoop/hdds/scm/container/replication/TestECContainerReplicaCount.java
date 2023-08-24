@@ -548,7 +548,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissing() {
+  public void testUnRecoverable() {
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, new HashSet<>(),
             Collections.emptyList(), 1);
@@ -557,6 +557,10 @@ public class TestECContainerReplicaCount {
 
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_MAINTENANCE, 2));
+    // The unhealthy replica does not help with recovery even though we now
+    // have 3 replicas.
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 3)));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     Assertions.assertTrue(rcnt.isUnrecoverable());
@@ -572,6 +576,74 @@ public class TestECContainerReplicaCount {
     // Not missing as the decommission replicas are still online
     Assertions.assertFalse(rcnt.isUnrecoverable());
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
+
+    // All unhealthy replicas is still un-recoverable.
+    replica = ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 1),
+        Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+        Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    // Not missing as the decommission replicas are still online
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+  }
+
+  @Test
+  public void testIsMissingAndUnhealthy() {
+    // No Replicas
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, new HashSet<>(),
+            Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 1 unhealthy
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 2 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 3 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+
+    // 3 replicas, with 1 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 3)));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 4 replicas, with 1 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3));
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 4)));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertFalse(rcnt.isUnrecoverable());
   }
 
   @Test

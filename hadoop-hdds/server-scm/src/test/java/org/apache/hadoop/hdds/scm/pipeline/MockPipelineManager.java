@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -70,8 +71,17 @@ public class MockPipelineManager implements PipelineManager {
   public Pipeline createPipeline(ReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
-    Pipeline pipeline = buildECPipeline(replicationConfig, excludedNodes,
-        favoredNodes);
+    Pipeline pipeline;
+    if (replicationConfig.getReplicationType()
+        == HddsProtos.ReplicationType.EC) {
+      pipeline = buildECPipeline(
+          replicationConfig, excludedNodes, favoredNodes);
+    } else {
+      pipeline = createPipeline(replicationConfig,
+          ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails(),
+              MockDatanodeDetails.randomDatanodeDetails()));
+    }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
         ClientVersion.CURRENT_VERSION));

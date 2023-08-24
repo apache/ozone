@@ -42,9 +42,11 @@ public class ECMisReplicationCheckHandler extends AbstractCheck {
       // This handler is only for EC containers.
       return false;
     }
+
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerID containerID = container.containerID();
+    LOG.debug("Checking container {} for mis replication.", container);
 
     ContainerHealthResult health = checkMisReplication(request);
     if (health.getHealthState() ==
@@ -74,6 +76,11 @@ public class ECMisReplicationCheckHandler extends AbstractCheck {
         container.getReplicationConfig().getRequiredNodes(),
         Collections.emptyList());
     if (!placement.isPolicySatisfied()) {
+      /*
+      Check if policy is satisfied by considering pending ops. For example if
+      there are some pending adds that can fix mis replication then we don't
+      want to queue this container.
+       */
       ContainerPlacementStatus placementAfterPending = getPlacementStatus(
           replicas, container.getReplicationConfig().getRequiredNodes(),
           request.getPendingOps());

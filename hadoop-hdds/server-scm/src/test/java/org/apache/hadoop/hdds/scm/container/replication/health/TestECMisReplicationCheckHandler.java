@@ -138,6 +138,10 @@ public class TestECMisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
+  /**
+   * If mis replication is fixed by a pending ADD, then the container should
+   * not be queued.
+   */
   @Test
   public void shouldReturnFalseForMisReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
@@ -184,6 +188,12 @@ public class TestECMisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.MIS_REPLICATED));
   }
 
+  /**
+   * This tests what happens when there's a pending DELETE. Suppose there's a
+   * mis replicated container with an excess unhealthy replica. And, there's a
+   * pending delete scheduled for the unhealthy replica. Then this container
+   * should not be queued.
+   */
   @Test
   public void testMisReplicationWithUnhealthyReplica() {
     ContainerInfo container = createContainerInfo(repConfig);
