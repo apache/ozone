@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -236,6 +235,7 @@ public class SnapshotChainManager {
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
       Map<UUID, SnapshotInfo> snaps = new HashMap<>();
+      // Forward Linked list for snapshot chain.
       Map<UUID, UUID> snapshotChain = new HashMap<>();
       UUID head = null;
       Table.KeyValue<String, SnapshotInfo> kv;
@@ -254,6 +254,7 @@ public class SnapshotChainManager {
                 snapshotInfo.getGlobalPreviousSnapshotId(),
                 snapshotInfo.getSnapshotId());
           }
+          // Adding edge to the linked list. prevGlobalSnapId -> snapId
           snapshotChain.put(snapshotInfo.getGlobalPreviousSnapshotId(),
               snapshotInfo.getSnapshotId());
         } else {
@@ -273,9 +274,9 @@ public class SnapshotChainManager {
       }
       if (size != snaps.size()) {
         throw new IOException(String.format("Snapshot chain corruption. " +
-                "All snapshots in the snapshot have not been added. " +
-                "Global Snapshot Chain is broken. Last snapshot add to chain : " +
-                "%s", prev));
+            "All snapshots in the snapshot have not been added. " +
+            "Global Snapshot Chain is broken. Last snapshot " +
+            "add to chain : %s", prev));
       }
     } catch (IOException ioException) {
       // TODO: [SNAPSHOT] Fail gracefully.
