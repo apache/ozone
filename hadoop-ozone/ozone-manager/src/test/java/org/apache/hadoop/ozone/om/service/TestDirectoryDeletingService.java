@@ -109,10 +109,11 @@ public class TestDirectoryDeletingService {
 
     // create parent directory and 2000 files in it crossing
     // size of 4MB as defined for the testcase
-    String longName = "test";
+    StringBuilder sb = new StringBuilder("test");
     for (int i = 0; i < 100; ++i) {
-      longName += "0123456789";
+      sb.append("0123456789");
     }
+    String longName = sb.toString();
     OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
         .setName("dir" + longName)
         .setCreationTime(Time.now())
@@ -147,7 +148,7 @@ public class TestDirectoryDeletingService {
     writeClient.deleteKey(delArgs);
 
     // wait for file count of only 100 but not all 2000 files
-    // as logic, will take 100 files
+    // as logic, will take 1000 files
     DirectoryDeletingService dirDeletingService =
         (DirectoryDeletingService) keyManager.getDirDeletingService();
     GenericTestUtils.waitFor(
