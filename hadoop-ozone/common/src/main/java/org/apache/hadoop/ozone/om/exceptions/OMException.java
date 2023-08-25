@@ -262,6 +262,7 @@ public class OMException extends IOException {
     INVALID_SNAPSHOT_ERROR,
     CONTAINS_SNAPSHOT,
     SSL_CONNECTION_FAILURE,
-    RENAME_OPEN_FILE
+    RENAME_OPEN_FILE,
+    UNAUTHORIZED
   }
 }
