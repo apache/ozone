@@ -65,14 +65,15 @@ public class TestSnapshotChain {
 
   private SnapshotInfo createSnapshotInfo(UUID snapshotID,
                                           UUID pathPrevID,
-                                          UUID globalPrevID) {
+                                          UUID globalPrevID,
+                                          long creationTime) {
     return new SnapshotInfo.Builder()
         .setSnapshotId(snapshotID)
         .setName("test")
         .setVolumeName("vol1")
         .setBucketName("bucket1")
         .setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE)
-        .setCreationTime(Time.now())
+        .setCreationTime(creationTime)
         .setDeletionTime(-1L)
         .setPathPreviousSnapshotId(pathPrevID)
         .setGlobalPreviousSnapshotId(globalPrevID)
@@ -141,13 +142,13 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-
+    long time = System.currentTimeMillis();
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       chainManager.addSnapshot(createSnapshotInfo(
           snapshotID,
           prevSnapshotID,
-          prevSnapshotID));
+          prevSnapshotID, time--));
       prevSnapshotID = snapshotID;
     }
 
@@ -203,14 +204,14 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-
+    long time = System.currentTimeMillis();
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       snapshotIdToSnapshotInfoMap.put(snapshotID,
           createSnapshotInfo(
               snapshotID,
               prevSnapshotID,
-              prevSnapshotID));
+              prevSnapshotID, time--));
 
       chainManager.addSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID));
       prevSnapshotID = snapshotID;
@@ -253,11 +254,12 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID2);
 
     UUID prevSnapshotID = null;
-
+    long time = System.currentTimeMillis();
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       snapshotInfo.put(snapshotID.toString(),
-          createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID));
+          createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID,
+          time--));
       prevSnapshotID = snapshotID;
     }
 
