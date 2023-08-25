@@ -805,7 +805,7 @@ public class ReplicationManager implements SCMService {
    * @param datanode The datanode for which the commands have been updated.
    */
   public void datanodeCommandCountUpdated(DatanodeDetails datanode) {
-    LOG.debug("Received a notification that the DN command count " +
+    LOG.trace("Received a notification that the DN command count " +
         "has been updated for {}", datanode);
     // If there is an existing mapping, we may need to remove it
     excludedNodes.computeIfPresent(datanode, (dn, v) -> {
