@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -1433,7 +1434,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String omStorageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
       String scmStorageDir =
           conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
-      if (omStorageDir.equals(scmStorageDir)) {
+      if (!Strings.isNullOrEmpty(omStorageDir) && !Strings
+          .isNullOrEmpty(scmStorageDir) && omStorageDir.equals(scmStorageDir)) {
         throw new IOException(
             "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
                 + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
