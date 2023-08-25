@@ -32,7 +32,7 @@ ${SECURITY_ENABLED}   true
 
 S3 Gateway Revoke Secret
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
-    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/secret/revoke
+    ${result} =         Execute                             curl -X POST --negotiate -u : -v ${ENDPOINT_URL}/secret/revoke
                         IF   '${SECURITY_ENABLED}' == 'true'
                             Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
                         ELSE

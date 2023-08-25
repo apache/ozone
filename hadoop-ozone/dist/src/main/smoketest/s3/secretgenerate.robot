@@ -31,7 +31,7 @@ ${ENDPOINT_URL}       http://s3g:9878
 
 S3 Gateway Generate Secret
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
-    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/secret/generate
+    ${result} =         Execute                             curl -X POST --negotiate -u : -v ${ENDPOINT_URL}/secret/generate
                         IF   '${SECURITY_ENABLED}' == 'true'
                             Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
                             Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
