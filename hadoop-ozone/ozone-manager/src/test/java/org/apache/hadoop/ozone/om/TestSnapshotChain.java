@@ -17,21 +17,32 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -274,5 +285,57 @@ public class TestSnapshotChain {
     assertThrows(NoSuchElementException.class,
         () -> chainManager.previousPathSnapshot(String
             .join("/", "vol1", "bucket1"), snapshotID1));
+  }
+
+  private static Stream<? extends Arguments> invalidSnapshotChain() {
+    List<UUID> nodes = IntStream.range(0, 5)
+        .mapToObj(i -> UUID.randomUUID())
+        .collect(Collectors.toList());
+    return Stream.of(
+        Arguments.of(Named.of("Disconnected Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(Named.of("Complete Cyclic Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(0), nodes.get(4),
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(Named.of("Partial Cyclic Snapshot Chain",
+            ImmutableMap.of(
+                nodes.get(0), nodes.get(3),
+                nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(3)))),
+        Arguments.of(Named.of("Diverged Snapshot Chain",
+            ImmutableMap.of(nodes.get(1), nodes.get(0),
+                nodes.get(2), nodes.get(1),
+                nodes.get(3), nodes.get(2),
+                nodes.get(4), nodes.get(2))))
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidSnapshotChain")
+  public void testInvalidChainFromLoadFromTable(Map<UUID, UUID> snapshotChain)
+      throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    Set<UUID> snapshotIDs = new HashSet<>();
+    snapshotChain.forEach((key, value) -> {
+      snapshotIDs.add(value);
+      snapshotIDs.add(key);
+    });
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotInfo.put(snapshotID.toString(),
+          createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
+              snapshotChain.get(snapshotID), System.currentTimeMillis()));
+    }
+    Assertions.assertThrows(RuntimeException.class,
+        () -> new SnapshotChainManager(omMetadataManager));
   }
 }
