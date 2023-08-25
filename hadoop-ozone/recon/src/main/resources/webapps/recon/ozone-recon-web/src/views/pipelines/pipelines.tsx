@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import {Table, Tabs, Tooltip, Icon} from 'antd';
 import './pipelines.less';
 import {PaginationConfig} from 'antd/lib/pagination';
@@ -29,6 +28,7 @@ import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 import {IAxiosResponse} from 'types/axios.types';
 import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const {TabPane} = Tabs;
 const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED', 'DORMANT'] as const;
@@ -166,6 +166,8 @@ const COLUMNS = [
   }
 ];
 
+let cancelPipelineSignal: AbortController;
+
 export class Pipelines extends React.Component<Record<string, object>, IPipelinesState> {
   autoReload: AutoReloadHelper;
 
@@ -184,7 +186,10 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
     this.setState({
       activeLoading: true
     });
-    axios.get('/api/v1/pipelines').then((response: IAxiosResponse<IPipelinesResponse>) => {
+    const { request, controller } = AxiosGetHelper('/api/v1/pipelines', cancelPipelineSignal);
+    cancelPipelineSignal = controller;
+
+    request.then((response: IAxiosResponse<IPipelinesResponse>) => {
       const pipelinesResponse: IPipelinesResponse = response.data;
       const totalCount = pipelinesResponse.totalCount;
       const pipelines: IPipelineResponse[] = pipelinesResponse.pipelines;
@@ -210,6 +215,9 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelRequests([
+      cancelPipelineSignal
+    ])
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

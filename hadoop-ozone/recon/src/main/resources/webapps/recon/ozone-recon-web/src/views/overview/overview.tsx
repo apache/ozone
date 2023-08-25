@@ -27,6 +27,7 @@ import {showDataFetchError,byteToSize} from 'utils/common';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import filesize from 'filesize';
 import './overview.less';
+import { AxiosAllGetHelper, AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({round: 1});
 
@@ -70,6 +71,9 @@ interface IOverviewState {
   deletePendingSummarytotalDeletedKeys: number,
 }
 
+let cancelOverviewSignal: AbortController;
+let cancelOMDBSyncSignal: AbortController;
+
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
   interval = 0;
   autoReload: AutoReloadHelper;
@@ -111,12 +115,22 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     this.setState({
       loading: true
     });
-    axios.all([
-      axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/task/status'),
-      axios.get('/api/v1/keys/open/summary'),
-      axios.get('/api/v1/keys/deletePending/summary'),
-    ]).then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
+
+    //cancel any previous pending requests
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ]);
+
+    const { requests, controller } = AxiosAllGetHelper([
+      '/api/v1/clusterState',
+      '/api/v1/task/status',
+      '/api/v1/keys/open?limit=0',
+      '/api/v1/keys/deletePending?limit=1'
+    ], cancelOverviewSignal);
+    cancelOverviewSignal = controller;
+
+    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
@@ -161,7 +175,14 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       loading: true
     });
 
-    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+    const { request, controller } = AxiosGetHelper(
+      '/api/v1/triggerdbsync/om',
+      cancelOMDBSyncSignal,
+      "OM-DB Sync request cancelled because data was updated"
+    );
+    cancelOMDBSyncSignal = controller;
+
+    request.then( omstatusResponse => {    
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -182,6 +203,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ]);
   }
 
   render() {
