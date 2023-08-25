@@ -80,6 +80,7 @@ public class WritableRatisContainerProvider
     */
 
     ContainerInfo containerInfo = null;
+    String failureReason = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
@@ -136,11 +137,16 @@ public class WritableRatisContainerProvider
             } catch (IOException e) {
               LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
                       allocatedPipelineIDs, e);
+              failureReason = "Waiting for one of pipelines to be OPEN failed. "
+                  + e.getMessage();
             }
+          } else {
+            failureReason = se.getMessage();
           }
         } catch (IOException e) {
           LOG.warn("Pipeline creation failed for repConfig: {}. "
               + "Retrying get pipelines call once.", repConfig, e);
+          failureReason = e.getMessage();
         }
 
         pipelineManager.acquireReadLock();
@@ -174,7 +180,7 @@ public class WritableRatisContainerProvider
         size, repConfig);
     throw new IOException(
         "Unable to allocate a container to the block of size: " + size
-            + ", replicationConfig: " + repConfig);
+            + ", replicationConfig: " + repConfig + ". " + failureReason);
   }
 
   private List<Pipeline> findPipelinesByState(
