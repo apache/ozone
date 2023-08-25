@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -234,7 +235,9 @@ public class SnapshotChainManager {
     // snapshot chains - both global and local path
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
-      Map<Long, SnapshotInfo> snaps = new TreeMap<>();
+      Map<UUID, SnapshotInfo> snaps = new HashMap<>();
+      Map<UUID, UUID> snapshotChain = new HashMap<>();
+      UUID head = null;
       Table.KeyValue<String, SnapshotInfo> kv;
       globalSnapshotChain.clear();
       snapshotChainByPath.clear();
@@ -243,10 +246,36 @@ public class SnapshotChainManager {
 
       while (keyIter.hasNext()) {
         kv = keyIter.next();
-        snaps.put(kv.getValue().getCreationTime(), kv.getValue());
+        SnapshotInfo snapshotInfo = kv.getValue();
+        snaps.put(kv.getValue().getSnapshotId(), snapshotInfo);
+        if (snapshotInfo.getGlobalPreviousSnapshotId() != null) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Global Snapshot chain link {} -> {}",
+                snapshotInfo.getGlobalPreviousSnapshotId(),
+                snapshotInfo.getSnapshotId());
+          }
+          snapshotChain.put(snapshotInfo.getGlobalPreviousSnapshotId(),
+              snapshotInfo.getSnapshotId());
+        } else {
+          head = snapshotInfo.getSnapshotId();
+        }
       }
-      for (SnapshotInfo snapshotInfo : snaps.values()) {
-        addSnapshot(snapshotInfo);
+      int size = 0;
+      UUID prev = null;
+      while (head != null) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Adding Snapshot Info: {}", snaps.get(head));
+        }
+        addSnapshot(snaps.get(head));
+        size += 1;
+        prev = head;
+        head = snapshotChain.get(head);
+      }
+      if (size != snaps.size()) {
+        throw new IOException(String.format("Snapshot chain corruption. " +
+                "All snapshots in the snapshot have not been added. " +
+                "Global Snapshot Chain is broken. Last snapshot add to chain : " +
+                "%s", prev));
       }
     } catch (IOException ioException) {
       // TODO: [SNAPSHOT] Fail gracefully.
