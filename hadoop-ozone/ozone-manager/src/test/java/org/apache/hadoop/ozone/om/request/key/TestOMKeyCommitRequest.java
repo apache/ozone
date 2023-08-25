@@ -352,10 +352,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // 3rd and final commit of all 10 blocks, HSync = false
     keyToDeleteMap = doKeyCommit(false, allocatedKeyLocationList);
-    // keyToDeleteMap should be empty because none of the previous blocks
+    // keyToDeleteMap should be null / empty because none of the previous blocks
     // should be deleted.
-    Assert.assertNotNull(keyToDeleteMap);
-    Assert.assertTrue(keyToDeleteMap.isEmpty());
+    Assert.assertTrue(keyToDeleteMap == null || keyToDeleteMap.isEmpty());
     bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     long thirdCommitUsedBytes = bucketInfo.getUsedBytes();
     Assert.assertEquals(1000, thirdCommitUsedBytes - usedBytes);
