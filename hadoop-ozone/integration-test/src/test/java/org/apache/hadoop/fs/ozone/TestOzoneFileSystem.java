@@ -84,6 +84,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -228,7 +229,7 @@ public class TestOzoneFileSystem {
   public void cleanup() {
     try {
       deleteRootDir();
-    } catch (IOException | InterruptedException ex) {
+    } catch (IOException | InterruptedException | TimeoutException ex) {
       LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
@@ -795,15 +796,19 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir() throws IOException, InterruptedException {
+  protected void deleteRootDir()
+      throws IOException, InterruptedException, TimeoutException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
     deleteRootRecursively(fileStatuses);
-    Thread.sleep(500);
     fileStatuses = fs.listStatus(ROOT);
+    FileStatus[] finalFileStatuses = fileStatuses;
+    GenericTestUtils.waitFor(
+        () -> (finalFileStatuses != null && finalFileStatuses.length == 0), 100, 500);
+
     if (fileStatuses != null) {
       Assert.assertEquals(
           "Delete root failed!", 0, fileStatuses.length);
