@@ -804,11 +804,8 @@ public class TestOzoneFileSystem {
       return;
     }
     deleteRootRecursively(fileStatuses);
+    Thread.sleep(500);
     fileStatuses = fs.listStatus(ROOT);
-    FileStatus[] finalFileStatuses = fileStatuses;
-    GenericTestUtils.waitFor(
-        () -> (finalFileStatuses != null && finalFileStatuses.length == 0), 100, 500);
-
     if (fileStatuses != null) {
       Assert.assertEquals(
           "Delete root failed!", 0, fileStatuses.length);
