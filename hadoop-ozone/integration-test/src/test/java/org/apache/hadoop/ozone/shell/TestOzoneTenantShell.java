@@ -496,10 +496,12 @@ public class TestOzoneTenantShell {
     checkOutput(err, "Assigned 'bob' to 'finance' with accessId"
         + " 'finance$bob'.\n", true);
 
-    // Try user getsecret again after assignment, should fail
+    // Try user getsecret again after assignment, should succeed
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
-    checkOutput(err, "Secret for 'finance$bob' already exists\n", true);
+    checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
+        false);
+    checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {
         "--verbose", "user", "assign", "bob", "--tenant=research"});
@@ -808,8 +810,8 @@ public class TestOzoneTenantShell {
     // Get secret should still give the previous secret key
     executeHA(tenantShell, new String[] {
         "user", "getsecret", tenantName + "$alice"});
-    checkOutput(err, "Secret for 'tenant-test-set-secret$alice' " +
-        "already exists\n", true);
+    checkOutput(out, "somesecret1", false);
+    checkOutput(err, "", true);
 
     // Set secret as alice should succeed
     final UserGroupInformation ugiAlice = UserGroupInformation
