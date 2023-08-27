@@ -111,6 +111,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+// TODO https://issues.apache.org/jira/browse/HDDS-9209
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.LOG;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
@@ -180,7 +182,7 @@ public class TestOMRatisSnapshots {
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
           TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
-          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 30,
+          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 10,
           TimeUnit.SECONDS);
     }
     if ("testSnapshotAndKeyDeletionBackgroundServices"
@@ -214,6 +216,11 @@ public class TestOMRatisSnapshots {
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)
         .build();
+    if ("testBackupCompactionFilesPruningBackgroundService"
+        .equals(testInfo.getDisplayName())) {
+      cluster.getOzoneManagersList()
+          .forEach(TestOMRatisSnapshots::suspendBackupCompactionFilesPruning);
+    }
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
@@ -1310,7 +1317,27 @@ public class TestOMRatisSnapshots {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM);
+    // Get the latest db checkpoint from the leader OM.
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerOM.getOMNodeId());
+    suspendBackupCompactionFilesPruning(followerOM);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 10s
+    GenericTestUtils.waitFor(() ->
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= leaderOMSnapshotIndex - 1, 100, 10000);
+
+    // Verify RPC server is running
+    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -1361,7 +1388,28 @@ public class TestOMRatisSnapshots {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM);
+    // Get the latest db checkpoint from the leader OM.
+    TransactionInfo transactionInfo =
+        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.valueOf(transactionInfo.getTerm(),
+            transactionInfo.getTransactionIndex());
+    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+
+    // Start the inactive OM. Checkpoint installation will happen spontaneously.
+    cluster.startInactiveOM(followerOM.getOMNodeId());
+
+    suspendBackupCompactionFilesPruning(followerOM);
+
+    // The recently started OM should be lagging behind the leader OM.
+    // Wait & for follower to update transactions to leader snapshot index.
+    // Timeout error if follower does not load update within 10s
+    GenericTestUtils.waitFor(() ->
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
+            >= leaderOMSnapshotIndex - 1, 100, 10000);
+
+    // Verify RPC server is running
+    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -1376,10 +1424,31 @@ public class TestOMRatisSnapshots {
     File sstBackupDir = getSstBackupDir(newLeaderOM);
     int numberOfSstFiles = sstBackupDir.listFiles().length;
 
+    resumeBackupCompactionFilesPruning(newLeaderOM);
     checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(SNAPSHOT_NAME_PREFIX,
         newLeaderOM);
+  }
+
+  private static void resumeBackupCompactionFilesPruning(
+      OzoneManager ozoneManager) {
+    LOG.info("###Resumin");
+    ozoneManager
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .resume();
+  }
+
+  private static void suspendBackupCompactionFilesPruning(
+      OzoneManager ozoneManager) {
+    LOG.info("###Suspending");
+    ozoneManager
+        .getMetadataManager()
+        .getStore()
+        .getRocksDBCheckpointDiffer()
+        .suspend();
   }
 
   @Test
@@ -1429,6 +1498,8 @@ public class TestOMRatisSnapshots {
       int numberOfSstFiles) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = sstBackupDir.listFiles().length;
+      // TODO https://issues.apache.org/jira/browse/HDDS-9209
+      LOG.info("###{},{}", numberOfSstFiles, newNumberOfSstFiles);
       return numberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 30000);
   }
