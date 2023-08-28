@@ -29,10 +29,12 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -153,13 +155,14 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-    long time = System.currentTimeMillis();
+    List<Integer> times = Arrays.asList(1, 2, 0);
+    int timeIdx = 0;
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       chainManager.addSnapshot(createSnapshotInfo(
           snapshotID,
           prevSnapshotID,
-          prevSnapshotID, time--));
+          prevSnapshotID, times.get(timeIdx++)));
       prevSnapshotID = snapshotID;
     }
 
@@ -215,14 +218,15 @@ public class TestSnapshotChain {
     snapshotIDs.add(snapshotID3);
 
     UUID prevSnapshotID = null;
-    long time = System.currentTimeMillis();
+    List<Integer> times = Arrays.asList(1, 2, 0);
+    int timeIdx = 0;
     // add 3 snapshots
     for (UUID snapshotID : snapshotIDs) {
       snapshotIdToSnapshotInfoMap.put(snapshotID,
           createSnapshotInfo(
               snapshotID,
               prevSnapshotID,
-              prevSnapshotID, time--));
+              prevSnapshotID, times.get(timeIdx++)));
 
       chainManager.addSnapshot(snapshotIdToSnapshotInfoMap.get(snapshotID));
       prevSnapshotID = snapshotID;
@@ -251,8 +255,10 @@ public class TestSnapshotChain {
     assertEquals(snapshotID3, chainManager.previousGlobalSnapshot(snapshotID2));
   }
 
-  @Test
-  public void testChainFromLoadFromTable() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testChainFromLoadFromTable(boolean increasingTIme)
+      throws Exception {
     Table<String, SnapshotInfo> snapshotInfo =
             omMetadataManager.getSnapshotInfoTable();
 
@@ -270,7 +276,7 @@ public class TestSnapshotChain {
     for (UUID snapshotID : snapshotIDs) {
       snapshotInfo.put(snapshotID.toString(),
           createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID,
-          time--));
+          increasingTIme ? time++ : time--));
       prevSnapshotID = snapshotID;
     }
 
@@ -292,26 +298,26 @@ public class TestSnapshotChain {
         .mapToObj(i -> UUID.randomUUID())
         .collect(Collectors.toList());
     return Stream.of(
-        Arguments.of(Named.of("Disconnected Snapshot Chain",
+        Arguments.of(nodes, Named.of("Disconnected Snapshot Chain",
             ImmutableMap.of(
                 nodes.get(1), nodes.get(0),
                 nodes.get(2), nodes.get(1),
                 nodes.get(4), nodes.get(3)))),
-        Arguments.of(Named.of("Complete Cyclic Snapshot Chain",
+        Arguments.of(nodes, Named.of("Complete Cyclic Snapshot Chain",
             ImmutableMap.of(
                 nodes.get(0), nodes.get(4),
                 nodes.get(1), nodes.get(0),
                 nodes.get(2), nodes.get(1),
                 nodes.get(3), nodes.get(2),
                 nodes.get(4), nodes.get(3)))),
-        Arguments.of(Named.of("Partial Cyclic Snapshot Chain",
+        Arguments.of(nodes, Named.of("Partial Cyclic Snapshot Chain",
             ImmutableMap.of(
                 nodes.get(0), nodes.get(3),
                 nodes.get(1), nodes.get(0),
                 nodes.get(2), nodes.get(1),
                 nodes.get(3), nodes.get(2),
                 nodes.get(4), nodes.get(3)))),
-        Arguments.of(Named.of("Diverged Snapshot Chain",
+        Arguments.of(nodes, Named.of("Diverged Snapshot Chain",
             ImmutableMap.of(nodes.get(1), nodes.get(0),
                 nodes.get(2), nodes.get(1),
                 nodes.get(3), nodes.get(2),
@@ -321,19 +327,31 @@ public class TestSnapshotChain {
 
   @ParameterizedTest
   @MethodSource("invalidSnapshotChain")
-  public void testInvalidChainFromLoadFromTable(Map<UUID, UUID> snapshotChain)
-      throws Exception {
+  public void testInvalidGlobalChainFromLoadFromTable(
+      List<UUID> snapshotIDs, Map<UUID, UUID> snapshotChain) throws Exception {
     Table<String, SnapshotInfo> snapshotInfo =
         omMetadataManager.getSnapshotInfoTable();
-    Set<UUID> snapshotIDs = new HashSet<>();
-    snapshotChain.forEach((key, value) -> {
-      snapshotIDs.add(value);
-      snapshotIDs.add(key);
-    });
     for (UUID snapshotID : snapshotIDs) {
       snapshotInfo.put(snapshotID.toString(),
           createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
               snapshotChain.get(snapshotID), System.currentTimeMillis()));
+    }
+    Assertions.assertThrows(IllegalStateException.class,
+        () -> new SnapshotChainManager(omMetadataManager));
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidSnapshotChain")
+  public void testInvalidChainFromLoadFromTable(List<UUID> snapshotIDs,
+      Map<UUID, UUID> snapshotChain) throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    UUID prevSnapshotId = null;
+    for (UUID snapshotID : snapshotIDs) {
+      snapshotInfo.put(snapshotID.toString(),
+          createSnapshotInfo(snapshotID, prevSnapshotId,
+              snapshotChain.get(snapshotID), System.currentTimeMillis()));
+      prevSnapshotId = snapshotID;
     }
     Assertions.assertThrows(RuntimeException.class,
         () -> new SnapshotChainManager(omMetadataManager));

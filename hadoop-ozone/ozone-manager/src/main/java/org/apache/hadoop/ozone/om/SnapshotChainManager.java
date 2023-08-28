@@ -236,7 +236,7 @@ public class SnapshotChainManager {
              keyIter = metadataManager.getSnapshotInfoTable().iterator()) {
       Map<UUID, SnapshotInfo> snaps = new HashMap<>();
       // Forward Linked list for snapshot chain.
-      Map<UUID, UUID> snapshotChain = new HashMap<>();
+      Map<UUID, UUID> nextSnapshotIdMap = new HashMap<>();
       UUID head = null;
       Table.KeyValue<String, SnapshotInfo> kv;
       globalSnapshotChain.clear();
@@ -255,7 +255,7 @@ public class SnapshotChainManager {
                 snapshotInfo.getSnapshotId());
           }
           // Adding edge to the linked list. prevGlobalSnapId -> snapId
-          snapshotChain.put(snapshotInfo.getGlobalPreviousSnapshotId(),
+          nextSnapshotIdMap.put(snapshotInfo.getGlobalPreviousSnapshotId(),
               snapshotInfo.getSnapshotId());
         } else {
           head = snapshotInfo.getSnapshotId();
@@ -270,13 +270,12 @@ public class SnapshotChainManager {
         addSnapshot(snaps.get(head));
         size += 1;
         prev = head;
-        head = snapshotChain.get(head);
+        head = nextSnapshotIdMap.get(head);
       }
       if (size != snaps.size()) {
-        throw new IOException(String.format("Snapshot chain corruption. " +
-            "All snapshots in the snapshot have not been added. " +
-            "Global Snapshot Chain is broken. Last snapshot " +
-            "add to chain : %s", prev));
+        throw new IllegalStateException(String.format("Snapshot chain " +
+            "corruption. All snapshots have not been added to the " +
+            "snapshot chain. Last snapshot added to chain : %s", prev));
       }
     } catch (IOException ioException) {
       // TODO: [SNAPSHOT] Fail gracefully.
