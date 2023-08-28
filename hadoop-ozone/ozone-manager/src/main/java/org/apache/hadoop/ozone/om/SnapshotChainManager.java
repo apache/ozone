@@ -76,6 +76,12 @@ public class SnapshotChainManager {
           "Snapshot chain corruption. Snapshot with snapshotId: %s is " +
               "already present in the the chain.", snapshotID));
     }
+    if (globalSnapshotChain.size() > 0 && prevGlobalID == null) {
+      throw new IllegalStateException(String.format("Snapshot chain " +
+          "corruption. Adding snapshot %s as head node while there are %d in " +
+          "the global snapshot chain.", snapshotID,
+          globalSnapshotChain.size()));
+    }
     if (prevGlobalID != null && globalSnapshotChain.containsKey(prevGlobalID)) {
       if (globalSnapshotChain.get(prevGlobalID).getNextSnapshotId() != null) {
         throw new IllegalStateException(String.format(
@@ -119,13 +125,25 @@ public class SnapshotChainManager {
           snapshotID));
     }
 
+    if (prevPathID == null && snapshotChainByPath.containsKey(snapshotPath) &&
+        !snapshotChainByPath.get(snapshotPath).isEmpty()) {
+      throw new IllegalStateException(String.format(
+          "Snapshot chain corruption. Error while adding snapshot with " +
+              "snapshotId %s with as the first snapshot in snapshot path:" +
+              " %s which already %d snapshots.", snapshotID, snapshotPath,
+          snapshotChainByPath.get(snapshotPath).size()));
+    }
+
     if (prevPathID != null && snapshotChainByPath.containsKey(snapshotPath)) {
-      if (snapshotChainByPath.get(snapshotPath).get(prevPathID) != null) {
+      if (snapshotChainByPath.get(snapshotPath).get(prevPathID)
+          .getNextSnapshotId() != null) {
         throw new IOException(String.format("Snapshot chain corruption. " +
                 "Next snapshotId: %s is already set for snapshotId: %s. " +
                 "Adding snapshot with %s with prevSnapshotId: %s will make " +
                 "the chain non linear.",
-            snapshotChainByPath.get(snapshotPath).get(prevPathID), prevPathID));
+            snapshotChainByPath.get(snapshotPath).get(prevPathID)
+                .getNextSnapshotId(), prevPathID,
+            snapshotID, prevPathID));
       }
       snapshotChainByPath
           .get(snapshotPath)
