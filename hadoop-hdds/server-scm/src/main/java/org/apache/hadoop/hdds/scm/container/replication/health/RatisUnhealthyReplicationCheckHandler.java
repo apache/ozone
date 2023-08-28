@@ -37,8 +37,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  *   factor number of replicas and queue them for under/over replication if
  *   needed.
  *   </li>
- *   <li>If there is perfect replication of healthy replicas, remove any
- *   excess unhealthy replicas.
+ *   <li>If there is a mixture of unhealthy and healthy containers this
+ *   handler will only be called if there is no under or over replication after
+ *   excluding the empty containers. If there is under or over replication the
+ *   ECReplicationCheckHandler will take care of it first.
  *   </li>
  * </ul>
  */
@@ -77,6 +79,9 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
           container.containerID());
     }
 
+    // At this point, we know there are only unhealthy replicas, so the
+    // container in UNHEALTHY, but it can also be over or under replicated with
+    // unhealthy replicas.
     ContainerHealthResult health = checkReplication(replicaCount);
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
