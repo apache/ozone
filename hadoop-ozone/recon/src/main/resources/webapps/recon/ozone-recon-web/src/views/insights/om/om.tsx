@@ -332,7 +332,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevKeyDeletePending: "",
       prevKeyDeleted: 0,
       expandedRowData: {},
-      activeTab: props.location.state && props.location.state.activeTab !== '1' ? props.location.state.activeTab:'1',
+      activeTab: props.location.state ? props.location.state.activeTab : '1',
       DEFAULT_LIMIT: 10,
       nextClickable: true,
       includeFso: true,
@@ -457,7 +457,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     } else if (this.state.activeTab  === '4') {
       this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
     }
-    else {
+    else if (this.state.activeTab  === '1') {
       this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
     }
   };

@@ -46,14 +46,14 @@ const defaultProps = {
 
 interface IOverviewCardWrapperProps {
   linkToUrl: string;
-  title:string
+  title: string
 }
 
 class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
   render() {
     const {linkToUrl, children} = this.props;
-    if (linkToUrl ) {
-      if(linkToUrl === '/Om'){
+    if (linkToUrl) {
+      if (linkToUrl === '/Om'){
       return (
         <Link to={{
           pathname: linkToUrl,
