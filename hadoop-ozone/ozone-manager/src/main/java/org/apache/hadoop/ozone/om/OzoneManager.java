@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -1431,11 +1432,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       OmUtils.createOMDir(omRatisDirectory);
 
-      String omStorageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
-      String scmStorageDir =
-          conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
-      if (!Strings.isNullOrEmpty(omStorageDir) && !Strings
-          .isNullOrEmpty(scmStorageDir) && omStorageDir.equals(scmStorageDir)) {
+      String scmStorageDir = SCMHAUtils.getSCMRatisDirectory(conf);
+      if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
+          .isNullOrEmpty(scmStorageDir) && omRatisDirectory.equals(scmStorageDir)) {
         throw new IOException(
             "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
                 + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
