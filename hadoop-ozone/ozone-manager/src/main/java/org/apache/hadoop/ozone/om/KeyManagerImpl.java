@@ -1613,7 +1613,7 @@ public class KeyManagerImpl implements KeyManager {
             // for recursive list all the entries
 
             if (!isKeyDeleted(entryInDb, keyTable)) {
-              cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
+              cacheKeyMap.putIfAbsent(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
             }
