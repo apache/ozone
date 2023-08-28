@@ -33,7 +33,7 @@ Setup headers
     # Stores the user to a suite variable, TEST_USER
     # Use TEST_USER to verify the caller from the metrics
     # This is run under s3g, so the user should be `testuser/s3g@EXAMPLE.COM`
-    Kinit test user    testuser2     testuser2.keytab
+    Kinit test user    testuser     testuser.keytab
     Setup secure v4 headers
 
 Setup aws credentials
