@@ -15,15 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3;
-
-import org.glassfish.jersey.server.ResourceConfig;
 
 /**
- * JaxRS resource definition.
+ * This package contains the top level generic classes of s3 secret gateway.
  */
-public class GatewayApplication extends ResourceConfig {
-  public GatewayApplication() {
-    packages("org.apache.hadoop.ozone.s3", "org.apache.hadoop.ozone.s3secret");
-  }
-}
+package org.apache.hadoop.ozone.s3secret;

@@ -819,6 +819,7 @@ public class RpcClient implements ClientProtocol {
    * @throws IOException
    */
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
