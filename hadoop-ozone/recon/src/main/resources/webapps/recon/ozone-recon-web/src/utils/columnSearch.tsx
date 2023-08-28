@@ -70,9 +70,9 @@ class ColumnSearch extends React.PureComponent {
       <Icon type='search' style={{color: filtered ? '#1890ff' : undefined}}/>
     ),
     onFilter: (value: string, record: any) => {
-      if (record[dataIndex]) {
+      if (record[dataIndex] !== undefined || record[dataIndex] !== null) {
           return typeof (record[dataIndex]) === typeof {}
-            ? Object.values(...record[dataIndex]).toString().toLowerCase().includes(value.toLowerCase())
+            ? record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())) ? true :false
             : record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
         }
         else {
