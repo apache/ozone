@@ -349,8 +349,8 @@ public class TestSnapshotChain {
     UUID prevSnapshotId = null;
     for (UUID snapshotID : snapshotIDs) {
       snapshotInfo.put(snapshotID.toString(),
-          createSnapshotInfo(snapshotID, prevSnapshotId,
-              snapshotChain.get(snapshotID), System.currentTimeMillis()));
+          createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
+              prevSnapshotId, System.currentTimeMillis()));
       prevSnapshotId = snapshotID;
     }
     Assertions.assertThrows(RuntimeException.class,

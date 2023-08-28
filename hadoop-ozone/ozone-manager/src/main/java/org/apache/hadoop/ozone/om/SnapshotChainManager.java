@@ -106,6 +106,13 @@ public class SnapshotChainManager {
     }
 
     if (prevPathID != null && snapshotChainByPath.containsKey(snapshotPath)) {
+      if (snapshotChainByPath.get(snapshotPath).get(prevPathID) != null) {
+        throw new IOException(String.format("Snapshot chain corruption. " +
+                "Next snapshotId: %s is already set for snapshotId: %s. " +
+                "Adding snapshot with %s with prevSnapshotId: %s will make " +
+                "the chain non linear.",
+            snapshotChainByPath.get(snapshotPath).get(prevPathID), prevPathID));
+      }
       snapshotChainByPath
           .get(snapshotPath)
           .get(prevPathID)
