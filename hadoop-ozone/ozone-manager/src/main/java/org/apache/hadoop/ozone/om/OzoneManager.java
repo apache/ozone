@@ -1434,7 +1434,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       String scmStorageDir = SCMHAUtils.getSCMRatisDirectory(conf);
       if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
-          .isNullOrEmpty(scmStorageDir) && omRatisDirectory.equals(scmStorageDir)) {
+          .isNullOrEmpty(scmStorageDir) && omRatisDirectory
+          .equals(scmStorageDir)) {
         throw new IOException(
             "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
                 + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR
