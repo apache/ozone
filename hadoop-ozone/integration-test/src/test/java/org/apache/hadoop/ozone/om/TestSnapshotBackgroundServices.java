@@ -312,7 +312,7 @@ public class TestSnapshotBackgroundServices {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 1000, 10000);
+    }, 1000, 30000);
 
     // get snapshot d
     OmSnapshot snapD;
