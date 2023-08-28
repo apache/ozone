@@ -71,7 +71,21 @@ public class SnapshotChainManager {
   private void addSnapshotGlobal(UUID snapshotID,
                                  UUID prevGlobalID) throws IOException {
     // On add snapshot, set previous snapshot entry nextSnapshotID = snapshotID
+    if (globalSnapshotChain.containsKey(snapshotID)) {
+      throw new IllegalStateException(String.format(
+          "Snapshot chain corruption. Snapshot with snapshotId: %s is " +
+              "already present in the the chain.", snapshotID));
+    }
     if (prevGlobalID != null && globalSnapshotChain.containsKey(prevGlobalID)) {
+      if (globalSnapshotChain.get(prevGlobalID).getNextSnapshotId() != null) {
+        throw new IllegalStateException(String.format(
+            "Snapshot chain corruption. Snapshot with snapshotId: %s already " +
+                "has the next snapshotId: %s. Adding snapshot %s with " +
+                "prevSnapshotId: %s will make the chain non linear.",
+            prevGlobalID,
+            globalSnapshotChain.get(prevGlobalID).getNextSnapshotId(),
+            snapshotID, prevGlobalID));
+      }
       globalSnapshotChain.get(prevGlobalID).setNextSnapshotId(snapshotID);
     }
 
