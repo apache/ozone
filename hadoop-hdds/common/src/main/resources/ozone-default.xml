@@ -4171,7 +4171,7 @@
   </property>
   <property>
     <name>ozone.om.upgrade.quota.recalculate.enabled</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, OM</tag>
     <description>
       quota recalculation trigger when upgrade to the layout version QUOTA.

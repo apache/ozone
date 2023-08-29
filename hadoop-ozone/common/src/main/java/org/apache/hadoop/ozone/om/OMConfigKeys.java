@@ -565,5 +565,5 @@ public final class OMConfigKeys {
       = "ozone.om.upgrade.quota.recalculate.enabled";
 
   public static final boolean OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT
-      = false;
+      = true;
 }
