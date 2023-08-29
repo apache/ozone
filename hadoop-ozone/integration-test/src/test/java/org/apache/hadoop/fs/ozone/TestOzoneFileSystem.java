@@ -1643,7 +1643,7 @@ public class TestOzoneFileSystem {
     // We can safely assert only trash directory here.
     // Asserting Current or checkpoint directory is not feasible here in this
     // test due to independent TrashEmptier thread running in cluster and
-    // possible flakyness is hard to avoid unless we test this test case
+    // possible flakiness is hard to avoid unless we test this test case
     // in separate mini cluster with closer accuracy of TrashEmptier.
     Assert.assertTrue(o3fs.exists(userTrash));
   }
