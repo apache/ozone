@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3;
 import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.glassfish.jersey.internal.PropertiesDelegate;
 import org.glassfish.jersey.server.ContainerRequest;
 import org.junit.Assert;
@@ -106,9 +105,7 @@ public class TestVirtualHostStyleFilter {
     ContainerRequest containerRequest = createContainerRequest("mybucket" +
             ".localhost:9878", "/myfile", null, true);
     virtualHostStyleFilter.filter(containerRequest);
-    URI expected = new URI("http://" + s3HttpAddr +
-        "/mybucket/myfile?" + S3Consts.ENDPOINT_STYLE_PARAM + "=" +
-        S3Consts.ENDPOINT_STYLE_VIRTUAL);
+    URI expected = new URI("http://" + s3HttpAddr + "/mybucket/myfile");
     Assert.assertEquals(expected, containerRequest.getRequestUri());
   }
 
@@ -138,11 +135,22 @@ public class TestVirtualHostStyleFilter {
     ContainerRequest containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, null, true);
     virtualHostStyleFilter.filter(containerRequest);
-    URI expected = new URI("http://" + s3HttpAddr + "/mybucket?" +
-        S3Consts.ENDPOINT_STYLE_PARAM + "=" +
-        S3Consts.ENDPOINT_STYLE_VIRTUAL);
+    URI expected = new URI("http://" + s3HttpAddr + "/mybucket");
     Assert.assertEquals(expected, containerRequest.getRequestUri());
 
+  }
+
+  @Test
+  public void testVirtualHostStyleWithCreateKeyRequest() throws Exception {
+    VirtualHostStyleFilter virtualHostStyleFilter =
+        new VirtualHostStyleFilter();
+    virtualHostStyleFilter.setConfiguration(conf);
+
+    ContainerRequest containerRequest = createContainerRequest("mybucket" +
+        ".localhost:9878", "/key1", null, true);
+    virtualHostStyleFilter.filter(containerRequest);
+    URI expected = new URI("http://" + s3HttpAddr + "/mybucket/key1");
+    Assert.assertEquals(expected, containerRequest.getRequestUri());
   }
 
   @Test
@@ -151,13 +159,10 @@ public class TestVirtualHostStyleFilter {
     VirtualHostStyleFilter virtualHostStyleFilter =
         new VirtualHostStyleFilter();
     virtualHostStyleFilter.setConfiguration(conf);
-
+    URI expected = new URI("http://" + s3HttpAddr + "/mybucket?prefix=bh");
     ContainerRequest containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, "?prefix=bh", true);
     virtualHostStyleFilter.filter(containerRequest);
-    URI expected = new URI("http://" + s3HttpAddr + "/mybucket?prefix=bh&" +
-        S3Consts.ENDPOINT_STYLE_PARAM + "=" +
-        S3Consts.ENDPOINT_STYLE_VIRTUAL);
     assertTrue(expected.toString().contains(containerRequest.getRequestUri()
         .toString()));
 
@@ -165,9 +170,7 @@ public class TestVirtualHostStyleFilter {
         ".localhost:9878", null, "?prefix=bh&type=dir", true);
     virtualHostStyleFilter.filter(containerRequest);
     expected = new URI("http://" + s3HttpAddr +
-        "/mybucket?prefix=bh&type=dir&" +
-        S3Consts.ENDPOINT_STYLE_PARAM + "=" +
-        S3Consts.ENDPOINT_STYLE_VIRTUAL);
+        "/mybucket?prefix=bh&type=dir");
     assertTrue(expected.toString().contains(containerRequest.getRequestUri()
         .toString()));
 

@@ -44,8 +44,6 @@ import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_PARAM;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_VIRTUAL;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -97,6 +95,7 @@ public class TestStringToSignProducer {
             //NOOP
           }
         }.parseSignature();
+    signatureInfo.setUnfilteredURI("/buckets");
 
     headers.fixContentType();
 
@@ -105,7 +104,6 @@ public class TestStringToSignProducer {
             signatureInfo,
             "http",
             "GET",
-            "/buckets",
             headers,
             queryParameters);
 
@@ -205,6 +203,7 @@ public class TestStringToSignProducer {
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
         headerMap.getFirst("Authorization"),
         headerMap.getFirst("X-Amz-Date")).parseSignature();
+    signatureInfo.setUnfilteredURI("/");
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);
     } catch (OS3Exception e) {
@@ -262,6 +261,7 @@ public class TestStringToSignProducer {
     SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
         headerMap.getFirst("Authorization"),
         headerMap.getFirst("x-amz-date")).parseSignature();
+    signatureInfo.setUnfilteredURI("/");
 
     try {
       StringToSignProducer.createSignatureBase(signatureInfo, context);
@@ -270,61 +270,5 @@ public class TestStringToSignProducer {
     }
 
     Assert.assertEquals(expectedResult, actualResult);
-  }
-
-  @Test
-  public void testVirtualStyleAddressURI() throws Exception {
-    String canonicalRequest = "GET\n"
-        + "/\n"
-        + "\n"
-        + "host:bucket1.s3g.internal:9878\nx-amz-content-sha256:Content-SHA\n"
-        + "x-amz-date:" + DATETIME + "\n"
-        + "\n"
-        + "host;x-amz-content-sha256;x-amz-date\n"
-        + "Content-SHA";
-
-    String authHeader =
-        "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
-            + "/s3/aws4_request, "
-            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
-            + "Signature"
-            +
-            "=db81b057718d7c1b3b8dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
-
-    MultivaluedMap<String, String>  headers = new MultivaluedHashMap<>();
-    headers.putSingle("Authorization", authHeader);
-    headers.putSingle("Content-Length", "123");
-    headers.putSingle("Host", "bucket1.s3g.internal:9878");
-    headers.putSingle("X-AMZ-Content-Sha256", "Content-SHA");
-    headers.putSingle("X-AMZ-Date", DATETIME);
-
-    final SignatureInfo signatureInfo =
-        new AuthorizationV4HeaderParser(authHeader, DATETIME) {
-          @Override
-          public void validateDateRange(Credential credentialObj) {
-            //NOOP
-          }
-        }.parseSignature();
-
-    ContainerRequestContext context = setupContext(
-        new URI("http://bucket1.s3g.internal:9878?" +
-            ENDPOINT_STYLE_PARAM + "=" + ENDPOINT_STYLE_VIRTUAL),
-        "GET",
-        headers,
-        new MultivaluedHashMap<>());
-
-    final String signatureBase =
-        StringToSignProducer.createSignatureBase(signatureInfo, context);
-
-    MessageDigest md = MessageDigest.getInstance("SHA-256");
-    md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
-
-    Assert.assertEquals(
-        "String to sign is invalid",
-        "AWS4-HMAC-SHA256\n"
-            + DATETIME + "\n"
-            + "20181009/us-east-1/s3/aws4_request\n"
-            + Hex.encode(md.digest()).toLowerCase(),
-        signatureBase);
   }
 }

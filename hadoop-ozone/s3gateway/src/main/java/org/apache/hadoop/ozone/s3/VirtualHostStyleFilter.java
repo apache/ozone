@@ -39,8 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_PARAM;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_VIRTUAL;
 
 /**
  * Filter used to convert virtual host style pattern to path style pattern.
@@ -51,7 +49,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.ENDPOINT_STYLE_VIRTUAL;
 @Priority(VirtualHostStyleFilter.PRIORITY)
 public class VirtualHostStyleFilter implements ContainerRequestFilter {
 
-  public static final int PRIORITY = 100;
+  public static final int PRIORITY = AuthorizationFilter.PRIORITY +
+      S3GatewayHttpServer.FILTER_PRIORITY_DO_AFTER;
 
   private static final Logger LOG = LoggerFactory.getLogger(
       VirtualHostStyleFilter.class);
@@ -105,18 +104,14 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       URI baseURI = requestContext.getUriInfo().getBaseUri();
       String currentPath = requestContext.getUriInfo().getPath();
       String newPath = bucketName;
-      if (currentPath != null) {
-        newPath += String.format("%s", currentPath);
-      }
       MultivaluedMap<String, String> queryParams = requestContext.getUriInfo()
           .getQueryParameters();
       UriBuilder requestAddrBuilder = UriBuilder.fromUri(baseURI).path(newPath);
+      if (currentPath != null) {
+        requestAddrBuilder.path(currentPath);
+      }
       queryParams.forEach((k, v) -> requestAddrBuilder.queryParam(k,
           v.toArray()));
-      // Enhance request URI to indicate virtual-host addressing style
-      // for later processing.
-      requestAddrBuilder.queryParam(
-          ENDPOINT_STYLE_PARAM, ENDPOINT_STYLE_VIRTUAL);
       URI requestAddr = requestAddrBuilder.build();
       requestContext.setRequestUri(baseURI, requestAddr);
     }

@@ -63,9 +63,9 @@ public final class S3Consts {
       ".com/doc/2006-03-01/";
 
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
-
+  
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
-  
+
 }

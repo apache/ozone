@@ -284,14 +284,14 @@ public class TestAuthorizationV4QueryParser {
         };
 
     final SignatureInfo signatureInfo = parser.parseSignature();
+    signatureInfo.setUnfilteredURI("/test.txt");
 
     LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
     headers.put("host", "localhost");
 
     final String stringToSign =
         StringToSignProducer.createSignatureBase(signatureInfo, "https", "GET",
-            "/test.txt", headers,
-            queryParams);
+            headers, queryParams);
 
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
