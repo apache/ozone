@@ -82,7 +82,12 @@ To decommission a SCM and remove the node from the SCM HA ring, the following st
 ozone admin scm decommission [-hV] [-id=<scmServiceId>] -nodeid=<nodeId>
                                     [--scm=<scm>]
 ```
-You can obtain the 'nodeid' by executing this command, **"ozone admin scm roles"**
+You can obtain the 'nodeId' by executing this command, **"ozone admin scm roles"**
 
-**Note -** If you want to decommission a **primordial** scm, first change the primordial scm.
-You can do it by stopping the scm first using **"ozone --daemon stop scm"** then updating the property **"ozone.scm.primordial.node.id"** with some other scm host in ozone-site.xml and then start the scm using **"ozone --daemon start scm"**
+**Note -** If you want to decommission a **primordial** scm, you may first transfer the leadership to a non primordial scm and then decommission the primordial scm.
+
+To transfer the leader, we can excute below command,
+```shell
+ozone admin scm transfer --service-id=scmservice -n ${nodeId}
+```
+After successful leadership change we can follow the above decommissioning command to decommission the scm node.
