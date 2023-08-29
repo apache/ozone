@@ -21,8 +21,10 @@ package org.apache.hadoop.ozone.s3secret;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 
@@ -34,8 +36,20 @@ import java.io.IOException;
 public class S3SecretGenerateEndpoint extends S3SecretEndpointBase {
   @POST
   public Response generate() throws IOException {
+    return generateInternal(null);
+  }
+
+  @POST
+  @Path("/{username}")
+  public Response generate(@PathParam("username") String username)
+      throws IOException {
+    return generateInternal(username);
+  }
+
+  private Response generateInternal(@Nullable String username)
+      throws IOException {
     S3SecretResponse s3SecretResponse = new S3SecretResponse();
-    S3SecretValue s3SecretValue = generateS3Secret();
+    S3SecretValue s3SecretValue = generateS3Secret(username);
     s3SecretResponse.setAwsSecret(s3SecretValue.getAwsSecret());
     s3SecretResponse.setAwsAccessKey(s3SecretValue.getAwsAccessKey());
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -43,7 +57,9 @@ public class S3SecretGenerateEndpoint extends S3SecretEndpointBase {
     return Response.ok(s3SecretResponse).build();
   }
 
-  private S3SecretValue generateS3Secret() throws IOException {
-    return getClient().getObjectStore().getS3Secret(userNameFromRequest());
+  private S3SecretValue generateS3Secret(@Nullable String username)
+      throws IOException {
+    String actualUsername = username == null ? userNameFromRequest() : username;
+    return getClient().getObjectStore().getS3Secret(actualUsername);
   }
 }

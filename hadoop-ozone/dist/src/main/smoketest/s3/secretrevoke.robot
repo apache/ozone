@@ -38,3 +38,12 @@ S3 Gateway Revoke Secret
                         ELSE
                             Should contain      ${result}       S3 Secret endpoint is disabled.
                         END
+
+S3 Gateway Revoke Secret By Username
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+    ${result} =         Execute                             curl -X POST --negotiate -u : -v ${ENDPOINT_URL}/secret/revoke/testuser2
+                        IF   '${SECURITY_ENABLED}' == 'true'
+                            Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
+                        ELSE
+                            Should contain      ${result}       S3 Secret endpoint is disabled.
+                        END

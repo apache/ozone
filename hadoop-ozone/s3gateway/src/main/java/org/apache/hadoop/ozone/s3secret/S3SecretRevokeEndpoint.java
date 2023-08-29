@@ -23,8 +23,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 
@@ -43,8 +45,20 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
 
   @POST
   public Response revoke() throws IOException {
+    return revokeInternal(null);
+  }
+
+  @POST
+  @Path("/{username}")
+  public Response revoke(@PathParam("username") String username)
+      throws IOException {
+    return revokeInternal(username);
+  }
+
+  private Response revokeInternal(@Nullable String username)
+      throws IOException {
     try {
-      revokeSecret();
+      revokeSecret(username);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           S3GAction.REVOKE_SECRET, getAuditParameters()));
       return Response.ok().build();
@@ -62,8 +76,9 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
     }
   }
 
-  private void revokeSecret() throws IOException {
-    getClient().getObjectStore().revokeS3Secret(userNameFromRequest());
+  private void revokeSecret(@Nullable String username) throws IOException {
+    String actualUsername = username == null ? userNameFromRequest() : username;
+    getClient().getObjectStore().revokeS3Secret(actualUsername);
   }
 
 }

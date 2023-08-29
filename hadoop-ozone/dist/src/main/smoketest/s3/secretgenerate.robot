@@ -38,3 +38,13 @@ S3 Gateway Generate Secret
                         ELSE
                             Should contain          ${result}       S3 Secret endpoint is disabled.
                         END
+
+S3 Gateway Generate Secret By Username
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+    ${result} =         Execute                             curl -X POST --negotiate -u : -v ${ENDPOINT_URL}/secret/generate/testuser2
+                        IF   '${SECURITY_ENABLED}' == 'true'
+                            Should contain          ${result}       HTTP/1.1 200 OK    ignore_case=True
+                            Should Match Regexp     ${result}       <awsAccessKey>.*</awsAccessKey><awsSecret>.*</awsSecret>
+                        ELSE
+                            Should contain          ${result}       S3 Secret endpoint is disabled.
+                        END
