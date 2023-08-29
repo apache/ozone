@@ -449,16 +449,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   componentDidMount(): void {
-    if (this.state.activeTab === '2') {
+    if (this.state.activeTab  === '1') {
+      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
+    } else if (this.state.activeTab === '2') {
       this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso, this.state.DEFAULT_LIMIT, this.state.prevKeyOpen);
     } else if (this.state.activeTab  === '3') {
       keysPendingExpanded =[];
       this.fetchDeletePendingKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeletePending);
     } else if (this.state.activeTab  === '4') {
       this.fetchDeletedKeys(this.state.DEFAULT_LIMIT, this.state.prevKeyDeleted);
-    }
-    else if (this.state.activeTab  === '1') {
-      this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
     }
   };
 
