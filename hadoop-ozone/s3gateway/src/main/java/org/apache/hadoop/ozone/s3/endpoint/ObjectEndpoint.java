@@ -245,8 +245,13 @@ public class ObjectEndpoint extends EndpointBase {
           .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
               OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
           bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
+
+      String amzDecodedLength =
+          headers.getHeaderString("x-amz-decoded-content-length");
+      boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
+          Long.parseLong(amzDecodedLength) == 0;
       if (canCreateDirectory &&
-          (length == 0 || hasTrailingSlash(keyPath))) {
+          (length == 0 || hasAmzDecodedLengthZero)) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
         createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
