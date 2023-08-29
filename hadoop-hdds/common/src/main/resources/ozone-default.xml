@@ -3461,6 +3461,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.version</name>
+    <tag>OZONE, DATANODE</tag>
+    <value></value>
+    <description>
+      DataNode version exposed to SCM and clients. Default version is defined
+      by DatanodeVersion.CURRENT_VERSION.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>

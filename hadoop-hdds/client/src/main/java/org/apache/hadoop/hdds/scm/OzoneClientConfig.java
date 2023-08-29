@@ -239,6 +239,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean incrementalChunkList = true;
 
+  @Config(key = "stream.putblock.piggybacking",
+          defaultValue = "false",
+          type = ConfigType.BOOLEAN,
+          description = "Allow PutBlock to be piggybacked in WriteChunk " +
+                  "requests if the chunk is small.",
+          tags = ConfigTag.CLIENT)
+  private boolean enablePutblockPiggybacking = false;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -419,6 +427,14 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public void setEnablePutblockPiggybacking(boolean enablePutblockPiggybacking) {
+    this.enablePutblockPiggybacking = enablePutblockPiggybacking;
+  }
+
+  public boolean getEnablePutblockPiggybacking() {
+    return enablePutblockPiggybacking;
   }
 
   public boolean isDatastreamPipelineMode() {
