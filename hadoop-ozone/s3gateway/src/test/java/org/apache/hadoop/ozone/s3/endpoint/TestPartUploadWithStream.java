@@ -20,13 +20,8 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -37,14 +32,9 @@ import org.mockito.Mockito;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
-import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -62,9 +52,6 @@ public class TestPartUploadWithStream {
 
   private static final String S3BUCKET = "streampartb1";
   private static final String S3KEY = "testkey";
-  private static final String S3_COPY_EXISTING_KEY = "test_copy_existing_key";
-  private static final String S3_COPY_EXISTING_KEY_CONTENT =
-      "test_copy_existing_key_content";
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -81,21 +68,8 @@ public class TestPartUploadWithStream {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
         true);
-    conf.setStorageSize(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, 1,
-        StorageUnit.BYTES);
     REST.setOzoneConfiguration(conf);
     REST.init();
-
-    OzoneBucket bucket =
-        client.getObjectStore().getS3Bucket(S3BUCKET);
-
-    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
-    try (OutputStream stream = bucket
-        .createKey(S3_COPY_EXISTING_KEY, keyContent.length,
-            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                ReplicationFactor.THREE), new HashMap<>())) {
-      stream.write(keyContent);
-    }
   }
 
   @Test
