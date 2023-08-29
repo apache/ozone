@@ -131,7 +131,7 @@ public class SnapshotChainManager {
       throw new IllegalStateException(String.format(
           "Path Snapshot chain corruption. Error while adding snapshot with " +
               "snapshotId %s with as the first snapshot in snapshot path: " +
-              "%s which already %d snapshots.", snapshotID, snapshotPath,
+              "%s which already has %d snapshots.", snapshotID, snapshotPath,
           snapshotChainByPath.get(snapshotPath).size()));
     }
 
@@ -140,7 +140,7 @@ public class SnapshotChainManager {
           .hasNextSnapshotId()) {
         throw new IllegalStateException(String.format(
             "Path Snapshot chain corruption. Next snapshotId: %s is already " +
-                "set for snapshotId: %s. Adding snapshot with %s with " +
+                "set for snapshotId: %s. Adding snapshotId: %s with " +
                 "prevSnapshotId: %s will make the chain non linear.",
             snapshotChainByPath.get(snapshotPath).get(prevPathID)
                 .getNextSnapshotId(), prevPathID,
