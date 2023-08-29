@@ -804,12 +804,16 @@ public class TestOzoneFileSystem {
       return;
     }
     deleteRootRecursively(fileStatuses);
-    Thread.sleep(500);
-    fileStatuses = fs.listStatus(ROOT);
-    if (fileStatuses != null) {
-      Assert.assertEquals(
-          "Delete root failed!", 0, fileStatuses.length);
-    }
+    GenericTestUtils.waitFor(() -> {
+      FileStatus[] fileStatus = new FileStatus[0];
+      try {
+        fileStatus = fs.listStatus(ROOT);
+        return fileStatus != null && fileStatus.length == 0;
+      } catch (IOException e) {
+        Assert.assertFalse(fileStatus.length == 0);
+        return false;
+      }
+    }, 100, 500);
   }
 
   private static void deleteRootRecursively(FileStatus[] fileStatuses)
@@ -1628,19 +1632,20 @@ public class TestOzoneFileSystem {
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.write(1);
     }
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
 
     // Construct paths
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path userTrash = new Path(TRASH_ROOT, username);
-    Path userTrashCurrent = new Path(userTrash, "Current");
-    Path trashPath = new Path(userTrashCurrent, testKeyName);
 
-    // Trash Current directory should still have been created.
-    Assert.assertTrue(o3fs.exists(userTrashCurrent));
-    // Check under trash, the key should be present
-    Assert.assertTrue(o3fs.exists(trashPath));
+    Assert.assertFalse(o3fs.exists(userTrash));
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+    // We can safely assert only trash directory here.
+    // Asserting Current or checkpoint directory is not feasible here in this
+    // test due to independent TrashEmptier thread running in cluster and
+    // possible flakyness is hard to avoid unless we test this test case
+    // in separate mini cluster with closer accuracy of TrashEmptier.
+    Assert.assertTrue(o3fs.exists(userTrash));
   }
 
   /**
@@ -1658,14 +1663,20 @@ public class TestOzoneFileSystem {
         isAssignableFrom(TrashPolicyOzone.class));
     assertEquals(TRASH_INTERVAL, trash.getConf().
         getFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, 0), 0);
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
 
     // Construct paths
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path userTrash = new Path(TRASH_ROOT, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
     Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+    // Added this assertion here and will be tested as part of testTrash
+    // test case which needs to be tested with separate mini cluster having
+    // emptier thread started with close match of timings of relevant
+    // assertion statements and corresponding trash and checkpoint interval.
+    Assert.assertTrue(o3fs.exists(userTrashCurrent));
 
     // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(() -> {
@@ -1676,7 +1687,7 @@ public class TestOzoneFileSystem {
         Assert.fail("Delete from Trash Failed");
         return false;
       }
-    }, 1000, 120000);
+    }, 100, 120000);
 
     // userTrash path will contain the checkpoint folder
     FileStatus[] statusList = fs.listStatus(userTrash);
