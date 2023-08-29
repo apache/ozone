@@ -139,8 +139,8 @@ public class SnapshotChainManager {
       if (snapshotChainByPath.get(snapshotPath).get(prevPathID)
           .hasNextSnapshotId()) {
         throw new IllegalStateException(String.format(
-            "Path Snapshot chain corruption. Next snapshotId: %s is already set" +
-                " for snapshotId: %s. Adding snapshot with %s with " +
+            "Path Snapshot chain corruption. Next snapshotId: %s is already " +
+                "set for snapshotId: %s. Adding snapshot with %s with " +
                 "prevSnapshotId: %s will make the chain non linear.",
             snapshotChainByPath.get(snapshotPath).get(prevPathID)
                 .getNextSnapshotId(), prevPathID,
@@ -295,7 +295,8 @@ public class SnapshotChainManager {
                 snapshotInfo.getSnapshotId());
           }
           // Adding edge to the linked list. prevGlobalSnapId -> snapId
-          snapshotToNextSnapshotMap.put(snapshotInfo.getGlobalPreviousSnapshotId(),
+          snapshotToNextSnapshotMap.put(
+              snapshotInfo.getGlobalPreviousSnapshotId(),
               snapshotInfo.getSnapshotId());
         } else {
           head = snapshotInfo.getSnapshotId();
