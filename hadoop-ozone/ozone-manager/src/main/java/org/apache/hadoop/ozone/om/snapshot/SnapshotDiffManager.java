@@ -121,6 +121,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToPrefixMap;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getSnapshotInfo;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_FAILED;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
@@ -1212,8 +1213,11 @@ public class SnapshotDiffManager implements AutoCloseable {
 
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
-        List<String> sstDiffList =
-            differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir);
+        Map<String, String> columnFamilyToPrefixMap =
+            getColumnFamilyToPrefixMap(ozoneManager.getMetadataManager(),
+                volume, bucket);
+        List<String> sstDiffList = differ.getSSTDiffListWithFullPath(toDSI,
+            fromDSI, diffDir, columnFamilyToPrefixMap);
         deltaFiles.addAll(sstDiffList);
       } catch (Exception exception) {
         LOG.warn("Failed to get SST diff file using RocksDBCheckpointDiffer. " +
