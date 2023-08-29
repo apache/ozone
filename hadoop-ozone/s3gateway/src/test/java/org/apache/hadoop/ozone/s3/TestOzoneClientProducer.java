@@ -17,15 +17,7 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
 import java.io.IOException;
-import java.net.URI;
-import java.util.Arrays;
-import java.util.Collection;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -35,7 +27,6 @@ import static org.junit.Assert.fail;
 
 import org.junit.Assert;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 /**
  * Test class for @{@link OzoneClientProducer}.

@@ -76,7 +76,7 @@ public abstract class EndpointBase implements Auditor {
   @Inject
   private OzoneClient client;
   @Inject
-  SignatureInfo signatureInfo;
+  private SignatureInfo signatureInfo;
 
   private S3Auth s3Auth;
   @Context

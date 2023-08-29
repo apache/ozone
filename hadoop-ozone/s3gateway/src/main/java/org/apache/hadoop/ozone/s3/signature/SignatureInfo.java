@@ -51,12 +51,12 @@ public class SignatureInfo {
 
   private boolean signPayload = true;
 
-  private String unfilteredURI;
+  private String unfilteredURI = null;
 
 
-  private String stringToSign;
+  private String stringToSign = null;
 
-  public SignatureInfo(){}
+  public SignatureInfo() { }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public SignatureInfo(
@@ -70,25 +70,8 @@ public class SignatureInfo {
       String algorithm,
       boolean signPayload
   ) {
-    this(version, date, dateTime, awsAccessId, signature, signedHeaders,
-        credentialScope, algorithm, signPayload, null, null);
-  }
-
-  public SignatureInfo(
-      Version version,
-      String date,
-      String dateTime,
-      String awsAccessId,
-      String signature,
-      String signedHeaders,
-      String credentialScope,
-      String algorithm,
-      boolean signPayload,
-      String uri,
-      String stringToSign
-  ) {
     initialize(version, date, dateTime, awsAccessId, signature, signedHeaders,
-        credentialScope, algorithm, signPayload, uri, stringToSign);
+        credentialScope, algorithm, signPayload, null, null);
   }
 
   public void initialize(
@@ -102,6 +85,7 @@ public class SignatureInfo {
         signatureInfo.getStringToSign());
   }
 
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:HiddenField"})
   public void initialize(
       Version version,
       String date,

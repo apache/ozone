@@ -25,14 +25,10 @@ import static org.junit.Assert.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
-import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
 import org.junit.Assert;
-import org.junit.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 /**
@@ -112,10 +108,11 @@ public class TestAuthorizationFilter {
       headerMap.putSingle(CONTENT_TYPE, contentType);
 
       UriInfo uriInfo = Mockito.mock(UriInfo.class);
-      ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);
+      ContainerRequestContext context = Mockito.mock(
+          ContainerRequestContext.class);
       Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
       Mockito.when(uriInfo.getRequestUri()).thenReturn(
-          new URI("http://" + host+path));
+          new URI("http://" + host + path));
 
       Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
       Mockito.when(context.getHeaders()).thenReturn(headerMap);
