@@ -320,7 +320,7 @@ public class TestHddsClientUtils {
         HddsClientUtils.verifyKeyName(name);
         // not throwing up on a valid name. it's working.
       } catch (IllegalArgumentException e) {
-        // throwing up on an valid name. it's not working.
+        // throwing up on an invalid name. it's not working.
         fail("Rejected valid string [" + name + "] as a name");
       }
     }
