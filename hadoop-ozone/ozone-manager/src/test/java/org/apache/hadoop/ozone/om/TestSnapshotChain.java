@@ -334,8 +334,12 @@ public class TestSnapshotChain {
           createSnapshotInfo(snapshotID, snapshotChain.get(snapshotID),
               snapshotChain.get(snapshotID), System.currentTimeMillis()));
     }
-    Assertions.assertThrows(IllegalStateException.class,
+    IllegalStateException exception = Assertions.assertThrows(
+        IllegalStateException.class,
         () -> new SnapshotChainManager(omMetadataManager));
+    Assertions.assertTrue(exception.getMessage()
+        .startsWith("Snapshot chain corruption. All snapshots have not been " +
+            "added to the snapshot chain."));
   }
 
   @ParameterizedTest
@@ -351,7 +355,10 @@ public class TestSnapshotChain {
               prevSnapshotId, System.currentTimeMillis()));
       prevSnapshotId = snapshotID;
     }
-    Assertions.assertThrows(RuntimeException.class,
+    IllegalStateException exception = Assertions.assertThrows(
+        IllegalStateException.class,
         () -> new SnapshotChainManager(omMetadataManager));
+    Assertions.assertTrue(exception.getMessage()
+        .startsWith("Path Snapshot chain corruption."));
   }
 }
