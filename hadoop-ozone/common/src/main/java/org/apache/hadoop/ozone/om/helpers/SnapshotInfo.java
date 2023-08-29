@@ -728,6 +728,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean)
         .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize)
+        .setReferencedReplicatedSize(exclusiveReplicatedSize)
+        .setExclusiveSize(exclusiveSize)
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
         .build();
   }
 }
