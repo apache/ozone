@@ -3280,7 +3280,7 @@
   <property>
     <name>ozone.om.enable.filesystem.paths</name>
     <tag>OZONE, OM</tag>
-    <value>true</value>
+    <value>false</value>
     <description>If true, key names will be interpreted as file system paths.
       "/" will be treated as a special character and paths will be normalized
       and must follow Unix filesystem path naming conventions. This flag will
