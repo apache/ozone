@@ -1005,8 +1005,8 @@ public class ObjectEndpoint extends EndpointBase {
       ReplicationConfig replication,
             Map<String, String> metadata) throws IOException {
     long copyLength;
-    if (datastreamEnabled && !((replication != null &&
-        replication.getReplicationType() == EC)) &&
+    if (datastreamEnabled && !(replication != null &&
+        replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
       try (OzoneDataStreamOutput dest = getClientProtocol()
           .createStreamKey(volume.getName(), destBucket, destKey, srcKeyLen,
