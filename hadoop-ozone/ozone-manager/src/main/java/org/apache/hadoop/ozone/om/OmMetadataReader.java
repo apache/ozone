@@ -307,7 +307,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
-
+    long startNanos = Time.monotonicNowNanos();
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(
         Pair.of(volumeName, bucketName));
 
@@ -336,6 +336,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         audit.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_KEYS,
             auditMap));
       }
+      perfMetrics.addListKeysLatencyNs(Time.monotonicNowNanos() - startNanos);
     }
   }
 

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Lists;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
@@ -646,8 +647,43 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, repReport.getStat(
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
+
+  /**
+   * A closed EC container with all healthy replicas and 1 extra unhealthy
+   * replica. It should be logged as over replicated, but not added to the over
+   * replication queue, as the unhealthy replica will be removed by the handler
+   * directly.
+   */
+  @Test
+  public void testPerfectlyReplicatedWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicas(container,
+        ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 1,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
   }
 
   @Test
@@ -790,6 +826,104 @@ public class TestReplicationManager {
     // to the over replication list.
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @Test
+  public void testMisReplicatedECContainer() throws IOException {
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5));
+
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  /**
+   * Consider an EC container with 5 closed and 1 unhealthy replica.
+   * Assume this container is also mis replicated because it's on
+   * insufficient racks. For such EC containers, RM should first delete the
+   * unhealthy replica and then solve mis replication.
+   */
+  @Test
+  public void testMisReplicatedECContainerWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(5, 5, 5, 1,
+            Lists.newArrayList(2, 1, 1, 1, 1)));
+
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4,
+            5);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 1, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    /*
+     Does not get queued as over replicated because a delete command is sent
+     directly for the unhealthy replica.
+     */
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    List<ContainerReplicaOp> ops =
+        containerReplicaPendingOps.getPendingOps(container.containerID());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
+    Assertions.assertEquals(1, ops.size());
+    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+        ops.get(0).getOpType());
+    Assertions.assertEquals(unhealthyReplica.getDatanodeDetails(),
+        ops.get(0).getTarget());
+    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
+    Assertions.assertEquals(1, replicationManager.getMetrics()
+        .getEcDeletionCmdsSentTotal());
+    Assertions.assertEquals(0, replicationManager.getMetrics()
+        .getDeletionCmdsSentTotal());
+
+    /*
+    Now, remove the unhealthy replica. This leaves 5 replicas on 4 racks,
+    which is mis replication. RM should queue this container as mis
+    replicated now.
+     */
+    replicas.remove(unhealthyReplica);
+    containerReplicaPendingOps.completeDeleteReplica(container.containerID(),
+        unhealthyReplica.getDatanodeDetails(), 1);
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
+            Lists.newArrayList(2, 1, 1, 1)));
+
+    repReport = new ReplicationManagerReport();
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
