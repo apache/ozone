@@ -750,7 +750,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setBucketName(keyArgs.getBucketName())
             .setKeyName(keyArgs.getKeyName())
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, locations)))
+                    new OmKeyLocationInfoGroup(0, locations,
+                        keyArgs.getIsMultipartKey())))
             .setCreationTime(keyArgs.getModificationTime())
             .setModificationTime(keyArgs.getModificationTime())
             .setDataSize(size)

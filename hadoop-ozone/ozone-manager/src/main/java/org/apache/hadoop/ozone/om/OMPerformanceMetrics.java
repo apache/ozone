@@ -86,6 +86,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "checkAccess latency in nanoseconds")
   private MutableRate checkAccessLatencyNs;
 
+  @Metric(about = "listKeys latency in nanoseconds")
+  private MutableRate listKeysLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -145,5 +148,9 @@ public class OMPerformanceMetrics {
 
   public void setCheckAccessLatencyNs(long latencyInNs) {
     checkAccessLatencyNs.add(latencyInNs);
+  }
+
+  public void addListKeysLatencyNs(long latencyInNs) {
+    listKeysLatencyNs.add(latencyInNs);
   }
 }

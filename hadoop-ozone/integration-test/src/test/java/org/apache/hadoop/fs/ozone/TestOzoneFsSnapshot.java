@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -136,6 +137,39 @@ public class TestOzoneFsSnapshot {
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request fails since snapshot name provided twice
     Assertions.assertEquals(1, res);
+  }
+
+  @Test
+  public void testCreateSnapshotWithSubDirInput() throws Exception {
+    // Test that:
+    // $ ozone fs -createSnapshot ofs://om/vol1/buck2/dir3/ snap1
+    //
+    // should print:
+    // Created snapshot ofs://om/vol1/buck2/.snapshot/snap1
+    //
+    // rather than:
+    // Created snapshot ofs://om/vol1/buck2/dir3/.snapshot/snap1
+
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    String dirPath = BUCKET_PATH + "/dir1/";
+
+    int res = ToolRunner.run(shell, new String[] {
+        "-mkdir", "-p", dirPath});
+    Assertions.assertEquals(0, res);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      res = ToolRunner.run(shell, new String[] {
+          "-createSnapshot", dirPath, snapshotName});
+      // Asserts that create request succeeded
+      Assertions.assertEquals(0, res);
+
+      String expectedSnapshotPath = Paths.get(
+          BUCKET_PATH, OM_SNAPSHOT_INDICATOR, snapshotName).toString();
+      String out = capture.getOutput().trim();
+      Assertions.assertTrue(out.endsWith(expectedSnapshotPath));
+    }
   }
 
   /**
