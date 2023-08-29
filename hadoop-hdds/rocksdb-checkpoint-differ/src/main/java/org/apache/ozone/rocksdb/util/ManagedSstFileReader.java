@@ -90,10 +90,6 @@ public class ManagedSstFileReader {
     return estimatedTotalKeys;
   }
 
-  public Stream<String> getKeyStream() throws RocksDBException {
-    return getKeyStream(null, null);
-  }
-
   public Stream<String> getKeyStream(String lowerBound,
       String upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
@@ -144,12 +140,6 @@ public class ManagedSstFileReader {
           }
         };
     return getStreamFromIterator(itr);
-  }
-
-  public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
-    return getKeyStreamWithTombstone(sstDumpTool,
-        null, null);
   }
 
   public Stream<String> getKeyStreamWithTombstone(
