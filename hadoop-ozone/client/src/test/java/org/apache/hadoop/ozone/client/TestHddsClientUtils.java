@@ -296,5 +296,33 @@ public class TestHddsClientUtils {
         // throwing up on an invalid name. it's working.
       }
     }
+
+    List<String> validNames = new ArrayList<>();
+    validNames.add("123_123");
+    validNames.add("abcd/abcd");
+    validNames.add("test-name");
+    validNames.add("hi!ozone");
+    validNames.add("test(string)");
+    validNames.add("10*3+1");
+    validNames.add("photo'0201'");
+    validNames.add("my.name");
+    validNames.add("you&me");
+    validNames.add("1=0");
+    validNames.add("print;");
+    validNames.add("3:5:2");
+    validNames.add("a,b,c");
+    validNames.add("my name is");
+    validNames.add("xyz@mail");
+    validNames.add("dollar$");
+
+    for (String name : validNames) {
+      try {
+        HddsClientUtils.verifyKeyName(name);
+        // not throwing up on a valid name. it's working.
+      } catch (IllegalArgumentException e) {
+        // throwing up on an valid name. it's not working.
+        fail("Rejected valid string [" + name + "] as a name");
+      }
+    }
   }
 }
