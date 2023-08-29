@@ -93,6 +93,10 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
     Assert.assertNotNull("Failed to find the fileInfo", omKeyInfo);
+    Assert.assertNotNull("Key Location is null!",
+        omKeyInfo.getLatestVersionLocations());
+    Assert.assertTrue("isMultipartKey is false!",
+        omKeyInfo.getLatestVersionLocations().isMultipartKey());
     Assert.assertEquals("FileName mismatches!", fileName,
             omKeyInfo.getKeyName());
     Assert.assertEquals("ParentId mismatches!", parentID,

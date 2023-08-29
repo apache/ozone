@@ -85,12 +85,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   @Override
   public void cleanup() {
     super.cleanup();
-    try {
-      deleteRootDir();
-    } catch (IOException e) {
-      LOG.info("Failed to cleanup DB tables.", e);
-      fail("Failed to cleanup DB tables." + e.getMessage());
-    }
   }
 
   private static final Logger LOG =

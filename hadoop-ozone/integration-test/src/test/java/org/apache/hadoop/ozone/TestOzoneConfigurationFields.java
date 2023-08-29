@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
+
+import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
@@ -51,6 +53,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
+            S3SecretConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
