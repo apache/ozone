@@ -23,7 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -195,7 +195,7 @@ class TestManagedSSTDumpIterator {
             new ArrayBlockingQueue<>(1),
             new ThreadPoolExecutor.CallerRunsPolicy());
     ManagedSSTDumpTool tool = new ManagedSSTDumpTool(executorService, 8192);
-    List<Optional<String>> testBounds = GenericTestUtils.getTestingBounds(
+    List<Optional<String>> testBounds = TestUtils.getTestingBounds(
         keys.keySet().stream().collect(Collectors.toMap(Pair::getKey,
             Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
     for (Optional<String> keyStart : testBounds) {
@@ -213,7 +213,8 @@ class TestManagedSSTDumpIterator {
         try (ManagedOptions options = new ManagedOptions();
              ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue> iterator =
             new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
-                file.getAbsolutePath(), options, lowerBound, upperBound) {
+                file.getAbsolutePath(), options, lowerBound.orElse(null),
+                upperBound.orElse(null)) {
               @Override
               protected KeyValue getTransformedValue(
                   Optional<KeyValue> value) {

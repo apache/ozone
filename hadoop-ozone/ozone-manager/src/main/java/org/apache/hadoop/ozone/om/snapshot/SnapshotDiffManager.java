@@ -1132,9 +1132,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
     char[] upperBoundCharArray = tablePrefix.toCharArray();
     upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
-    Optional<String> sstFileReaderLowerBound = Optional.of(tablePrefix);
-    Optional<String> sstFileReaderUpperBound =
-        Optional.of(String.valueOf(upperBoundCharArray));
+    String sstFileReaderLowerBound = tablePrefix;
+    String sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
     try (Stream<String> keysToCheck =
              nativeRocksToolsLoaded && sstDumpTool.isPresent()
                  ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get(),

@@ -25,13 +25,8 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
@@ -467,36 +462,6 @@ public abstract class GenericTestUtils {
       super.write(buf, off, len);
       other.write(buf, off, len);
     }
-  }
-
-  public static String getLexicographicallyLowerString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] -= 1;
-    return String.valueOf(charVal);
-  }
-
-  public static String getLexicographicallyHigherString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] += 1;
-    return String.valueOf(charVal);
-  }
-
-  public static List<Optional<String>> getTestingBounds(
-      TreeMap<String, Integer> keys) {
-    Set<String> boundary = new HashSet<>();
-    if (keys.size() > 0) {
-      List<String> sortedKeys = new ArrayList<>(keys.keySet());
-      boundary.add(getLexicographicallyLowerString(keys.firstKey()));
-      boundary.add(keys.firstKey());
-      for (int i = 1; i <= 10; i++) {
-        boundary.add(sortedKeys.get((i * keys.size() / 10) - 1));
-      }
-      boundary.add(getLexicographicallyHigherString(keys.lastKey()));
-    }
-    List<Optional<String>> bounds = boundary.stream().map(Optional::of)
-        .collect(Collectors.toList());
-    bounds.add(Optional.empty());
-    return bounds;
   }
 
 }

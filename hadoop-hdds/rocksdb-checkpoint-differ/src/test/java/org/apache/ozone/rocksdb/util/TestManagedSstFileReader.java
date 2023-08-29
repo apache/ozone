@@ -22,11 +22,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -65,7 +65,7 @@ class TestManagedSstFileReader {
   private String createRandomSSTFile(TreeMap<String, Integer> keys)
       throws IOException, RocksDBException {
     File file = File.createTempFile("tmp_sst_file", ".sst");
-//    file.deleteOnExit();
+    file.deleteOnExit();
 
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions managedEnvOptions = new ManagedEnvOptions();
@@ -124,7 +124,7 @@ class TestManagedSstFileReader {
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
-    List<Optional<String>> bounds = GenericTestUtils.getTestingBounds(keys);
+    List<Optional<String>> bounds = TestUtils.getTestingBounds(keys);
     for (Optional<String> lowerBound : bounds) {
       for (Optional<String> upperBound : bounds) {
         // Calculating the expected keys which lie in the given boundary.
@@ -138,7 +138,7 @@ class TestManagedSstFileReader {
                     Map.Entry::getValue));
         try (Stream<String> keyStream =
                  new ManagedSstFileReader(files).getKeyStream(
-                     lowerBound, upperBound)) {
+                     lowerBound.orElse(null), upperBound.orElse(null))) {
           keyStream.forEach(key -> {
             Assertions.assertEquals(keysInBoundary.get(key), 1);
             Assertions.assertNotNull(keysInBoundary.remove(key));
@@ -171,7 +171,7 @@ class TestManagedSstFileReader {
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
-    List<Optional<String>> bounds = GenericTestUtils.getTestingBounds(keys);
+    List<Optional<String>> bounds = TestUtils.getTestingBounds(keys);
     try {
       for (Optional<String> lowerBound : bounds) {
         for (Optional<String> upperBound : bounds) {
@@ -185,7 +185,8 @@ class TestManagedSstFileReader {
                   .collect(Collectors.toMap(Map.Entry::getKey,
                       Map.Entry::getValue));
           try (Stream<String> keyStream = new ManagedSstFileReader(files)
-              .getKeyStreamWithTombstone(sstDumpTool, lowerBound, upperBound)) {
+              .getKeyStreamWithTombstone(sstDumpTool, lowerBound.orElse(null),
+                  upperBound.orElse(null))) {
             keyStream.forEach(
                 key -> {
                   Assertions.assertNotNull(keysInBoundary.remove(key));

@@ -19,6 +19,7 @@
 package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
@@ -90,31 +91,36 @@ public class ManagedSstFileReader {
   }
 
   public Stream<String> getKeyStream() throws RocksDBException {
-    return getKeyStream(Optional.empty(), Optional.empty());
+    return getKeyStream(null, null);
   }
 
-  public Stream<String> getKeyStream(Optional<String> lowerBound,
-      Optional<String> upperBound) throws RocksDBException {
+  public Stream<String> getKeyStream(String lowerBound,
+      String upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           private ManagedOptions options;
           private ReadOptions readOptions;
 
-          private Optional<ManagedSlice> lowerBoundSLice;
+          private ManagedSlice lowerBoundSLice;
 
-          private Optional<ManagedSlice> upperBoundSlice;
+          private ManagedSlice upperBoundSlice;
 
           @Override
           protected void init() {
             this.options = new ManagedOptions();
             this.readOptions = new ManagedReadOptions();
-            this.lowerBoundSLice = lowerBound
-                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
-            this.upperBoundSlice = upperBound
-                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
-            lowerBoundSLice.ifPresent(s -> readOptions.setIterateLowerBound(s));
-            upperBoundSlice.ifPresent(s -> readOptions.setIterateUpperBound(s));
+            if (Objects.nonNull(lowerBound)) {
+              this.lowerBoundSLice = new ManagedSlice(
+                  StringUtils.string2Bytes(lowerBound));
+              readOptions.setIterateLowerBound(lowerBoundSLice);
+            }
+
+            if (Objects.nonNull(upperBound)) {
+              this.upperBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(upperBound));
+              readOptions.setIterateUpperBound(upperBoundSlice);
+            }
           }
 
           @Override
@@ -134,6 +140,7 @@ public class ManagedSstFileReader {
             super.close();
             options.close();
             readOptions.close();
+            IOUtils.closeQuietly(lowerBoundSLice, upperBoundSlice);
           }
         };
     return getStreamFromIterator(itr);
@@ -142,26 +149,30 @@ public class ManagedSstFileReader {
   public Stream<String> getKeyStreamWithTombstone(
       ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
     return getKeyStreamWithTombstone(sstDumpTool,
-        Optional.empty(), Optional.empty());
+        null, null);
   }
 
   public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool, Optional<String> lowerBound,
-      Optional<String> upperBound) throws RocksDBException {
+      ManagedSSTDumpTool sstDumpTool, String lowerBound,
+      String upperBound) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
           private ManagedOptions options;
-          private Optional<ManagedSlice> lowerBoundSlice;
-          private Optional<ManagedSlice> upperBoundSlice;
+          private ManagedSlice lowerBoundSlice;
+          private ManagedSlice upperBoundSlice;
 
           @Override
           protected void init() {
             this.options = new ManagedOptions();
-            this.lowerBoundSlice = lowerBound
-                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
-            this.upperBoundSlice = upperBound
-                .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+            if (Objects.nonNull(lowerBound)) {
+              this.lowerBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(lowerBound));
+            }
+            if (Objects.nonNull(upperBound)) {
+              this.upperBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(upperBound));
+            }
           }
 
           @Override
@@ -181,8 +192,7 @@ public class ManagedSstFileReader {
           public void close() throws UncheckedIOException {
             super.close();
             options.close();
-            lowerBoundSlice.ifPresent(ManagedSlice::close);
-            upperBoundSlice.ifPresent(ManagedSlice::close);
+            IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice);
           }
         };
     return getStreamFromIterator(itr);

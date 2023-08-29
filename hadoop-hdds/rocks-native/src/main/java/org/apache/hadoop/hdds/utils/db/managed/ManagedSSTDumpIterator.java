@@ -33,6 +33,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,13 +64,13 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
       String sstFilePath, ManagedOptions options)
       throws NativeLibraryNotLoadedException, IOException {
-    this(sstDumpTool, sstFilePath, options, Optional.empty(), Optional.empty());
+    this(sstDumpTool, sstFilePath, options, null, null);
   }
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath, ManagedOptions options,
-                                Optional<ManagedSlice> lowerKeyBound,
-                                Optional<ManagedSlice> upperKeyBound)
+                                ManagedSlice lowerKeyBound,
+                                ManagedSlice upperKeyBound)
       throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
@@ -135,17 +136,19 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-      ManagedOptions options, Optional<ManagedSlice> lowerKeyBound,
-      Optional<ManagedSlice> upperKeyBound)
+      ManagedOptions options, ManagedSlice lowerKeyBound,
+      ManagedSlice upperKeyBound)
       throws NativeLibraryNotLoadedException {
     Map<String, String> argMap = Maps.newHashMap();
     argMap.put("file", sstFile.getAbsolutePath());
     argMap.put("silent", null);
     argMap.put("command", "scan");
-    lowerKeyBound.ifPresent(s -> argMap.put("from",
-        String.valueOf(s.getNativeHandle())));
-    upperKeyBound.ifPresent(s -> argMap.put("to",
-        String.valueOf(s.getNativeHandle())));
+    if (Objects.nonNull(lowerKeyBound)) {
+      argMap.put("from", String.valueOf(lowerKeyBound.getNativeHandle()));
+    }
+    if (Objects.nonNull(upperKeyBound)) {
+      argMap.put("to", String.valueOf(upperKeyBound.getNativeHandle()));
+    }
     this.sstDumpToolTask = sstDumpTool.run(argMap, options);
     processOutput = sstDumpToolTask.getPipedOutput();
     intBuffer = new byte[4];
