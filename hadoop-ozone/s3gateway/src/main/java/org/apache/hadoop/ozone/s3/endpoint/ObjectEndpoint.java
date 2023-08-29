@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -247,13 +248,14 @@ public class ObjectEndpoint extends EndpointBase {
           bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
       String amzDecodedLength =
-          headers.getHeaderString("x-amz-decoded-content-length");
+          headers.getHeaderString(S3Consts.DECODED_CONTENT_LENGTH_HEADER);
       boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
           Long.parseLong(amzDecodedLength) == 0;
       if (canCreateDirectory &&
           (length == 0 || hasAmzDecodedLengthZero)) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
-        createDirectory(volume.getName(), bucketName, keyPath);
+        getClientProtocol()
+            .createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
@@ -324,16 +326,6 @@ public class ObjectEndpoint extends EndpointBase {
         getMetrics().updateCreateKeySuccessStats(startNanos);
       }
     }
-  }
-
-  private static boolean hasTrailingSlash(String keyPath) {
-    return keyPath.charAt(keyPath.length() - 1) == '/';
-  }
-
-  private void createDirectory(String volumeName,
-      String bucketName, String keyPath) throws IOException {
-    getClientProtocol()
-        .createDirectory(volumeName, bucketName, keyPath);
   }
 
   /**
