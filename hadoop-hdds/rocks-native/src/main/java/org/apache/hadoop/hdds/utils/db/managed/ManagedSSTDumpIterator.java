@@ -143,6 +143,12 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     argMap.put("file", sstFile.getAbsolutePath());
     argMap.put("silent", null);
     argMap.put("command", "scan");
+    // strings containing '\0' do not have the same value when encode UTF-8 on
+    // java which is 0. But in jni the utf-8 encoded value for '\0'
+    // becomes -64 -128. Thus the value becomes different.
+    // In order to support this, changes have been made on the rocks-tools
+    // to pass the address of the ManagedSlice and the jni can use the object
+    // of slice directly from there.
     if (Objects.nonNull(lowerKeyBound)) {
       argMap.put("from", String.valueOf(lowerKeyBound.getNativeHandle()));
     }
