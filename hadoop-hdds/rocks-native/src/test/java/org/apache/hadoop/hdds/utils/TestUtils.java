@@ -22,7 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.SortedMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,7 +46,7 @@ public final class TestUtils {
   }
 
   public static List<Optional<String>> getTestingBounds(
-      TreeMap<String, Integer> keys) {
+      SortedMap<String, Integer> keys) {
     Set<String> boundary = new HashSet<>();
     if (keys.size() > 0) {
       List<String> sortedKeys = new ArrayList<>(keys.keySet());

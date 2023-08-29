@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -91,7 +92,7 @@ class TestManagedSstFileReader {
             i -> i % 2));
   }
 
-  private Pair<TreeMap<String, Integer>, List<String>> createDummyData(
+  private Pair<SortedMap<String, Integer>, List<String>> createDummyData(
       int numberOfFiles) throws RocksDBException, IOException {
     List<String> files = new ArrayList<>();
     int numberOfKeysPerFile = 1000;
@@ -117,10 +118,10 @@ class TestManagedSstFileReader {
   @ValueSource(ints = {0, 1, 2, 3, 7, 10})
   public void testGetKeyStream(int numberOfFiles)
       throws RocksDBException, IOException {
-    Pair<TreeMap<String, Integer>, List<String>> data =
+    Pair<SortedMap<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
-    TreeMap<String, Integer> keys = data.getLeft();
+    SortedMap<String, Integer> keys = data.getLeft();
     // Getting every possible combination of 2 elements from the sampled keys.
     // Reading the sst file lying within the given bounds and
     // validating the keys read from the sst file.
@@ -157,10 +158,10 @@ class TestManagedSstFileReader {
       throws RocksDBException, IOException, NativeLibraryNotLoadedException {
     Assumptions.assumeTrue(NativeLibraryLoader.getInstance()
         .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
-    Pair<TreeMap<String, Integer>, List<String>> data =
+    Pair<SortedMap<String, Integer>, List<String>> data =
         createDummyData(numberOfFiles);
     List<String> files = data.getRight();
-    TreeMap<String, Integer> keys = data.getLeft();
+    SortedMap<String, Integer> keys = data.getLeft();
     ExecutorService executorService = new ThreadPoolExecutor(0,
         2, 60, TimeUnit.SECONDS,
         new SynchronousQueue<>(), new ThreadFactoryBuilder()
