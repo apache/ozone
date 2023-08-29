@@ -133,8 +133,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     const value = e.target.value;
     let inputValid = "";
     let helpMessage = ""
-    // Only allow letters, numbers,underscores and forward slashes
-    const regex = /^[a-zA-Z0-9_/]*$/;
+    // Only allow letters, numbers,underscores and forward slashes and hyphen
+    const regex = /^[a-zA-Z0-9_/-]*$/;
     if (!regex.test(value)) {
       helpMessage = "Please enter valid path"
       inputValid = "error"
@@ -392,7 +392,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                       </div>
                     </div>
                     <div id="heatmap-chart-container">
-                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
+                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent} childEntityType={this.state.entityType}></HeatMapConfiguration>
                     </div>
                   </div>
                   :
