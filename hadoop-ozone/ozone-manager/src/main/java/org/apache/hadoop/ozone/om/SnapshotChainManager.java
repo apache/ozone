@@ -80,7 +80,16 @@ public class SnapshotChainManager {
               "snapshots in the global snapshot chain.", snapshotID,
           globalSnapshotChain.size()));
     }
-    if (prevGlobalID != null && globalSnapshotChain.containsKey(prevGlobalID)) {
+
+    if (prevGlobalID != null &&
+        !globalSnapshotChain.containsKey(prevGlobalID)) {
+      throw new IllegalStateException(String.format(
+          "Global Snapshot chain corruption. Previous snapshotId: %s is " +
+              "set for snapshotId: %s but no associated snapshot found in " +
+              "snapshot chain.", prevGlobalID, snapshotID));
+    }
+
+    if (prevGlobalID != null) {
       if (globalSnapshotChain.get(prevGlobalID).hasNextSnapshotId()) {
         throw new IllegalStateException(String.format(
             "Global Snapshot chain corruption. Snapshot with snapshotId: %s " +
@@ -95,13 +104,6 @@ public class SnapshotChainManager {
       globalSnapshotChain.get(prevGlobalID).setNextSnapshotId(snapshotID);
     }
 
-    if (prevGlobalID != null &&
-        !globalSnapshotChain.containsKey(prevGlobalID)) {
-      throw new IllegalStateException(String.format(
-          "Global Snapshot chain corruption. Previous snapshotId: %s is " +
-              "set for snapshotId: %s but no associated snapshot found in " +
-              "snapshot chain.", prevGlobalID, snapshotID));
-    }
     globalSnapshotChain.put(snapshotID,
         new SnapshotChainInfo(snapshotID, prevGlobalID, null));
 
