@@ -110,6 +110,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getWriteChunkResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -801,6 +802,7 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
+    ContainerProtos.BlockData blockDataProto = null;
     try {
       checkContainerOpen(kvContainer);
 
@@ -809,6 +811,13 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
+
+      BlockData blockData = null;
+      if (writeChunk.hasBlock()) {
+        metrics.incContainerOpsMetrics(Type.PutBlock);
+        blockData = BlockData.getFromProtoBuf(
+            writeChunk.getBlock().getBlockData());
+      }
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
@@ -824,6 +833,17 @@ public class KeyValueHandler extends Handler {
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
+      if (blockData != null) {
+        // optimization for hsync:
+        // block metadata is piggybacked in the same message.
+        // there will not be an additional PutBlock request.
+        blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
+        blockManager.putBlock(kvContainer, blockData);
+        blockDataProto = blockData.getProtoBufMessage();
+        final long numBytes = blockDataProto.getSerializedSize();
+        metrics.incContainerBytesStats(Type.PutBlock, numBytes);
+      }
+
       // We should increment stats after writeChunk
       if (stage == WriteChunkStage.WRITE_DATA ||
           stage == WriteChunkStage.COMBINED) {
@@ -838,7 +858,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getSuccessResponse(request);
+    return getWriteChunkResponseSuccess(request, blockDataProto);
   }
 
   /**

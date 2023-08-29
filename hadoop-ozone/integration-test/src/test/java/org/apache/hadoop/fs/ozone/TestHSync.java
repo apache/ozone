@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -77,6 +78,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -116,6 +118,8 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    CONF.setInt(HDDS_DATANODE_VERSION, DatanodeVersion.CURRENT_VERSION - 1);
+    CONF.setBoolean("ozone.client.stream.putblock.piggybacking", true);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -340,7 +344,8 @@ public class TestHSync {
           break;
         }
         for (int i = 0; i < n; i++) {
-          assertEquals(data[offset + i], buffer[i]);
+          assertEquals(data[offset + i], buffer[i],
+              "expected at offset " + offset + " i=" + i);
         }
         offset += n;
       }

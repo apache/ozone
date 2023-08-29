@@ -406,9 +406,11 @@ message  WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
+  optional PutBlockRequestProto block = 4;
 }
 
 message  WriteChunkResponseProto {
+  optional GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
 enum ReadChunkVersion {

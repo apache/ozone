@@ -74,6 +74,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VERSION;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -230,7 +231,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+      //datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+      datanodeDetails.setCurrentVersion(
+          conf.getInt(HDDS_DATANODE_VERSION, DatanodeVersion.CURRENT_VERSION));
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);

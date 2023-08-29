@@ -530,16 +530,38 @@ public class TestOmContainerLocationCache {
 
   private void mockWriteChunkResponse(XceiverClientSpi mockDnProtocol)
       throws IOException, ExecutionException, InterruptedException {
-    ContainerCommandResponseProto writeResponse =
-        ContainerCommandResponseProto.newBuilder()
-            .setWriteChunk(WriteChunkResponseProto.newBuilder().build())
-            .setResult(Result.SUCCESS)
-            .setCmdType(Type.WriteChunk)
-            .build();
     doAnswer(invocation ->
-        new XceiverClientReply(completedFuture(writeResponse)))
+        new XceiverClientReply(
+            completedFuture(
+                createWriteChunkResponse(
+                    (ContainerCommandRequestProto)invocation.getArgument(0)))))
         .when(mockDnProtocol)
         .sendCommandAsync(argThat(matchCmd(Type.WriteChunk)));
+  }
+
+  ContainerCommandResponseProto createWriteChunkResponse(
+      ContainerCommandRequestProto request) {
+    ContainerProtos.WriteChunkRequestProto writeChunk = request.getWriteChunk();
+
+    WriteChunkResponseProto.Builder builder =
+        WriteChunkResponseProto.newBuilder();
+    if (writeChunk.hasBlock()) {
+      ContainerProtos.BlockData
+          blockData = writeChunk.getBlock().getBlockData();
+
+      GetCommittedBlockLengthResponseProto response =
+          GetCommittedBlockLengthResponseProto.newBuilder()
+          .setBlockID(blockData.getBlockID())
+          .setBlockLength(blockData.getSize())
+          .build();
+
+      builder.setCommittedBlockLength(response);
+    }
+    return ContainerCommandResponseProto.newBuilder()
+        .setWriteChunk(builder.build())
+        .setResult(Result.SUCCESS)
+        .setCmdType(Type.WriteChunk)
+        .build();
   }
 
   private ArgumentMatcher<ContainerCommandRequestProto> matchCmd(Type type) {

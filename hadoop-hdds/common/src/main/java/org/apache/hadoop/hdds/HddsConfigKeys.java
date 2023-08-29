@@ -392,4 +392,6 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
       "ozone.audit.log.debug.cmd.list.dnaudit";
+
+  public static final String HDDS_DATANODE_VERSION = "hdds.datanode.version";
 }
