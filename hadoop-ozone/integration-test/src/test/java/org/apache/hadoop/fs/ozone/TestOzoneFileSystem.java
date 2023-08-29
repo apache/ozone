@@ -1511,7 +1511,7 @@ public class TestOzoneFileSystem {
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = new Path(TRASH_ROOT, username);
+    Path expectedOutPath1 = o3fs.makeQualified(new Path(TRASH_ROOT, username));
     Assert.assertEquals(expectedOutPath1, outPath1);
   }
 
