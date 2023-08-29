@@ -1008,11 +1008,9 @@ public class ObjectEndpoint extends EndpointBase {
     if (datastreamEnabled && !(replication != null &&
         replication.getReplicationType() == EC) &&
         srcKeyLen > datastreamMinLength) {
-      try (OzoneDataStreamOutput dest = getClientProtocol()
-          .createStreamKey(volume.getName(), destBucket, destKey, srcKeyLen,
-              replication, metadata)) {
-        copyLength = IOUtils.copyLarge(src, dest);
-      }
+      copyLength = ObjectEndpointStreaming
+          .putKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
+              chunkSize, replication, metadata, src);
     } else {
       try (OzoneOutputStream dest = getClientProtocol()
           .createKey(volume.getName(), destBucket, destKey, srcKeyLen,

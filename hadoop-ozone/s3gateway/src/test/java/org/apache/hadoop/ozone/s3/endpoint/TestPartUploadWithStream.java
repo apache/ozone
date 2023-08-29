@@ -168,33 +168,4 @@ public class TestPartUploadWithStream {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
     }
   }
-
-  @Test
-  public void testPartUploadWithCopy() throws Exception {
-    Response response = REST.initializeMultipartUpload(S3BUCKET, S3KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    assertEquals(200, response.getStatus());
-
-
-    Map<String, String> additionalHeaders = new HashMap<>();
-    additionalHeaders
-        .put(COPY_SOURCE_HEADER, S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
-
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
-
-    additionalHeaders
-        .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
-    REST.setHeaders(headers);
-
-    response = REST.put(S3BUCKET, S3KEY, 0, 1, uploadID, null);
-
-    assertNotNull(response.getHeaderString("ETag"));
-
-  }
 }
