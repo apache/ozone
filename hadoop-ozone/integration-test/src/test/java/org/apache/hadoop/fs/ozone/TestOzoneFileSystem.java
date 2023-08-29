@@ -1597,10 +1597,12 @@ public class TestOzoneFileSystem {
         bucket.getKey("a/b/c/key").getName());
     Assert.assertEquals("a/b/c/",
         bucket.getKey("a/b/c/").getName());
-    Assert.assertEquals("a/b/c",
+    Assert.assertEquals("a/b/c/",
         bucket.getKey("a/b/c").getName());
-    Assert.assertEquals("a/b",
+    Assert.assertEquals("a/b/",
         bucket.getKey("a/b/").getName());
+    Assert.assertEquals("a/b/",
+        bucket.getKey("a/b").getName());
   }
 
   @Test

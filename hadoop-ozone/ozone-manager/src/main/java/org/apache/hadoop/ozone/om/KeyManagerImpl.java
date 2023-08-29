@@ -396,9 +396,12 @@ public class KeyManagerImpl implements KeyManager {
           .validateAndNormalizeKey(enableFileSystemPaths, keyName,
               bucketLayout);
 
+      LOG.info("tej enableFso: " + enableFileSystemPaths);
       if (bucketLayout.isFileSystemOptimized()) {
+        LOG.info("tej key at KeyManagerImpl, fso: " + keyName);
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
+        LOG.info("tej key at KeyManagerImpl, not FSO " + keyName);
         value = getOmKeyInfo(volumeName, bucketName, keyName);
         if (value != null) {
           // For Legacy & OBS buckets, any key is a file by default. This is to
@@ -434,10 +437,24 @@ public class KeyManagerImpl implements KeyManager {
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName) throws IOException {
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .build();
+    OzoneFileStatus fileStatus = getOzoneFileStatus(keyArgs, null);
+
+    LOG.info("tej key omkeyinfo; "+keyName+" status:"+fileStatus);
+    if (fileStatus.isDirectory()) {
+      keyName = OzoneFSUtils.addTrailingSlashIfNeeded(
+          fileStatus.getKeyInfo().getKeyName());
+    }
+    LOG.info("tej key omkeyinfo; "+keyName);
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
     BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
         bucketName);
+    LOG.info("tej keybytes omkeyinfo; "+keyBytes);
     return metadataManager
         .getKeyTable(bucketLayout)
         .get(keyBytes);
@@ -1926,6 +1943,7 @@ public class KeyManagerImpl implements KeyManager {
       throws IOException {
     Preconditions.checkNotNull(args);
 
+    LOG.info("tej key at KeyManagerImpl, getkeyInfo: " + args.getKeyName());
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
         () -> readKeyInfo(args));
