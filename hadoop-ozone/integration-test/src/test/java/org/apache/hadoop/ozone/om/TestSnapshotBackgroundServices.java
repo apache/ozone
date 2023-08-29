@@ -124,7 +124,7 @@ public class TestSnapshotBackgroundServices {
       conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 1,
           TimeUnit.SECONDS);
     }
-    if ("testCompactionLogsAppendingByBackgroundService"
+    if ("testCompactionLogBackgroundService"
         .equals(testInfo.getDisplayName())) {
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
           TimeUnit.MILLISECONDS);
@@ -134,7 +134,7 @@ public class TestSnapshotBackgroundServices {
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
           TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
-          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 10,
+          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 1,
           TimeUnit.SECONDS);
     }
     if ("testSnapshotAndKeyDeletionBackgroundServices"
@@ -211,7 +211,7 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM);
+    startInactiveFollower(leaderOM, followerOM, () -> {});
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -361,7 +361,8 @@ public class TestSnapshotBackgroundServices {
   }
 
   private void startInactiveFollower(OzoneManager leaderOM,
-                                     OzoneManager followerOM)
+                                     OzoneManager followerOM,
+                                     Runnable actionAfterStarting)
       throws IOException, TimeoutException, InterruptedException {
     // Get the latest db checkpoint from the leader OM.
     TransactionInfo transactionInfo =
@@ -373,6 +374,7 @@ public class TestSnapshotBackgroundServices {
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerOM.getOMNodeId());
+    actionAfterStarting.run();
 
     // The recently started OM should be lagging behind the leader OM.
     // Wait & for follower to update transactions to leader snapshot index.
@@ -412,8 +414,8 @@ public class TestSnapshotBackgroundServices {
   }
 
   @Test
-  @DisplayName("testCompactionLogsAppendingByBackgroundService")
-  public void testCompactionLogsAppendingByBackgroundService()
+  @DisplayName("testCompactionLogBackgroundService")
+  public void testCompactionLogBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
     OzoneManager leaderOM = getLeaderOM();
     OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
@@ -492,38 +494,12 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    // Get the latest db checkpoint from the leader OM.
-    TransactionInfo transactionInfo =
-        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
-    TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(transactionInfo.getTerm(),
-            transactionInfo.getTransactionIndex());
-    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
+    File leaderSstBackupDir = getSstBackupDir(leaderOM);
+    int numberOfSstFiles =
+        Objects.requireNonNull(leaderSstBackupDir.listFiles()).length;
 
-    // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerOM.getOMNodeId());
-
-    GenericTestUtils.waitFor(() -> {
-      suspendBackupCompactionFilesPruning(followerOM);
-      boolean shouldRun = followerOM
-          .getMetadataManager()
-          .getStore()
-          .getRocksDBCheckpointDiffer()
-          .shouldRun();
-      // TODO https://issues.apache.org/jira/browse/HDDS-9209
-      LOG.info("###shouldRun={}", shouldRun);
-      return !shouldRun;
-    }, 1000, 10000);
-
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() ->
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= leaderOMSnapshotIndex - 1, 100, 10000);
-
-    // Verify RPC server is running
-    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
+    startInactiveFollower(leaderOM, followerOM,
+        () -> suspendBackupCompactionFilesPruning(followerOM));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -535,12 +511,11 @@ public class TestSnapshotBackgroundServices {
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
-    File sstBackupDir = getSstBackupDir(newLeaderOM);
-    int numberOfSstFiles =
-        Objects.requireNonNull(sstBackupDir.listFiles()).length;
-
     resumeBackupCompactionFilesPruning(newLeaderOM);
-    checkIfCompactionBackupFilesWerePruned(sstBackupDir, numberOfSstFiles);
+
+    File newLeaderSstBackupDir = getSstBackupDir(newLeaderOM);
+    checkIfCompactionBackupFilesWerePruned(newLeaderSstBackupDir,
+        numberOfSstFiles);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
         newLeaderOM);
@@ -577,7 +552,7 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM);
+    startInactiveFollower(leaderOM, followerOM, () -> {});
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -622,7 +597,7 @@ public class TestSnapshotBackgroundServices {
       // TODO https://issues.apache.org/jira/browse/HDDS-9209
       LOG.info("###{},{}", numberOfSstFiles, newNumberOfSstFiles);
       return numberOfSstFiles > newNumberOfSstFiles;
-    }, 1000, 30000);
+    }, 1000, 10000);
   }
 
   private static void checkIfCompactionLogsGetAppendedByForcingCompaction(
