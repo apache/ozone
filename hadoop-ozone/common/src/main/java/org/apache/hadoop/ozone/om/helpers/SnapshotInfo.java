@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -52,15 +53,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * snapshot checkpoint directory, previous snapshotid
  * for the snapshot path & global amongst other necessary fields.
  */
-public final class SnapshotInfo implements Auditable {
+public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
       SnapshotInfo::getFromProtobuf,
-      SnapshotInfo::getProtobuf,
-      // FIXME: HDDS-8665 Deep copy will cause failures
-      //        - TestOMSnapshotDeleteRequest           NullPointerException
-      //        - TestOMSnapshotPurgeRequestAndResponse AssertionFailedError
-      DelegatedCodec.CopyType.SHALLOW);
+      SnapshotInfo::getProtobuf);
 
   public static Codec<SnapshotInfo> getCodec() {
     return CODEC;
@@ -598,5 +595,28 @@ public final class SnapshotInfo implements Auditable {
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
         globalPreviousSnapshotId, snapshotPath, checkpointDir);
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  @Override
+  public SnapshotInfo copyObject() {
+    return new Builder()
+        .setSnapshotId(snapshotId)
+        .setName(name)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setSnapshotStatus(snapshotStatus)
+        .setCreationTime(creationTime)
+        .setDeletionTime(deletionTime)
+        .setPathPreviousSnapshotId(pathPreviousSnapshotId)
+        .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
+        .setSnapshotPath(snapshotPath)
+        .setCheckpointDir(checkpointDir)
+        .setDbTxSequenceNumber(dbTxSequenceNumber)
+        .setDeepClean(deepClean)
+        .setSstFiltered(sstFiltered)
+        .build();
   }
 }
