@@ -172,9 +172,8 @@ public class WritableRatisContainerProvider
       }
     }
 
-    // we have tried all strategies we know and but somehow we are not able
-    // to get a container for this block. Log that info and return a null and
-    // throw an exception.
+    // we have tried all strategies we know but somehow we are not able
+    // to get a container for this block. Log that info and throw an exception.
     LOG.error(
         "Unable to allocate a block for the size: {}, repConfig: {}",
         size, repConfig);
