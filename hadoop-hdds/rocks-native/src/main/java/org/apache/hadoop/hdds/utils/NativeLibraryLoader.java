@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -151,10 +152,13 @@ public class NativeLibraryLoader {
         return Optional.empty();
       }
 
+      final String nativeLibDir =
+          Objects.nonNull(getSystemProperty(NATIVE_LIB_TMP_DIR)) ?
+              getSystemProperty(NATIVE_LIB_TMP_DIR) : "";
+      final File dir = new File(nativeLibDir).getAbsoluteFile();
+
       // create a temporary file to copy the library to
-      final File temp = File.createTempFile(libraryName, getLibOsSuffix(),
-          new File(Optional.ofNullable(getSystemProperty(NATIVE_LIB_TMP_DIR))
-              .orElse("")).getAbsoluteFile());
+      final File temp = File.createTempFile(libraryName, getLibOsSuffix(), dir);
       if (!temp.exists()) {
         return Optional.empty();
       } else {
