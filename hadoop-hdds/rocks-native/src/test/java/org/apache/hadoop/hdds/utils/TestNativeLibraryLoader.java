@@ -44,21 +44,17 @@ import static org.mockito.ArgumentMatchers.same;
  */
 public class TestNativeLibraryLoader {
 
-  private static Stream<Arguments> nativeLibraryDirectoryLocations()
+  private static Stream<String> nativeLibraryDirectoryLocations()
       throws IOException {
-    return Stream.of(
-        Arguments.of(Optional.of("")),
-        Arguments.of(Optional.of(File.createTempFile("prefix", "suffix")
-            .getParentFile().getAbsolutePath())),
-        Arguments.of(Optional.empty())
-    );
+    return Stream.of("", File.createTempFile("prefix", "suffix")
+        .getParentFile().getAbsolutePath(), null);
   }
 
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @MethodSource("nativeLibraryDirectoryLocations")
   public void testNativeLibraryLoader(
-      Optional<String> nativeLibraryDirectoryLocation) throws IOException {
+      String nativeLibraryDirectoryLocation) {
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader =
@@ -66,7 +62,7 @@ public class TestNativeLibraryLoader {
                  Mockito.CALLS_REAL_METHODS)) {
       mockedNativeLibraryLoader.when(() ->
               NativeLibraryLoader.getSystemProperty(same(NATIVE_LIB_TMP_DIR)))
-          .thenReturn(nativeLibraryDirectoryLocation.orElse(null));
+          .thenReturn(nativeLibraryDirectoryLocation);
       mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getInstance())
           .thenReturn(loader);
       Assertions.assertTrue(NativeLibraryLoader.getInstance()
@@ -82,15 +78,15 @@ public class TestNativeLibraryLoader {
       NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName);
       NativeLibraryLoader.isLibraryLoaded(dummyLibraryName);
       // Checking if the resource with random was copied to a temp file.
-      Optional<File[]> libPath = Optional.ofNullable(
-          new File(nativeLibraryDirectoryLocation.orElse(""))
+      File[] libPath =
+          new File(nativeLibraryDirectoryLocation == null ? "" :
+              nativeLibraryDirectoryLocation)
           .getAbsoluteFile().listFiles((dir, name) ->
               name.startsWith(dummyLibraryName) &&
-                  name.endsWith(NativeLibraryLoader.getLibOsSuffix())));
-      Assertions.assertEquals(1, libPath.map(paths -> paths.length)
-          .orElse(0));
-      Assertions.assertTrue(libPath.map(paths -> paths[0].delete())
-          .orElse(false));
+                  name.endsWith(NativeLibraryLoader.getLibOsSuffix()));
+      Assertions.assertNotNull(libPath);
+      Assertions.assertEquals(1, libPath.length);
+      Assertions.assertTrue(libPath[0].delete());
     }
 
   }
