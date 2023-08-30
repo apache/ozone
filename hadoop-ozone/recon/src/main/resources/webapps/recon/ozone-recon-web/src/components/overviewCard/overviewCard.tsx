@@ -50,6 +50,20 @@ interface IOverviewCardWrapperProps {
 }
 
 class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
+  // To set Current ACtive Tab for OM DB Insights
+  setCurrentActiveTab = (title: any) => {
+    if (title === "Open Keys Summary") {
+      return {
+        active: '2'
+      }
+    }
+    else if (title === "Pending Deleted Keys Summary") {
+      return {
+        active: '3'
+      }
+    }
+  };
+
   render() {
     const {linkToUrl, children} = this.props;
     if (linkToUrl) {
@@ -57,7 +71,7 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
       return (
         <Link to={{
           pathname: linkToUrl,
-          state: { activeTab: children._owner && children._owner.stateNode.props && children._owner.stateNode.props.title === "Open Keys Summary"? '2':'3'}
+          state: { activeTab: children._owner.stateNode.props ? this.setCurrentActiveTab (children._owner.stateNode.props.title).active : '1'}
         }} >
           {children}
         </Link>
