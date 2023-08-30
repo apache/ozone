@@ -115,7 +115,11 @@ public class RootCARotationHandlerImpl implements RootCARotationHandler {
       return;
     }
 
-    // make sure the rotation preparation is finished on this SCM
+    // Wait for the rotation preparation of this SCM to finish. The rotation
+    // preparation is running parallel in rotationManager's executor thread.
+    // If rotation preparation is not finished yet, then the later move
+    // new -> current operation will fail as the new directory may not exist
+    // yet.
     long st = System.nanoTime();
     long waitForNanos =
         rotationManager.getSecurityConfig().getCaAckTimeout().toNanos();
