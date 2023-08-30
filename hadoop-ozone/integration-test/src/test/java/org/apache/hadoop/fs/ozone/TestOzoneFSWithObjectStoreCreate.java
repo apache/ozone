@@ -252,7 +252,15 @@ public class TestOzoneFSWithObjectStoreCreate {
   private void checkPath(Path path) {
     try {
       o3fs.getFileStatus(path);
-      fail("testObjectStoreCreateWithO3fs failed for Path" + path);
+      FileStatus[] fileStatuses = o3fs.listStatus(new Path("/"));
+      StringBuilder sb = new StringBuilder();
+      if (null != fileStatuses) {
+        for (FileStatus fStatus : fileStatuses) {
+          sb.append(fStatus.getPath().toString());
+          sb.append(",");
+        }
+      }
+      fail("testObjectStoreCreateWithO3fs failed for Path" + sb.toString());
     } catch (IOException ex) {
       Assert.assertTrue(ex instanceof FileNotFoundException);
       Assert.assertTrue(ex.getMessage().contains("No such file or directory"));
