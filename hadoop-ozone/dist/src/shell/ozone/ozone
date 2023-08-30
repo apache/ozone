@@ -78,6 +78,7 @@ function ozonecmd_case
   # This parameter significantly reduces GC pressure for Datanode.
   # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
+  OZONE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.native.workdir=${OZONE_HOME}/temp ${OZONE_OPTS}"
   # Add JVM parameter for Java 17
   OZONE_MODULE_ACCESS_ARGS=""
 
