@@ -728,8 +728,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
-    // TODO: Consider FULL_CACHE for snapshotInfoTable since exclusiveSize in
-    //  SnapshotInfo can be frequently updated.
+    // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
+    //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);

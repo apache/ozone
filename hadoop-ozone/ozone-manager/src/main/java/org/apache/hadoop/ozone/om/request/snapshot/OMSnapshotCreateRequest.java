@@ -178,8 +178,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // depending on the choice of the client at the time of writing that key.
       // And we will NOT do an O(n) walk over the keyTable (fileTable) here
       // because it is a design goal of CreateSnapshot to be an O(1) operation.
-      // TODO: Assign actual data size once we have the pre-replicated key size
-      //  counter in OmBucketInfo.
+      // TODO: [SNAPSHOT] Assign actual data size once we have the
+      //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
       addSnapshotInfoToSnapshotChainAndCache(omMetadataManager,
