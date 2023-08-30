@@ -62,11 +62,9 @@ ozone admin datanode recommission [-hV] [-id=<scmServiceId>]
 Ozone Manager (OM) decommissioning is the process in which you gracefully remove one of the OM from the OM HA Ring.
 
 To decommission an OM and remove the node from the OM HA ring, the following steps need to be executed.
-1. Stop the OzoneManager process only on the node which needs to be decommissioned. <p> **Note -** Do not stop the decommissioning OM if there are
-   only two OMs in the ring as both the OMs would be needed to reach consensus to update the Ratis configuration.</p>
-2. Add the _OM NodeId_ of the to be decommissioned OM node to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
+1. Add the _OM NodeId_ of the to be decommissioned OM node to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
    other OMs.
-3. Run the following command to decommission an OM node.
+2. Run the following command to decommission an OM node.
 ```shell
 ozone admin om decommission -id=<om-service-id> -nodeid=<decommissioning-om-node-id> -hostname=<decommissioning-om-node-address> [optional --force]
 ```
