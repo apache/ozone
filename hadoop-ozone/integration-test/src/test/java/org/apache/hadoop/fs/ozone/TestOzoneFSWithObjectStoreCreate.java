@@ -126,6 +126,45 @@ public class TestOzoneFSWithObjectStoreCreate {
   }
 
   @Test
+  public void test() throws Exception {
+
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String key1 = "///dir1/dir2/file1";
+    String key2 = "///dir1/dir2/file2";
+    int length = 10;
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key1, length);
+    byte[] b = new byte[10];
+    Arrays.fill(b, (byte)96);
+    ozoneOutputStream.write(b);
+    ozoneOutputStream.close();
+
+    ozoneOutputStream = ozoneBucket.createKey(key2, length);
+    ozoneOutputStream.write(b);
+    ozoneOutputStream.close();
+
+    // Adding "/" here otherwise Path will be considered as relative path and
+    // workingDir will be added.
+    key1 = "///dir1/dir2/file1";
+    Path p = new Path(key1);
+    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+
+    p = p.getParent();
+    checkAncestors(p);
+
+
+    key2 = "///dir1/dir2/file2";
+    p = new Path(key2);
+    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+    checkAncestors(p);
+
+  }
+
+
+  @Test
   public void testObjectStoreCreateWithO3fs() throws Exception {
     OzoneVolume ozoneVolume =
         client.getObjectStore().getVolume(volumeName);
@@ -144,7 +183,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     keys.add("/dir1/dir2/dir3/dir4/");
     for (int i = 1; i <= 3; i++) {
       int length = 10;
-      String fileName = parentDir.concat("file" + i + "/");
+      String fileName = parentDir.concat("/file" + i + "/");
       keys.add(fileName);
       OzoneOutputStream ozoneOutputStream =
           ozoneBucket.createKey(fileName, length);
@@ -156,7 +195,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // check
     for (int i = 1; i <= 3; i++) {
-      String fileName = parentDir.concat("file" + i + "/");
+      String fileName = parentDir.concat("/file" + i + "/");
       Path p = new Path(fileName);
       Assert.assertTrue(o3fs.getFileStatus(p).isFile());
       checkAncestors(p);
@@ -164,7 +203,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Delete keys with object store api delete
     for (int i = 1; i <= 3; i++) {
-      String fileName = parentDir.concat("file" + i + "/");
+      String fileName = parentDir.concat("/file" + i + "/");
       ozoneBucket.deleteKey(fileName);
     }
 
@@ -181,7 +220,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     for (int i = 1; i <= 3; i++) {
       int length = 10;
-      String fileName = parentDir.concat("file" + i + "/");
+      String fileName = parentDir.concat("/file" + i + "/");
       OzoneOutputStream ozoneOutputStream =
           ozoneBucket.createKey(fileName, length);
       byte[] b = new byte[10];
@@ -206,6 +245,177 @@ public class TestOzoneFSWithObjectStoreCreate {
       checkAncestors(p);
     }
 
+  }
+
+
+  @Test
+  public void testKeyCreationFailDuetoDirectoryCreationBeforeCommit()
+      throws Exception {
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createKey("/a/b/c", 10);
+    byte[] b = new byte[10];
+    Arrays.fill(b, (byte)96);
+    ozoneOutputStream.write(b);
+
+    // Before close create directory with same name.
+    o3fs.mkdirs(new Path("/a/b/c"));
+
+    try {
+      ozoneOutputStream.close();
+      fail("testKeyCreationFailDuetoDirectoryCreationBeforeCommit");
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE,
+          ((OMException) ex).getResult());
+    }
+
+  }
+
+
+  @Test
+  public void testMPUFailDuetoDirectoryCreationBeforeComplete()
+      throws Exception {
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String keyName = "/dir1/dir2/mpukey";
+    OmMultipartInfo omMultipartInfo =
+        ozoneBucket.initiateMultipartUpload(keyName);
+    Assert.assertNotNull(omMultipartInfo);
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createMultipartKey(keyName, 10, 1,
+            omMultipartInfo.getUploadID());
+    byte[] b = new byte[10];
+    Arrays.fill(b, (byte)96);
+    ozoneOutputStream.write(b);
+
+    // Before close, create directory with same name.
+    o3fs.mkdirs(new Path(keyName));
+
+    // This should succeed, as we check during creation of part or during
+    // complete MPU.
+    ozoneOutputStream.close();
+
+    Map<Integer, String> partsMap = new HashMap<>();
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+
+    // Should fail, as we have directory with same name.
+    try {
+      ozoneBucket.completeMultipartUpload(keyName,
+          omMultipartInfo.getUploadID(), partsMap);
+      fail("testMPUFailDuetoDirectoryCreationBeforeComplete failed");
+    } catch (OMException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+    }
+
+    // Delete directory
+    o3fs.delete(new Path(keyName), true);
+
+    // And try again for complete MPU. This should succeed.
+    ozoneBucket.completeMultipartUpload(keyName,
+        omMultipartInfo.getUploadID(), partsMap);
+
+    try (FSDataInputStream ozoneInputStream = o3fs.open(new Path(keyName))) {
+      byte[] buffer = new byte[10];
+      // This read will not change the offset inside the file
+      int readBytes = ozoneInputStream.read(0, buffer, 0, 10);
+      String readData = new String(buffer, 0, readBytes, UTF_8);
+      Assert.assertEquals(new String(b, 0, b.length, UTF_8), readData);
+    }
+
+  }
+
+  @Test
+  public void testCreateDirectoryFirstThenKeyAndFileWithSameName()
+      throws Exception {
+    o3fs.mkdirs(new Path("/t1/t2"));
+
+    try {
+      o3fs.create(new Path("/t1/t2"));
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (FileAlreadyExistsException ex) {
+      Assert.assertTrue(ex.getMessage().contains(NOT_A_FILE.name()));
+    }
+
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    ozoneBucket.createDirectory("t1/t2");
+    try {
+      ozoneBucket.createKey("t1/t2", 0);
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (OMException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+    }
+  }
+
+
+  @Test
+  public void testListKeysWithNotNormalizedPath() throws Exception {
+
+    OzoneVolume ozoneVolume =
+        client.getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String key1 = "/dir1///dir2/file1/";
+    String key2 = "/dir1///dir2/file2/";
+    String key3 = "/dir1///dir2/file3/";
+
+    LinkedList<String> keys = new LinkedList<>();
+    keys.add("dir1/");
+    keys.add("dir1/dir2/");
+    keys.add(OmUtils.normalizeKey(key1, false));
+    keys.add(OmUtils.normalizeKey(key2, false));
+    keys.add(OmUtils.normalizeKey(key3, false));
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+
+    createKey(ozoneBucket, key1, 10, input);
+    createKey(ozoneBucket, key2, 10, input);
+    createKey(ozoneBucket, key3, 10, input);
+
+    // Iterator with key name as prefix.
+
+    Iterator<? extends OzoneKey > ozoneKeyIterator =
+        ozoneBucket.listKeys("/dir1//");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with with normalized key prefix.
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("dir1/");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with key name as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+        "/dir1///dir2/file1/");
+
+    // Remove keys before //dir1/dir2/file1
+    keys.remove("dir1/");
+    keys.remove("dir1/dir2/");
+    keys.remove("dir1/dir2/file1");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with  normalized key as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+        OmUtils.normalizeKey(key1, false));
+
+    checkKeyList(ozoneKeyIterator, keys);
   }
 
   private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
@@ -252,15 +462,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   private void checkPath(Path path) {
     try {
       o3fs.getFileStatus(path);
-      FileStatus[] fileStatuses = o3fs.listStatus(new Path("/"));
-      StringBuilder sb = new StringBuilder();
-      if (null != fileStatuses) {
-        for (FileStatus fStatus : fileStatuses) {
-          sb.append(fStatus.getPath().toString());
-          sb.append(",");
-        }
-      }
-      fail("testObjectStoreCreateWithO3fs failed for Path" + sb.toString());
+      fail("testObjectStoreCreateWithO3fs failed for Path" + path);
     } catch (IOException ex) {
       Assert.assertTrue(ex instanceof FileNotFoundException);
       Assert.assertTrue(ex.getMessage().contains("No such file or directory"));
