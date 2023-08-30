@@ -64,12 +64,12 @@ public class TestUploadWithStream {
   private static final String S3_COPY_EXISTING_KEY_CONTENT =
       "test_copy_existing_key_content";
   private static OzoneClient client;
-  private static final HttpHeaders headers;
+  private static final HttpHeaders HEADERS;
   private static ContainerRequestContext context;
 
   static {
-    headers = Mockito.mock(HttpHeaders.class);
-    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+    HEADERS = Mockito.mock(HttpHeaders.class);
+    when(HEADERS.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
   }
 
   @BeforeClass
@@ -77,7 +77,7 @@ public class TestUploadWithStream {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(S3BUCKET);
 
-    REST.setHeaders(headers);
+    REST.setHeaders(HEADERS);
     REST.setClient(client);
 
     OzoneConfiguration conf = new OzoneConfiguration();
