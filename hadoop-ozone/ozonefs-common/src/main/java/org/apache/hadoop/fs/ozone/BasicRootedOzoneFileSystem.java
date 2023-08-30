@@ -369,7 +369,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     if (src.isRoot()) {
       // Cannot rename root of file system
       LOG.trace("Cannot rename the root of a filesystem");
-      return false;
+      throw new IOException("Cannot rename the root of a filesystem");
     }
 
     // src and dst should be in the same bucket
@@ -398,7 +398,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       srcStatus = getFileStatus(src);
     } catch (FileNotFoundException fnfe) {
       // source doesn't exist, return
-      return false;
+      throw new IOException("Source file doesn't exist");
     }
 
     // Check if the destination exists
@@ -438,19 +438,23 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           // If dst exists and not a directory not empty
           LOG.warn("Failed to rename {} to {}, file already exists" +
               " or not empty!", src, dst);
-          return false;
+          throw new IOException(String.format(
+              "Failed to rename %s to %s, file already exists or not empty",
+              src, dst));
         }
       } else {
         // If dst is not a directory
         LOG.warn("Failed to rename {} to {}, file already exists!", src, dst);
-        return false;
+        throw new IOException(String.format(
+            "Failed to rename %s to %s, file already exists!", src, dst));
       }
     }
 
     if (srcStatus.isDirectory()) {
       if (dst.toString().startsWith(src.toString() + OZONE_URI_DELIMITER)) {
         LOG.trace("Cannot rename a directory to a subdirectory of self");
-        return false;
+        throw new IOException("Cannot rename a directory to " +
+            "a subdirectory of self");
       }
     }
     RenameIterator iterator = new RenameIterator(src, dst);
@@ -473,13 +477,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     } catch (OMException ome) {
       LOG.error("rename key failed: {}. source:{}, destin:{}",
           ome.getMessage(), srcKeyPath, dstKeyPath);
-      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
-          OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
-          OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
-        return false;
-      } else {
-        throw ome;
-      }
+      throw ome;
     }
     return true;
   }
