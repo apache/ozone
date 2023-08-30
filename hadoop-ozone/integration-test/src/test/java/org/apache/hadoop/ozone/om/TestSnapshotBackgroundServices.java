@@ -211,7 +211,8 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM, () -> {});
+    startInactiveFollower(leaderOM, followerOM, () -> {
+    });
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -387,14 +388,14 @@ public class TestSnapshotBackgroundServices {
     GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
   }
 
-  private void createSnapshotsEachWithNewKeys(OzoneManager leaderOM)
+  private void createSnapshotsEachWithNewKeys(OzoneManager ozoneManager)
       throws IOException {
     int keyIncrement = 10;
     for (int snapshotCount = 0; snapshotCount < 10;
          snapshotCount++) {
       String snapshotName = SNAPSHOT_NAME_PREFIX + snapshotCount;
       writeKeys(keyIncrement);
-      createOzoneSnapshot(leaderOM, snapshotName);
+      createOzoneSnapshot(ozoneManager, snapshotName);
     }
   }
 
@@ -492,12 +493,6 @@ public class TestSnapshotBackgroundServices {
     OzoneManager leaderOM = getLeaderOM();
     OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
 
-    createSnapshotsEachWithNewKeys(leaderOM);
-
-    File leaderSstBackupDir = getSstBackupDir(leaderOM);
-    int numberOfSstFiles =
-        Objects.requireNonNull(leaderSstBackupDir.listFiles()).length;
-
     startInactiveFollower(leaderOM, followerOM,
         () -> suspendBackupCompactionFilesPruning(followerOM));
 
@@ -511,14 +506,18 @@ public class TestSnapshotBackgroundServices {
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     Assertions.assertEquals(leaderOM, newFollowerOM);
 
+    createSnapshotsEachWithNewKeys(newLeaderOM);
+
+    File sstBackupDir = getSstBackupDir(newLeaderOM);
+    int numberOfSstFiles =
+        Objects.requireNonNull(sstBackupDir.listFiles()).length;
+
     resumeBackupCompactionFilesPruning(newLeaderOM);
 
-    File newLeaderSstBackupDir = getSstBackupDir(newLeaderOM);
-    checkIfCompactionBackupFilesWerePruned(newLeaderSstBackupDir,
+    checkIfCompactionBackupFilesWerePruned(sstBackupDir,
         numberOfSstFiles);
 
-    confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
-        newLeaderOM);
+    confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(newLeaderOM);
   }
 
   private static void resumeBackupCompactionFilesPruning(
@@ -552,7 +551,8 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    startInactiveFollower(leaderOM, followerOM, () -> {});
+    startInactiveFollower(leaderOM, followerOM, () -> {
+    });
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
