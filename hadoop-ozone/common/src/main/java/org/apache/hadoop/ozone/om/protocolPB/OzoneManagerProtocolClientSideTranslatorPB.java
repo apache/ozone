@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -1005,6 +1006,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     GetS3SecretRequest request = GetS3SecretRequest.newBuilder()
         .setKerberosID(kerberosID)
@@ -1194,13 +1196,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public String printCompactionLogDag(String fileName, String graphType)
+  public String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
     final PrintCompactionLogDagRequest.Builder request =
         PrintCompactionLogDagRequest.newBuilder();
 
-    if (fileName != null) {
-      request.setFileName(fileName);
+    if (fileNamePrefix != null) {
+      request.setFileNamePrefix(fileNamePrefix);
     }
     if (graphType != null) {
       request.setGraphType(graphType);
@@ -1211,7 +1213,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    return omResponse.getPrintCompactionLogDagResponse().getImagePath();
+    return omResponse.getPrintCompactionLogDagResponse().getMessage();
   }
 
   /**

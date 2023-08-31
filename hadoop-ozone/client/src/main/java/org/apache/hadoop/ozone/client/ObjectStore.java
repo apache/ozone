@@ -595,14 +595,14 @@ public class ObjectStore {
 
   /**
    * Create an image of the current compaction log DAG in the OM.
-   * @param fileName     name of the image file.
-   * @param graphType    type of node name to use in the graph image.
-   * @return path of the image file.
-   * @throws IOException
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
    */
-  public String printCompactionLogDag(String fileName,
+  public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
-    return proxy.printCompactionLogDag(fileName, graphType);
+    return proxy.printCompactionLogDag(fileNamePrefix, graphType);
   }
 
   /**

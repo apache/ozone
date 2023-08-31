@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.NavigableSet;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
@@ -94,7 +96,7 @@ public class WritableECContainerProvider
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
-    int openPipelineCount = 0;
+    int openPipelineCount;
     synchronized (this) {
       openPipelineCount = pipelineManager.getPipelineCount(repConfig,
           Pipeline.PipelineState.OPEN);
@@ -114,9 +116,9 @@ public class WritableECContainerProvider
       }
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
-        repConfig, Pipeline.PipelineState.OPEN,
-        excludeList.getDatanodes(), excludeList.getPipelineIds());
+        repConfig, Pipeline.PipelineState.OPEN);
     final int pipelineCount = existingPipelines.size();
+    LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
@@ -140,7 +142,7 @@ public class WritableECContainerProvider
             pipelineManager.closePipeline(pipeline, true);
             openPipelineCount--;
           } else {
-            if (containerIsExcluded(containerInfo, excludeList)) {
+            if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
               existingPipelines.remove(pipelineIndex);
             } else {
               containerInfo.updateLastUsedTime();
@@ -159,13 +161,21 @@ public class WritableECContainerProvider
     // If we get here, all the pipelines we tried were no good. So try to
     // allocate a new one.
     try {
-      synchronized (this) {
-        if (openPipelineCount < maximumPipelines) {
+      if (openPipelineCount >= maximumPipelines) {
+        final int nodeCount = nodeManager.getNodeCount(inServiceHealthy());
+        if (nodeCount > maximumPipelines) {
+          LOG.debug("Increasing pipeline limit {} -> {} for final attempt",
+              maximumPipelines, nodeCount);
+          maximumPipelines = nodeCount;
+        }
+      }
+      if (openPipelineCount < maximumPipelines) {
+        synchronized (this) {
           return allocateContainer(repConfig, size, owner, excludeList);
         }
-        throw new IOException("Pipeline limit (" + maximumPipelines
-            + ") reached (" + openPipelineCount + "), none closed");
       }
+      throw new IOException("Pipeline limit (" + maximumPipelines
+          + ") reached (" + openPipelineCount + "), none closed");
     } catch (IOException e) {
       LOG.warn("Unable to allocate a container after trying {} existing ones; "
           + "requested size={}, replication={}, owner={}, {}",
@@ -202,9 +212,32 @@ public class WritableECContainerProvider
     return container;
   }
 
-  private boolean containerIsExcluded(ContainerInfo container,
+  /**
+   * Checks if the specified pipeline is excluded. It's excluded if the
+   * specified excludeList contains the specified container associated with
+   * this pipeline, or if it contains this pipeline, or if it contains any
+   * Datanode that is a part of this pipeline.
+   * @param pipeline Pipeline to check
+   * @param container Container associated with this pipeline
+   * @param excludeList Objects to exclude
+   * @return true if excluded, else false
+   */
+  private boolean pipelineIsExcluded(Pipeline pipeline, ContainerInfo container,
       ExcludeList excludeList) {
-    return excludeList.getContainerIds().contains(container.containerID());
+    if (excludeList.getContainerIds().contains(container.containerID())) {
+      return true;
+    }
+    if (excludeList.getPipelineIds().contains(pipeline.getId())) {
+      return true;
+    }
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (excludeList.getDatanodes().contains(dn)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private ContainerInfo getContainerFromPipeline(Pipeline pipeline)
@@ -235,12 +268,14 @@ public class WritableECContainerProvider
    * Class to hold configuration for WriteableECContainerProvider.
    */
   @ConfigGroup(prefix = WritableECContainerProviderConfig.PREFIX)
-  public static class WritableECContainerProviderConfig {
+  public static class WritableECContainerProviderConfig
+      extends ReconfigurableConfig {
 
     private static final String PREFIX = "ozone.scm.ec";
 
     @Config(key = "pipeline.minimum",
         defaultValue = "5",
+        reconfigurable = true,
         type = ConfigType.INT,
         description = "The minimum number of pipelines to have open for each " +
             "Erasure Coding configuration",
@@ -265,6 +300,7 @@ public class WritableECContainerProvider
     @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
+        reconfigurable = true,
         tags = {SCM},
         description = "TODO"
     )

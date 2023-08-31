@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -556,9 +557,25 @@ public class OzoneBucket extends WithMetadata {
    */
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix, String prevKey)
       throws IOException {
+    return listKeys(keyPrefix, prevKey, false);
+  }
 
+  /**
+   * Returns Iterator to iterate over all keys after prevKey in the bucket.
+   * If shallow is true, iterator will only contain immediate children.
+   * This applies to the aws s3 list with delimiter '/' scenario.
+   * Note: When shallow is true, whether keyPrefix ends with slash or not
+   * will affect the results, see {@code getNextShallowListOfKeys}.
+   *
+   * @param keyPrefix Bucket prefix to match
+   * @param prevKey Keys will be listed after this key name
+   * @param shallow If true, only list immediate children ozoneKeys
+   * @return {@code Iterator<OzoneKey>}
+   */
+  public Iterator<? extends OzoneKey> listKeys(String keyPrefix, String prevKey,
+      boolean shallow) throws IOException {
     return new KeyIteratorFactory()
-        .getKeyIterator(keyPrefix, prevKey, bucketLayout);
+        .getKeyIterator(keyPrefix, prevKey, bucketLayout, shallow);
   }
 
   /**
@@ -1049,6 +1066,9 @@ public class OzoneBucket extends WithMetadata {
     private String keyPrefix = null;
     private Iterator<OzoneKey> currentIterator;
     private OzoneKey currentValue;
+    private final boolean shallow;
+    private boolean addedKeyPrefix;
+    private String delimiterKeyPrefix;
 
     String getKeyPrefix() {
       return keyPrefix;
@@ -1058,15 +1078,27 @@ public class OzoneBucket extends WithMetadata {
       keyPrefix = keyPrefixPath;
     }
 
+    boolean addedKeyPrefix() {
+      return addedKeyPrefix;
+    }
+
+    void setAddedKeyPrefix(boolean addedKeyPrefix) {
+      this.addedKeyPrefix = addedKeyPrefix;
+    }
+
     /**
      * Creates an Iterator to iterate over all keys after prevKey in the bucket.
      * If prevKey is null it iterates from the first key in the bucket.
      * The returned keys match key prefix.
      * @param keyPrefix
+     * @param prevKey
+     * @param shallow
      */
-    KeyIterator(String keyPrefix, String prevKey) throws IOException {
+    KeyIterator(String keyPrefix, String prevKey, boolean shallow)
+        throws IOException {
       setKeyPrefix(keyPrefix);
       this.currentValue = null;
+      this.shallow = shallow;
       this.currentIterator = getNextListOfKeys(prevKey).iterator();
     }
 
@@ -1099,9 +1131,139 @@ public class OzoneBucket extends WithMetadata {
      */
     List<OzoneKey> getNextListOfKeys(String prevKey) throws
         IOException {
+      // If shallow is true, only list immediate children
+      if (shallow) {
+        return getNextShallowListOfKeys(prevKey);
+      }
       return proxy.listKeys(volumeName, name, keyPrefix, prevKey,
           listCacheSize);
     }
+
+    /**
+     * Using listStatus instead of listKeys avoiding listing all children keys.
+     * Giving the structure of keys delimited by "/":
+     *
+     *                   buck-1
+     *                     |
+     *                     a
+     *                     |
+     *       -----------------------------------
+     *      |           |                       |
+     *      b1          b2                      b3
+     *    -----       --------               ----------
+     *    |    |      |    |   |             |    |     |
+     *   c1   c2     d1   d2  d3             e1   e2   e3
+     *                    |                  |
+     *                --------               |
+     *               |        |              |
+     *            d21.txt   d22.txt        e11.txt
+     *
+     * For the above structure, the keys listed delimited "/" in order are
+     * as follows:
+     *      a/
+     *      a/b1/
+     *      a/b1/c1/
+     *      a/b1/c2/
+     *      a/b2/
+     *      a/b2/d1/
+     *      a/b2/d2/
+     *      a/b2/d2/d21.txt
+     *      a/b2/d2/d22.txt
+     *      a/b2/d3/
+     *      a/b3/
+     *      a/b3/e1/
+     *      a/b3/e1/e11.txt
+     *      a/b3/e2/
+     *      a/b3/e3/
+     *
+     * When keyPrefix ends without slash (/), the result as Example 1:
+     * Example 1: keyPrefix="a/b2", prevKey=""
+     *            result: [a/b2/]
+     * Example 2: keyPrefix="a/b2/", prevKey=""
+     *            result: [a/b2/d1/, a/b2/d2/, a/b2/d3/]
+     * Example 3: keyPrefix="a/b2/", prevKey="a/b2/d2/d21.txt"
+     *            result: [a/b2/d2/, a/b2/d3/]
+     * Example 4: keyPrefix="a/b2/", prevKey="a/b2/d2/d22.txt"
+     *            result: [a/b2/d3/]
+     * Say, keyPrefix="a/b" and prevKey="", the results will be
+     * [a/b1/, a/b2/, a/b3/]
+     * In implementation, the keyPrefix "a/b" can be identified in listKeys,
+     * but cannot be identified in listStatus. Therefore, keyPrefix "a/b"
+     * needs to be split into keyPrefix "a" and call listKeys method to get
+     * the next one key as the startKey in listStatus.
+     */
+    protected List<OzoneKey> getNextShallowListOfKeys(String prevKey)
+        throws IOException {
+      List<OzoneKey> resultList = new ArrayList<>();
+      String startKey = prevKey;
+
+      // handle for first round
+      if (!addedKeyPrefix) {
+        // prepare startKey
+        List<OzoneKey> nextOneKeys =
+            proxy.listKeys(volumeName, name, getKeyPrefix(), prevKey, 1);
+        if (nextOneKeys.isEmpty()) {
+          return nextOneKeys;
+        }
+        // Special case: ListKey expects keyPrefix element should present in
+        // the resultList if startKey is blank or equals to keyPrefix.
+        // The nextOneKey needs be added to the result because it will not be
+        // present when using the 'listStatus' method.
+        // Consider the case, keyPrefix="test/", prevKey="" or 'test1/',
+        // then 'test/' will be added to the list result.
+        startKey = nextOneKeys.get(0).getName();
+        if (getKeyPrefix().endsWith(OZONE_URI_DELIMITER) &&
+            startKey.equals(getKeyPrefix())) {
+          resultList.add(nextOneKeys.get(0));
+        }
+
+        // prepare delimiterKeyPrefix
+        delimiterKeyPrefix = getKeyPrefix();
+        if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
+          delimiterKeyPrefix = OzoneFSUtils.getParentDir(getKeyPrefix());
+        }
+      }
+
+      // Elements in statuses must be sorted after startKey,
+      // which means they come after the keyPrefix.
+      List<OzoneFileStatus> statuses = proxy.listStatus(volumeName, name,
+          delimiterKeyPrefix, false, startKey, listCacheSize);
+
+      if (addedKeyPrefix) {
+        // previous round already include the startKey, so remove it
+        statuses.remove(0);
+      } else {
+        setAddedKeyPrefix(true);
+      }
+
+      List<OzoneKey> ozoneKeys = buildOzoneKeysFromFileStatus(statuses)
+          .stream()
+          .filter(key -> StringUtils.startsWith(key.getName(), getKeyPrefix()))
+          .collect(Collectors.toList());
+
+      resultList.addAll(ozoneKeys);
+      return resultList;
+    }
+
+    private List<OzoneKey> buildOzoneKeysFromFileStatus(
+        List<OzoneFileStatus> statuses) {
+      return statuses.stream()
+          .map(status -> {
+            OmKeyInfo keyInfo = status.getKeyInfo();
+            String keyName = keyInfo.getKeyName();
+            if (status.isDirectory()) {
+              // add trailing slash to represent directory
+              keyName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+            }
+            return new OzoneKey(keyInfo.getVolumeName(),
+                keyInfo.getBucketName(), keyName,
+                keyInfo.getDataSize(), keyInfo.getCreationTime(),
+                keyInfo.getModificationTime(),
+                keyInfo.getReplicationConfig(), keyInfo.isFile());
+          })
+          .collect(Collectors.toList());
+    }
+
   }
 
 
@@ -1136,7 +1298,6 @@ public class OzoneBucket extends WithMetadata {
   private class KeyIteratorWithFSO extends KeyIterator {
 
     private Stack<Pair<String, String>> stack;
-    private boolean addedKeyPrefix;
     private String removeStartKey = "";
 
     /**
@@ -1146,9 +1307,11 @@ public class OzoneBucket extends WithMetadata {
      *
      * @param keyPrefix
      * @param prevKey
+     * @param shallow
      */
-    KeyIteratorWithFSO(String keyPrefix, String prevKey) throws IOException {
-      super(keyPrefix, prevKey);
+    KeyIteratorWithFSO(String keyPrefix, String prevKey, boolean shallow)
+        throws IOException {
+      super(keyPrefix, prevKey, shallow);
     }
 
     /**
@@ -1189,7 +1352,7 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // normalize paths
-      if (!addedKeyPrefix) {
+      if (!addedKeyPrefix()) {
         prevKey = OmUtils.normalizeKey(prevKey, true);
         String keyPrefixName = "";
         if (StringUtils.isNotBlank(getKeyPrefix())) {
@@ -1421,12 +1584,12 @@ public class OzoneBucket extends WithMetadata {
     private void addKeyPrefixInfoToResultList(String keyPrefix,
         String startKey, List<OzoneKey> keysResultList) throws IOException {
 
-      if (addedKeyPrefix) {
+      if (addedKeyPrefix()) {
         return;
       }
 
       // setting flag to true.
-      addedKeyPrefix = true;
+      setAddedKeyPrefix(true);
 
       // not required to addKeyPrefix
       // case-1) if keyPrefix is null/empty/just contains snapshot indicator
@@ -1450,14 +1613,16 @@ public class OzoneBucket extends WithMetadata {
       }
 
       if (status != null) {
-        OmKeyInfo keyInfo = status.getKeyInfo();
-        String keyName = keyInfo.getKeyName();
-
-        if (status.isDirectory()) {
-          // add trailing slash to represent directory
-          keyName =
-              OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
+        // not required to addKeyPrefix
+        // case-3) if the keyPrefix corresponds to a file and not a dir,
+        // prefix should not be added to avoid duplicate entry
+        if (!status.isDirectory()) {
+          return;
         }
+        OmKeyInfo keyInfo = status.getKeyInfo();
+        // add trailing slash to represent directory
+        String keyName =
+            OzoneFSUtils.addTrailingSlashIfNeeded(keyInfo.getKeyName());
 
         // removeStartKey - as the startKey is a placeholder, which is
         // managed internally to traverse leaf node's sub-paths.
@@ -1479,11 +1644,11 @@ public class OzoneBucket extends WithMetadata {
 
   private class KeyIteratorFactory {
     KeyIterator getKeyIterator(String keyPrefix, String prevKey,
-        BucketLayout bType) throws IOException {
+        BucketLayout bType, boolean shallow) throws IOException {
       if (bType.isFileSystemOptimized()) {
-        return new KeyIteratorWithFSO(keyPrefix, prevKey);
+        return new KeyIteratorWithFSO(keyPrefix, prevKey, shallow);
       } else {
-        return new KeyIterator(keyPrefix, prevKey);
+        return new KeyIterator(keyPrefix, prevKey, shallow);
       }
     }
   }

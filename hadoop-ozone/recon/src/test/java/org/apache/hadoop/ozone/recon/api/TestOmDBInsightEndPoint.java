@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -57,6 +58,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getBucketLayout;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
@@ -81,6 +84,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
+  private Set<Long> generatedIds = new HashSet<>();
+
+  private long generateUniqueRandomLong() {
+    long newValue;
+    do {
+      newValue = random.nextLong();
+    } while (generatedIds.contains(newValue));
+
+    generatedIds.add(newValue);
+    return newValue;
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -212,54 +226,126 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testKeyCountsForValidAndInvalidKeyPrefix() {
+    Timestamp now = new Timestamp(System.currentTimeMillis());
+    GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
+
+    // Insert valid key count with valid key prefix
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "Count", 3L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "ReplicatedDataSize", 150L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "ReplicatedDataSize", 150L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openKeyTable" + "UnReplicatedDataSize", 50L);
+    insertGlobalStatsRecords(statsDao, now,
+        "openFileTable" + "UnReplicatedDataSize", 50L);
+
+    Response openKeyInfoResp =
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    Map<String, Long> openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
+    // Assert that the key prefix format is accepted in the global stats
+    Assertions.assertEquals(6L,
+        openKeysSummary.get("totalOpenKeys"));
+    Assertions.assertEquals(300L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(100L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
+
+    // Delete the previous records and Update the new value for valid key prefix
+    statsDao.deleteById("openKeyTable" + "Count",
+        "openFileTable" + "Count",
+        "openKeyTable" + "ReplicatedDataSize",
+        "openFileTable" + "ReplicatedDataSize",
+        "openKeyTable" + "UnReplicatedDataSize",
+        "openFileTable" + "UnReplicatedDataSize");
+
+    // Insert new record for a key with invalid prefix
+    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "InvalidPrefix",
+        3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "InvalidPrefix",
+        3L);
+
+    openKeyInfoResp =
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
+    // Assert that the key format is not accepted in the global stats
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalOpenKeys"));
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(0L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
+  }
+
+  @Test
   public void testKeysSummaryAttribute() {
     Timestamp now = new Timestamp(System.currentTimeMillis());
     GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
     // Insert records for replicated and unreplicated data sizes
-    GlobalStats newRecord =
-        new GlobalStats("openFileTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openKeyTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableReplicatedDataSize", 30L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openFileTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openKeyTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableUnReplicatedDataSize", 10L, now);
-    statsDao.insert(newRecord);
-
+    insertGlobalStatsRecords(statsDao, now, "openFileTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableReplicatedDataSize",
+        30L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTableUnReplicatedDataSize",
+        10L);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableUnReplicatedDataSize",
+        10L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableUnReplicatedDataSize",
+        10L);
 
     // Insert records for table counts
-    newRecord = new GlobalStats("openKeyTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("openFileTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
-    newRecord = new GlobalStats("deletedTableTableCount", 3L, now);
-    statsDao.insert(newRecord);
+    insertGlobalStatsRecords(statsDao, now, "openKeyTableCount", 3L);
+    insertGlobalStatsRecords(statsDao, now, "openFileTableCount", 3L);
+    insertGlobalStatsRecords(statsDao, now, "deletedTableCount", 3L);
 
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
-        omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
-    KeyInsightInfoResponse keyInsightInfoResp =
-        (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Map<String, Long> summary = keyInsightInfoResp.getKeysSummary();
-    Assertions.assertEquals(60L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(20L, summary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(6L, summary.get("totalOpenKeys"));
+        omdbInsightEndpoint.getOpenKeySummary();
+    Assertions.assertNotNull(openKeyInfoResp);
+
+    Map<String, Long> openKeysSummary =
+        (Map<String, Long>) openKeyInfoResp.getEntity();
+
+    Assertions.assertEquals(60L,
+        openKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(20L,
+        openKeysSummary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(6L,
+        openKeysSummary.get("totalOpenKeys"));
 
     // Call the API of Deleted keys to get the response
     Response deletedKeyInfoResp =
-        omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
-    keyInsightInfoResp =
-        (KeyInsightInfoResponse) deletedKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    summary = keyInsightInfoResp.getKeysSummary();
-    Assertions.assertEquals(30L, summary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(10L, summary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(3L, summary.get("totalDeletedKeys"));
+        omdbInsightEndpoint.getDeletedKeySummary();
+    Assertions.assertNotNull(deletedKeyInfoResp);
+
+    Map<String, Long> deletedKeysSummary = (Map<String, Long>)
+        deletedKeyInfoResp.getEntity();
+
+    Assertions.assertEquals(30L,
+        deletedKeysSummary.get("totalReplicatedDataSize"));
+    Assertions.assertEquals(10L,
+        deletedKeysSummary.get("totalUnreplicatedDataSize"));
+    Assertions.assertEquals(3L,
+        deletedKeysSummary.get("totalDeletedKeys"));
+  }
+
+  private void insertGlobalStatsRecords(GlobalStatsDao statsDao,
+                                        Timestamp timestamp, String key,
+                                        long value) {
+    GlobalStats newRecord = new GlobalStats(key, value, timestamp);
+    statsDao.insert(newRecord);
   }
 
   @Test
@@ -532,6 +618,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setFile(isFile)
+        .setObjectID(generateUniqueRandomLong())
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(random.nextLong())
@@ -635,4 +722,59 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Assertions.assertEquals("/sampleVol/bucketOne/dir_two",
         keyInsightInfoResp.getLastKey());
   }
+
+  @Test
+  public void testGetDirectorySizeInfo() throws Exception {
+
+    OmKeyInfo omKeyInfo1 =
+        getOmKeyInfo("sampleVol", "bucketOne", "dir1", false);
+    OmKeyInfo omKeyInfo2 =
+        getOmKeyInfo("sampleVol", "bucketTwo", "dir2", false);
+    OmKeyInfo omKeyInfo3 =
+        getOmKeyInfo("sampleVol", "bucketThree", "dir3", false);
+
+    // Add 3 entries to deleted dir table for directory dir1, dir2 and dir3
+    // having object id 1, 2 and 3 respectively
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/18/21/21/dir1/1", omKeyInfo1);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/18/26/26/dir2/2", omKeyInfo2);
+    reconOMMetadataManager.getDeletedDirTable()
+        .put("/18/28/28/dir3/3", omKeyInfo3);
+
+    // Prepare NS summary data and populate the table
+    Table<Long, NSSummary> table = omdbInsightEndpoint.getNsSummaryTable();
+    // Set size of files to 5 for directory object id 1
+    table.put(omKeyInfo1.getObjectID(), getNsSummary(5L));
+    // Set size of files to 6 for directory object id 2
+    table.put(omKeyInfo2.getObjectID(), getNsSummary(6L));
+    // Set size of files to 7 for directory object id 3
+    table.put(omKeyInfo3.getObjectID(), getNsSummary(7L));
+
+    Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+    KeyInsightInfoResponse keyInsightInfoResp =
+        (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+    Assertions.assertNotNull(keyInsightInfoResp);
+    Assertions.assertEquals(3,
+        keyInsightInfoResp.getDeletedDirInfoList().size());
+    // Assert the total size under directory dir1 is 5L
+    Assertions.assertEquals(5L,
+        keyInsightInfoResp.getDeletedDirInfoList().get(0).getSize());
+    // Assert the total size under directory dir2 is 6L
+    Assertions.assertEquals(6L,
+        keyInsightInfoResp.getDeletedDirInfoList().get(1).getSize());
+    // Assert the total size under directory dir3 is 7L
+    Assertions.assertEquals(7L,
+        keyInsightInfoResp.getDeletedDirInfoList().get(2).getSize());
+
+    // Assert the total of all the deleted directories is 18L
+    Assertions.assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
+  }
+
+  private NSSummary getNsSummary(long size) {
+    NSSummary summary = new NSSummary();
+    summary.setSizeOfFiles(size);
+    return summary;
+  }
+
 }

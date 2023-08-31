@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.AfterClass;
@@ -109,6 +108,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
@@ -262,33 +262,36 @@ public class TestOmSnapshot {
     counter = new AtomicInteger();
   }
 
-  private static void expectFailurePreFinalization(LambdaTestUtils.
-      VoidCallable eval) throws Exception {
-    OMException ex  = assertThrows(OMException.class,
-            () -> eval.call());
-    Assert.assertEquals(ex.getResult(),
-            NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
-    Assert.assertTrue(ex.getMessage().contains(
-            "cannot be invoked before finalization."));
-  }
 
   private static void preFinalizationChecks() throws Exception {
     // None of the snapshot APIs is usable before the upgrade finalization step
-    expectFailurePreFinalization(() ->
-        store.createSnapshot(volumeName, bucketName,
+
+    OMException omException  = assertThrows(OMException.class,
+        () -> store.createSnapshot(volumeName, bucketName,
             UUID.randomUUID().toString()));
-    expectFailurePreFinalization(() ->
-        store.listSnapshot(volumeName, bucketName, null, null));
-    expectFailurePreFinalization(() ->
-        store.snapshotDiff(volumeName, bucketName,
+    assertFinalizationException(omException);
+    omException  = assertThrows(OMException.class,
+        () -> store.listSnapshot(volumeName, bucketName, null, null));
+    assertFinalizationException(omException);
+    omException  = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volumeName, bucketName,
             UUID.randomUUID().toString(),
             UUID.randomUUID().toString(),
           "", 1000, false, disableNativeDiff));
-    expectFailurePreFinalization(() ->
-        store.deleteSnapshot(volumeName, bucketName,
+    assertFinalizationException(omException);
+    omException  = assertThrows(OMException.class,
+        () -> store.deleteSnapshot(volumeName, bucketName,
             UUID.randomUUID().toString()));
+    assertFinalizationException(omException);
+
   }
 
+  private static void assertFinalizationException(OMException omException) {
+    Assert.assertEquals(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        omException.getResult());
+    Assert.assertTrue(omException.getMessage().contains(
+        "cannot be invoked before finalization."));
+  }
   /**
    * Trigger OM upgrade finalization from the client and block until completion
    * (status FINALIZATION_DONE).
@@ -567,9 +570,9 @@ public class TestOmSnapshot {
     //create volume but not bucket
     store.createVolume(volume);
 
-    LambdaTestUtils.intercept(OMException.class,
-            "Bucket not found",
-            () -> createSnapshot(volume, bucket));
+    OMException omException = assertThrows(OMException.class,
+        () -> createSnapshot(volume, bucket));
+    assertEquals(BUCKET_NOT_FOUND, omException.getResult());
   }
 
   @Test
@@ -1498,22 +1501,19 @@ public class TestOmSnapshot {
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volumea, bucketa, snap2);
     // Bucket is nonexistent
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    OMException omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volumea, bucketb, snap1, snap2,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
     // Volume is nonexistent
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
-                null, 0, forceFullSnapshotDiff,
-                disableNativeDiff));
-    // Both volume and bucket are nonexistent
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
-                null, 0, forceFullSnapshotDiff,
-                disableNativeDiff));
+    omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volumeb, bucketa, snap2, snap1,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
+    omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volumeb, bucketb, snap2, snap1,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
   }
 
   /**
@@ -1566,23 +1566,23 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap2);
     String nullstr = "";
     // Destination snapshot is empty
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    OMException omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volume, bucket, snap1, nullstr,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
     // From snapshot is empty
-    LambdaTestUtils.intercept(OMException.class,
-            "KEY_NOT_FOUND",
-            () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    omException = assertThrows(OMException.class,
+        () -> store.snapshotDiff(volume, bucket, nullstr, snap1,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
+    assertEquals(KEY_NOT_FOUND, omException.getResult());
     // Bucket is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff));
+        () -> store.snapshotDiff(volume, nullstr, snap1, snap2,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
-            () -> store.snapshotDiff(nullstr, bucket, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff));
+        () -> store.snapshotDiff(nullstr, bucket, snap1, snap2,
+            null, 0, forceFullSnapshotDiff, disableNativeDiff));
   }
 
   @Test
@@ -1728,10 +1728,10 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap1);
     store.deleteSnapshot(volume, bucket, snap1);
 
-    LambdaTestUtils.intercept(OMException.class,
-            "FILE_NOT_FOUND",
+    OMException omException = assertThrows(OMException.class,
             () -> store.deleteSnapshot(volume, bucket, snap1));
-
+    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND,
+        omException.getResult());
   }
 
   @Test
@@ -1749,14 +1749,16 @@ public class TestOmSnapshot {
     createSnapshot(volume, bucket, snap1);
 
     // Delete non-existent snapshot
-    LambdaTestUtils.intercept(OMException.class,
-            "FILE_NOT_FOUND",
-            () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
+    OMException omException = assertThrows(OMException.class,
+        () -> store.deleteSnapshot(volume, bucket, "snapnonexistent"));
+    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND,
+        omException.getResult());
 
     // Delete snapshot with non-existent url
-    LambdaTestUtils.intercept(OMException.class,
-            "BUCKET_NOT_FOUND",
-            () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+    omException = assertThrows(OMException.class,
+        () -> store.deleteSnapshot(volume, "nonexistentbucket", snap1));
+    assertEquals(BUCKET_NOT_FOUND,
+        omException.getResult());
   }
 
   @Test

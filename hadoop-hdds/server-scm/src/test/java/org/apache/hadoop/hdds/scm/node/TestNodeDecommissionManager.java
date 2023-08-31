@@ -29,9 +29,11 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -51,14 +53,11 @@ public class TestNodeDecommissionManager {
   private StorageContainerManager scm;
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
-  private String storageDir;
 
   @BeforeEach
-  public void setup() throws Exception {
+  void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
-    storageDir = GenericTestUtils.getTempPath(
-        TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     nodeManager = createNodeManager(conf);
     decom = new NodeDecommissionManager(conf, nodeManager, null,
         SCMContext.emptyContext(), new EventQueue(), null);

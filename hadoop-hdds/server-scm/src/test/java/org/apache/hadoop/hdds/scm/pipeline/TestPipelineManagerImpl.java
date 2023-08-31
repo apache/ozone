@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -65,6 +64,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +87,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -113,7 +114,6 @@ import static org.mockito.Mockito.when;
  */
 public class TestPipelineManagerImpl {
   private OzoneConfiguration conf;
-  private File testDir;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
   private int maxPipelineCount;
@@ -123,13 +123,9 @@ public class TestPipelineManagerImpl {
   private TestClock testClock;
 
   @BeforeEach
-  public void init() throws Exception {
+  void init(@TempDir File testDir) throws Exception {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     scm = HddsTestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     // Mock Node Manager is not able to correctly set up things for the EC
@@ -155,7 +151,6 @@ public class TestPipelineManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-    FileUtil.fullyDelete(testDir);
   }
 
   private PipelineManagerImpl createPipelineManager(boolean isLeader)
@@ -359,6 +354,60 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testRemoveContainerFromPipeline() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline ratisPipeline =  pipelineManager.createPipeline(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+      pipelineManager.openPipeline(ratisPipeline.getId());
+      ECReplicationConfig ecRepConfig = new ECReplicationConfig(3, 2);
+      Pipeline ecPipeline = pipelineManager.createPipeline(ecRepConfig);
+      pipelineManager.openPipeline(ecPipeline.getId());
+
+      ContainerInfo ratisContainerInfo = HddsTestUtils.
+          getContainer(HddsProtos.LifeCycleState.OPEN, ratisPipeline.getId());
+      ContainerInfo ecContainerInfo = HddsTestUtils.getECContainer(
+          HddsProtos.LifeCycleState.OPEN, ecPipeline.getId(), ecRepConfig);
+
+      pipelineManager.addContainerToPipeline(ratisPipeline.getId(),
+          ratisContainerInfo.containerID());
+      pipelineManager.addContainerToPipeline(ecPipeline.getId(),
+          ecContainerInfo.containerID());
+
+      List<Pipeline> ratisPipelines = pipelineManager.getPipelines(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          Pipeline.PipelineState.OPEN);
+
+      List<Pipeline> ecPipelines = pipelineManager.getPipelines(
+          ecRepConfig, Pipeline.PipelineState.OPEN);
+
+      // Background pipeline creator could create additional Ratis pipelines,
+      // so an equals check may not work. EC pipelines are created on demand,
+      // so an equals check is fine.
+      Assertions.assertTrue(ratisPipelines.contains(ratisPipeline));
+      Assertions.assertEquals(1, ecPipelines.size());
+
+      // Ensure both pipelines have a single container
+      Assertions.assertEquals(1, pipelineManager
+          .getContainersInPipeline(ratisPipeline.getId()).size());
+      Assertions.assertEquals(1, pipelineManager
+          .getContainersInPipeline(ecPipeline.getId()).size());
+
+      // Remove the container from the Ratis pipeline - this should leave the
+      // pipeline in the OPEN state
+      pipelineManager.removeContainerFromPipeline(ratisPipeline.getId(),
+          ratisContainerInfo.containerID());
+      Assertions.assertEquals(OPEN, pipelineManager
+          .getPipeline(ratisPipeline.getId()).getPipelineState());
+
+      // Removing from the EC pipeline should trigger the pipeline to close.
+      pipelineManager.removeContainerFromPipeline(ecPipeline.getId(),
+          ecContainerInfo.containerID());
+      Assertions.assertEquals(CLOSED, pipelineManager
+          .getPipeline(ecPipeline.getId()).getPipelineState());
+    }
+  }
+
+  @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
     try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
       Pipeline pipeline = assertAllocate(pipelineManager);
@@ -545,7 +594,7 @@ public class TestPipelineManagerImpl {
     Assertions.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+            CLOSED).contains(closedPipeline));
 
     // Set the clock to "now". All pipelines were created before this.
     testClock.set(Instant.now());
@@ -563,7 +612,7 @@ public class TestPipelineManagerImpl {
     Assertions.assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+            CLOSED).contains(closedPipeline));
 
     testClock.fastForward((60000));
 
@@ -598,7 +647,7 @@ public class TestPipelineManagerImpl {
 
     pipelineManager.scrubPipelines();
     pipeline = pipelineManager.getPipeline(pipeline.getId());
-    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+    Assertions.assertEquals(CLOSED,
         pipeline.getPipelineState());
   }
 

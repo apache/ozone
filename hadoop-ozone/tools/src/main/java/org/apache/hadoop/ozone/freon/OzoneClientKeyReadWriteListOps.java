@@ -42,13 +42,13 @@ import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
  */
 
 @CommandLine.Command(name = "ockrw",
-        aliases = "ozone-client-key-read-write-ops",
+        aliases = "ozone-client-key-read-write-list-ops",
         description = "Generate keys with a fixed name and ranges that can" 
-        + " be written and read as sub-ranges from multiple clients.",
+        + " be written, read and listed as sub-ranges from multiple clients.",
         versionProvider = HddsVersionProvider.class,
         mixinStandardHelpOptions = true,
         showDefaultValues = true)
-public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
+public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
         implements Callable<Void> {
 
   @CommandLine.Option(names = {"-v", "--volume"},
@@ -98,10 +98,23 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
   @CommandLine.Option(names = {"--percentage-read"},
           description = "Percentage of read tasks in mix workload."
-          + " The remainder of the percentage will writes to keys."
-          + " Example --percentage-read 90 will result in 10% writes.",
-          defaultValue = "100")
+          + " The remainder of the percentage will be divided between write"
+          + " and list tasks.",
+          required = true)
   private int percentageRead;
+
+  @CommandLine.Option(names = {"--percentage-list"},
+          description = "Percentage of list tasks in mix workload."
+          + " The remainder of the percentage will be divided between write"
+          + " and read tasks.",
+          required = true)
+  private int percentageList;
+
+  @CommandLine.Option(names = {"--max-list-result"},
+      description = "Maximum number of keys to be fetched during the list task."
+          + " It ensures the size of the result will not exceed this limit.",
+      defaultValue = "1000")
+  private int maxListResult;
 
   @CommandLine.Option(
           names = "--om-service-id",
@@ -118,14 +131,15 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
   private byte[] keyContent;
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(OzoneClientKeyReadWriteOps.class);
+          LoggerFactory.getLogger(OzoneClientKeyReadWriteListOps.class);
 
   /**
    * Task type of read task, or write task.
    */
   public enum TaskType {
     READ_TASK,
-    WRITE_TASK
+    WRITE_TASK,
+    LIST_TASK
   }
   private KeyGeneratorUtil kg;
 
@@ -142,14 +156,14 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
 
     ensureVolumeAndBucketExist(ozoneClients[0], volumeName, bucketName);
 
-    timer = getMetrics().timer("key-read-write");
+    timer = getMetrics().timer("key-read-write-list");
     if (objectSizeInBytes >= 0) {
       keyContent = RandomUtils.nextBytes(objectSizeInBytes);
     }
     if (kg == null) {
       kg = new KeyGeneratorUtil();
     }
-    runTests(this::readWriteKeys);
+    runTests(this::readWriteListKeys);
 
     for (int i = 0; i < clientCount; i++) {
       if (ozoneClients[i] != null) {
@@ -159,9 +173,10 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     return null;
   }
 
-  public void readWriteKeys(long counter) throws RuntimeException, IOException {
+  public void readWriteListKeys(long counter) throws RuntimeException,
+      IOException {
     int clientIndex = (int)((counter) % clientCount);
-    TaskType taskType = decideReadOrWriteTask();
+    TaskType taskType = decideReadWriteOrListTask();
     String keyName = getKeyName();
 
     timer.time(() -> {
@@ -172,6 +187,9 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
           break;
         case WRITE_TASK:
           processWriteTasks(keyName, ozoneClients[clientIndex]);
+          break;
+        case LIST_TASK:
+          processListTasks(ozoneClients[clientIndex]);
           break;
         default:
           break;
@@ -212,16 +230,22 @@ public class OzoneClientKeyReadWriteOps extends BaseFreonGenerator
     }
   }
 
-  public TaskType decideReadOrWriteTask() {
-    if (percentageRead == 100) {
-      return TaskType.READ_TASK;
-    } else if (percentageRead == 0) {
-      return TaskType.WRITE_TASK;
+  public void processListTasks(OzoneClient ozoneClient)
+      throws RuntimeException, IOException {
+    try {
+      ozoneClient.getProxy()
+          .listKeys(volumeName, bucketName, getPrefix(), null, maxListResult);
+    } catch (Exception ex) {
+      throw ex;
     }
-    //mix workload
+  }
+
+  public TaskType decideReadWriteOrListTask() {
     int tmp = ThreadLocalRandom.current().nextInt(1, 101);
-    if (tmp  <= percentageRead) {
+    if (tmp <= percentageRead) {
       return TaskType.READ_TASK;
+    } else if (tmp > percentageRead && tmp <= percentageRead + percentageList) {
+      return TaskType.LIST_TASK;
     } else {
       return TaskType.WRITE_TASK;
     }

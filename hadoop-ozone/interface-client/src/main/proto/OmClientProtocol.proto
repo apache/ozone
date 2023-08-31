@@ -819,6 +819,7 @@ message SnapshotInfo {
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
+  optional bool sstFiltered = 14;
  }
 
 message SnapshotDiffJobProto {
@@ -1783,7 +1784,7 @@ message DeleteSnapshotRequest {
 }
 
 message PrintCompactionLogDagRequest {
-  optional string fileName = 1;
+  optional string fileNamePrefix = 1;
   optional string graphType = 2;
 }
 
@@ -1879,7 +1880,7 @@ message DeleteSnapshotResponse {
 }
 
 message PrintCompactionLogDagResponse {
-  optional string imagePath = 1;
+  optional string message = 1;
 }
 
 message SnapshotMoveDeletedKeysResponse {

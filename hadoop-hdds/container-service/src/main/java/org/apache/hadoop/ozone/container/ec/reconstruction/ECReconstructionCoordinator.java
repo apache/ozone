@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -285,7 +286,31 @@ public class ECReconstructionCoordinator implements Closeable {
             .collect(Collectors.toSet()));
         long length = safeBlockGroupLength;
         while (length > 0) {
-          int readLen = sis.recoverChunks(bufs);
+          int readLen;
+          try {
+            readLen = sis.recoverChunks(bufs);
+            Set<Integer> failedIndexes = sis.getFailedIndexes();
+            if (!failedIndexes.isEmpty()) {
+              // There was a problem reading some of the block indexes, but we
+              // did not get an exception as there must have been spare indexes
+              // to try and recover from. Therefore we should log out the block
+              // group details in the same way as for the exception case below.
+              logBlockGroupDetails(blockLocationInfo, repConfig,
+                  blockDataGroup);
+            }
+          } catch (IOException e) {
+            // When we see exceptions here, it could be due to some transient
+            // issue that causes the block read to fail when reconstructing it,
+            // but we have seen issues where the containers don't have the
+            // blocks they appear they should have, or the block chunks are the
+            // wrong length etc. In order to debug these sort of cases, if we
+            // get an error, we will log out the details about the block group
+            // length on each source, along with their chunk list and chunk
+            // lengths etc.
+            logBlockGroupDetails(blockLocationInfo, repConfig,
+                blockDataGroup);
+            throw e;
+          }
           // TODO: can be submitted in parallel
           for (int i = 0; i < bufs.length; i++) {
             CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
@@ -308,6 +333,43 @@ public class ECReconstructionCoordinator implements Closeable {
         }
         IOUtils.cleanupWithLogger(LOG, targetBlockStreams);
       }
+    }
+  }
+
+  private void logBlockGroupDetails(BlockLocationInfo blockLocationInfo,
+      ECReplicationConfig repConfig, BlockData[] blockDataGroup) {
+    LOG.info("Block group details for {}. " +
+        "Replication Config {}. Calculated safe length: {}. ",
+        blockLocationInfo.getBlockID(), repConfig,
+        blockLocationInfo.getLength());
+    for (int i = 0; i < blockDataGroup.length; i++) {
+      BlockData data = blockDataGroup[i];
+      if (data == null) {
+        continue;
+      }
+      StringBuilder sb = new StringBuilder();
+      sb.append("Block Data for: ")
+          .append(data.getBlockID())
+          .append(" replica Index: ")
+          .append(i + 1)
+          .append(" block length: ")
+          .append(data.getSize())
+          .append(" block group length: ")
+          .append(getBlockDataLength(data))
+          .append(" chunk list: \n");
+      int cnt = 0;
+      for (ContainerProtos.ChunkInfo chunkInfo : data.getChunks()) {
+        if (cnt > 0) {
+          sb.append("\n");
+        }
+        sb.append("  chunkNum: ")
+            .append(++cnt)
+            .append(" length: ")
+            .append(chunkInfo.getLen())
+            .append(" offset: ")
+            .append(chunkInfo.getOffset());
+      }
+      LOG.info(sb.toString());
     }
   }
 
@@ -492,15 +554,22 @@ public class ECReconstructionCoordinator implements Closeable {
         continue;
       }
 
-      String putBlockLenStr = blockGroup[i].getMetadata()
-          .get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
-      long putBlockLen = (putBlockLenStr == null) ?
-          Long.MAX_VALUE :
-          Long.parseLong(putBlockLenStr);
-      // Use the min to be conservative
+      long putBlockLen = getBlockDataLength(blockGroup[i]);
+      // Use safe length is the minimum of the lengths recorded across the
+      // stripe
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
+  }
+
+  private long getBlockDataLength(BlockData blockData) {
+    String lenStr = blockData.getMetadata()
+        .get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
+    // If we don't have the length, then it indicates a problem with the stripe.
+    // All replica should carry the length, so if it is not there, we return 0,
+    // which will cause us to set the length of the block to zero and not
+    // attempt to reconstruct it.
+    return (lenStr == null) ? 0 : Long.parseLong(lenStr);
   }
 
   public ECReconstructionMetrics getECReconstructionMetrics() {

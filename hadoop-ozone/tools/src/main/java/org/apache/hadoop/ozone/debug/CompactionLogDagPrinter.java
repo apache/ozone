@@ -29,7 +29,7 @@ import picocli.CommandLine;
 import java.io.IOException;
 
 /**
- * Handler to generate image for current compaction DAG in the OM.
+ * Handler to generate image for current compaction DAG in the OM leader node.
  * ozone sh snapshot print-log-dag.
  */
 @CommandLine.Command(
@@ -40,15 +40,15 @@ import java.io.IOException;
 public class CompactionLogDagPrinter extends Handler
     implements SubcommandWithParent {
 
-  @CommandLine.Option(names = {"-f", "--file-name"},
-      description = "Name of the image file. (optional)")
-  private String fileName;
+  @CommandLine.Option(names = {"-f", "--file-name-prefix"},
+      description = "Prefix to be use in image file name. (optional)")
+  private String fileNamePrefix;
 
   // TODO: Change graphType to enum.
   @CommandLine.Option(names = {"-t", "--graph-type"},
-      description = "Type of node name to use in the graph image.\n" +
-          "Accepted values are: \n" +
-          "  file_name: to use file name as node name in DAG,\n" +
+      description = "Type of node name to use in the graph image. " +
+          "(optional)\n Accepted values are: \n" +
+          "  file_name (default) : to use file name as node name in DAG,\n" +
           "  key_size: to show the no. of keys in the file along with file " +
           "name in the DAG node name,\n" +
           "  cumulative_size: to show the cumulative size along with file " +
@@ -64,8 +64,8 @@ public class CompactionLogDagPrinter extends Handler
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
-    String imagePath = client.getObjectStore()
-        .printCompactionLogDag(fileName, graphType);
-    System.out.println("DAG image is created on path: " + imagePath);
+    String message = client.getObjectStore()
+        .printCompactionLogDag(fileNamePrefix, graphType);
+    System.out.println(message);
   }
 }

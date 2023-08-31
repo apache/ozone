@@ -59,7 +59,7 @@ public class TestHeatMapInfo {
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
   private String auditRespStr;
-  private HeatMapServiceImpl heatMapService;
+  private HeatMapUtil heatMapUtil;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
@@ -81,7 +81,7 @@ public class TestHeatMapInfo {
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    heatMapService = reconTestInjector.getInstance(HeatMapServiceImpl.class);
+    heatMapUtil = reconTestInjector.getInstance(HeatMapUtil.class);
     auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -756,7 +756,7 @@ public class TestHeatMapInfo {
     List<EntityMetaData> entityMetaDataList =
         Arrays.stream(entities).collect(Collectors.toList());
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-        heatMapService.generateHeatMap(entityMetaDataList);
+        heatMapUtil.generateHeatMap(entityMetaDataList);
     Assertions.assertTrue(
         entityReadAccessHeatMapResponse.getChildren().size() > 0);
     Assertions.assertEquals(12,
@@ -872,7 +872,7 @@ public class TestHeatMapInfo {
       //  "minAccessCount": 19263
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-          heatMapService.generateHeatMap(entityMetaDataList);
+          heatMapUtil.generateHeatMap(entityMetaDataList);
       Assertions.assertTrue(
           entityReadAccessHeatMapResponse.getChildren().size() > 0);
       Assertions.assertEquals(2,
@@ -1107,7 +1107,7 @@ public class TestHeatMapInfo {
       //    "maxAccessCount": 701
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
-          heatMapService.generateHeatMap(entityMetaDataList);
+          heatMapUtil.generateHeatMap(entityMetaDataList);
       Assertions.assertTrue(
           entityReadAccessHeatMapResponse.getChildren().size() > 0);
       Assertions.assertEquals(2,

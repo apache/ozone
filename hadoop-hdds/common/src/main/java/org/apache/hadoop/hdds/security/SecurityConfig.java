@@ -52,6 +52,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_TIME_OF_DAY_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
@@ -137,6 +139,7 @@ public class SecurityConfig {
   private final SslProvider grpcSSLProvider;
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
+  private final Duration expiredCertificateCheckInterval;
 
   /**
    * Constructs a SecurityConfig.
@@ -243,6 +246,13 @@ public class SecurityConfig {
     this.rootCaCertificatePollingInterval =
         Duration.parse(rootCaCertificatePollingIntervalString);
 
+    String expiredCertificateCheckIntervalString = configuration.get(
+        HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL,
+        HDDS_X509_EXPIRED_CERTIFICATE_CHECK_INTERVAL_DEFAULT);
+
+    this.expiredCertificateCheckInterval =
+        Duration.parse(expiredCertificateCheckIntervalString);
+
     this.externalRootCaCert = configuration.get(
         HDDS_X509_ROOTCA_CERTIFICATE_FILE,
         HDDS_X509_ROOTCA_CERTIFICATE_FILE_DEFAULT);
@@ -310,30 +320,32 @@ public class SecurityConfig {
       throw new IllegalArgumentException(msg);
     }
 
-    if (caCheckInterval.isNegative() || caCheckInterval.isZero()) {
-      String msg = "Property " + HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
-          " should not be zero or negative";
-      LOG.error(msg);
-      throw new IllegalArgumentException(msg);
-    }
+    if (autoCARotationEnabled) {
+      if (caCheckInterval.isNegative() || caCheckInterval.isZero()) {
+        String msg = "Property " + HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+            " should not be zero or negative";
+        LOG.error(msg);
+        throw new IllegalArgumentException(msg);
+      }
 
-    if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
-          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
-    }
+      if (caCheckInterval.compareTo(renewalGracePeriod) >= 0) {
+        throw new IllegalArgumentException("Property value of " +
+            HDDS_X509_CA_ROTATION_CHECK_INTERNAL +
+            " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      }
 
-    if (caAckTimeout.isNegative() || caAckTimeout.isZero()) {
-      String msg = "Property " + HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
-          " should not be zero or negative";
-      LOG.error(msg);
-      throw new IllegalArgumentException(msg);
-    }
+      if (caAckTimeout.isNegative() || caAckTimeout.isZero()) {
+        String msg = "Property " + HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
+            " should not be zero or negative";
+        LOG.error(msg);
+        throw new IllegalArgumentException(msg);
+      }
 
-    if (caAckTimeout.compareTo(renewalGracePeriod) >= 0) {
-      throw new IllegalArgumentException("Property value of " +
-          HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
-          " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      if (caAckTimeout.compareTo(renewalGracePeriod) >= 0) {
+        throw new IllegalArgumentException("Property value of " +
+            HDDS_X509_CA_ROTATION_ACK_TIMEOUT +
+            " should be smaller than " + HDDS_X509_RENEW_GRACE_DURATION);
+      }
     }
 
     if (tokenSanityChecksEnabled
@@ -573,6 +585,10 @@ public class SecurityConfig {
 
   public boolean isAutoCARotationEnabled() {
     return autoCARotationEnabled;
+  }
+
+  public Duration getExpiredCertificateCheckInterval() {
+    return expiredCertificateCheckInterval;
   }
 
   /**

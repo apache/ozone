@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -624,7 +625,7 @@ public interface ClientProtocol {
    * @return S3SecretValue
    * @throws IOException
    */
-  S3SecretValue getS3Secret(String kerberosID) throws IOException;
+  @Nonnull S3SecretValue getS3Secret(String kerberosID) throws IOException;
 
   /**
    * Returns S3 Secret given kerberos user.
@@ -1047,12 +1048,12 @@ public interface ClientProtocol {
 
   /**
    * Create an image of the current compaction log DAG in the OM.
-   * @param fileName     name of the image file.
-   * @param graphType    type of node name to use in the graph image.
-   * @return path of the image file.
-   * @throws IOException
+   * @param fileNamePrefix  file name prefix of the image file.
+   * @param graphType       type of node name to use in the graph image.
+   * @return message which tells the image name, parent dir and OM leader
+   * node information.
    */
-  String printCompactionLogDag(String fileName, String graphType)
+  String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException;
 
   /**

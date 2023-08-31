@@ -27,8 +27,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +34,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.ozone.rocksdb.util.RdbUtil;
@@ -125,7 +125,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   private volatile String currentCompactionLogPath = null;
 
-  static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
+  public static final String COMPACTION_LOG_FILE_NAME_SUFFIX = ".log";
 
   /**
    * Marks the beginning of a comment line in the compaction log.
@@ -176,14 +176,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private long reconstructionSnapshotGeneration;
   private String reconstructionLastSnapshotID;
 
-  private final ScheduledExecutorService executor;
-  private boolean closed;
+  private final Scheduler scheduler;
+  private volatile boolean closed;
   private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock
       = new BootstrapStateHandler.Lock();
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private final AtomicInteger tarballRequestCount;
+  private final String dagPruningServiceName = "CompactionDagPruningService";
 
   /**
    * This is a package private constructor and should not be used other than
@@ -229,21 +230,23 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
             TimeUnit.MILLISECONDS);
 
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
-      this.executor = Executors.newSingleThreadScheduledExecutor();
-      this.executor.scheduleWithFixedDelay(
+      this.scheduler = new Scheduler(dagPruningServiceName,
+          true, 1);
+
+      this.scheduler.scheduleWithFixedDelay(
           this::pruneOlderSnapshotsWithCompactionHistory,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS);
 
-      this.executor.scheduleWithFixedDelay(
+      this.scheduler.scheduleWithFixedDelay(
           this::pruneSstFiles,
           pruneCompactionDagDaemonRunIntervalInMs,
           pruneCompactionDagDaemonRunIntervalInMs,
           TimeUnit.MILLISECONDS
       );
     } else {
-      this.executor = null;
+      this.scheduler = null;
     }
     this.tarballRequestCount = new AtomicInteger(0);
   }
@@ -326,13 +329,17 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     appendToCurrentCompactionLog("");
   }
 
+
   @Override
-  public void close() {
-    synchronized (this) {
-      if (!closed) {
-        closed = true;
-        if (executor != null) {
-          executor.shutdown();
+  public void close() throws Exception {
+    if (!closed) {
+      synchronized (this) {
+        if (!closed) {
+          closed = true;
+          if (scheduler != null) {
+            LOG.info("Shutting down {}.", dagPruningServiceName);
+            scheduler.close();
+          }
         }
       }
     }
@@ -1444,6 +1451,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return sstBackupDir;
   }
 
+  public String getCompactionLogDir() {
+    return compactionLogDir;
+  }
+
   private static final class SnapshotLogInfo {
     private final long snapshotGenerationId;
     private final String snapshotId;
@@ -1512,6 +1523,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
+  public String getCurrentCompactionLogPath() {
+    return currentCompactionLogPath;
+  }
+
+  @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
   }
@@ -1540,6 +1556,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
               activeDBLocationName,
               configuration));
     }
+
+    /**
+     * Close RocksDBCheckpointDiffer object if value is present for the key.
+     * @param cacheKey cacheKey is metadataDirName path which is used as key
+     *                for cache.
+     */
+    public static void invalidateCacheEntry(String cacheKey) {
+      IOUtils.closeQuietly(INSTANCE_MAP.get(cacheKey));
+      INSTANCE_MAP.remove(cacheKey);
+    }
   }
 
   @Override
@@ -1547,17 +1573,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     return lock;
   }
 
-  public String pngPrintMutableGraph(String fileName, GraphType graphType)
+  public void pngPrintMutableGraph(String filePath, GraphType graphType)
       throws IOException {
-    Objects.requireNonNull(fileName, "Image file name is required.");
+    Objects.requireNonNull(filePath, "Image file path is required.");
     Objects.requireNonNull(graphType, "Graph type is required.");
 
     PrintableGraph graph;
     synchronized (this) {
-      graph = new PrintableGraph(forwardCompactionDAG, graphType);
+      graph = new PrintableGraph(backwardCompactionDAG, graphType);
     }
 
-    graph.generateImage(fileName);
-    return fileName;
+    graph.generateImage(filePath);
   }
 }

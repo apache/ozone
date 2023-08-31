@@ -377,6 +377,10 @@ public final class OzoneConsts {
   // For Multipart upload
   public static final int OM_MULTIPART_MIN_SIZE = 5 * 1024 * 1024;
 
+  // refer to :
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
+  public static final int MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD = 10000;
+
   // GRPC block token metadata header and context key
   public static final String OZONE_BLOCK_TOKEN = "blocktoken";
   public static final Context.Key<UserGroupInformation> UGI_CTX_KEY =
@@ -423,12 +427,12 @@ public final class OzoneConsts {
    * contains illegal characters when creating/renaming key.
    *
    * Avoid the following characters in a key name:
-   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
-   * and Non-printable ASCII characters (128–255 decimal characters).
-   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   * "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", Quotation
+   * marks and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
    */
   public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
-          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+          Pattern.compile("^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff]+$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
 
@@ -583,8 +587,6 @@ public final class OzoneConsts {
 
   public static final String OM_SNAPSHOT_INDICATOR = ".snapshot";
   public static final String OM_SNAPSHOT_DIFF_DB_NAME = "db.snapdiff";
-
-  public static final String FILTERED_SNAPSHOTS = "filtered-snapshots";
 
   /**
    * Name of the SST file backup directory placed under metadata dir.
