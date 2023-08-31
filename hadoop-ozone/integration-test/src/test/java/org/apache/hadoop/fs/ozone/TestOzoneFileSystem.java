@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -1638,6 +1639,26 @@ public class TestOzoneFileSystem {
     Assert.assertTrue(o3fs.exists(userTrashCurrent));
     // Check under trash, the key should be present
     Assert.assertTrue(o3fs.exists(trashPath));
+
+    // Try to delete root
+    Path root = new Path(OZONE_URI_DELIMITER);
+    try {
+      trash.moveToTrash(root);
+      Assert.fail("Trying to delete root should throw exception");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof IOException);
+    }
+    // Also try with TrashPolicyDefault
+    OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
+    conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
+        TrashPolicy.class);
+    Trash trashPolicyDefault = new Trash(conf2);
+    try {
+      trashPolicyDefault.moveToTrash(root);
+      Assert.fail("Trying to delete root should throw exception");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof IOException);
+    }
   }
 
   /**
