@@ -62,7 +62,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   private StackTraceElement[] stackTrace;
 
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
-      String sstFilePath, ManagedOptions options)
+                                String sstFilePath, ManagedOptions options)
       throws NativeLibraryNotLoadedException, IOException {
     this(sstDumpTool, sstFilePath, options, null, null);
   }
@@ -136,8 +136,8 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-      ManagedOptions options, ManagedSlice lowerKeyBound,
-      ManagedSlice upperKeyBound)
+                    ManagedOptions options, ManagedSlice lowerKeyBound,
+                    ManagedSlice upperKeyBound)
       throws NativeLibraryNotLoadedException {
     Map<String, String> argMap = Maps.newHashMap();
     argMap.put("file", sstFile.getAbsolutePath());
@@ -219,7 +219,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       UnsignedLong sequenceNumber = getNextUnsignedLong()
           .orElseThrow(() -> new IllegalStateException(
               String.format("Error while trying to read sequence number" +
-                      " for key %s", StringUtils.bytes2String(key.get()))));
+                  " for key %s", StringUtils.bytes2String(key.get()))));
 
       Integer type = getNextNumberInStream()
           .orElseThrow(() -> new IllegalStateException(
@@ -281,7 +281,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     private final byte[] value;
 
     private KeyValue(byte[] key, UnsignedLong sequence, Integer type,
-             byte[] value) {
+                     byte[] value) {
       this.key = key;
       this.sequence = sequence;
       this.type = type;
