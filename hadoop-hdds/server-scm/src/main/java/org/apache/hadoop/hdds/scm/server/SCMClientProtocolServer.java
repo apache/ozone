@@ -345,8 +345,6 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
-
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
     StringBuilder strContainerIDs = new StringBuilder();
@@ -379,12 +377,11 @@ public class SCMClientProtocolServer implements
     List<ContainerWithPipeline> cpList = new ArrayList<>();
     for (Long containerID : containerIDs) {
       try {
-        getScm().checkAdminAccess(getRemoteUser(), true);
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
       } catch (IOException ex) {
         //not found , just go ahead
-        LOG.error("IOException - Admin Access Failed: {}", ex);
+        LOG.error("Container with common pipeline not found: {}", ex);
       }
     }
     return cpList;
@@ -600,7 +597,6 @@ public class SCMClientProtocolServer implements
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     if (queryScope == HddsProtos.QueryScope.POOL) {
       throw new IllegalArgumentException("Not Supported yet");
     }
@@ -973,9 +969,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ReplicationManagerReport getReplicationManagerReport()
-      throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
+  public ReplicationManagerReport getReplicationManagerReport() {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();

@@ -337,8 +337,7 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
-      String clientMachine) throws IOException {
-    scm.checkAdminAccess(getRemoteUser(), true);
+      String clientMachine) {
     boolean auditSuccess = true;
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
