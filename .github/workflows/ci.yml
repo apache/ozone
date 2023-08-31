@@ -25,14 +25,14 @@ jobs:
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
-      basic-checks: false
-      needs-basic-checks: false
+      basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
+      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
-      needs-compile: false
+      needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: false
-      needs-integration-tests: false
-      needs-kubernetes-tests: false
+      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
+      needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
+      needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
         uses: actions/checkout@v3
@@ -248,6 +248,14 @@ jobs:
     strategy:
       matrix:
         suite:
+          - secure
+          - unsecure
+          - compat
+          - EC
+          - HA-secure
+          - HA-unsecure
+          - MR
+          - misc
           - cert-rotation
       fail-fast: false
     steps:
@@ -272,7 +280,6 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_VOLUME_OWNER: 1000
-          ITERATIONS: 10
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
