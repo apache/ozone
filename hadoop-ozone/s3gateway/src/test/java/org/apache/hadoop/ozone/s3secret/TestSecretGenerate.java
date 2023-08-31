@@ -51,7 +51,7 @@ public class TestSecretGenerate {
   private static final String OTHER_USER_NAME = "test2";
   private static final String USER_SECRET = "test_secret";
 
-  private S3SecretGenerateEndpoint endpoint;
+  private S3SecretManagementEndpoint endpoint;
 
   @Mock
   private ClientProtocol proxy;
@@ -79,7 +79,7 @@ public class TestSecretGenerate {
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretGenerateEndpoint();
+    endpoint = new S3SecretManagementEndpoint();
     endpoint.setClient(client);
     endpoint.setContext(context);
   }

@@ -57,7 +57,7 @@ public class TestSecretRevoke {
   private static final String USER_NAME = "test";
   private static final String OTHER_USER_NAME = "test2";
 
-  private S3SecretRevokeEndpoint endpoint;
+  private S3SecretManagementEndpoint endpoint;
 
   @Mock
   private ObjectStoreStub objectStore;
@@ -78,7 +78,7 @@ public class TestSecretRevoke {
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretRevokeEndpoint();
+    endpoint = new S3SecretManagementEndpoint();
     endpoint.setClient(client);
     endpoint.setContext(context);
   }
