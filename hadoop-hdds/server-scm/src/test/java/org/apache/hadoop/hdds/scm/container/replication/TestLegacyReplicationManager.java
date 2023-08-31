@@ -64,6 +64,8 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Disabled;
@@ -831,6 +833,57 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
+    }
+
+    /**
+     * 1 closed replica
+     * 2 quasi-closed replicas
+     * SCM state is closed.
+     * Expectation: The replicate container command should only contain the
+     * closed replica as a source.
+     */
+    @Test
+    public void testOnlyMatchingReplicasChosen()
+        throws IOException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica quasiReplica = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica closedReplica1 = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      final ContainerReplica closedReplica2 = getReplicas(
+          id, State.CLOSED, 1000L, datanodeDetails.getUuid(), datanodeDetails);
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, quasiReplica);
+      containerStateManager.updateContainerReplica(id, closedReplica1);
+      containerStateManager.updateContainerReplica(id, closedReplica2);
+
+      final int currentReplicateCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+      // Two of the replicas are in OPEN state
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(currentReplicateCommandCount + 1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Optional<CommandForDatanode> cmdOptional =
+          datanodeCommandHandler.getReceivedCommands().stream().findFirst();
+      Assertions.assertTrue(cmdOptional.isPresent());
+      SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
+      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
+
+      // Only the closed replicas should have been used as sources.
+      List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
+      Assertions.assertEquals(2, repSources.size());
+      Assertions.assertTrue(repSources.containsAll(
+          Arrays.asList(closedReplica1.getDatanodeDetails(),
+              closedReplica2.getDatanodeDetails())));
+      Assertions.assertFalse(repSources.contains(quasiReplica.getDatanodeDetails()));
     }
 
     /**
