@@ -729,7 +729,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setDeepClean(deepClean)
         .setSstFiltered(sstFiltered)
         .setReferencedSize(referencedSize)
-        .setReferencedReplicatedSize(exclusiveReplicatedSize)
+        .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
         .build();
