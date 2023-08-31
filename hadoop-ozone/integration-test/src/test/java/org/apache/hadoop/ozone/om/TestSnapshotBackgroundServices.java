@@ -77,7 +77,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.LOG;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
@@ -522,8 +521,6 @@ public class TestSnapshotBackgroundServices {
 
   private static void resumeBackupCompactionFilesPruning(
       OzoneManager ozoneManager) {
-    // TODO https://issues.apache.org/jira/browse/HDDS-9209
-    LOG.info("###Resuming");
     ozoneManager
         .getMetadataManager()
         .getStore()
@@ -533,8 +530,6 @@ public class TestSnapshotBackgroundServices {
 
   private static void suspendBackupCompactionFilesPruning(
       OzoneManager ozoneManager) {
-    // TODO https://issues.apache.org/jira/browse/HDDS-9209
-    LOG.info("###Suspending");
     ozoneManager
         .getMetadataManager()
         .getStore()
@@ -594,8 +589,6 @@ public class TestSnapshotBackgroundServices {
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = Objects.requireNonNull(
           sstBackupDir.listFiles()).length;
-      // TODO https://issues.apache.org/jira/browse/HDDS-9209
-      LOG.info("###{},{}", numberOfSstFiles, newNumberOfSstFiles);
       return numberOfSstFiles > newNumberOfSstFiles;
     }, 1000, 10000);
   }

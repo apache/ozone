@@ -1167,13 +1167,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   public void pruneOlderSnapshotsWithCompactionHistory() {
     if (!shouldRun()) {
-      // TODO https://issues.apache.org/jira/browse/HDDS-9209
-      LOG.info("###Service (pruneOlderSnapshotsWithCompactionHistory) suspended for {}.", getCurrentCompactionLogPath());
       return;
     }
-
-    // TODO https://issues.apache.org/jira/browse/HDDS-9209
-    LOG.info("###Service (pruneOlderSnapshotsWithCompactionHistory) not suspended for {}.", getCurrentCompactionLogPath());
 
     List<Path> olderSnapshotsLogFilePaths =
         getOlderSnapshotsCompactionLogFilePaths();
@@ -1494,13 +1489,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    */
   public synchronized void pruneSstFiles() {
     if (!shouldRun()) {
-      // TODO https://issues.apache.org/jira/browse/HDDS-9209
-      LOG.info("###Service (pruneSstFiles) suspended for {}.", getCurrentCompactionLogPath());
       return;
     }
-
-    // TODO https://issues.apache.org/jira/browse/HDDS-9209
-    LOG.info("###Service (pruneSstFiles) not suspended for {}", getCurrentCompactionLogPath());
 
     Set<String> nonLeafSstFiles;
     nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
