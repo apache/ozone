@@ -158,7 +158,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
           .setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
       archiveOutputStream
           .setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      // Files to be excluded from tarball
       RocksDBCheckpointDiffer differ =
           getDbStore().getRocksDBCheckpointDiffer();
       DirectoryData sstBackupDir = new DirectoryData(tmpdir,
@@ -166,10 +165,11 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       DirectoryData compactionLogDir = new DirectoryData(tmpdir,
           differ.getCompactionLogDir());
 
-      Map<Path, Path> toExcludeFiles = normalizeExcludeList(toExcludeList,
+      // Files to be excluded from tarball
+      Map<Path, Path> sstFilesToExclude = normalizeExcludeList(toExcludeList,
           checkpoint.getCheckpointLocation(), sstBackupDir);
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
-          hardLinkFiles, toExcludeFiles, includeSnapshotData(request),
+          hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           excludedList, sstBackupDir, compactionLogDir);
       writeFilesToArchive(copyFiles, hardLinkFiles, archiveOutputStream,
           completed, checkpoint.getCheckpointLocation());
@@ -197,8 +197,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Path checkpointLocation,
       DirectoryData sstBackupDir) {
     Map<Path, Path> paths = new HashMap<>();
+    Path metaDirPath = getMetaDirPath(checkpointLocation);
     for (String s : toExcludeList) {
-      Path metaDirPath = getMetaDirPath(checkpointLocation);
       Path destPath = Paths.get(metaDirPath.toString(), s);
       if (destPath.toString().startsWith(
           sstBackupDir.getOriginalDir().toString())) {
@@ -289,7 +289,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   private boolean getFilesForArchive(DBCheckpoint checkpoint,
                                   Map<Path, Path> copyFiles,
                                   Map<Path, Path> hardLinkFiles,
-                                  Map<Path, Path> toExcludeFiles,
+                                  Map<Path, Path> sstFilesToExclude,
                                   boolean includeSnapshotData,
                                   List<String> excluded,
                                   DirectoryData sstBackupDir,
@@ -309,7 +309,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     AtomicLong copySize = new AtomicLong(0L);
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
-    if (!processDir(dir, copyFiles, hardLinkFiles, toExcludeFiles,
+    if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize, null)) {
       return false;
     }
@@ -322,20 +322,20 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     Set<Path> snapshotPaths = waitForSnapshotDirs(checkpoint);
     Path snapshotDir = Paths.get(OMStorage.getOmDbDir(getConf()).toString(),
         OM_SNAPSHOT_DIR);
-    if (!processDir(snapshotDir, copyFiles, hardLinkFiles, toExcludeFiles,
+    if (!processDir(snapshotDir, copyFiles, hardLinkFiles, sstFilesToExclude,
         snapshotPaths, excluded, copySize, null)) {
       return false;
     }
     // Process the tmp sst compaction dir.
     if (!processDir(sstBackupDir.getTmpDir().toPath(), copyFiles, hardLinkFiles,
-        toExcludeFiles, new HashSet<>(), excluded, copySize,
+        sstFilesToExclude, new HashSet<>(), excluded, copySize,
         sstBackupDir.getOriginalDir().toPath())) {
       return false;
     }
 
     // Process the tmp compaction log dir.
     return processDir(compactionLogDir.getTmpDir().toPath(), copyFiles,
-        hardLinkFiles, toExcludeFiles,
+        hardLinkFiles, sstFilesToExclude,
         new HashSet<>(), excluded, copySize,
         compactionLogDir.getOriginalDir().toPath());
 
@@ -384,7 +384,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private boolean processDir(Path dir, Map<Path, Path> copyFiles,
                           Map<Path, Path> hardLinkFiles,
-                          Map<Path, Path> toExcludeFiles,
+                          Map<Path, Path> sstFilesToExclude,
                           Set<Path> snapshotPaths,
                           List<String> excluded,
                           AtomicLong copySize,
@@ -429,13 +429,13 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
             destSubDir = Paths.get(destDir.toString(),
                 filename.toString());
           }
-          if (!processDir(file, copyFiles, hardLinkFiles, toExcludeFiles,
+          if (!processDir(file, copyFiles, hardLinkFiles, sstFilesToExclude,
                           snapshotPaths, excluded, copySize, destSubDir)) {
             return false;
           }
         } else {
           long fileSize = processFile(file, copyFiles, hardLinkFiles,
-              toExcludeFiles, excluded, destDir);
+              sstFilesToExclude, excluded, destDir);
           if (copySize.get() + fileSize > maxTotalSstSize) {
             return false;
           } else {
@@ -450,18 +450,18 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   /**
    * Takes a db file and determines whether it should be included in
    * the tarball, or added as a link, or excluded altogether.
-   * Uses the toExcludeFiles list to know what already
+   * Uses the sstFilesToExclude list to know what already
    * exists on the follower.
    * @param file The db file to be processed.
    * @param copyFiles The db files to be added to tarball.
    * @param hardLinkFiles The db files to be added as hard links.
-   * @param toExcludeFiles The db files to be excluded from tarball.
+   * @param sstFilesToExclude The db files to be excluded from tarball.
    * @param excluded The list of db files that actually were excluded.
    */
   @VisibleForTesting
   public static long processFile(Path file, Map<Path, Path> copyFiles,
                                  Map<Path, Path> hardLinkFiles,
-                                 Map<Path, Path> toExcludeFiles,
+                                 Map<Path, Path> sstFilesToExclude,
                                  List<String> excluded,
                                  Path destDir)
       throws IOException {
@@ -480,12 +480,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (destDir != null) {
       destFile = Paths.get(destDir.toString(), fileName);
     }
-    if (toExcludeFiles.containsKey(file)) {
+    if (sstFilesToExclude.containsKey(file)) {
       excluded.add(destFile.toString());
     } else {
       if (fileName.endsWith(ROCKSDB_SST_SUFFIX)) {
         // If same as existing excluded file, add a link for it.
-        Path linkPath = findLinkPath(toExcludeFiles, file);
+        Path linkPath = findLinkPath(sstFilesToExclude, file);
         if (linkPath != null) {
           hardLinkFiles.put(destFile, linkPath);
         } else {
@@ -528,19 +528,21 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     for (Map.Entry<Path, Path> entry: files.entrySet()) {
       Path srcPath = entry.getKey();
       Path destPath = entry.getValue();
-      if (srcPath.toString().endsWith(fileName)) {
-        if (srcPath.toFile().exists()) {
-          // If the files are hard linked to each other
-          // Note comparison must be done against srcPath, because
-          // destPath may only exist on Follower.
-          if (OmSnapshotUtils.getINode(srcPath).equals(
-              OmSnapshotUtils.getINode(file))) {
-            return destPath;
-          } else {
-            LOG.info("Found non linked sst files with the same name: {}, {}",
-                srcPath, file);
-          }
-        }
+      if (!srcPath.toString().endsWith(fileName)) {
+        continue;
+      }
+      if (!srcPath.toFile().exists()) {
+        continue;
+      }
+      // Check if the files are hard linked to each other.
+      // Note comparison must be done against srcPath, because
+      // destPath may only exist on Follower.
+      if (OmSnapshotUtils.getINode(srcPath).equals(
+          OmSnapshotUtils.getINode(file))) {
+        return destPath;
+      } else {
+        LOG.info("Found non linked sst files with the same name: {}, {}",
+            srcPath, file);
       }
     }
     return null;
