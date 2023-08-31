@@ -26,6 +26,8 @@ import {HashRouter as Router, Switch, Route, Redirect} from 'react-router-dom';
 import {routes} from './routes';
 import {MakeRouteWithSubRoutes} from './makeRouteWithSubRoutes';
 import classNames from 'classnames';
+import axios from 'axios';
+import { showDataFetchError } from 'utils/common';
 
 const {
   Header, Content, Footer
@@ -33,26 +35,60 @@ const {
 
 interface IAppState {
   collapsed: boolean;
+  isHeatmapAvailable: boolean;
+  isLoading: boolean
 }
 
 class App extends React.Component<Record<string, object>, IAppState> {
   constructor(props = {}) {
     super(props);
-    this.state = {collapsed: false};
+    this.state = {
+      isHeatmapAvailable: false,
+      collapsed: false,
+      isLoading: false
+    };
   }
 
   onCollapse = (collapsed: boolean) => {
     this.setState({collapsed});
   };
 
+  componentDidMount(): void {
+    this.setState({
+      isLoading: true
+    });
+    this.fetchDisableFeatures();
+  }
+  
+  fetchDisableFeatures = () => {
+    this.setState({
+      isLoading: true
+    });
+
+    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
+    axios.get(disabledfeaturesEndpoint).then(response => {
+      const disabledFeaturesFlag = response.data && response.data.includes('HEATMAP');
+      // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
+      this.setState({
+        isLoading: false,
+        isHeatmapAvailable: !disabledFeaturesFlag
+      });
+    }).catch(error => {
+      this.setState({
+        isLoading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
   render() {
-    const {collapsed} = this.state;
+    const {collapsed, isHeatmapAvailable} = this.state;
     const layoutClass = classNames('content-layout', {'sidebar-collapsed': collapsed});
 
     return (
       <Router>
         <Layout style={{minHeight: '100vh'}}>
-          <NavBar collapsed={collapsed} onCollapse={this.onCollapse}/>
+          <NavBar collapsed={collapsed} onCollapse={this.onCollapse} isHeatmapAvailable={this.state.isHeatmapAvailable}/>
           <Layout className={layoutClass}>
             <Header>
               <div style={{margin: '16px 0'}}>
@@ -65,9 +101,12 @@ class App extends React.Component<Record<string, object>, IAppState> {
                   <Redirect to='/Overview'/>
                 </Route>
                 {
+                  isHeatmapAvailable ?
                   routes.map(
                     (route, index) => <MakeRouteWithSubRoutes key={index} {...route}/>
-                  )
+                  ) :
+                  routes.filter(route => route.path !== '/Heatmap').map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route}/>)
                 }
               </Switch>
             </Content>
