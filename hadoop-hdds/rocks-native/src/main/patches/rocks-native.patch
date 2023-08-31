@@ -272,7 +272,7 @@ index 7be876390..768c5b1e2 100644
  
  }  // namespace ROCKSDB_NAMESPACE
 diff --git a/tools/sst_dump_tool.cc b/tools/sst_dump_tool.cc
-index 7053366e7..47296cf8d 100644
+index 7053366e7..8f248ddf3 100644
 --- a/tools/sst_dump_tool.cc
 +++ b/tools/sst_dump_tool.cc
 @@ -31,7 +31,7 @@ static const std::vector<std::pair<CompressionType, const char*>>
@@ -315,8 +315,8 @@ index 7053366e7..47296cf8d 100644
 -  std::string from_key;
 -  std::string to_key;
 +  bool silent = false;
-+  Slice* from_key;
-+  Slice* to_key;
++  Slice* from_key = nullptr;
++  Slice* to_key = nullptr;
    std::string block_size_str;
    std::string compression_level_from_str;
    std::string compression_level_to_str;

@@ -255,7 +255,7 @@ class TestManagedSSTDumpIterator {
     Future future = Mockito.mock(Future.class);
     Mockito.when(future.isDone()).thenReturn(false);
     Mockito.when(future.get()).thenReturn(0);
-    Mockito.when(tool.run(Matchers.any(String[].class),
+    Mockito.when(tool.run(Matchers.any(Map.class),
             Matchers.any(ManagedOptions.class)))
         .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
             byteArrayInputStream));
