@@ -139,7 +139,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
 
     assertTrue(handler.handle(request));
     assertEquals(1, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
     ArgumentCaptor<Integer> replicaIndexCaptor =
         ArgumentCaptor.forClass(Integer.class);

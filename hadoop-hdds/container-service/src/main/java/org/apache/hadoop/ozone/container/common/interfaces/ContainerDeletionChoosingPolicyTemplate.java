@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.container.common.interfaces;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService.ContainerBlockInfo;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,10 +49,10 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
 
     int originalBlockCount = blockCount;
     List<ContainerBlockInfo> result = new ArrayList<>();
-    List<KeyValueContainerData> orderedList = new LinkedList<>();
+    List<ContainerData> orderedList = new LinkedList<>();
 
     for (ContainerData entry: candidateContainers.values()) {
-      orderedList.add((KeyValueContainerData) entry);
+      orderedList.add(entry);
     }
 
     orderByDescendingPriority(orderedList);
@@ -64,16 +64,18 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
     // container but with container we also return an integer so that total
     // blocks don't exceed the number of blocks to be deleted in an interval.
 
-    for (KeyValueContainerData entry : orderedList) {
-      if (entry.getNumPendingDeletionBlocks() > 0) {
-        long numBlocksToDelete = Math.min(blockCount,
-            entry.getNumPendingDeletionBlocks());
+    for (ContainerData entry : orderedList) {
+      long pendingDeletionBlocks =
+          ContainerUtils.getPendingDeletionBlocks(entry);
+
+      if (pendingDeletionBlocks > 0) {
+        long numBlocksToDelete = Math.min(blockCount, pendingDeletionBlocks);
         blockCount -= numBlocksToDelete;
         result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
         if (LOG.isDebugEnabled()) {
           LOG.debug("Select container {} for block deletion, "
               + "pending deletion blocks num: {}.", entry.getContainerID(),
-              entry.getNumPendingDeletionBlocks());
+              pendingDeletionBlocks);
         }
         if (blockCount == 0) {
           break;
@@ -92,5 +94,5 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
    * @param candidateContainers candidate containers to be ordered
    */
   protected abstract void orderByDescendingPriority(
-      List<KeyValueContainerData> candidateContainers);
+      List<ContainerData> candidateContainers);
 }
