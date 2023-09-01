@@ -433,7 +433,7 @@ public final class ContainerBalancerConfiguration {
         iterations,
         "Time Limit for Single Container's Movement",
         Duration.ofMillis(moveTimeout).toMinutes(),
-        "Time Limit for Container Replication's Move",
+        "Time Limit for Single Container's Replication",
         Duration.ofMillis(moveReplicationTimeout).toMinutes(),
         "Interval between each Iteration",
         Duration.ofMillis(balancingInterval).toMinutes(),
