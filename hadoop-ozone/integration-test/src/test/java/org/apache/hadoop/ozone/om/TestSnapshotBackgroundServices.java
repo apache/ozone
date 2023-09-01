@@ -466,8 +466,9 @@ public class TestSnapshotBackgroundServices {
         .substring(0, lastIndex);
     File compactionLogsDir = new File(compactionLogsPath);
     Assertions.assertNotNull(compactionLogsDir);
-    int numberOfLogFiles = Objects.requireNonNull(
-        compactionLogsDir.listFiles()).length;
+    File[] files = compactionLogsDir.listFiles();
+    Assertions.assertNotNull(files);
+    int numberOfLogFiles = files.length;
     long contentLength;
     Path currentCompactionLog = Paths.get(currentCompactionLogPath);
     try (BufferedReader bufferedReader =
@@ -508,8 +509,9 @@ public class TestSnapshotBackgroundServices {
     createSnapshotsEachWithNewKeys(newLeaderOM);
 
     File sstBackupDir = getSstBackupDir(newLeaderOM);
-    int numberOfSstFiles =
-        Objects.requireNonNull(sstBackupDir.listFiles()).length;
+    File[] files = sstBackupDir.listFiles();
+    Assertions.assertNotNull(files);
+    int numberOfSstFiles = files.length;
 
     resumeBackupCompactionFilesPruning(newLeaderOM);
 
@@ -601,8 +603,9 @@ public class TestSnapshotBackgroundServices {
     ozoneManager.getMetadataManager()
         .getStore()
         .compactDB();
-    int newNumberOfLogFiles = Objects.requireNonNull(
-        compactionLogsDir.listFiles()).length;
+    File[] files = compactionLogsDir.listFiles();
+    Assertions.assertNotNull(files);
+    int newNumberOfLogFiles = files.length;
     long newContentLength;
     try (BufferedReader bufferedReader =
              Files.newBufferedReader(currentCompactionLog)) {
