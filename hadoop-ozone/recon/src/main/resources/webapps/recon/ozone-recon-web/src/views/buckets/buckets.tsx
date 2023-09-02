@@ -33,6 +33,7 @@ import {AclPanel} from '../../components/aclDrawer/aclDrawer';
 import {ColumnProps} from 'antd/es/table';
 import QuotaBar from '../../components/quotaBar/quotaBar';
 import {AxiosGetHelper} from "../../utils/axiosRequestHelper";
+import CreatableSelect from "react-select/creatable";
 
 interface IBucketResponse {
   volumeName: string;
@@ -321,11 +322,25 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
   };
 
   _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const limit = (selected as IOption)
+    const selectedLimit = (selected as IOption)
     this.setState({
-      selectedLimit: limit
-    })
-    this._loadData()
+      selectedLimit
+    }, this._loadData)
+  }
+
+  _onCreateOption = (created: string) => {
+    // Check that it's a numeric and non-negative
+    if (parseInt(created)) {
+      const createdOption: IOption = {
+        label: created,
+        value: created
+      }
+      this.setState({
+        selectedLimit: createdOption
+      }, this._loadData);
+    } else {
+      console.log('Not a valid option')
+    }
   }
 
   _handleVolumeChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
@@ -516,16 +531,24 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
             /> Columns
           </div>
           <div className='limit-block'>
-            <MultiSelect
-                allowSelectAll={false}
-                isMulti={false}
-                maxShowValues={LIMIT_OPTIONS.length}
+            <CreatableSelect
                 className='multi-select-container'
+                isClearable={false}
+                isDisabled={loading}
+                isLoading={loading}
+                onChange={this._handleLimitChange}
+                onCreateOption={this._onCreateOption}
+                isValidNewOption={(input, value, _option) => {
+                  // Only number will be accepted
+                  return !isNaN(parseInt(input))
+                }}
                 options={LIMIT_OPTIONS}
-                closeMenuOnSelect={true}
                 hideSelectedOptions={false}
                 value={selectedLimit}
-                onChange={this._handleLimitChange}
+                createOptionPosition='last'
+                formatCreateLabel={(input) => {
+                  return `new limit... ${input}`
+                }}
             /> Limit
           </div>
           <AutoReloadPanel

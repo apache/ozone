@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, {useState} from 'react';
 import axios from 'axios';
 import {Table} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
@@ -243,11 +243,11 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   };
 
   _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const limit = (selected as IOption)
+    const selectedLimit = (selected as IOption)
     this.setState({
-      selectedLimit: limit
-    });
-    this._loadData()
+      // ...this.state,
+      selectedLimit
+    }, this._loadData);
   }
 
   _onCreateOption = (created: string) => {
@@ -259,8 +259,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       }
       this.setState({
         selectedLimit: createdOption
-      });
-      this._loadData()
+      }, this._loadData);
     } else {
       console.log('Not a valid option')
     }
