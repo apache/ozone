@@ -812,7 +812,7 @@ public class TestOzoneFileSystem {
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
       for (FileStatus fileStatus : fileStatuses) {
-        LOG.error("Unexpected file, should be been deleted: {}", fileStatus);
+        LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
       }
       Assert.assertEquals(
           "Delete root failed!", 0, fileStatuses.length);
