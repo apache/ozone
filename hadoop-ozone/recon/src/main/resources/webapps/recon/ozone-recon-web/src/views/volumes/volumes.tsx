@@ -245,7 +245,6 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
   _handleLimitChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
     const selectedLimit = (selected as IOption)
     this.setState({
-      // ...this.state,
       selectedLimit
     }, this._loadData);
   }
