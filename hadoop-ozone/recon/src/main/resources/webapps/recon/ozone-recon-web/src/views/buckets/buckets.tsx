@@ -32,6 +32,7 @@ import {BucketLayout, BucketLayoutTypeList, BucketStorage, BucketStorageTypeList
 import {AclPanel} from '../../components/aclDrawer/aclDrawer';
 import {ColumnProps} from 'antd/es/table';
 import QuotaBar from '../../components/quotaBar/quotaBar';
+import {AxiosGetHelper} from "../../utils/axiosRequestHelper";
 
 interface IBucketResponse {
   volumeName: string;
@@ -247,6 +248,8 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+let cancelSignal: AbortController;
+
 export class Buckets extends React.Component<Record<string, object>, IBucketsState> {
   autoReload: AutoReloadHelper;
 
@@ -372,11 +375,11 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
       showPanel: false
     }));
-    axios.get('/api/v1/om/buckets', {
-      params: {
-        limit: this.state.selectedLimit.value
-      },
-    }).then(response => {
+
+    const { request, controller} = AxiosGetHelper('/api/v1/om/buckets', cancelSignal,
+        "", { limit: this.state.selectedLimit.value});
+    cancelSignal = controller;
+    request.then(response => {
       const bucketsResponse: IBucketsResponse = response.data;
       const totalCount = bucketsResponse.totalCount;
       const buckets: IBucketResponse[] = bucketsResponse.buckets;
@@ -464,6 +467,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelSignal && cancelSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

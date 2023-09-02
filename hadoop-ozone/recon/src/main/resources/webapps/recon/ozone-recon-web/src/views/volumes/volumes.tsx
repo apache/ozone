@@ -34,6 +34,7 @@ import {ColumnProps} from 'antd/es/table';
 import QuotaBar from '../../components/quotaBar/quotaBar';
 import {Link} from 'react-router-dom';
 import CreatableSelect from 'react-select/creatable';
+import {AxiosGetHelper} from "../../utils/axiosRequestHelper";
 
 interface IVolumeResponse {
   volume: string;
@@ -174,6 +175,8 @@ const LIMIT_OPTIONS: IOption[] = [
 
 const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
 
+let cancelSignal: AbortController;
+
 export class Volumes extends React.Component<Record<string, object>, IVolumesState> {
   autoReload: AutoReloadHelper;
 
@@ -284,11 +287,10 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
       showPanel: false
     }));
-    axios.get('/api/v1/om/volumes', {
-      params: {
-        limit: this.state.selectedLimit.value
-      },
-    }).then(response => {
+    const { request, controller } = AxiosGetHelper('/api/v1/om/volumes', cancelSignal,
+        "", { limit: this.state.selectedLimit.value});
+    cancelSignal = controller;
+    request.then(response => {
       const volumesResponse: IVolumesResponse = response.data;
       const totalCount = volumesResponse.totalCount;
       const volumes: IVolumeResponse[] = volumesResponse.volumes;
@@ -330,6 +332,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelSignal && cancelSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -364,32 +367,24 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
           </div>
           <div className='limit-block'>
             <CreatableSelect
-                className={'limit-block'}
+                className='multi-select-container'
                 isClearable={false}
                 isDisabled={loading}
                 isLoading={loading}
                 onChange={this._handleLimitChange}
                 onCreateOption={this._onCreateOption}
                 isValidNewOption={(input, value, _option) => {
-                  return parseInt(input)
+                  // Only number will be accepted
+                  return !isNaN(parseInt(input))
                 }}
                 options={LIMIT_OPTIONS}
+                hideSelectedOptions={false}
                 value={selectedLimit}
+                createOptionPosition='last'
                 formatCreateLabel={(input) => {
-                  return `New limit... ${input}`
+                  return `new limit... ${input}`
                 }}
             /> Limit
-            {/*<MultiSelect*/}
-            {/*    allowSelectAll={false}*/}
-            {/*    isMulti={false}*/}
-            {/*    maxShowValues={LIMIT_OPTIONS.length}*/}
-            {/*    className='multi-select-container'*/}
-            {/*    options={LIMIT_OPTIONS}*/}
-            {/*    closeMenuOnSelect={true}*/}
-            {/*    hideSelectedOptions={false}*/}
-            {/*    value={selectedLimit}*/}
-            {/*    onChange={this._handleLimitChange}*/}
-            {/*/> Limit*/}
           </div>
           <AutoReloadPanel
             isLoading={loading}
