@@ -388,7 +388,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
           </div>
           <AutoReloadPanel
             isLoading={loading}
-            lastUpdated={lastUpdated}
+            lastRefreshed={lastUpdated}
             togglePolling={this.autoReload.handleAutoReloadToggle}
             onReload={this._loadData}
           />

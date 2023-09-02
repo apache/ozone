@@ -26,7 +26,7 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
-import {nullAwareLocalCompare, showDataFetchError} from 'utils/common';
+import {nullAwareLocaleCompare, showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
 import {BucketLayout, BucketLayoutTypeList, BucketStorage, BucketStorageTypeList, IAcl, IBucket} from 'types/om.types';
 import {AclPanel} from '../../components/aclDrawer/aclDrawer';
@@ -138,7 +138,7 @@ const COLUMNS: BucketTableColumn[] = [
     dataIndex: 'owner',
     key: 'owner',
     isVisible: true,
-    sorter: (a: IBucket, b: IBucket) => nullAwareLocalCompare(a.owner, b.owner)
+    sorter: (a: IBucket, b: IBucket) => nullAwareLocaleCompare(a.owner, b.owner)
   },
   {
     title: 'Versioning',
@@ -530,7 +530,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
           </div>
           <AutoReloadPanel
             isLoading={loading}
-            lastUpdated={lastUpdated}
+            lastRefreshed={lastUpdated}
             togglePolling={this.autoReload.handleAutoReloadToggle}
             onReload={this._loadData}
           />

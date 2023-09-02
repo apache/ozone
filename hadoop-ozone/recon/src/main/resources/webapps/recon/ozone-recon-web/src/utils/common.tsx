@@ -52,7 +52,7 @@ export const byteToSize = (bytes: number, decimals: number) => {
   return  isNaN(i) ? `Not Defined`:`${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
 };
 
-export const nullAwareLocalCompare = (a: string, b: string) => {
+export const nullAwareLocaleCompare = (a: string, b: string) => {
   if (!a && !b) {
     return 0;
   }
