@@ -41,6 +41,7 @@ public final class ReconConstants {
   public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String DEFAULT_BATCH_NUMBER = "1";
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
+  public static final String RECON_QUERY_STARTKEY = "startKey";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";

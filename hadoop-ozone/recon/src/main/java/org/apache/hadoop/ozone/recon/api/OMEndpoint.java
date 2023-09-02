@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_STARTKEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 
 /**
@@ -74,10 +74,10 @@ public class OMEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT)
       @QueryParam(RECON_QUERY_LIMIT) int limit,
       @DefaultValue(StringUtils.EMPTY)
-      @QueryParam(RECON_QUERY_PREVKEY) String prevKey
+      @QueryParam(RECON_QUERY_STARTKEY) String startKey
   ) throws IOException {
     List<OmVolumeArgs> volumes = omMetadataManager.listVolumes(
-        prevKey, limit);
+        startKey, limit);
     List<VolumeMetadata> volumeMetadata = volumes.stream()
         .map(this::toVolumeMetadata).collect(Collectors.toList());
     VolumesResponse volumesResponse =
@@ -92,10 +92,10 @@ public class OMEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT)
       @QueryParam(RECON_QUERY_LIMIT) int limit,
       @DefaultValue(StringUtils.EMPTY)
-      @QueryParam(RECON_QUERY_PREVKEY) String prevKey
+      @QueryParam(RECON_QUERY_STARTKEY) String startKey
   ) throws IOException {
     List<OmBucketInfo> buckets = omMetadataManager.listBucketsUnderVolume(
-        volume, prevKey, limit);
+        volume, startKey, limit);
     List<BucketMetadata> bucketMetadata = buckets
         .stream().map(this::toBucketMetadata).collect(Collectors.toList());
     BucketsResponse bucketsResponse =
