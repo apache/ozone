@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.time.Instant;
 import java.util.List;
 
 /**
@@ -100,11 +99,11 @@ public final class BucketMetadata {
     return storageType;
   }
 
-  public Instant getCreationTime() {
+  public long getCreationTime() {
     return creationTime;
   }
 
-  public Instant getModificationTime() {
+  public long getModificationTime() {
     return modificationTime;
   }
 
