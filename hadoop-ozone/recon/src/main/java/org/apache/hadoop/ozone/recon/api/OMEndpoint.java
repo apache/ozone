@@ -40,7 +40,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -120,9 +119,8 @@ public class OMEndpoint {
     return builder.withVolume(omVolumeArgs.getVolume())
         .withOwner(omVolumeArgs.getOwnerName())
         .withAdmin(omVolumeArgs.getAdminName())
-        .withCreationTime(Instant.ofEpochMilli(omVolumeArgs.getCreationTime()))
-        .withModificationTime(
-            Instant.ofEpochMilli(omVolumeArgs.getModificationTime()))
+        .withCreationTime(omVolumeArgs.getCreationTime())
+        .withModificationTime(omVolumeArgs.getModificationTime())
         .withQuotaInBytes(omVolumeArgs.getQuotaInBytes())
         .withQuotaInNamespace(
             omVolumeArgs.getQuotaInNamespace())
@@ -165,10 +163,8 @@ public class OMEndpoint {
         .withAcls(acls)
         .withVersionEnabled(omBucketInfo.getIsVersionEnabled())
         .withStorageType(omBucketInfo.getStorageType().toString().toUpperCase())
-        .withCreationTime(
-            Instant.ofEpochMilli(omBucketInfo.getCreationTime()))
-        .withModificationTime(
-            Instant.ofEpochMilli(omBucketInfo.getModificationTime()))
+        .withCreationTime(omBucketInfo.getCreationTime())
+        .withModificationTime(omBucketInfo.getModificationTime())
         .withUsedBytes(omBucketInfo.getUsedBytes())
         .withUsedNamespace(omBucketInfo.getUsedNamespace())
         .withQuotaInBytes(omBucketInfo.getQuotaInBytes())

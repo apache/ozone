@@ -39,8 +39,8 @@ interface IBucketResponse {
   isVersionEnabled: boolean;
   storageType: string;
   bucketLayout: string;
-  creationTime: string;
-  modificationTime: string;
+  creationTime: number;
+  modificationTime: number;
   sourceVolume: string;
   sourceBucket: string;
   usedBytes: number;
@@ -173,8 +173,9 @@ const COLUMNS: BucketTableColumn[] = [
     dataIndex: 'creationTime',
     key: 'creationTime',
     isVisible: true,
-    render: (creationTime: string) => {
-      return creationTime && creationTime.length > 0 ? moment(creationTime).format('ll LTS') : 'NA';
+    sorter: (a: IBucket, b: IBucket) => a.creationTime - b.creationTime,
+    render: (creationTime: number) => {
+      return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -182,8 +183,9 @@ const COLUMNS: BucketTableColumn[] = [
     dataIndex: 'modificationTime',
     key: 'modificationTime',
     isVisible: true,
-    render: (modificationTime: string) => {
-      return modificationTime && modificationTime.length > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
+    sorter: (a: IBucket, b: IBucket) => a.modificationTime - b.modificationTime,
+    render: (modificationTime: number) => {
+      return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
     }
   },
   {

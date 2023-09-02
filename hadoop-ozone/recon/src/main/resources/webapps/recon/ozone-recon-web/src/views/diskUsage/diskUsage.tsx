@@ -576,7 +576,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                             "x": 1.2,
                             "xanchor": "right"
                           },
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
                         }
                       }
                       onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>

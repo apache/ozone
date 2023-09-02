@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
 import java.util.List;
 
@@ -38,12 +37,10 @@ public final class VolumeMetadata {
   private String owner;
   @XmlElement(name = "admin")
   private String admin;
-  @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "creationTime")
-  private Instant creationTime;
-  @XmlJavaTypeAdapter(IsoDateAdapter.class)
+  private long creationTime;
   @XmlElement(name = "modificationTime")
-  private Instant modificationTime;
+  private long modificationTime;
   @XmlElement(name = "quotaInBytes")
   private long quotaInBytes;
   @XmlElement(name = "quotaInNamespace")
@@ -118,8 +115,8 @@ public final class VolumeMetadata {
     private String volume;
     private String owner;
     private String admin;
-    private Instant creationTime;
-    private Instant modificationTime;
+    private long creationTime;
+    private long modificationTime;
     private long quotaInBytes;
     private long quotaInNamespace;
     private long usedNamespace;
@@ -144,12 +141,12 @@ public final class VolumeMetadata {
       return this;
     }
 
-    public Builder withCreationTime(Instant creationTime) {
+    public Builder withCreationTime(long creationTime) {
       this.creationTime = creationTime;
       return this;
     }
 
-    public Builder withModificationTime(Instant modificationTime) {
+    public Builder withModificationTime(long modificationTime) {
       this.modificationTime = modificationTime;
       return this;
     }

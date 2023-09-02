@@ -39,8 +39,8 @@ interface IVolumeResponse {
   volume: string;
   owner: string;
   admin: string;
-  creationTime: string;
-  modificationTime: string;
+  creationTime: number;
+  modificationTime: number;
   quotaInBytes: number;
   quotaInNamespace: number;
   usedNamespace: number;
@@ -98,8 +98,9 @@ const COLUMNS: VolumnTableColumn[] = [
     dataIndex: 'creationTime',
     key: 'creationTime',
     isVisible: true,
-    render: (creationTime: string) => {
-      return creationTime && creationTime.length > 0 ? moment(creationTime).format('ll LTS') : 'NA';
+    sorter: (a: IVolume, b: IVolume) => a.creationTime - b.creationTime,
+    render: (creationTime: number) => {
+      return creationTime > 0 ? moment(creationTime).format('ll LTS') : 'NA';
     }
   },
   {
@@ -107,8 +108,9 @@ const COLUMNS: VolumnTableColumn[] = [
     dataIndex: 'modificationTime',
     key: 'modificationTime',
     isVisible: true,
-    render: (modificationTime: string) => {
-      return modificationTime && modificationTime.length > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
+    sorter: (a: IVolume, b: IVolume) => a.modificationTime - b.modificationTime,
+    render: (modificationTime: number) => {
+      return modificationTime  > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
     }
   },
   {

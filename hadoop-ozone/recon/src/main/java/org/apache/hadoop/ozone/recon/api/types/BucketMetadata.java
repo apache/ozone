@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
 import java.util.List;
 
@@ -42,12 +41,10 @@ public final class BucketMetadata {
   private boolean isVersionEnabled;
   @XmlElement(name = "storageType")
   private String storageType;
-  @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "creationTime")
-  private Instant creationTime;
-  @XmlJavaTypeAdapter(IsoDateAdapter.class)
+  private long creationTime;
   @XmlElement(name = "modificationTime")
-  private Instant modificationTime;
+  private long modificationTime;
   @XmlElement(name = "sourceVolume")
   private String sourceVolume;
   @XmlElement(name = "sourceBucket")
@@ -162,8 +159,8 @@ public final class BucketMetadata {
     private List<AclMetadata> acls;
     private boolean isVersionEnabled;
     private String storageType;
-    private Instant creationTime;
-    private Instant modificationTime;
+    private long creationTime;
+    private long modificationTime;
     private String sourceVolume;
     private String sourceBucket;
     private long usedBytes;
@@ -202,12 +199,12 @@ public final class BucketMetadata {
       return this;
     }
 
-    public Builder withCreationTime(Instant creationTime) {
+    public Builder withCreationTime(long creationTime) {
       this.creationTime = creationTime;
       return this;
     }
 
-    public Builder withModificationTime(Instant modificationTime) {
+    public Builder withModificationTime(long modificationTime) {
       this.modificationTime = modificationTime;
       return this;
     }

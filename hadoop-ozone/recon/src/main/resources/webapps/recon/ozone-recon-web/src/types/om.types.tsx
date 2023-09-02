@@ -27,8 +27,8 @@ export interface IVolume {
   volume: string;
   owner: string;
   admin: string;
-  creationTime: string;
-  modificationTime: string;
+  creationTime: number;
+  modificationTime: number;
   quotaInBytes: number;
   quotaInNamespace: number;
   usedNamespace: number;
@@ -40,8 +40,8 @@ export interface IBucket {
   bucketName: string;
   isVersionEnabled: boolean;
   storageType: BucketStorage;
-  creationTime: string;
-  modificationTime: string;
+  creationTime: number;
+  modificationTime: number;
   sourceVolume?: string;
   sourceBucket?: string;
   usedBytes: number;
