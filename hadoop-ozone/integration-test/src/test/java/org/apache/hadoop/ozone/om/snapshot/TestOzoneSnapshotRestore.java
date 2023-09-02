@@ -56,6 +56,7 @@ import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
@@ -75,6 +76,7 @@ public class TestOzoneSnapshotRestore {
   private OzoneManager leaderOzoneManager;
   private OzoneConfiguration clientConf;
   private OzoneClient client;
+  private static AtomicInteger counter;
 
   private static Stream<Arguments> bucketTypes() {
     return Stream.of(
@@ -88,6 +90,10 @@ public class TestOzoneSnapshotRestore {
             arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, BucketLayout.LEGACY),
             arguments(BucketLayout.LEGACY, BucketLayout.FILE_SYSTEM_OPTIMIZED)
     );
+  }
+
+  static {
+    counter = new AtomicInteger();
   }
 
   @BeforeEach
@@ -121,7 +127,6 @@ public class TestOzoneSnapshotRestore {
 
     KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
             .getInternalState(leaderOzoneManager, "keyManager");
-
     // stop the deletion services so that keys can still be read
     keyManager.stop();
     OMStorage.getOmDbDir(leaderConfig);
@@ -152,9 +157,9 @@ public class TestOzoneSnapshotRestore {
     }
   }
 
-  private String createSnapshot(String volName, String buckName)
+  private String createSnapshot(String volName, String buckName,
+                                String snapshotName)
           throws IOException, InterruptedException, TimeoutException {
-    String snapshotName = UUID.randomUUID().toString();
     store.createSnapshot(volName, buckName, snapshotName);
     String snapshotKeyPrefix = OmSnapshotManager
             .getSnapshotPrefix(snapshotName);
@@ -199,8 +204,9 @@ public class TestOzoneSnapshotRestore {
   @MethodSource("bucketTypes")
   public void testRestoreSnapshot(BucketLayout bucketLayoutTest)
           throws Exception {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buc-" + counter.incrementAndGet();
+    String snapshotName = "snap-" + counter.incrementAndGet();
     String keyPrefix = "key-";
 
     store.createVolume(volume);
@@ -214,7 +220,7 @@ public class TestOzoneSnapshotRestore {
       createFileKey(buck, keyPrefix + i);
     }
 
-    String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
     Assertions.assertEquals(5, volBucketKeyCount);
@@ -232,17 +238,18 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix));
+    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix, 5));
   }
 
   @ParameterizedTest
   @MethodSource("bucketTypes")
   public void testRestoreSnapshotDifferentBucket(BucketLayout bucketLayoutTest)
           throws Exception {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
-    String bucket2 = "buc-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buc-" + counter.incrementAndGet();
+    String bucket2 = "buc-" + counter.incrementAndGet();
     String keyPrefix = "key-";
+    String snapshotName = "snap-" + counter.incrementAndGet();
 
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
@@ -257,7 +264,7 @@ public class TestOzoneSnapshotRestore {
       createFileKey(buck, keyPrefix + i);
     }
 
-    String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
     Assertions.assertEquals(5, volBucketKeyCount);
@@ -286,7 +293,7 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix, 5));
   }
 
   @ParameterizedTest
@@ -294,10 +301,11 @@ public class TestOzoneSnapshotRestore {
   public void testRestoreSnapshotDifferentBucketLayout(
           BucketLayout bucketLayoutSource, BucketLayout bucketLayoutDest)
           throws Exception {
-    String volume = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucket = "buc-" + RandomStringUtils.randomNumeric(5);
-    String bucket2 = "buc-" + RandomStringUtils.randomNumeric(5);
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buc-" + counter.incrementAndGet();
+    String bucket2 = "buc-" + counter.incrementAndGet();
     String keyPrefix = "key-";
+    String snapshotName = "snap-" + counter.incrementAndGet();
 
     store.createVolume(volume);
     OzoneVolume vol = store.getVolume(volume);
@@ -315,7 +323,7 @@ public class TestOzoneSnapshotRestore {
       createFileKey(buck, keyPrefix + i);
     }
 
-    String snapshotKeyPrefix = createSnapshot(volume, bucket);
+    String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
     int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
     Assertions.assertEquals(5, volBucketKeyCount);
@@ -329,17 +337,65 @@ public class TestOzoneSnapshotRestore {
       keyCopy(sourcePath + keyPrefix + i, destPath);
     }
 
-    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix));
+    assertDoesNotThrow(() -> waitForKeyCount(buck2, keyPrefix, 5));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketTypes")
+  public void testUnorderedDeletion(BucketLayout bucketLayoutTest)
+          throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume vol = store.getVolume(volume);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+            .setBucketLayout(bucketLayoutTest).build();
+    vol.createBucket(bucket, bucketArgs);
+    OzoneBucket buck = vol.getBucket(bucket);
+    // Create Key1 and take snapshot
+
+    String[] key = new String[10];
+    String[] snapshotName = new String[10];
+    String[] snapshotKeyPrefix = new String[10];
+
+    // create 10 incremental snapshots
+    for (int i = 0; i < 10; i++) {
+      key[i] = "key-" + counter.incrementAndGet();
+      snapshotName[i] = "snap-" + counter.incrementAndGet();
+      createFileKey(buck, key[i]);
+      snapshotKeyPrefix[i] = createSnapshot(volume, bucket, snapshotName[i]);
+    }
+
+    // delete multiple snapshots - 2nd, 5th , 8th
+    for (int i = 2; i < 10; i += 3) {
+      store.deleteSnapshot(volume, bucket, snapshotName[i]);
+    }
+
+    // delete all keys in bucket before restoring from snapshot
+    deleteKeys(buck);
+    int keyCountAfterDelete = keyCount(buck, "key-");
+    Assertions.assertEquals(0, keyCountAfterDelete);
+
+    String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
+            + OM_KEY_PREFIX + snapshotKeyPrefix[9];
+    String destPath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
+            + OM_KEY_PREFIX;
+
+    for (int i = 0; i < 10; i++) {
+      keyCopy(sourcePath + key[i], destPath);
+    }
+
+    assertDoesNotThrow(() -> waitForKeyCount(buck, "key-", 10));
   }
 
   /**
    * Waits for key count to be equal to expected number of keys.
    */
-  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix)
+  private void waitForKeyCount(OzoneBucket bucket, String keyPrefix, int count)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       try {
-        return 5 == keyCount(bucket, keyPrefix);
+        return count == keyCount(bucket, keyPrefix);
       } catch (IOException e) {
         return false;
       }

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -226,6 +227,37 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
             ozoneManagerDoubleBufferHelper);
     Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheQuotaSetWhenLinkBucket()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String linkBucketName = "link" + bucketName;
+
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    OMRequestTestUtils.addBucketToDB(
+        volumeName, bucketName, omMetadataManager, 1 * GB);
+    OmBucketInfo.Builder link = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(linkBucketName)
+        .setSourceVolume(volumeName)
+        .setSourceBucket(bucketName);
+    OMRequestTestUtils.addBucketToDB(omMetadataManager, link);
+    
+    OMRequest originalRequest =
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
+            5 * GB, 100L);
+
+    OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
+        new OMVolumeSetQuotaRequest(originalRequest);
+
+    OMClientResponse omClientResponse = omVolumeSetQuotaRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.OK);
   }
 
   @Test

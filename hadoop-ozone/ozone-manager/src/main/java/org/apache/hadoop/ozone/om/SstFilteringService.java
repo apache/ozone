@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -114,6 +116,17 @@ public class SstFilteringService extends BackgroundService
     super.start();
   }
 
+  @VisibleForTesting
+  public void pause() {
+    running.set(false);
+  }
+
+  @VisibleForTesting
+  public void resume() {
+    running.set(true);
+  }
+
+
   private class SstFilteringTask implements BackgroundTask {
 
 
@@ -167,38 +180,58 @@ public class SstFilteringService extends BackgroundService
         long snapshotLimit = snapshotLimitPerTask;
 
         while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
-          Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-          String snapShotTableKey = keyValue.getKey();
-          SnapshotInfo snapshotInfo = keyValue.getValue();
+          try {
+            Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
+            String snapShotTableKey = keyValue.getKey();
+            SnapshotInfo snapshotInfo = keyValue.getValue();
 
-          if (snapshotInfo.isSstFiltered()) {
-            continue;
-          }
-
-          LOG.debug("Processing snapshot {} to filter relevant SST Files",
-              snapShotTableKey);
-
-          List<Pair<String, String>> prefixPairs =
-              constructPrefixPairs(snapshotInfo);
-
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                   snapshotMetadataReader = snapshotCache.get()
-              .get(snapshotInfo.getTableKey())) {
-            OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
-            RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
-                .getStore();
-            RocksDatabase db = rdbStore.getDb();
-            try (BootstrapStateHandler.Lock lock =
-                getBootstrapStateLock().lock()) {
-              db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+            if (snapshotInfo.isSstFiltered()) {
+              continue;
             }
+
+            LOG.debug("Processing snapshot {} to filter relevant SST Files",
+                snapShotTableKey);
+
+            List<Pair<String, String>> prefixPairs = constructPrefixPairs(
+                snapshotInfo);
+
+            try (
+                ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                    snapshotMetadataReader = snapshotCache.get().get(
+                        snapshotInfo.getTableKey())) {
+              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+              RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
+                  .getStore();
+              RocksDatabase db = rdbStore.getDb();
+              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
+                  .lock()) {
+                db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+              }
+            } catch (OMException ome) {
+              // FILE_NOT_FOUND is obtained when the snapshot is deleted
+              // In this case, get the snapshotInfo from the db, check if
+              // it is deleted and if deleted mark it as sstFiltered.
+              if (ome.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+                SnapshotInfo snapshotInfoToCheck =
+                    ozoneManager.getMetadataManager().getSnapshotInfoTable()
+                        .get(snapShotTableKey);
+                if (snapshotInfoToCheck.getSnapshotStatus() ==
+                    SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+                  LOG.info("Snapshot with name: '{}', id: '{}' has been " +
+                          "deleted.", snapshotInfo.getName(), snapshotInfo
+                      .getSnapshotId());
+                }
+              }
+            }
+            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName(), snapshotInfo.getName());
+            snapshotLimit--;
+            snapshotFilteredCount.getAndIncrement();
+          } catch (RocksDBException | IOException e) {
+            LOG.error("Exception encountered while filtering a snapshot", e);
           }
-          markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
-              snapshotInfo.getBucketName(), snapshotInfo.getName());
-          snapshotLimit--;
-          snapshotFilteredCount.getAndIncrement();
         }
-      } catch (RocksDBException | IOException e) {
+      } catch (IOException e) {
         LOG.error("Error during Snapshot sst filtering ", e);
       }
 

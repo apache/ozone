@@ -35,6 +35,9 @@ const showErrorNotification = (title: string, description: string) => {
 
 export const showDataFetchError = (error: string) => {
   const title = 'Error while fetching data';
+  if (error.includes("CanceledError")){
+    error = "Previous request cancelled because context changed"
+  }
   showErrorNotification(title, error);
 };
 

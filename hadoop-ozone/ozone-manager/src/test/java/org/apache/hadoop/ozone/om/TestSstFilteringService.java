@@ -73,6 +73,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test SST Filtering Service.
  */
 public class TestSstFilteringService {
+  public static final String SST_FILE_EXTENSION = ".sst";
   @TempDir
   private File folder;
   private OzoneManagerProtocol writeClient;
@@ -249,6 +250,76 @@ public class TestSstFilteringService {
     Set<String> keysFromSnapshot2 =
         getKeysFromSnapshot(volumeName, bucketName2, snapshotName2);
     assertEquals(keysFromActiveDb2, keysFromSnapshot2);
+  }
+
+  @Test
+  public void testActiveAndDeletedSnapshotCleanup() throws IOException {
+    RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
+    String volumeName = "volume1";
+    List<String> bucketNames = Arrays.asList("bucket1", "bucket2");
+
+    // Create 2 Buckets
+    for (String bucketName : bucketNames) {
+      createVolumeAndBucket(volumeName, bucketName);
+    }
+    // Write 25 keys in each bucket, 2 sst files would be generated each for
+    // keys in a single bucket
+    int keyCount = 25;
+    for (int bucketIdx = 0; bucketIdx < bucketNames.size(); bucketIdx++) {
+      for (int i = 1; i <= keyCount; i++) {
+        createKey(writeClient, volumeName, bucketNames.get(bucketIdx),
+            "key" + i);
+      }
+      activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+      activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+    }
+
+    SstFilteringService sstFilteringService =
+        keyManager.getSnapshotSstFilteringService();
+    sstFilteringService.pause();
+
+    writeClient.createSnapshot(volumeName, bucketNames.get(0), "snap1");
+    writeClient.createSnapshot(volumeName, bucketNames.get(0), "snap2");
+
+    SnapshotInfo snapshot1Info = om.getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap1"));
+    File snapshot1Dir =
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot1Info));
+    SnapshotInfo snapshot2Info = om.getMetadataManager().getSnapshotInfoTable()
+        .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap2"));
+    File snapshot2Dir =
+        new File(OmSnapshotManager.getSnapshotPath(conf, snapshot2Info));
+
+    File snap1Current = new File(snapshot1Dir, "CURRENT");
+    File snap2Current = new File(snapshot2Dir, "CURRENT");
+
+    // wait till both checkpoints are created
+    with().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofSeconds(1))
+        .await().until(() -> snap1Current.exists() && snap2Current.exists());
+
+    long snap1SstFileCountBeforeFilter = Arrays.stream(snapshot1Dir.listFiles())
+        .filter(f -> f.getName().endsWith(".sst")).count();
+    long snap2SstFileCountBeforeFilter = Arrays.stream(snapshot2Dir.listFiles())
+        .filter(f -> f.getName().endsWith(".sst")).count();
+
+    // delete snap1
+    writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
+    sstFilteringService.resume();
+    // Filtering service will only act on snap2 as it is an active snaphot
+    with().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofSeconds(1))
+        .await()
+        .until(() -> sstFilteringService.getSnapshotFilteredCount().get() >= 2);
+    long snap1SstFileCountAfterFilter = Arrays.stream(snapshot1Dir.listFiles())
+        .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
+    long snap2SstFileCountAfterFilter = Arrays.stream(snapshot2Dir.listFiles())
+        .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
+    // one sst will be filtered in both active but not in  deleted snapshot
+    // as sstFiltering svc won't run on already deleted snapshots but will mark
+    // it as filtered.
+    assertEquals(2, sstFilteringService.getSnapshotFilteredCount().get());
+    assertEquals(snap1SstFileCountBeforeFilter, snap1SstFileCountAfterFilter);
+    assertEquals(snap2SstFileCountBeforeFilter - 1,
+        snap2SstFileCountAfterFilter);
   }
 
   private void createKeys(String volumeName,

@@ -318,6 +318,8 @@ public abstract class SCMCommonPlacementPolicy implements
     }
 
     if (!enoughForData) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+              "bytes for data.", datanodeDetails, dataSizeRequired);
       return false;
     }
 
@@ -332,8 +334,11 @@ public abstract class SCMCommonPlacementPolicy implements
     } else {
       enoughForMeta = true;
     }
-
-    return enoughForData && enoughForMeta;
+    if (!enoughForMeta) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+              "bytes for metadata.", datanodeDetails, metadataSizeRequired);
+    }
+    return enoughForMeta;
   }
 
   /**
@@ -481,16 +486,20 @@ public abstract class SCMCommonPlacementPolicy implements
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);
-    } else {
-      if (datanodeInfo.getNodeStatus().isNodeWritable() &&
-          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-              dataSizeRequired))) {
-        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
-                "required data size is {}",
-            datanodeDetails, metadataSizeRequired, dataSizeRequired);
-        return true;
-      }
+      return false;
     }
+    NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
+    if (nodeStatus.isNodeWritable() &&
+        (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+            dataSizeRequired))) {
+      LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+              "required data size is {} and NodeStatus is {}",
+          datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
+      return true;
+    }
+    LOG.debug("Datanode {} is not chosen. Required metadata size is {} and " +
+            "required data size is {} and NodeStatus is {}",
+        datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
     return false;
   }
 

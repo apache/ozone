@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -32,17 +31,16 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .VolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.when;
 
 /**
  * Tests create volume request.
  */
-
 public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
   @Test
@@ -52,8 +50,9 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String ownerName = UUID.randomUUID().toString();
     doPreExecute(volumeName, adminName, ownerName);
     // Verify exception thrown on invalid volume name
-    LambdaTestUtils.intercept(OMException.class, "Invalid volume name: v1",
+    OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("v1", adminName, ownerName));
+    assertEquals("Invalid volume name: v1", omException.getMessage());
   }
 
   @Test
@@ -277,9 +276,10 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         String ownerName)
         throws Exception {
     // Verify exception thrown on invalid volume name
-    LambdaTestUtils.intercept(OMException.class, "Invalid volume name: " 
-        + volumeName,
+    OMException omException = assertThrows(OMException.class,
         () -> doPreExecute(volumeName, adminName, ownerName));
+    assertEquals("Invalid volume name: " + volumeName,
+        omException.getMessage());
   }
 
   private void doPreExecute(String volumeName,

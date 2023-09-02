@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -118,10 +117,13 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
+      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+          volumeName, bucketName);
+
       // add all missing parents to dir table
       missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, pathInfoFSO,
-              transactionLogIndex);
+          .getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
+              pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -156,8 +158,6 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
-          volumeName, bucketName);
       final ReplicationConfig replicationConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
@@ -182,8 +182,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
-              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+              new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+          .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfoFSO,
+              ozoneManager.getPrefixManager()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?

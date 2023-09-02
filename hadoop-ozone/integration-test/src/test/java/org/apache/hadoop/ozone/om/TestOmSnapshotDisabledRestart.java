@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -101,8 +100,9 @@ public class TestOmSnapshotDisabledRestart {
         om.getConfiguration().setBoolean(
             OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
         // Restart OM, expect OM start up failure
-        LambdaTestUtils.intercept(RuntimeException.class, "snapshots remaining",
+        RuntimeException rte = Assertions.assertThrows(RuntimeException.class,
             () -> cluster.restartOzoneManager(om, true));
+        Assertions.assertTrue(rte.getMessage().contains("snapshots remaining"));
         // Enable snapshot feature again
         om.getConfiguration().setBoolean(
             OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);

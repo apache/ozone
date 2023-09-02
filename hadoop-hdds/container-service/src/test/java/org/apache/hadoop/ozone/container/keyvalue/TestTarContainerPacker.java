@@ -44,7 +44,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.SpyInputStream;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.AfterClass;
@@ -58,6 +57,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Test the tar/untar for a given container.
@@ -307,7 +307,7 @@ public class TestTarContainerPacker {
 
     File containerFile = packContainerWithSingleFile(file, entryName);
 
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> unpackContainerData(containerFile));
   }
 
@@ -324,7 +324,7 @@ public class TestTarContainerPacker {
 
     File containerFile = packContainerWithSingleFile(file, entryName);
 
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> unpackContainerData(containerFile));
   }
 
