@@ -76,7 +76,7 @@ public class OMEndpoint {
       @DefaultValue(StringUtils.EMPTY)
       @QueryParam(RECON_QUERY_PREVKEY) String prevKey
   ) throws IOException {
-    List<OmVolumeArgs> volumes = omMetadataManager.listAllVolumes(
+    List<OmVolumeArgs> volumes = omMetadataManager.listVolumes(
         prevKey, limit);
     List<VolumeMetadata> volumeMetadata = volumes.stream()
         .map(this::toVolumeMetadata).collect(Collectors.toList());

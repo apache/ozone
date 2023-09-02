@@ -52,25 +52,26 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
   boolean isOmTablesInitialized();
 
   /**
-   * Return all volumes in the file system.
-   * @return all the volumes from the OM DB.
-   */
-  List<OmVolumeArgs> listVolumes() throws IOException;
-
-  /**
    * Return a list of volumes owned by a given user; if user is null, returns
    * all volumes.
    *
    * This method can be optimized by using username as a filter.
    *
    * @param startKey the start volume name determines where to start listing
-   * from, this key is excluded from the result.
+   * from, this key is excluded from the result. Returns all the volumes if
+   * it's null.
    * @param maxKeys the maximum number of volumes to return.
-   * @return
-   * @throws IOException
+   * @return volumes with starting from <code>startKey</code> limited by
+   *         <code>maxKeys</code>
    */
-  List<OmVolumeArgs> listAllVolumes(String startKey,
-      int maxKeys) throws IOException;
+  List<OmVolumeArgs> listVolumes(String startKey,
+                                 int maxKeys) throws IOException;
+
+  /**
+   * Return all volumes in the file system.
+   * @return all the volumes from the OM DB.
+   */
+  List<OmVolumeArgs> listVolumes() throws IOException;
 
   /**
    * Check if volume exists in the OM table.

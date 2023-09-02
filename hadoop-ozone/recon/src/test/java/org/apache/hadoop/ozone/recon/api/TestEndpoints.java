@@ -1070,16 +1070,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // Test prevKey (it should be ignored)
     Response responsePrevKeyWithoutVolume = omEndpoint.getBuckets(
-        null, 1, "bucketOne");
+        null, 3, "bucketOne");
 
     Assertions.assertEquals(200,
         responsePrevKeyWithoutVolume.getStatus());
 
     BucketsResponse bucketResponsePrevKeyWithoutVolume =
         (BucketsResponse) responsePrevKeyWithoutVolume.getEntity();
-    Assertions.assertEquals(1,
+    Assertions.assertEquals(3,
         bucketResponsePrevKeyWithoutVolume.getTotalCount());
-    Assertions.assertEquals(1,
+    Assertions.assertEquals(3,
         bucketResponsePrevKeyWithoutVolume.getBuckets().size());
     Assertions.assertEquals("sampleVol",
         bucketResponsePrevKeyWithoutVolume.getBuckets()
@@ -1102,7 +1102,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(1,
         bucketResponseLimitWithVolume.getBuckets().size());
 
-    // Test prevKey (it should not be ignored)
+    // Case 3: Test prevKey (it should not be ignored)
     Response responsePrevKeyWithVolume = omEndpoint.getBuckets(
         "sampleVol2", 1, "bucketOne");
 
@@ -1121,7 +1121,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         bucketPrevKeyResponseWithVolume.getBuckets()
             .stream().findFirst().get().getBucketName());
 
-    // Test volume does not exist
+    // Case 4: Test volume does not exist
     Response responseVolumeNotExist = omEndpoint.getBuckets(
         "sampleVol3", 100, "bucketOne");
 

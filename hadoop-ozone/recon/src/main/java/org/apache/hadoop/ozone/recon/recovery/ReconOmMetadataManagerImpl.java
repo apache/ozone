@@ -159,38 +159,12 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   /**
-   * Return all volumes in the file system.
-   * This method can be optimized by using username as a filter.
-   * @return a list of volume names under the system
-   */
-  @Override
-  public List<OmVolumeArgs> listVolumes() throws IOException {
-    List<OmVolumeArgs> result = new ArrayList<>();
-    Table<String, OmVolumeArgs> volumeTable = getVolumeTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = volumeTable.iterator()) {
-
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
-
-        OmVolumeArgs omVolumeArgs = kv.getValue();
-        if (omVolumeArgs != null) {
-          result.add(omVolumeArgs);
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
    * {@inheritDoc}
    */
   @Override
-  public List<OmVolumeArgs> listAllVolumes(String startKey,
+  public List<OmVolumeArgs> listVolumes(String startKey,
        int maxKeys) throws IOException {
     List<OmVolumeArgs> result = Lists.newArrayList();
-
-    Table<String, OmVolumeArgs> volumeTable = getVolumeTable();
 
     String volumeName;
     OmVolumeArgs omVolumeArgs;
@@ -201,7 +175,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = volumeTable.iterator()) {
+             iterator = getVolumeTable().iterator()) {
 
       while (iterator.hasNext() && result.size() < maxKeys) {
         Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -221,6 +195,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
 
     return result;
+  }
+
+  /**
+   * Return all volumes in the file system.
+   * This method can be optimized by using username as a filter.
+   * @return a list of volume names under the system
+   */
+  @Override
+  public List<OmVolumeArgs> listVolumes() throws IOException {
+    return listVolumes(null, Integer.MAX_VALUE);
   }
 
   @Override
