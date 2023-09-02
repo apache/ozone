@@ -73,6 +73,14 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
       int maxKeys) throws IOException;
 
   /**
+   * Check if volume exists in the OM table.
+   * @param volName volume name without any protocol prefix.
+   * @return true if volume exists, otherwise false.
+   * @throws IOException IOE
+   */
+  boolean volumeExists(String volName) throws IOException;
+
+  /**
    * Returns a list of buckets represented by {@link OmBucketInfo} in the given
    * volume.
    *
@@ -86,16 +94,8 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * @return a list of buckets.
    * @throws IOException
    */
-  List<OmBucketInfo> listAllBuckets(String volumeName,
+  List<OmBucketInfo> listBucketsUnderVolume(String volumeName,
       String startBucket, int maxNumOfBuckets) throws IOException;
-
-  /**
-   * Check if volume exists in the OM table.
-   * @param volName volume name without any protocol prefix.
-   * @return true if volume exists, otherwise false.
-   * @throws IOException IOE
-   */
-  boolean volumeExists(String volName) throws IOException;
 
   /**
    * List all buckets under a volume.

@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -196,14 +195,6 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     String volumeName;
     OmVolumeArgs omVolumeArgs;
 
-    // Fail fast when volume specified by startKey does not exist
-    // Otherwise will iterate the whole table for nothing
-    String startVolumeNameBytes = getVolumeKey(startKey);
-    if (getVolumeTable().getSkipCache(startVolumeNameBytes) == null) {
-      throw new OMException("Volume " + startKey + " not found.",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
-    }
-
     boolean startKeyIsEmpty = Strings.isNullOrEmpty(startKey);
 
     // Unlike in {@link OmMetadataManagerImpl}, the volumes are queried directly
@@ -239,53 +230,10 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   /**
-   * List all buckets under a volume, if volume name is null, return all buckets
-   * under the system.
-   * @param volumeName volume name without protocol prefix
-   * @return buckets under volume or all buckets if volume is null
-   * @throws IOException IOE
-   */
-  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
-      throws IOException {
-    List<OmBucketInfo> result = new ArrayList<>();
-    // if volume name is null, seek prefix is an empty string
-    String seekPrefix = "";
-
-    Table bucketTable = getBucketTable();
-
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-        iterator = bucketTable.iterator()) {
-
-      if (volumeName != null) {
-        if (!volumeExists(volumeName)) {
-          return result;
-        }
-        seekPrefix = getVolumeKey(volumeName + OM_KEY_PREFIX);
-      }
-
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> kv = iterator.next();
-
-        String key = kv.getKey();
-        OmBucketInfo omBucketInfo = kv.getValue();
-
-        if (omBucketInfo != null) {
-          // We should return only the keys, whose keys match with the seek
-          // prefix
-          if (key.startsWith(seekPrefix)) {
-            result.add(omBucketInfo);
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  /**
    * {@inheritDoc}
    */
   @Override
-  public List<OmBucketInfo> listAllBuckets(final String volumeName,
+  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName,
        final String startBucket, final int maxNumOfBuckets) throws IOException {
     List<OmBucketInfo> result = new ArrayList<>();
 
@@ -298,10 +246,8 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       return listAllBuckets(maxNumOfBuckets);
     }
 
-    String volumeNameBytes = getVolumeKey(volumeName);
-    if (getVolumeTable().getSkipCache(volumeNameBytes) == null) {
-      throw new OMException("Volume " + volumeName + " not found.",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    if (!volumeExists(volumeName)) {
+      return result;
     }
 
     String startKey;
@@ -321,7 +267,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-        iterator = getBucketTable().iterator()) {
+        iterator = getBucketTable().iterator(seekPrefix)) {
 
       while (currentCount < maxNumOfBuckets && iterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> kv =
@@ -345,6 +291,19 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       }
     }
     return result;
+  }
+
+  /**
+   * List all buckets under a volume, if volume name is null, return all buckets
+   * under the system.
+   * @param volumeName volume name without protocol prefix
+   * @return buckets under volume or all buckets if volume is null
+   * @throws IOException IOE
+   */
+  public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
+      throws IOException {
+    return listBucketsUnderVolume(volumeName, null,
+        Integer.MAX_VALUE);
   }
 
   private List<OmBucketInfo> listAllBuckets(final int maxNumberOfBuckets)

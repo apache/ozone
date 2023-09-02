@@ -94,7 +94,7 @@ public class OMEndpoint {
       @DefaultValue(StringUtils.EMPTY)
       @QueryParam(RECON_QUERY_PREVKEY) String prevKey
   ) throws IOException {
-    List<OmBucketInfo> buckets = omMetadataManager.listAllBuckets(
+    List<OmBucketInfo> buckets = omMetadataManager.listBucketsUnderVolume(
         volume, prevKey, limit);
     List<BucketMetadata> bucketMetadata = buckets
         .stream().map(this::toBucketMetadata).collect(Collectors.toList());

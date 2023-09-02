@@ -707,7 +707,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
-    Assertions.assertEquals(2, clusterStateResponse.getBuckets());
+    Assertions.assertEquals(3, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
     // Since a single RepeatedOmKeyInfo can contain multiple deleted keys with
     // the same name, the total count of pending deletion keys is determined by
@@ -1115,11 +1115,24 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(1,
         bucketPrevKeyResponseWithVolume.getBuckets().size());
     Assertions.assertEquals("sampleVol2",
-        bucketResponsePrevKeyWithoutVolume.getBuckets()
+        bucketPrevKeyResponseWithVolume.getBuckets()
             .stream().findFirst().get().getVolumeName());
     Assertions.assertEquals("bucketTwo",
         bucketPrevKeyResponseWithVolume.getBuckets()
             .stream().findFirst().get().getBucketName());
+
+    // Test volume does not exist
+    Response responseVolumeNotExist = omEndpoint.getBuckets(
+        "sampleVol3", 100, "bucketOne");
+
+    Assertions.assertEquals(200, responseVolumeNotExist.getStatus());
+
+    BucketsResponse bucketVolumeNotExistResponse  =
+        (BucketsResponse) responseVolumeNotExist.getEntity();
+    Assertions.assertEquals(0,
+        bucketVolumeNotExistResponse.getTotalCount());
+    Assertions.assertEquals(0,
+        bucketVolumeNotExistResponse.getBuckets().size());
 
   }
 
