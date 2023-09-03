@@ -1642,23 +1642,14 @@ public class TestOzoneFileSystem {
 
     // Try to delete root
     Path root = new Path(OZONE_URI_DELIMITER);
-    try {
-      trash.moveToTrash(root);
-      Assert.fail("Trying to delete root should throw exception");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof IOException);
-    }
+    Assert.assertThrows(IOException.class, () -> trash.moveToTrash(root));
     // Also try with TrashPolicyDefault
     OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
     conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
         TrashPolicy.class);
     Trash trashPolicyDefault = new Trash(conf2);
-    try {
-      trashPolicyDefault.moveToTrash(root);
-      Assert.fail("Trying to delete root should throw exception");
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof IOException);
-    }
+    Assert.assertThrows(IOException.class,
+        () -> trashPolicyDefault.moveToTrash(root));
   }
 
   /**
