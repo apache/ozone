@@ -1428,7 +1428,6 @@ public class KeyManagerImpl implements KeyManager {
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
         cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
       } else if (cacheOmKeyInfo == null) {
-        LOG.error("####DEVESH#### :::: {}", cacheKey);
         cacheKeyMap.putIfAbsent(cacheKey, null);
       }
     }
