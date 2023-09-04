@@ -276,9 +276,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
-      OmBucketInfo bucketInfo, PrefixManager prefixManager) {
-    List<OzoneAcl> acls = new ArrayList<>();
+      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
+      PrefixManager prefixManager) {
 
+    List<OzoneAcl> acls = new ArrayList<>();
     if (keyArgs.getAclsList() != null) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
@@ -302,13 +303,54 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
+    // Inherit DEFAULT acls from parent-dir only if DEFAULT acls for
+    // prefix are not set
+    if (omPathInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+        return acls;
+      }
+    }
+
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
-    // prefix are not set.
+    // parent-dir are not set.
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
         return acls;
       }
     }
+
+    return acls;
+  }
+
+  /**
+   * Inherit parent DEFAULT acls and generate its own ACCESS acls.
+   * @param keyArgs
+   * @param bucketInfo
+   * @param omPathInfo
+   * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
+   */
+  protected static List<OzoneAcl> getAclsForDir(KeyArgs keyArgs,
+      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo) {
+    // Acls inherited from parent or bucket will convert to DEFAULT scope
+    List<OzoneAcl> acls = new ArrayList<>();
+
+    // Inherit DEFAULT acls from parent-dir
+    if (omPathInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+        OzoneAclUtil.toDefaultScope(acls);
+      }
+    }
+
+    // Inherit DEFAULT acls from bucket only if DEFAULT acls for
+    // parent-dir are not set.
+    if (acls.isEmpty() && bucketInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
+        OzoneAclUtil.toDefaultScope(acls);
+      }
+    }
+
+    // add itself acls
+    acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
 
     return acls;
   }
@@ -629,12 +671,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID, boolean isRatisEnabled,
           ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
-            locations, encInfo, prefixManager, omBucketInfo, null,
+            locations, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
@@ -651,7 +694,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoWithFSO omPathInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
           boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
@@ -700,30 +743,33 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      OMFileRequest.OMPathInfoWithFSO omPathInfo,
-      long transactionLogIndex, long objectID
-  ) {
+      OMFileRequest.OMPathInfo omPathInfo,
+      long transactionLogIndex, long objectID) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, locations)))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(size)
-        .setReplicationConfig(replicationConfig)
-        .setFileEncryptionInfo(encInfo)
-        .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(
-            keyArgs.getMetadataList()))
-        .setUpdateID(transactionLogIndex)
-        .setFile(true);
-    if (omPathInfo != null) {
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName())
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, locations,
+                        keyArgs.getIsMultipartKey())))
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setDataSize(size)
+            .setReplicationConfig(replicationConfig)
+            .setFileEncryptionInfo(encInfo)
+            .setAcls(getAclsForKey(
+                keyArgs, omBucketInfo, omPathInfo, prefixManager))
+            .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getMetadataList()))
+            .setUpdateID(transactionLogIndex)
+            .setFile(true);
+    if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
-      objectID = omPathInfo.getLeafNodeObjectId();
-      builder.setParentObjectID(omPathInfo.getLastKnownParentId());
-      builder.setFileName(omPathInfo.getLeafNodeName());
+      OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
+          = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
+      objectID = omPathInfoFSO.getLeafNodeObjectId();
+      builder.setParentObjectID(omPathInfoFSO.getLastKnownParentId());
+      builder.setFileName(omPathInfoFSO.getLeafNodeName());
     }
     builder.setObjectID(objectID);
     return builder.build();
@@ -742,7 +788,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull List<OmKeyLocationInfo> locations,
           FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoWithFSO omPathInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID)
           throws IOException {
 
@@ -755,15 +801,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String uploadID = args.getMultipartUploadID();
     Preconditions.checkNotNull(uploadID);
     String multipartKey = "";
-    if (omPathInfo != null) {
+    if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
+      OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
+          = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
       final long volumeId = omMetadataManager.getVolumeId(
               args.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               args.getVolumeName(), args.getBucketName());
       // FileTable metadata format
       multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
-              omPathInfo.getLastKnownParentId(),
-              omPathInfo.getLeafNodeName(), uploadID);
+          omPathInfoFSO.getLastKnownParentId(),
+          omPathInfoFSO.getLeafNodeName(), uploadID);
     } else {
       multipartKey = omMetadataManager
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),

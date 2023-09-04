@@ -155,7 +155,7 @@ public class TestOzoneFileSystem {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(600);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -227,11 +227,9 @@ public class TestOzoneFileSystem {
   @After
   public void cleanup() {
     try {
-      FileStatus[] fileStatuses = fs.listStatus(ROOT);
-      for (FileStatus fileStatus : fileStatuses) {
-        fs.delete(fileStatus.getPath(), true);
-      }
-    } catch (IOException ex) {
+      deleteRootDir();
+    } catch (IOException | InterruptedException ex) {
+      LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
   }
@@ -797,20 +795,34 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir() throws IOException {
+  protected void deleteRootDir() throws IOException, InterruptedException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
+    deleteRootRecursively(fileStatuses);
 
-    for (FileStatus fStatus : fileStatuses) {
-      fs.delete(fStatus.getPath(), true);
-    }
+    // Waiting for double buffer flush before calling listStatus() again
+    // seem to have mitigated the flakiness in cleanup(), but at the cost of
+    // almost doubling the test run time. M1 154s->283s (all 4 sets of params)
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    // TODO: Investigate whether listStatus() is correctly iterating cache.
 
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+      for (FileStatus fileStatus : fileStatuses) {
+        LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
+      }
+      Assert.assertEquals(
+          "Delete root failed!", 0, fileStatuses.length);
+    }
+  }
+
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+      throws IOException {
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
     }
   }
 

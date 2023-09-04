@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -573,6 +574,7 @@ public interface OzoneManagerProtocol
    * @return S3SecretValue
    * @throws IOException
    */
+  @Nonnull
   default S3SecretValue getS3Secret(String kerberosID) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");

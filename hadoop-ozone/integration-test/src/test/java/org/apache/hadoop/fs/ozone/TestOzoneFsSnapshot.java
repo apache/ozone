@@ -21,11 +21,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import com.google.common.base.Strings;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -44,6 +48,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
@@ -138,6 +143,39 @@ public class TestOzoneFsSnapshot {
     Assertions.assertEquals(1, res);
   }
 
+  @Test
+  public void testCreateSnapshotWithSubDirInput() throws Exception {
+    // Test that:
+    // $ ozone fs -createSnapshot ofs://om/vol1/buck2/dir3/ snap1
+    //
+    // should print:
+    // Created snapshot ofs://om/vol1/buck2/.snapshot/snap1
+    //
+    // rather than:
+    // Created snapshot ofs://om/vol1/buck2/dir3/.snapshot/snap1
+
+    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+
+    String dirPath = BUCKET_PATH + "/dir1/";
+
+    int res = ToolRunner.run(shell, new String[] {
+        "-mkdir", "-p", dirPath});
+    Assertions.assertEquals(0, res);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+             new GenericTestUtils.SystemOutCapturer()) {
+      res = ToolRunner.run(shell, new String[] {
+          "-createSnapshot", dirPath, snapshotName});
+      // Asserts that create request succeeded
+      Assertions.assertEquals(0, res);
+
+      String expectedSnapshotPath = Paths.get(
+          BUCKET_PATH, OM_SNAPSHOT_INDICATOR, snapshotName).toString();
+      String out = capture.getOutput().trim();
+      Assertions.assertTrue(out.endsWith(expectedSnapshotPath));
+    }
+  }
+
   /**
    * Create snapshot should succeed.
    * 1st case: valid snapshot name
@@ -224,10 +262,12 @@ public class TestOzoneFsSnapshot {
     String newKey = "key-" + RandomStringUtils.randomNumeric(5);
     String newKeyPath = BUCKET_PATH + OM_KEY_PREFIX + newKey;
 
-    // Create new key, while the old one
-    // might be deleted from a previous test.
+    // Write a non-zero byte key.
+    Path tempFile = Files.createTempFile("testFsLsSnapshot-", "any-suffix");
+    FileUtils.write(tempFile.toFile(), "random data", UTF_8);
     execShellCommandAndGetOutput(0,
-        new String[]{"-touch", newKeyPath});
+        new String[]{"-put", tempFile.toString(), newKeyPath});
+    Files.deleteIfExists(tempFile);
 
     // Create snapshot
     String snapshotName = createSnapshot();
@@ -312,7 +352,7 @@ public class TestOzoneFsSnapshot {
                     "testsnap",
                     "Snapshot does not exist",
                     1),
-            Arguments.of("2nd case: invalid bucekt path",
+            Arguments.of("2nd case: invalid bucket path",
                     invalidBucketPath,
                     "testsnap",
                     "No such file or directory",
