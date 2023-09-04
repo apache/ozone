@@ -1426,7 +1426,10 @@ public class KeyManagerImpl implements KeyManager {
         }
         OzoneFileStatus fileStatus = new OzoneFileStatus(
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
-        cacheKeyMap.put(cacheKey, fileStatus);
+        cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
+      } else if (cacheOmKeyInfo == null) {
+        LOG.error("####DEVESH#### :::: {}", cacheKey);
+        cacheKeyMap.putIfAbsent(cacheKey, null);
       }
     }
   }
@@ -1540,8 +1543,14 @@ public class KeyManagerImpl implements KeyManager {
     countEntries = 0;
     // Convert results in cacheKeyMap to List
     for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
-      // No need to check if a key is deleted or not here, this is handled
-      // when adding entries to cacheKeyMap from DB.
+      // Here need to check if a key is deleted as cacheKeyMap will contain
+      // deleted entries as well. Adding deleted entries in cacheKeyMap is done
+      // as there is a possible race condition where table cache iterator is
+      // flushed already and isKeyDeleted check may not work as expected
+      // before putting entries in cacheKeyMap in findKeyInDbWithIterator call.
+      if (fileStatus == null) {
+        continue;
+      }
       fileStatusList.add(fileStatus);
       countEntries++;
       if (countEntries >= numEntries) {
@@ -1611,8 +1620,9 @@ public class KeyManagerImpl implements KeyManager {
           String entryKeyName = omKeyInfo.getKeyName();
           if (recursive) {
             // for recursive list all the entries
-
-            if (!isKeyDeleted(entryInDb, keyTable)) {
+            // Since putIfAbsent doesn't work as expected in case of null value,
+            // so had to explicitly check using containsKey
+            if (!cacheKeyMap.containsKey(entryInDb)) {
               cacheKeyMap.putIfAbsent(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
@@ -1626,23 +1636,27 @@ public class KeyManagerImpl implements KeyManager {
                 .getImmediateChild(entryKeyName, keyName);
             boolean isFile = OzoneFSUtils.isFile(immediateChild);
             if (isFile) {
-              if (!isKeyDeleted(entryInDb, keyTable)) {
-                cacheKeyMap.put(entryInDb,
+              // Since putIfAbsent doesn't work as expected in case of null
+              // value, so had to explicitly check using containsKey
+              if (!cacheKeyMap.containsKey(entryInDb)) {
+                cacheKeyMap.putIfAbsent(entryInDb,
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                 countEntries++;
               }
             } else {
               // if entry is a directory
-              if (!isKeyDeleted(entryInDb, keyTable)) {
+              // Since putIfAbsent doesn't work as expected in case of null
+              // value, so had to explicitly check using containsKey
+              if (!cacheKeyMap.containsKey(entryInDb)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo, immediateChild);
-                  cacheKeyMap.put(entryInDb,
+                  cacheKeyMap.putIfAbsent(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
                 } else {
                   // If entryKeyName matches dir name, we have the info
-                  cacheKeyMap.put(entryInDb,
+                  cacheKeyMap.putIfAbsent(entryInDb,
                       new OzoneFileStatus(omKeyInfo, 0, true));
                 }
                 countEntries++;

@@ -803,19 +803,16 @@ public class TestOzoneFileSystem {
     }
     deleteRootRecursively(fileStatuses);
 
-    // Waiting for double buffer flush before calling listStatus() again
-    // seem to have mitigated the flakiness in cleanup(), but at the cost of
-    // almost doubling the test run time. M1 154s->283s (all 4 sets of params)
-    cluster.getOzoneManager().awaitDoubleBufferFlush();
-    // TODO: Investigate whether listStatus() is correctly iterating cache.
-
     fileStatuses = fs.listStatus(ROOT);
+    StringBuilder sb = new StringBuilder();
     if (fileStatuses != null) {
       for (FileStatus fileStatus : fileStatuses) {
+        sb.append(fileStatus.getPath().toString());
+        sb.append(",");
         LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
       }
       Assert.assertEquals(
-          "Delete root failed!", 0, fileStatuses.length);
+          "Delete root failed! ::: " + sb.toString(), 0, fileStatuses.length);
     }
   }
 

@@ -215,7 +215,11 @@ public class OzoneListStatusHelper {
         HeapEntry entry = heapIterator.next();
         OzoneFileStatus status = entry.getStatus(prefixKey,
             scmBlockSize, volumeName, bucketName, replication);
-        map.putIfAbsent(entry.key, status);
+        // Since putIfAbsent doesn't work as expected in case of null value,
+        // so had to explicitly check using containsKey
+        if (!map.containsKey(entry.key)) {
+          map.putIfAbsent(entry.key, status);
+        }
       }
     }
 
