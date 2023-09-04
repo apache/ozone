@@ -54,9 +54,10 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
 
     OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-
     OMClientResponse omClientResponse = new OMEchoRPCWriteResponse(
         omResponse.setEchoRPCResponse(echoRPCResponse).build());
+    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+        omDoubleBufferHelper);
 
     return omClientResponse;
   }
