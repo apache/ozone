@@ -804,15 +804,11 @@ public class TestOzoneFileSystem {
     deleteRootRecursively(fileStatuses);
 
     fileStatuses = fs.listStatus(ROOT);
-    StringBuilder sb = new StringBuilder();
     if (fileStatuses != null) {
       for (FileStatus fileStatus : fileStatuses) {
-        sb.append(fileStatus.getPath().toString());
-        sb.append(",");
         LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
       }
-      Assert.assertEquals(
-          "Delete root failed! ::: " + sb.toString(), 0, fileStatuses.length);
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
     }
   }
 
