@@ -422,27 +422,8 @@ public class TestSnapshotBackgroundServices {
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
-    // Get the latest db checkpoint from the leader OM.
-    TransactionInfo transactionInfo =
-        TransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
-    TermIndex leaderOMTermIndex =
-        TermIndex.valueOf(transactionInfo.getTerm(),
-            transactionInfo.getTransactionIndex());
-    long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
-
-    // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerOM.getOMNodeId());
-    suspendBackupCompactionFilesPruning(followerOM);
-
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 10s
-    GenericTestUtils.waitFor(() ->
-        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-            >= leaderOMSnapshotIndex - 1, 100, 10000);
-
-    // Verify RPC server is running
-    GenericTestUtils.waitFor(followerOM::isOmRpcServerRunning, 100, 5000);
+    startInactiveFollower(leaderOM, followerOM,
+        () -> suspendBackupCompactionFilesPruning(followerOM));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
