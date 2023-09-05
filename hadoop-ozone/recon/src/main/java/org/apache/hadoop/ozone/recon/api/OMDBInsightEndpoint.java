@@ -28,9 +28,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -88,15 +90,20 @@ public class OMDBInsightEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
   private final GlobalStatsDao globalStatsDao;
+  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
                              ReconOMMetadataManager omMetadataManager,
-                             GlobalStatsDao globalStatsDao) {
+                             GlobalStatsDao globalStatsDao,
+                             ReconNamespaceSummaryManagerImpl
+                                 reconNamespaceSummaryManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.omMetadataManager = omMetadataManager;
     this.globalStatsDao = globalStatsDao;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
   }
 
   /**
@@ -532,7 +539,8 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(key);
         keyEntityInfo.setPath(omKeyInfo.getKeyName());
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(omKeyInfo.getDataSize());
+        keyEntityInfo.setSize(
+            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
         keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
@@ -556,6 +564,27 @@ public class OMDBInsightEndpoint {
       throw new WebApplicationException(ex,
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Given an object ID, return total data size (no replication)
+   * under this object. Note:- This method is RECURSIVE.
+   *
+   * @param objectId the object's ID
+   * @return total used data size in bytes
+   * @throws IOException ioEx
+   */
+  protected long fetchSizeForDeletedDirectory(long objectId)
+      throws IOException {
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary == null) {
+      return 0L;
+    }
+    long totalSize = nsSummary.getSizeOfFiles();
+    for (long childId : nsSummary.getChildDir()) {
+      totalSize += fetchSizeForDeletedDirectory(childId);
+    }
+    return totalSize;
   }
 
   /** This method retrieves set of directories pending for deletion.
@@ -640,4 +669,8 @@ public class OMDBInsightEndpoint {
     return this.globalStatsDao;
   }
 
+  @VisibleForTesting
+  public Table<Long, NSSummary> getNsSummaryTable() {
+    return this.reconNamespaceSummaryManager.getNSSummaryTable();
+  }
 }

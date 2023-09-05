@@ -3411,26 +3411,14 @@
   ],
 
   "keysOpenSummary": {
-    "keysSummary": {
-      "totalUnreplicatedDataSize": 1000,
-      "totalReplicatedDataSize": 30000000,
-      "totalOpenKeys": 10
-    },
-    "lastKey": "",
-    "replicatedDataSize": 0,
-    "unreplicatedDataSize": 0,
-    "status": "OK"
-   },
+    "totalUnreplicatedDataSize": 10485760,
+    "totalReplicatedDataSize": 31457280,
+    "totalOpenKeys": 10
+  },
   "keysdeletePendingSummary":{
-    "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
       "totalReplicatedDataSize": 87873,
       "totalDeletedKeys": 3
-    },
-    "lastKey": "/s3v/fso-bucket/dira/dira13/key3/-9223372036854762239",
-    "replicatedDataSize": 87873,
-    "unreplicatedDataSize": 29291,
-    "status": "OK"
   },
   "omMismatch":{
       "lastKey":11,

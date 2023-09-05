@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -76,9 +78,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // or write to same tables and can send deletion requests for same key
   // multiple times.
   private static final int DIR_DELETING_CORE_POOL_SIZE = 1;
+  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
 
   // Number of items(dirs/files) to be batched in an iteration.
   private final long pathLimitPerTask;
+  private final int ratisByteLimit;
   private final AtomicBoolean suspended;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
@@ -89,6 +93,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
             OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
+    int limit = (int) configuration.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    // always go to 90% of max limit for request as other header will be added
+    this.ratisByteLimit = (int) (limit * 0.9);
     this.suspended = new AtomicBoolean(false);
   }
 
@@ -141,6 +151,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subDirNum = 0L;
         long subFileNum = 0L;
         long remainNum = pathLimitPerTask;
+        int consumedSize = 0;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
@@ -170,6 +181,22 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 remainNum, pendingDeletedDirInfo.getValue(),
                 pendingDeletedDirInfo.getKey(), allSubDirList,
                 getOzoneManager().getKeyManager());
+            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                request.getSerializedSize())) {
+              if (purgePathRequestList.size() != 0) {
+                // if message buffer reaches max limit, avoid sending further
+                remainNum = 0;
+                break;
+              }
+              // if directory itself is having a lot of keys / files,
+              // reduce capacity to minimum level
+              remainNum = MIN_ERR_LIMIT_PER_TASK;
+              request = prepareDeleteDirRequest(
+                  remainNum, pendingDeletedDirInfo.getValue(),
+                  pendingDeletedDirInfo.getKey(), allSubDirList,
+                  getOzoneManager().getKeyManager());
+            }
+            consumedSize += request.getSerializedSize();
             purgePathRequestList.add(request);
             remainNum = remainNum - request.getDeletedSubFilesCount();
             remainNum = remainNum - request.getMarkDeletedSubDirsCount();
@@ -184,7 +211,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
-              allSubDirList, purgePathRequestList, null, startTime);
+              allSubDirList, purgePathRequestList, null, startTime,
+              ratisByteLimit - consumedSize);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
