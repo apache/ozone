@@ -1242,7 +1242,7 @@ public class KeyManagerImpl implements KeyManager {
           // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
           if (key.startsWith(targetKey)) {
             if (!Objects.equals(key, targetKey)
-                && !isKeyDeleted(key, keyTable)) {
+                && keyTable.isExist(key)) {
               LOG.debug("Fake dir {} required for {}", targetKey, key);
               return createDirectoryKey(keyValue.getValue(), dirKey);
             }
@@ -1611,7 +1611,7 @@ public class KeyManagerImpl implements KeyManager {
         OmKeyInfo omKeyInfo = entry.getValue();
         String volumeName = omKeyInfo.getVolumeName();
         String bucketName = omKeyInfo.getBucketName();
-        if (isKeyDeleted(entryInDb, keyTable)) {
+        if (!keyTable.isExist(entryInDb)) {
           continue;
         }
         if (entryInDb.startsWith(keyArgs)) {
