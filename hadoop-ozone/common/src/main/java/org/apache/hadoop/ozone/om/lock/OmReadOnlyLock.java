@@ -21,7 +21,7 @@ import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
 
 /**
  * Read only "lock" for snapshots
- * Uses no lock.  Always returns true when aquiring
+ * Uses no lock.  Always returns true when acquiring
  * read lock and false for write locks
  */
 public class OmReadOnlyLock implements IOzoneManagerLock {
