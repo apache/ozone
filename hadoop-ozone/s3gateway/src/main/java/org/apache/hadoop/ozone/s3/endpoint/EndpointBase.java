@@ -80,7 +80,7 @@ public abstract class EndpointBase implements Auditor {
   private ContainerRequestContext context;
 
   private Set<String> excludeMetadataFields =
-          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -290,8 +290,7 @@ public abstract class EndpointBase implements Auditor {
 
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
-          throw new IllegalArgumentException("Illegal user defined metadata." +
-              " Combined size cannot exceed 2KB.");
+          throw newError(S3ErrorTable.METADATA_TOO_LARGE, key);
         }
         customMetadata.put(mapKey, value);
       }

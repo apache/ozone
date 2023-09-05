@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 
 
 /** Block Manager manages the block access for SCM. */
-public class BlockManagerImpl implements BlockManager {
+public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockManagerImpl.class);
   // TODO : FIX ME : Hard coding the owner.

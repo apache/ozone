@@ -140,6 +140,8 @@ public abstract class MisReplicationHandler implements
               container.getContainerID());
       return 0;
     }
+
+    LOG.debug("Handling mis replicated container {}.", container);
     Set<ContainerReplica> sources = filterSources(replicas);
     Set<ContainerReplica> replicasToBeReplicated = containerPlacement
             .replicasToCopyToFixMisreplication(replicas.stream()

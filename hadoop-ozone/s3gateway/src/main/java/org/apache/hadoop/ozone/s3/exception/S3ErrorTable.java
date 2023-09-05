@@ -29,6 +29,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
 
 /**
@@ -125,6 +126,11 @@ public final class S3ErrorTable {
 
   public static final OS3Exception NO_OVERWRITE = new OS3Exception(
       "Conflict", "Cannot overwrite file with directory", HTTP_CONFLICT);
+
+  public static final OS3Exception METADATA_TOO_LARGE = new OS3Exception(
+      "MetadataTooLarge", "Illegal user defined metadata. Combined size " +
+      "exceeds the maximum allowed metadata size of " +
+      S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB + "KB", HTTP_BAD_REQUEST);
 
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
