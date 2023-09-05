@@ -35,7 +35,7 @@ import java.io.IOException;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
- * Endpoint to generate and return S3 secret.
+ * Endpoint to manage S3 secret.
  */
 @Path("/secret")
 @S3SecretEnabled
