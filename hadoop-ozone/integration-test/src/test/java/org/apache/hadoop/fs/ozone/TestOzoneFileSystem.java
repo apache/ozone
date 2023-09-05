@@ -84,7 +84,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
@@ -229,7 +228,7 @@ public class TestOzoneFileSystem {
   public void cleanup() {
     try {
       deleteRootDir();
-    } catch (IOException | InterruptedException | TimeoutException ex) {
+    } catch (IOException | InterruptedException ex) {
       LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
@@ -796,24 +795,20 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir()
-      throws IOException, InterruptedException, TimeoutException {
+  protected void deleteRootDir() throws IOException, InterruptedException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
     deleteRootRecursively(fileStatuses);
-    GenericTestUtils.waitFor(() -> {
-      FileStatus[] fileStatus = new FileStatus[0];
-      try {
-        fileStatus = fs.listStatus(ROOT);
-        return fileStatus != null && fileStatus.length == 0;
-      } catch (IOException e) {
-        Assert.assertFalse(fileStatus.length == 0);
-        return false;
+    fileStatuses = fs.listStatus(ROOT);
+    if (fileStatuses != null) {
+      for (FileStatus fileStatus : fileStatuses) {
+        LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
       }
-    }, 100, 500);
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+    }
   }
 
   private static void deleteRootRecursively(FileStatus[] fileStatuses)
