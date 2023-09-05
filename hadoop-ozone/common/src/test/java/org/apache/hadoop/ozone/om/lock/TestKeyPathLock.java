@@ -219,7 +219,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
 
     // Waiting for all the threads to be instantiated/to reach
-    // acquireWriteHashedLock.
+    // acquireWriteLock.
     countDown.countDown();
     Assert.assertEquals(1, lock.getCurrentLocks().size());
 
