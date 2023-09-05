@@ -21,7 +21,8 @@ package org.apache.hadoop.ozone;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -96,16 +97,17 @@ public class TestOmUtils {
     conf.set("ozone.om.address.ozone1.node1", "1.1.1.1");
     conf.set("ozone.om.address.ozone1.node2", "1.1.1.2");
     conf.set("ozone.om.address.ozone1.node3", "1.1.1.3");
-    Collection<InetSocketAddress> rpcAddrs =
-        OmUtils.getOmHAAddressesById(conf);
+    Map<String, List<InetSocketAddress>> addresses =
+            OmUtils.getOmHAAddressesById(conf);
+    assertFalse(addresses.isEmpty());
+    List<InetSocketAddress> rpcAddrs = addresses.get("ozone1");
     assertFalse(rpcAddrs.isEmpty());
-    assertFalse(rpcAddrs.isEmpty());
     assertTrue(rpcAddrs.stream().anyMatch(
-        a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
+            a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
     assertTrue(rpcAddrs.stream().anyMatch(
-        a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
+            a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
     assertTrue(rpcAddrs.stream().anyMatch(
-        a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
+            a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
   }
 
   @Test
