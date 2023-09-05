@@ -51,8 +51,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.Assert;
+
+import static org.apache.hadoop.ozone.s3.util.S3Utils.formatTime;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import org.junit.BeforeClass;
@@ -102,11 +103,11 @@ public class TestMultipartUploadWithCopy {
         .getKey(EXISTING_KEY)
         .getModificationTime().toEpochMilli();
     beforeSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
+        formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime + DELAY_MS);
+        formatTime(sourceKeyLastModificationTime + DELAY_MS);
     futureTimeStr =
-        OzoneUtils.formatTime(sourceKeyLastModificationTime +
+        formatTime(sourceKeyLastModificationTime +
             1000 * 60 * 24);
 
     // Make sure DELAY_MS has passed, otherwise

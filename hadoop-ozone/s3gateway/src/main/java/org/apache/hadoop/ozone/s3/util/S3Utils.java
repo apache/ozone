@@ -17,15 +17,24 @@
  */
 package org.apache.hadoop.ozone.s3.util;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.text.ParseException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.TimeZone;
+import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -115,5 +124,45 @@ public final class S3Utils {
     } catch (IllegalArgumentException ex) {
       throw newError(INVALID_ARGUMENT, storageType, ex);
     }
+  }
+
+  /**
+   * Returns a random Request ID.
+   *
+   * Request ID is returned to the client as well as flows through the system
+   * facilitating debugging on why a certain request failed.
+   *
+   * @return String random request ID
+   */
+  public static String getRequestID() {
+    return UUID.randomUUID().toString();
+  }
+
+  /**
+   * Date format that used in ozone. Here the format is thread safe to use.
+   */
+  private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter
+      .ofPattern(OzoneConsts.OZONE_DATE_FORMAT, Locale.US);
+
+
+  /**
+   * Convert time in millisecond to a human readable format required in ozone.
+   * @return a human readable string for the input time
+   */
+  public static String formatTime(long millis) {
+    return Instant.ofEpochMilli(millis)
+        .atZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE).toZoneId())
+        .format(DATE_FORMAT);
+  }
+
+  /**
+   * Convert time in ozone date format to millisecond.
+   * @return time in milliseconds
+   */
+  public static long formatDate(String date) throws ParseException {
+    Preconditions.checkNotNull(date, "Date string should not be null.");
+    return LocalDateTime.parse(date, DATE_FORMAT)
+        .atZone(TimeZone.getTimeZone(OzoneConsts.OZONE_TIME_ZONE).toZoneId())
+        .toInstant().toEpochMilli();
   }
 }

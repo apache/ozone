@@ -83,7 +83,6 @@ import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableMap;
@@ -124,6 +123,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.formatDate;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.getRequestID;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 import org.apache.http.HttpStatus;
@@ -1046,7 +1047,7 @@ public class ObjectEndpoint extends EndpointBase {
           // still does not support this just returning dummy response
           // for now
           CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-          copyObjectResponse.setETag(OzoneUtils.getRequestID());
+          copyObjectResponse.setETag(getRequestID());
           copyObjectResponse.setLastModified(Instant.ofEpochMilli(
               Time.now()));
           return copyObjectResponse;
@@ -1069,7 +1070,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       getMetrics().updateCopyObjectSuccessStats(startNanos);
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-      copyObjectResponse.setETag(OzoneUtils.getRequestID());
+      copyObjectResponse.setETag(getRequestID());
       copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
       return copyObjectResponse;
     } catch (OMException ex) {
@@ -1131,7 +1132,7 @@ public class ObjectEndpoint extends EndpointBase {
       return OptionalLong.empty();
     }
     try {
-      ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
+      ozoneDateInMs = formatDate(ozoneDateStr);
     } catch (ParseException e) {
       // if time not parseable, then return empty()
       return OptionalLong.empty();
