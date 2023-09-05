@@ -403,33 +403,11 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
     excludedNodes.add(datanodes.get(5));
-    if (datanodeCount == 6) {
-      /*
-      * when datanodeCount is 6, the clusterMap will be
-      * /rack0/node0
-      * /rack0/node1
-      * /rack0/node2
-      * /rack0/node3
-      * /rack0/node4
-      * /rack1/node5
-      * if we select node0 and node5 as the excluded datanode,
-      * only datanode in rack0 will be chosen when calling
-      * `policy.chooseDatanodes` and the placement will not be
-      *  met since there are two racks exist, but only one
-      * of them is chosen
-      * */
-      SCMException e = assertThrows(SCMException.class,
-          () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
-      String message = e.getMessage();
-      assertTrue(message.contains("Chosen nodes size: 2, but required nodes " +
-          "to choose: 3 do not match."));
-    } else {
-      datanodeDetails = policy.chooseDatanodes(
-          excludedNodes, null, nodeNum, 0, 15);
-      Assertions.assertEquals(nodeNum, datanodeDetails.size());
-      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-          Math.min(totalNum, rackNum));
-    }
+    datanodeDetails = policy.chooseDatanodes(
+        excludedNodes, null, nodeNum, 0, 15);
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+        Math.min(totalNum, rackNum));
   }
 
   @ParameterizedTest
@@ -803,6 +781,56 @@ public class TestSCMContainerPlacementRackScatter {
         excludedNodes, null, nodeNum, 0, 5);
     Assertions.assertEquals(nodeNum, datanodeDetails.size());
   }
+
+  @Test
+  public void testAllNodesOnRackExcludedReducesRackCount()
+      throws SCMException {
+    setup(10, 2);
+    // Here we have the following nodes / racks. Note that rack 4 is all
+    // excluded, so this test ensures we still get a node returned on the
+    // reduced set of racks.
+    // /rack0/node0 - used
+    // /rack0/node1 - free
+    // /rack1/node2 - used
+    // /rack1/node3 - free
+    // /rack2/node4 - used
+    // /rack2/node5 - free
+    // /rack3/node6 - used
+    // /rack3/node7 - free
+    // /rack4/node8 - excluded
+    // /rack4/node9 - excluded
+
+    List<DatanodeDetails> usedDns =
+        getDatanodes(Lists.newArrayList(0, 2, 4, 6));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(8, 9));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+  }
+
+  @Test
+  public void testAllNodesOnRackExcludedReducesRackCount2()
+      throws SCMException {
+    setup(5, 2);
+    // Here we have a setup like this, which is like a Ratis container with a
+    // decommissioning node on rack 2. This makes rack 2 excluded, so we should
+    // get a node returned on rack 0 or 1 instead.
+    // /rack0/node0 - used
+    // /rack0/node1 - free
+    // /rack1/node2 - used
+    // /rack1/node3 - free
+    // /rack2/node4 - excluded (eg decommissioning)
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 2));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(4));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+  }
+
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {
     Set<Node> racks = new HashSet<>();
