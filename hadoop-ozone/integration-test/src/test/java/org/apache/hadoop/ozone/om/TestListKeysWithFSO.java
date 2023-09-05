@@ -263,6 +263,11 @@ public class TestListKeysWithFSO {
     expectedKeys =
         getExpectedKeyList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
     checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
+
+    // case-10: keyPrefix corresponds an exist file
+    expectedKeys =
+        getExpectedKeyList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
+    checkKeyList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
   }
 
   @Test

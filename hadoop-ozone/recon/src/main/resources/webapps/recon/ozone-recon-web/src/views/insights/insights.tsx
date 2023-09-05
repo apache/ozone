@@ -26,6 +26,7 @@ import * as Plotly from 'plotly.js';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import './insights.less';
+import { AxiosAllGetHelper } from 'utils/axiosRequestHelper';
 const {TabPane} = Tabs;
 
 const size = filesize.partial({standard: 'iec',round: 0});
@@ -65,6 +66,8 @@ const allBucketsOption: IOption = {
   label: 'All Buckets',
   value: '*'
 };
+
+let cancelInsightSignal: AbortController;
 
 export class Insights extends React.Component<Record<string, object>, IInsightsState> {
   constructor(props = {}) {
@@ -214,11 +217,13 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     this.setState({
       isLoading: true
     });
+    const { requests, controller } = AxiosAllGetHelper([
+      '/api/v1/utilization/fileCount',
+      '/api/v1/utilization/containerCount'
+    ], cancelInsightSignal);
 
-    axios.all([
-      axios.get('/api/v1/utilization/fileCount'),
-      axios.get('/api/v1/utilization/containerCount')
-    ]).then(axios.spread((fileCountresponse, containerCountresponse) => {
+    cancelInsightSignal = controller;
+    requests.then(axios.spread((fileCountresponse, containerCountresponse) => {
       const fileCountsResponse: IFileCountResponse[] = fileCountresponse.data;
       const containerCountResponse: IContainerCountResponse[] = containerCountresponse.data;
       // Construct volume -> bucket[] map for populating filters
@@ -260,6 +265,10 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       });
       showDataFetchError(error.toString());
     });
+  }
+
+  componentWillUnmount(): void {
+    cancelInsightSignal && cancelInsightSignal.abort(); 
   }
 
   render() {

@@ -26,12 +26,17 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -100,7 +105,8 @@ import static org.apache.hadoop.util.Time.monotonicNow;
  */
 public abstract class OMKeyRequest extends OMClientRequest {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  @VisibleForTesting
+  public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -270,9 +276,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
-      OmBucketInfo bucketInfo, PrefixManager prefixManager) {
-    List<OzoneAcl> acls = new ArrayList<>();
+      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
+      PrefixManager prefixManager) {
 
+    List<OzoneAcl> acls = new ArrayList<>();
     if (keyArgs.getAclsList() != null) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
@@ -296,13 +303,54 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
 
+    // Inherit DEFAULT acls from parent-dir only if DEFAULT acls for
+    // prefix are not set
+    if (omPathInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+        return acls;
+      }
+    }
+
     // Inherit DEFAULT acls from bucket only if DEFAULT acls for
-    // prefix are not set.
+    // parent-dir are not set.
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
         return acls;
       }
     }
+
+    return acls;
+  }
+
+  /**
+   * Inherit parent DEFAULT acls and generate its own ACCESS acls.
+   * @param keyArgs
+   * @param bucketInfo
+   * @param omPathInfo
+   * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
+   */
+  protected static List<OzoneAcl> getAclsForDir(KeyArgs keyArgs,
+      OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo) {
+    // Acls inherited from parent or bucket will convert to DEFAULT scope
+    List<OzoneAcl> acls = new ArrayList<>();
+
+    // Inherit DEFAULT acls from parent-dir
+    if (omPathInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls())) {
+        OzoneAclUtil.toDefaultScope(acls);
+      }
+    }
+
+    // Inherit DEFAULT acls from bucket only if DEFAULT acls for
+    // parent-dir are not set.
+    if (acls.isEmpty() && bucketInfo != null) {
+      if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls())) {
+        OzoneAclUtil.toDefaultScope(acls);
+      }
+    }
+
+    // add itself acls
+    acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
 
     return acls;
   }
@@ -623,12 +671,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID, boolean isRatisEnabled,
           ReplicationConfig replicationConfig)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
-            locations, encInfo, prefixManager, omBucketInfo, null,
+            locations, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, isRatisEnabled, replicationConfig);
   }
 
@@ -645,7 +694,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable FileEncryptionInfo encInfo,
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoWithFSO omPathInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
           boolean isRatisEnabled, ReplicationConfig replicationConfig)
           throws IOException {
@@ -694,30 +743,33 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      OMFileRequest.OMPathInfoWithFSO omPathInfo,
-      long transactionLogIndex, long objectID
-  ) {
+      OMFileRequest.OMPathInfo omPathInfo,
+      long transactionLogIndex, long objectID) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(keyArgs.getKeyName())
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, locations)))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(size)
-        .setReplicationConfig(replicationConfig)
-        .setFileEncryptionInfo(encInfo)
-        .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(
-            keyArgs.getMetadataList()))
-        .setUpdateID(transactionLogIndex)
-        .setFile(true);
-    if (omPathInfo != null) {
+            .setBucketName(keyArgs.getBucketName())
+            .setKeyName(keyArgs.getKeyName())
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, locations,
+                        keyArgs.getIsMultipartKey())))
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setDataSize(size)
+            .setReplicationConfig(replicationConfig)
+            .setFileEncryptionInfo(encInfo)
+            .setAcls(getAclsForKey(
+                keyArgs, omBucketInfo, omPathInfo, prefixManager))
+            .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getMetadataList()))
+            .setUpdateID(transactionLogIndex)
+            .setFile(true);
+    if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
-      objectID = omPathInfo.getLeafNodeObjectId();
-      builder.setParentObjectID(omPathInfo.getLastKnownParentId());
-      builder.setFileName(omPathInfo.getLeafNodeName());
+      OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
+          = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
+      objectID = omPathInfoFSO.getLeafNodeObjectId();
+      builder.setParentObjectID(omPathInfoFSO.getLastKnownParentId());
+      builder.setFileName(omPathInfoFSO.getLeafNodeName());
     }
     builder.setObjectID(objectID);
     return builder.build();
@@ -736,7 +788,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull List<OmKeyLocationInfo> locations,
           FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
-          OMFileRequest.OMPathInfoWithFSO omPathInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID)
           throws IOException {
 
@@ -749,15 +801,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String uploadID = args.getMultipartUploadID();
     Preconditions.checkNotNull(uploadID);
     String multipartKey = "";
-    if (omPathInfo != null) {
+    if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
+      OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
+          = (OMFileRequest.OMPathInfoWithFSO) omPathInfo;
       final long volumeId = omMetadataManager.getVolumeId(
               args.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               args.getVolumeName(), args.getBucketName());
       // FileTable metadata format
       multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
-              omPathInfo.getLastKnownParentId(),
-              omPathInfo.getLeafNodeName(), uploadID);
+          omPathInfoFSO.getLastKnownParentId(),
+          omPathInfoFSO.getLeafNodeName(), uploadID);
     } else {
       multipartKey = omMetadataManager
               .getMultipartKey(args.getVolumeName(), args.getBucketName(),
@@ -843,5 +897,110 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  /**
+   * Remove blocks in-place from keysToBeFiltered that exist in referenceKey.
+   * <p>
+   * keysToBeFiltered.getOmKeyInfoList() becomes an empty list when all blocks
+   * are filtered out.
+   *
+   * @param referenceKey OmKeyInfo
+   * @param keysToBeFiltered RepeatedOmKeyInfo
+   */
+  protected void filterOutBlocksStillInUse(OmKeyInfo referenceKey,
+                                           RepeatedOmKeyInfo keysToBeFiltered) {
+
+    LOG.debug("Before block filtering, keysToBeFiltered = {}",
+        keysToBeFiltered);
+
+    // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
+    // the referenceKey.
+    HashSet<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
+        .stream()
+        .flatMap(e -> e.getLocationList().stream())
+        .map(omKeyLocationInfo ->
+            omKeyLocationInfo.getBlockID().getContainerBlockID())
+        .collect(Collectors.toCollection(HashSet::new));
+
+    // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
+    // keysToBeFiltered               // Layer 0. RepeatedOmKeyInfo
+    //     .getOmKeyInfoList()        // 1. List<OmKeyInfo>
+    //     .get(0)                    // 2. OmKeyInfo
+    //     .getKeyLocationVersions()  // 3. List<OmKeyLocationInfoGroup>
+    //     .get(0)                    // 4. OmKeyLocationInfoGroup
+    //     .getLocationVersionMap()   // 5. Map<Long, List<OmKeyLocationInfo>>
+    //     .get(version)              // 6. List<OmKeyLocationInfo>
+    //     .get(0)                    // 7. OmKeyLocationInfo
+    //     .getBlockID()              // 8. BlockID
+    //     .getContainerBlockID();    // 9. ContainerBlockID
+
+    // Using iterator instead of `for` or `forEach` for in-place entry removal
+
+    // Layer 1: List<OmKeyInfo>
+    Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
+        .getOmKeyInfoList().iterator();
+
+    while (iterOmKeyInfo.hasNext()) {
+      // Note with HDDS-8462, each RepeatedOmKeyInfo should have only one entry,
+      // so this outer most loop should never be entered twice in each call.
+
+      // But for completeness sake I shall put it here.
+      // Remove only when RepeatedOmKeyInfo is no longer used.
+
+      // Layer 2: OmKeyInfo
+      OmKeyInfo oldOmKeyInfo = iterOmKeyInfo.next();
+      // Layer 3: List<OmKeyLocationInfoGroup>
+      Iterator<OmKeyLocationInfoGroup> iterKeyLocInfoGroup = oldOmKeyInfo
+          .getKeyLocationVersions().iterator();
+      while (iterKeyLocInfoGroup.hasNext()) {
+        // Layer 4: OmKeyLocationInfoGroup
+        OmKeyLocationInfoGroup keyLocInfoGroup = iterKeyLocInfoGroup.next();
+        // Layer 5: Map<Long, List<OmKeyLocationInfo>>
+        Iterator<Map.Entry<Long, List<OmKeyLocationInfo>>> iterVerMap =
+            keyLocInfoGroup.getLocationVersionMap().entrySet().iterator();
+
+        while (iterVerMap.hasNext()) {
+          Map.Entry<Long, List<OmKeyLocationInfo>> mapEntry = iterVerMap.next();
+          // Layer 6: List<OmKeyLocationInfo>
+          List<OmKeyLocationInfo> omKeyLocationInfoList = mapEntry.getValue();
+
+          Iterator<OmKeyLocationInfo> iterKeyLocInfo =
+              omKeyLocationInfoList.iterator();
+          while (iterKeyLocInfo.hasNext()) {
+            // Layer 7: OmKeyLocationInfo
+            OmKeyLocationInfo keyLocationInfo = iterKeyLocInfo.next();
+            // Layer 8: BlockID. Then Layer 9: ContainerBlockID
+            ContainerBlockID cbId = keyLocationInfo
+                .getBlockID().getContainerBlockID();
+
+            if (cbIdSet.contains(cbId)) {
+              // Remove this block from oldVerKeyInfo because it is referenced.
+              iterKeyLocInfo.remove();
+              LOG.debug("Filtered out block: {}", cbId);
+            }
+          }
+
+          // Cleanup when Layer 6 is an empty list
+          if (omKeyLocationInfoList.isEmpty()) {
+            iterVerMap.remove();
+          }
+        }
+
+        // Cleanup when Layer 5 is an empty map
+        if (keyLocInfoGroup.getLocationVersionMap().isEmpty()) {
+          iterKeyLocInfoGroup.remove();
+        }
+      }
+
+      // Cleanup when Layer 3 is an empty list
+      if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
+        iterOmKeyInfo.remove();
+      }
+    }
+
+    // Intentional extra space for alignment
+    LOG.debug("After block filtering,  keysToBeFiltered = {}",
+        keysToBeFiltered);
   }
 }

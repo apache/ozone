@@ -19,11 +19,12 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,9 +52,10 @@ public class TestRequireSnapshotFeatureStateAspect {
     when(methodSignature.toShortString()).thenReturn("snapshotMethod");
     when(joinPoint.getSignature()).thenReturn(methodSignature);
 
-    LambdaTestUtils.intercept(OMException.class,
-        "Operation snapshotMethod cannot be invoked because " +
-            "Ozone snapshot feature is disabled",
+    OMException omException = assertThrows(OMException.class,
         () -> aspect.checkFeatureState(joinPoint));
+    assertEquals("Operation snapshotMethod cannot be invoked " +
+            "because Ozone snapshot feature is disabled.",
+        omException.getMessage());
   }
 }

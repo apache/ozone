@@ -33,20 +33,22 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   private final OutputStream outputStream;
   private final Syncable syncable;
+  private boolean enableHsync;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
    *
    * @param outputStream an {@link OutputStream} which is {@link Syncable}.
+   * @param enableHsync if false, hsync() executes flush() instead.
    */
-  public OzoneOutputStream(Syncable outputStream) {
+  public OzoneOutputStream(Syncable outputStream, boolean enableHsync) {
     this(Optional.of(Objects.requireNonNull(outputStream,
                 "outputStream == null"))
         .filter(s -> s instanceof OutputStream)
         .map(s -> (OutputStream)s)
         .orElseThrow(() -> new IllegalArgumentException(
             "The parameter syncable is not an OutputStream")),
-        outputStream);
+        outputStream, enableHsync);
   }
 
   /**
@@ -58,11 +60,26 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
    *                 for accessing the {@link Syncable} feature.
    */
   public OzoneOutputStream(OutputStream outputStream, Syncable syncable) {
+    this(outputStream, syncable, false);
+  }
+
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link OutputStream}
+   * with an optional {@link Syncable} object.
+   *
+   * @param outputStream for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   * @param enableHsync if false, hsync() executes flush() instead.
+   */
+  public OzoneOutputStream(OutputStream outputStream, Syncable syncable,
+      boolean enableHsync) {
     this.outputStream = Objects.requireNonNull(outputStream,
         "outputStream == null");
     this.syncable = syncable != null ? syncable
         : outputStream instanceof Syncable ? (Syncable) outputStream
         : null;
+    this.enableHsync = enableHsync;
   }
 
   @Override
@@ -87,6 +104,11 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
   }
 
   public void hsync() throws IOException {
+    // Disable the feature flag restores the prior behavior.
+    if (!enableHsync) {
+      outputStream.flush();
+      return;
+    }
     if (syncable != null) {
       if (outputStream != syncable) {
         outputStream.flush();

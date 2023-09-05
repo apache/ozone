@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -34,7 +35,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -88,6 +91,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   // from the same table and can send deletion requests for same snapshot
   // multiple times.
   private static final int SNAPSHOT_DELETING_CORE_POOL_SIZE = 1;
+  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
   private final ClientId clientId = ClientId.randomId();
 
   private final OzoneManager ozoneManager;
@@ -98,6 +102,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   private final AtomicLong successRunCount;
   private final long snapshotDeletionPerTask;
   private final int keyLimitPerSnapshot;
+  private final int ratisByteLimit;
 
   public SnapshotDeletingService(long interval, long serviceTimeout,
       OzoneManager ozoneManager, ScmBlockLocationProtocol scmClient)
@@ -116,6 +121,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.snapshotDeletionPerTask = conf
         .getLong(SNAPSHOT_DELETING_LIMIT_PER_TASK,
         SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT);
+    int limit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    // always go to 90% of max limit for request as other header will be added
+    this.ratisByteLimit = (int) (limit * 0.9);
     this.keyLimitPerSnapshot = conf.getInt(
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
@@ -147,12 +158,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         while (iterator.hasNext() && snapshotLimit > 0) {
           SnapshotInfo snapInfo = iterator.next().getValue();
-          SnapshotInfo.SnapshotStatus snapshotStatus =
-              snapInfo.getSnapshotStatus();
+          boolean isSstFilteringServiceEnabled =
+              ((KeyManagerImpl) ozoneManager.getKeyManager())
+                  .isSstFilteringSvcEnabled();
 
           // Only Iterate in deleted snapshot
-          if (!snapshotStatus.equals(
-              SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)) {
+          if (shouldIgnoreSnapshot(snapInfo, isSstFilteringServiceEnabled)) {
             continue;
           }
 
@@ -380,6 +391,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       long subDirNum = 0L;
       long subFileNum = 0L;
       long remainNum = keyLimitPerSnapshot;
+      int consumedSize = 0;
       List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
       List<Pair<String, OmKeyInfo>> allSubDirList
           = new ArrayList<>(keyLimitPerSnapshot);
@@ -400,6 +412,21 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             PurgePathRequest request = prepareDeleteDirRequest(
                 remainNum, deletedDir.getValue(), deletedDir.getKey(),
                 allSubDirList, omSnapshot.getKeyManager());
+            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                request.getSerializedSize())) {
+              if (purgePathRequestList.size() != 0) {
+                // if message buffer reaches max limit, avoid sending further
+                remainNum = 0;
+                break;
+              }
+              // if directory itself is having a lot of keys / files,
+              // reduce capacity to minimum level
+              remainNum = MIN_ERR_LIMIT_PER_TASK;
+              request = prepareDeleteDirRequest(
+                  remainNum, deletedDir.getValue(), deletedDir.getKey(),
+                  allSubDirList, omSnapshot.getKeyManager());
+            }
+            consumedSize += request.getSerializedSize();
             purgePathRequestList.add(request);
             remainNum = remainNum - request.getDeletedSubFilesCount();
             remainNum = remainNum - request.getMarkDeletedSubDirsCount();
@@ -417,7 +444,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         remainNum = optimizeDirDeletesAndSubmitRequest(remainNum, dirNum,
             subDirNum, subFileNum, allSubDirList, purgePathRequestList,
-            snapInfo.getTableKey(), startTime);
+            snapInfo.getTableKey(), startTime, ratisByteLimit - consumedSize);
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files for " +
             "snapshot " + snapInfo.getTableKey() + " in snapshot deleting " +
@@ -562,6 +589,13 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             "Will retry at next run.", e);
       }
     }
+  }
+
+  public static boolean shouldIgnoreSnapshot(SnapshotInfo snapInfo,
+      boolean isSstFilteringServiceEnabled) {
+    SnapshotInfo.SnapshotStatus snapshotStatus = snapInfo.getSnapshotStatus();
+    return !(snapshotStatus == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED)
+        || (isSstFilteringServiceEnabled && !snapInfo.isSstFiltered());
   }
 
   // TODO: Move this util class.

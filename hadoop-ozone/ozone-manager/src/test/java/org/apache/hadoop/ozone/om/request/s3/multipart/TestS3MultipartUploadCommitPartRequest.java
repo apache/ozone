@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -101,9 +102,14 @@ public class TestS3MultipartUploadCommitPartRequest
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
     Assert.assertTrue(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey).getPartKeyInfoMap().size() == 1);
-    Assert.assertNotNull(omMetadataManager
+
+    OmKeyInfo mpuOpenKeyInfo = omMetadataManager
         .getOpenKeyTable(s3MultipartUploadCommitPartRequest.getBucketLayout())
-        .get(multipartOpenKey));
+        .get(multipartOpenKey);
+    Assert.assertNotNull(mpuOpenKeyInfo);
+    Assert.assertNotNull(mpuOpenKeyInfo.getLatestVersionLocations());
+    Assert.assertTrue(mpuOpenKeyInfo.getLatestVersionLocations()
+        .isMultipartKey());
 
     String partKey = getOpenKey(volumeName, bucketName, keyName, clientID);
     Assert.assertNull(omMetadataManager
@@ -221,7 +227,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
       String keyName, long clientID) throws Exception {
-    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
+    OMRequestTestUtils.addKeyToTable(true, true,  volumeName, bucketName,
             keyName, clientID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, omMetadataManager);
   }
