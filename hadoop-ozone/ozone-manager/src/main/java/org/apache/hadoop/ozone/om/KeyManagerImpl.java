@@ -1389,13 +1389,6 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  public static boolean isKeyDeleted(String key, Table keyTable) {
-    CacheValue<OmKeyInfo> omKeyInfoCacheValue
-        = keyTable.getCacheValue(new CacheKey(key));
-    return omKeyInfoCacheValue != null
-        && omKeyInfoCacheValue.getCacheValue() == null;
-  }
-
   /**
    * Helper function for listStatus to find key in TableCache.
    * If enableFileSystemPaths is false, create a fakeDir and add to cacheKeyMap
