@@ -66,6 +66,37 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
 
+  @Config(key = "datastream.buffer.flush.size",
+      defaultValue = "16MB",
+      type = ConfigType.SIZE,
+      description = "The boundary at which putBlock is executed",
+      tags = ConfigTag.CLIENT)
+  private long dataStreamBufferFlushSize = 16 * 1024 * 1024;
+
+  @Config(key = "datastream.min.packet.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamMinPacketSize = 1024 * 1024;
+
+  @Config(key = "datastream.window.size",
+      defaultValue = "64MB",
+      type = ConfigType.SIZE,
+      description = "Maximum size of BufferList(used for retry) size per " +
+          "BlockDataStreamOutput instance",
+      tags = ConfigTag.CLIENT)
+  private long streamWindowSize = 64 * 1024 * 1024;
+
+  @Config(key = "datastream.pipeline.mode",
+      defaultValue = "true",
+      description = "Streaming write support both pipeline mode(datanode1->" +
+          "datanode2->datanode3) and star mode(datanode1->datanode2, " +
+          "datanode1->datanode3). By default we use pipeline mode.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPipelineMode = true;
+
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -143,6 +174,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int maxECStripeWriteRetries = 10;
 
+  @Config(key = "ec.stripe.queue.size",
+      defaultValue = "2",
+      description = "The max number of EC stripes can be buffered in client " +
+          " before flushing into datanodes.",
+      tags = ConfigTag.CLIENT)
+  private int ecStripeQueueSize = 2;
+
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
       description = "Time after which an excluded node is reconsidered for" +
@@ -175,6 +213,14 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private String checksumCombineMode =
       ChecksumCombineMode.COMPOSITE_CRC.name();
+
+  @Config(key = "fs.default.bucket.layout",
+      defaultValue = "FILE_SYSTEM_OPTIMIZED",
+      type = ConfigType.STRING,
+      description = "The bucket layout used by buckets created using OFS. " +
+          "Valid values include FILE_SYSTEM_OPTIMIZED and LEGACY",
+      tags = ConfigTag.CLIENT)
+  private String fsDefaultBucketLayout = "FILE_SYSTEM_OPTIMIZED";
 
   @PostConstruct
   private void validate() {
@@ -236,6 +282,22 @@ public class OzoneClientConfig {
     this.streamBufferMaxSize = streamBufferMaxSize;
   }
 
+  public int getDataStreamMinPacketSize() {
+    return dataStreamMinPacketSize;
+  }
+
+  public void setDataStreamMinPacketSize(int dataStreamMinPacketSize) {
+    this.dataStreamMinPacketSize = dataStreamMinPacketSize;
+  }
+
+  public long getStreamWindowSize() {
+    return streamWindowSize;
+  }
+
+  public void setStreamWindowSize(long streamWindowSize) {
+    this.streamWindowSize = streamWindowSize;
+  }
+
   public int getMaxRetryCount() {
     return maxRetryCount;
   }
@@ -280,12 +342,24 @@ public class OzoneClientConfig {
     return this.maxECStripeWriteRetries;
   }
 
+  public int getEcStripeQueueSize() {
+    return this.ecStripeQueueSize;
+  }
+
   public long getExcludeNodesExpiryTime() {
     return excludeNodesExpiryTime;
   }
 
   public int getBufferIncrement() {
     return bufferIncrement;
+  }
+
+  public long getDataStreamBufferFlushSize() {
+    return dataStreamBufferFlushSize;
+  }
+
+  public void setDataStreamBufferFlushSize(long dataStreamBufferFlushSize) {
+    this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
   }
 
   public ChecksumCombineMode getChecksumCombineMode() {
@@ -306,5 +380,23 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeReadPoolLimit() {
     return ecReconstructStripeReadPoolLimit;
+  }
+
+  public void setFsDefaultBucketLayout(String bucketLayout) {
+    if (!bucketLayout.isEmpty()) {
+      this.fsDefaultBucketLayout = bucketLayout;
+    }
+  }
+
+  public String getFsDefaultBucketLayout() {
+    return fsDefaultBucketLayout;
+  }
+
+  public boolean isDatastreamPipelineMode() {
+    return datastreamPipelineMode;
+  }
+
+  public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
+    this.datastreamPipelineMode = datastreamPipelineMode;
   }
 }

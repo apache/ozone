@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
@@ -84,6 +85,7 @@ public class BlockID {
     sb.append(" bcsId: ").append(blockCommitSequenceId);
   }
 
+  @JsonIgnore
   public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {
     return ContainerProtos.DatanodeBlockID.newBuilder().
         setContainerID(containerBlockID.getContainerID())
@@ -91,18 +93,21 @@ public class BlockID {
         .setBlockCommitSequenceId(blockCommitSequenceId).build();
   }
 
+  @JsonIgnore
   public static BlockID getFromProtobuf(
       ContainerProtos.DatanodeBlockID blockID) {
     return new BlockID(blockID.getContainerID(),
         blockID.getLocalID(), blockID.getBlockCommitSequenceId());
   }
 
+  @JsonIgnore
   public HddsProtos.BlockID getProtobuf() {
     return HddsProtos.BlockID.newBuilder()
         .setContainerBlockID(containerBlockID.getProtobuf())
         .setBlockCommitSequenceId(blockCommitSequenceId).build();
   }
 
+  @JsonIgnore
   public static BlockID getFromProtobuf(HddsProtos.BlockID blockID) {
     return new BlockID(
         ContainerBlockID.getFromProtobuf(blockID.getContainerBlockID()),

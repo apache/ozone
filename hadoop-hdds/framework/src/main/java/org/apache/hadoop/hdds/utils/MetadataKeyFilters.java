@@ -32,6 +32,7 @@ import com.google.common.base.Strings;
 public final class MetadataKeyFilters {
   private MetadataKeyFilters() { }
 
+  @Deprecated
   public static KeyPrefixFilter getDeletingKeyFilter() {
     return new MetadataKeyFilters.KeyPrefixFilter()
             .addFilter(OzoneConsts.DELETING_KEY_PREFIX);

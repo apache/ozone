@@ -18,11 +18,16 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
+
+import java.io.IOException;
+
 /**
  * Signals that {@link ContainerBalancerConfiguration} contains invalid
  * configuration value(s).
  */
-public class InvalidContainerBalancerConfigurationException extends Exception {
+public class InvalidContainerBalancerConfigurationException extends
+    SCMServiceException {
 
   /**
    * Constructs an InvalidContainerBalancerConfigurationException with no detail
@@ -44,4 +49,8 @@ public class InvalidContainerBalancerConfigurationException extends Exception {
     super(s);
   }
 
+  public InvalidContainerBalancerConfigurationException(String s,
+                                                        IOException e) {
+    super(s, e);
+  }
 }

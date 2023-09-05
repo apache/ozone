@@ -27,8 +27,29 @@ import java.io.IOException;
  */
 public class MetadataVolume extends StorageVolume {
 
+  private final VolumeType type = VolumeType.META_VOLUME;
+
   protected MetadataVolume(Builder b) throws IOException {
     super(b);
+    // Tmp directory on Metadata Volume uses the volume root as the working
+    // directory. It is not dependent on the cluster ID from SCM.
+    super.createTmpDirs("");
+  }
+
+  public VolumeType getType() {
+    return type;
+  }
+
+  @Override
+  public void format(String cid) throws IOException {
+    // No-op for Metadata volumes.
+  }
+
+  @Override
+  public void createTmpDirs(String workingDirName) {
+    // No-op for metadata volumes.
+    // Tmp directory is created on construction since it is not dependent on
+    // getting the cluster ID from SCM.
   }
 
   /**
@@ -48,5 +69,10 @@ public class MetadataVolume extends StorageVolume {
     public MetadataVolume build() throws IOException {
       return new MetadataVolume(this);
     }
+  }
+
+  @Override
+  public String getStorageID() {
+    return "";
   }
 }

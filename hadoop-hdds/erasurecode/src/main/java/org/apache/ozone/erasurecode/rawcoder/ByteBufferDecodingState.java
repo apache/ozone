@@ -95,26 +95,29 @@ class ByteBufferDecodingState extends DecodingState {
   void checkInputBuffers(ByteBuffer[] buffers) {
     int validInputs = 0;
 
-    for (ByteBuffer buffer : buffers) {
+    for (int i = 0; i < buffers.length; i++) {
+      ByteBuffer buffer = buffers[i];
+
       if (buffer == null) {
         continue;
       }
 
       if (buffer.remaining() != decodeLength) {
-        throw new IllegalArgumentException(
-            "Invalid buffer, not of length " + decodeLength);
+        throw new IllegalArgumentException("Invalid buffer [" + i +
+            "], not of length " + decodeLength);
       }
       if (buffer.isDirect() != usingDirectBuffer) {
-        throw new IllegalArgumentException(
-            "Invalid buffer, isDirect should be " + usingDirectBuffer);
+        throw new IllegalArgumentException("Invalid buffer [" + i +
+            "], isDirect should be " + usingDirectBuffer);
       }
 
       validInputs++;
     }
 
     if (validInputs < decoder.getNumDataUnits()) {
-      throw new IllegalArgumentException(
-          "No enough valid inputs are provided, not recoverable");
+      throw new IllegalArgumentException("No enough valid inputs are provided ("
+          + validInputs + " vs. " + decoder.getNumDataUnits()
+          + "), not recoverable");
     }
   }
 

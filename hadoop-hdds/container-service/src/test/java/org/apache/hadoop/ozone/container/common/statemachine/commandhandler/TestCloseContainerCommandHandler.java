@@ -98,7 +98,7 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, new OzoneConfiguration());
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(1000);
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);
@@ -126,7 +126,7 @@ public class TestCloseContainerCommandHandler {
     verify(writeChannel)
         .submitRequest(any(), eq(pipelineID.getProtobuf()));
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
   }
 
   @Test
@@ -141,7 +141,18 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
+  }
+
+  @Test
+  public void closeContainerWithForceFlagSet() throws IOException {
+    // close a container that's associated with an existing pipeline
+    subject.handle(forceCloseWithoutPipeline(), ozoneContainer, context, null);
+
+    verify(containerHandler)
+        .markContainerForClose(container);
+    verify(writeChannel, never()).submitRequest(any(), any());
+    verify(containerHandler).closeContainer(container);
   }
 
   @Test
@@ -165,10 +176,10 @@ public class TestCloseContainerCommandHandler {
 
     verify(writeChannel, never())
         .submitRequest(any(), any());
-    // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
-    // exist. Container should not exist in CLOSING state without a pipeline.
+    // Container in CLOSING state is moved to CLOSED if pipeline does not
+    // exist and force is set to TRUE.
     verify(containerHandler)
-        .quasiCloseContainer(container);
+        .closeContainer(container);
   }
 
   @Test
@@ -181,7 +192,7 @@ public class TestCloseContainerCommandHandler {
     verify(writeChannel)
         .submitRequest(any(), any());
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
   }
@@ -199,7 +210,7 @@ public class TestCloseContainerCommandHandler {
     verify(containerHandler, never())
         .markContainerForClose(container);
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
     verify(writeChannel, never())

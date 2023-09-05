@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSto
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
@@ -111,14 +112,15 @@ public final class SCMCertStore implements CertificateStore {
   public void storeValidScmCertificate(BigInteger serialID,
       X509Certificate certificate) throws IOException {
     lock.lock();
-    try {
-      BatchOperation batchOperation =
-          scmMetadataStore.getBatchHandler().initBatchOperation();
+    try (BatchOperation batchOperation =
+             scmMetadataStore.getBatchHandler().initBatchOperation()) {
       scmMetadataStore.getValidSCMCertsTable().putWithBatch(batchOperation,
           serialID, certificate);
       scmMetadataStore.getValidCertsTable().putWithBatch(batchOperation,
           serialID, certificate);
       scmMetadataStore.getStore().commitBatchOperation(batchOperation);
+      LOG.info("Scm certificate {} for {} is stored", serialID,
+          certificate.getSubjectDN());
     } finally {
       lock.unlock();
     }
@@ -220,6 +222,44 @@ public final class SCMCertStore implements CertificateStore {
   }
 
   @Override
+  public List<X509Certificate> removeAllExpiredCertificates()
+      throws IOException {
+    List<X509Certificate> removedCerts = new ArrayList<>();
+    lock.lock();
+    try (BatchOperation batchOperation =
+             scmMetadataStore.getBatchHandler().initBatchOperation()) {
+      removedCerts.addAll(addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidCertsTable()));
+      removedCerts.addAll(addExpiredCertsToBeRemoved(batchOperation,
+          scmMetadataStore.getValidSCMCertsTable()));
+      scmMetadataStore.getStore().commitBatchOperation(batchOperation);
+    } finally {
+      lock.unlock();
+    }
+    return removedCerts;
+  }
+
+  private List<X509Certificate> addExpiredCertsToBeRemoved(
+      BatchOperation batchOperation, Table<BigInteger,
+      X509Certificate> certTable) throws IOException {
+    List<X509Certificate> removedCerts = new ArrayList<>();
+    try (TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
+        X509Certificate>> certsIterator = certTable.iterator()) {
+      Date now = new Date();
+      while (certsIterator.hasNext()) {
+        Table.KeyValue<BigInteger, X509Certificate> certEntry =
+            certsIterator.next();
+        X509Certificate cert = certEntry.getValue();
+        if (cert.getNotAfter().before(now)) {
+          removedCerts.add(cert);
+          certTable.deleteWithBatch(batchOperation, certEntry.getKey());
+        }
+      }
+    }
+    return removedCerts;
+  }
+
+  @Override
   public X509Certificate getCertificateByID(BigInteger serialID,
                                             CertType certType)
       throws IOException {
@@ -265,7 +305,7 @@ public final class SCMCertStore implements CertificateStore {
     } else {
       List<? extends Table.KeyValue<BigInteger, CertInfo>> certs =
           scmMetadataStore.getRevokedCertsV2Table().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
 
       for (Table.KeyValue<BigInteger, CertInfo> kv : certs) {
         try {
@@ -290,10 +330,10 @@ public final class SCMCertStore implements CertificateStore {
 
     if (role == SCM) {
       return scmMetadataStore.getValidSCMCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     } else {
       return scmMetadataStore.getValidCertsTable().getRangeKVs(
-          startSerialID, count);
+          startSerialID, count, null);
     }
   }
 

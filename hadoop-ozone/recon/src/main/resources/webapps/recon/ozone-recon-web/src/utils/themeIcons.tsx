@@ -34,12 +34,12 @@ export class FilledIcon extends React.Component {
 }
 
 interface IRatisIconProps {
-  replicationFactor: number;
+  replicationFactor: string;
   isLeader: boolean;
 }
 
 interface IReplicationIconProps {
-  replicationFactor: number;
+  replicationFactor: string;
   replicationType: string;
   leaderNode: string;
   isLeader: boolean;
@@ -49,7 +49,7 @@ export class RatisIcon extends React.PureComponent<IRatisIconProps> {
   render() {
     const {replicationFactor, isLeader} = this.props;
     const threeFactorClass = isLeader ? 'icon-text-three-dots-leader' : 'icon-text-three-dots';
-    const textClass = replicationFactor >= 3 ? threeFactorClass : 'icon-text-one-dot';
+    const textClass = replicationFactor === "THREE" ? threeFactorClass : 'icon-text-one-dot';
     return (
       <div className='ratis-icon'>
         <div className={textClass}>R</div>

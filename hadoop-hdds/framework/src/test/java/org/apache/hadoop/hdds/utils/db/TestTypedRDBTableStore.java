@@ -28,9 +28,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
@@ -42,8 +43,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -52,6 +51,7 @@ import org.rocksdb.StatsLevel;
  * Tests for RocksDBTable Store.
  */
 public class TestTypedRDBTableStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -60,27 +60,29 @@ public class TestTypedRDBTableStore {
           "Sixth", "Seven", "Eighth",
           "Ninth", "Ten");
   private RDBStore rdbStore = null;
-  private DBOptions options = null;
+  private ManagedDBOptions options = null;
   private CodecRegistry codecRegistry;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
-    options = new DBOptions();
+    options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 
     Statistics statistics = new Statistics();
     statistics.setStatsLevel(StatsLevel.ALL);
-    options = options.setStatistics(statistics);
+    options.setStatistics(statistics);
 
     Set<TableConfig> configSet = new HashSet<>();
     for (String name : families) {
-      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      TableConfig newConfig = new TableConfig(name,
+          new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
 
-    codecRegistry = new CodecRegistry();
+    codecRegistry = CodecRegistry.newBuilder().build();
 
   }
 
@@ -89,6 +91,7 @@ public class TestTypedRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -248,8 +251,7 @@ public class TestTypedRDBTableStore {
         String key = Integer.toString(x);
         String value = Integer.toString(x);
         testTable.addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(value),
-            x));
+            CacheValue.get(x, value));
       }
 
       // As we have added to cache, so get should return value even if it
@@ -274,11 +276,10 @@ public class TestTypedRDBTableStore {
         String value = Integer.toString(x);
         if (x % 2 == 0) {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), x));
+              CacheValue.get(x, value));
         } else {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(),
-              x));
+              CacheValue.get(x));
         }
       }
 
@@ -362,11 +363,11 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.of(value), 1L));
+          CacheValue.get(1L, value));
       Assertions.assertTrue(testTable.isExist(key));
 
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 1L));
+          CacheValue.get(1L));
       Assertions.assertFalse(testTable.isExist(key));
     }
   }
@@ -402,7 +403,7 @@ public class TestTypedRDBTableStore {
       Assertions.assertArrayEquals(value, testTable.get(key));
       Assertions.assertNotSame(value, actualValue);
       testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), 1L));
+              CacheValue.get(1L, value));
       Assertions.assertSame(value, testTable.get(key));
     }
   }

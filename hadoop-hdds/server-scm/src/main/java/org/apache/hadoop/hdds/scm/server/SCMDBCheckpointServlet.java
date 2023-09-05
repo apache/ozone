@@ -60,6 +60,7 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
         scm.getMetrics().getDBCheckpointMetrics(),
         false,
         Collections.emptyList(),
+        Collections.emptyList(),
         false);
   }
 }

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.IOException;
 import java.util.Objects;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
@@ -104,7 +105,8 @@ public class OzoneFileStatus {
     return builder.build();
   }
 
-  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto status) {
+  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto status)
+      throws IOException {
     return new OzoneFileStatus(
         OmKeyInfo.getFromProtobuf(status.getKeyInfo()),
         status.getBlockSize(),

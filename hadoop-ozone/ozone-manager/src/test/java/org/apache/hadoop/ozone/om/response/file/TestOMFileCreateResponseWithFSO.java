@@ -29,6 +29,7 @@ import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 
+import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -49,19 +50,22 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
   @NotNull
   @Override
-  protected String getOpenKeyName() {
+  protected String getOpenKeyName() throws IOException {
     Assert.assertNotNull(omBucketInfo);
-    return omMetadataManager.getOpenFileName(
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOpenFileName(volumeId, bucketId,
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
   @NotNull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-      OmBucketInfo bucketInfo, OMResponse response) {
+      OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMFileCreateResponseWithFSO(response, keyInfo,
-        new ArrayList<>(), clientID, bucketInfo);
+        new ArrayList<>(), clientID, bucketInfo, getVolumeId());
   }
 
   @Override

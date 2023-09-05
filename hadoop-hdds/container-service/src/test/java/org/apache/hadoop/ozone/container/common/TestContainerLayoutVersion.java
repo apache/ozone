@@ -19,11 +19,11 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests ContainerLayoutVersion.

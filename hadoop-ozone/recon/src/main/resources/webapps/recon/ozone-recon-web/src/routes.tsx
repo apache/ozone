@@ -23,7 +23,10 @@ import {NotFound} from './views/notFound/notFound';
 import {IRoute} from './types/routes.types';
 import {MissingContainers} from './views/missingContainers/missingContainers';
 import {Insights} from './views/insights/insights';
+import {Om} from './views/insights/om/om';
+
 import {DiskUsage} from './views/diskUsage/diskUsage';
+import {Heatmap} from './views/heatMap/heatmap';
 
 export const routes: IRoute[] = [
   {
@@ -43,12 +46,28 @@ export const routes: IRoute[] = [
     component: Insights
   },
   {
+    path: '/Om',
+    component: Om
+  },
+  {
     path: '/MissingContainers',
     component: MissingContainers
   },
   {
     path: '/DiskUsage',
     component: DiskUsage
+  },
+  {
+    path: '/Buckets',
+    component: DiskUsage,
+  },
+  {
+    path: '/Containers',
+    component: MissingContainers,
+  },
+  {
+    path: '/Heatmap',
+    component: Heatmap
   },
   {
     path: '/:NotFound',

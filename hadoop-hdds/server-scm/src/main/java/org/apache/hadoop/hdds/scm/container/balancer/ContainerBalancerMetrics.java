@@ -73,6 +73,22 @@ public final class ContainerBalancerMetrics {
       "Container Balancer.")
   private MutableCounterLong dataSizeMovedGB;
 
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally across all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailed;
+
+  @Metric(about = "Total number container for which moves failed " +
+      "exceptionally in latest iteration of Container Balancer.")
+  private MutableCounterLong numContainerMovesFailedInLatestIteration;
+
+  @Metric(about = "Number of container moves that were scheduled in the " +
+      "latest iteration of Container Balancer.")
+  private MutableCounterLong numContainerMovesScheduledInLatestIteration;
+
+  @Metric(about = "Total number of container moves that were scheduled across" +
+      " all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesScheduled;
+
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
    * for {@link ContainerBalancer}.
@@ -87,6 +103,32 @@ public final class ContainerBalancerMetrics {
 
   private ContainerBalancerMetrics(MetricsSystem ms) {
     this.ms = ms;
+  }
+
+  /**
+   * Gets the number of container moves scheduled across all iterations of
+   * Container Balancer.
+   * @return number of moves
+   */
+  public long getNumContainerMovesScheduled() {
+    return numContainerMovesScheduled.value();
+  }
+
+  void incrementNumContainerMovesScheduled(long valueToAdd) {
+    this.numContainerMovesScheduled.incr(valueToAdd);
+  }
+
+  /**
+   * Gets the number of container moves scheduled in the latest iteration of
+   * Container Balancer.
+   * @return number of moves
+   */
+  public long getNumContainerMovesScheduledInLatestIteration() {
+    return numContainerMovesScheduledInLatestIteration.value();
+  }
+
+  void incrementNumContainerMovesScheduledInLatestIteration(long valueToAdd) {
+    this.numContainerMovesScheduledInLatestIteration.incr(valueToAdd);
   }
 
   /**
@@ -119,6 +161,42 @@ public final class ContainerBalancerMetrics {
   public void incrementNumContainerMovesCompletedInLatestIteration(
       long valueToAdd) {
     this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
+  }
+
+  public void incrementCurrentIterationContainerMoveMetric(
+      MoveManager.MoveResult result, long valueToAdd) {
+    if (result == null) {
+      return;
+    }
+    switch (result) {
+    case COMPLETED:
+      this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
+      break;
+    case REPLICATION_FAIL_TIME_OUT:
+    case DELETION_FAIL_TIME_OUT:
+      this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
+      break;
+    // TODO: Add metrics for other errors that need to be tracked.
+    case FAIL_LEADER_NOT_READY:
+    case REPLICATION_FAIL_INFLIGHT_REPLICATION:
+    case REPLICATION_FAIL_NOT_EXIST_IN_SOURCE:
+    case REPLICATION_FAIL_EXIST_IN_TARGET:
+    case REPLICATION_FAIL_CONTAINER_NOT_CLOSED:
+    case REPLICATION_FAIL_INFLIGHT_DELETION:
+    case REPLICATION_FAIL_NODE_NOT_IN_SERVICE:
+    case DELETION_FAIL_NODE_NOT_IN_SERVICE:
+    case REPLICATION_FAIL_NODE_UNHEALTHY:
+    case DELETION_FAIL_NODE_UNHEALTHY:
+    case DELETE_FAIL_POLICY:
+    case REPLICATION_NOT_HEALTHY_BEFORE_MOVE:
+    case REPLICATION_NOT_HEALTHY_AFTER_MOVE:
+    case FAIL_CONTAINER_ALREADY_BEING_MOVED:
+    case FAIL_UNEXPECTED_ERROR:
+      incrementNumContainerMovesFailedInLatestIteration(valueToAdd);
+      break;
+    default:
+      break;
+    }
   }
 
   public void resetNumContainerMovesCompletedInLatestIteration() {
@@ -229,5 +307,26 @@ public final class ContainerBalancerMetrics {
 
   public void incrementDataSizeMovedGB(long valueToAdd) {
     dataSizeMovedGB.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailed() {
+    return numContainerMovesFailed.value();
+  }
+
+  public void incrementNumContainerMovesFailed(long valueToAdd) {
+    numContainerMovesFailed.incr(valueToAdd);
+  }
+
+  public long getNumContainerMovesFailedInLatestIteration() {
+    return numContainerMovesFailedInLatestIteration.value();
+  }
+
+  public void incrementNumContainerMovesFailedInLatestIteration(
+      long valueToAdd) {
+    numContainerMovesFailedInLatestIteration.incr(valueToAdd);
+  }
+  public void resetNumContainerMovesFailedInLatestIteration() {
+    numContainerMovesFailedInLatestIteration.incr(
+        -getNumContainerMovesFailedInLatestIteration());
   }
 }

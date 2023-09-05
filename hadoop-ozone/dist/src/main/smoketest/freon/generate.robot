@@ -30,6 +30,3 @@ OM Key Generator
 
 OM Bucket Generator
     Freon OMBG    prefix=ombg${PREFIX}
-
-DN Chunk Generator
-    Freon DCG     prefix=dcg${PREFIX}    n=100

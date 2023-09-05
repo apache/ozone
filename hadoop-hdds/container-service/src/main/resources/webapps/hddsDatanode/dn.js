@@ -26,10 +26,30 @@
         },
         controller: function ($http) {
             var ctrl = this;
-            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=StorageContainerMetrics")
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=VolumeInfoMetrics*")
                 .then(function (result) {
-                    ctrl.dnmetrics = result.data.beans[0];
+                    ctrl.dnmetrics = result.data.beans;
+                    ctrl.dnmetrics.forEach(volume => {
+                 volume.Used = transform(volume.Used);
+                 volume.Available = transform(volume.Available);
+                 volume.Reserved = transform(volume.Reserved);
+                 volume.TotalCapacity = transform(volume.TotalCapacity);
+                })
                 });
         }
     });
+        function transform(v) {
+          var UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'ZB'];
+          var prev = 0, i = 0;
+          while (Math.floor(v) > 0 && i < UNITS.length) {
+            prev = v;
+            v /= 1024;
+            i += 1;
+          }
+          if (i > 0 && i < UNITS.length) {
+            v = prev;
+            i -= 1;
+          }
+          return Math.round(v * 100) / 100 + ' ' + UNITS[i];
+        }
 })();

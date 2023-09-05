@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -46,16 +47,24 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
         S3InitiateMultipartUploadResponse {
   private List<OmDirectoryInfo> parentDirInfos;
   private String mpuDBKey;
+  private long volumeId;
+  private long bucketId;
+  private OmBucketInfo omBucketInfo;
 
+  @SuppressWarnings("parameternumber")
   public S3InitiateMultipartUploadResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull String mpuDBKey,
       @Nonnull List<OmDirectoryInfo> parentDirInfos,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
+      @Nonnull long bucketId, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omMultipartKeyInfo, omKeyInfo, bucketLayout);
     this.parentDirInfos = parentDirInfos;
     this.mpuDBKey = mpuDBKey;
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
@@ -77,14 +86,25 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
      */
     if (parentDirInfos != null) {
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        String parentKey = parentDirInfo.getPath();
+        final String parentKey = omMetadataManager.getOzonePathKey(
+                volumeId, bucketId, parentDirInfo.getParentObjectID(),
+                parentDirInfo.getName());
         omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
                 parentKey, parentDirInfo);
       }
+
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          omBucketInfo.getVolumeName(),
+          omBucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, omBucketInfo);
     }
 
-    OMFileRequest.addToOpenFileTable(omMetadataManager, batchOperation,
-        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID());
+    OMFileRequest.addToOpenFileTableForMultipart(omMetadataManager,
+        batchOperation,
+        getOmKeyInfo(), getOmMultipartKeyInfo().getUploadID(), volumeId,
+        bucketId);
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         mpuDBKey, getOmMultipartKeyInfo());

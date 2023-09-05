@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -38,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
@@ -189,6 +189,8 @@ public class TestCleanupTableInfo {
   public void testKeyCreateRequestSetsAllTouchedTableCachesForEviction() {
     OMKeyCreateRequest request = anOMKeyCreateRequest();
     when(om.getEnableFileSystemPaths()).thenReturn(true);
+    when(om.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(false, false));
 
     Map<String, Integer> cacheItemCount = recordCacheItemCounts();
 
@@ -243,7 +245,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getVolumeTable().put(volumeKey, volumeArgs);
     om.getMetadataManager().getVolumeTable().addCacheEntry(
         new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(volumeArgs), 2)
+        CacheValue.get(2, volumeArgs)
     );
   }
 
@@ -261,7 +263,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getBucketTable().put(bucketKey, bucketInfo);
     om.getMetadataManager().getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(bucketInfo), 1)
+        CacheValue.get(1, bucketInfo)
     );
   }
 
@@ -281,7 +283,7 @@ public class TestCleanupTableInfo {
       Assert.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    return spy(new OmMetadataManagerImpl(conf));
+    return spy(new OmMetadataManagerImpl(conf, null));
   }
 
   private OMFileCreateRequest anOMFileCreateRequest() {

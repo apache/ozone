@@ -23,9 +23,9 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -38,8 +38,8 @@ import java.util.Optional;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockDnUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockScmUpgradeAction;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test HDDS upgrade action registrations.
@@ -58,9 +58,9 @@ public class TestHDDSLayoutVersionManager {
 
     //Cluster is finalized, hence should not register.
     Optional<HDDSUpgradeAction> action = INITIAL_VERSION.scmAction(ON_FINALIZE);
-    Assert.assertFalse(action.isPresent());
+    Assertions.assertFalse(action.isPresent());
     action = DATANODE_SCHEMA_V2.datanodeAction(ON_FIRST_UPGRADE_START);
-    Assert.assertFalse(action.isPresent());
+    Assertions.assertFalse(action.isPresent());
 
     // Start from an unfinalized version manager.
     lvm = mock(HDDSLayoutVersionManager.class);

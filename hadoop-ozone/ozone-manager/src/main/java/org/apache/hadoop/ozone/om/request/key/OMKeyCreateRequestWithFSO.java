@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -111,6 +110,12 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               volumeName, bucketName);
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      final long volumeId = omMetadataManager.getVolumeTable()
+              .get(omMetadataManager.getVolumeKey(volumeName)).getObjectID();
+      final long bucketId = omMetadataManager.getBucketTable()
+              .get(omMetadataManager.getBucketKey(volumeName, bucketName))
+              .getObjectID();
+
       OmKeyInfo dbFileInfo = null;
 
       OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
@@ -119,7 +124,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       if (pathInfoFSO.getDirectoryResult()
               == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
-        String dbFileKey = omMetadataManager.getOzonePathKey(
+        String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
                 pathInfoFSO.getLastKnownParentId(),
                 pathInfoFSO.getLeafNodeName());
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
@@ -137,22 +142,23 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             + " as there is already file in the given path", NOT_A_FILE);
       }
 
+      // do open key
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(volumeName, bucketName));
+
       // add all missing parents to dir table
       missingParentInfos =
-              OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
-                      ozoneManager, keyArgs, pathInfoFSO, trxnLogIndex);
+          OMDirectoryCreateRequestWithFSO.getAllMissingParentDirInfo(
+              ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
 
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
               dbFileInfo, keyArgs.getDataSize(), locations,
@@ -164,8 +170,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
       String dbOpenFileName = omMetadataManager
-          .getOpenFileName(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), clientID);
+          .getOpenFileName(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(), clientID);
 
       // Append new blocks
       List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
@@ -178,8 +185,10 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          preAllocatedSpace);
+      checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -191,8 +200,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              trxnLogIndex);
+              volumeId, bucketId, trxnLogIndex,
+              missingParentInfos, null);
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
@@ -205,7 +214,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,
-              omBucketInfo.copyObject());
+              omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -252,11 +261,15 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                                          OMMetadataManager omMetadataManager)
       throws IOException {
 
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
     long parentId =
         getParentId(omMetadataManager, volumeName, bucketName, keyName);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
 
-    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
+    return omMetadataManager.getMultipartKey(volumeId, bucketId, parentId,
+            fileName, uploadID);
   }
 }

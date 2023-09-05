@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -31,7 +33,8 @@ public abstract class AbstractBlockChecksumComputer {
    * Compute block checksum. The result can be obtained by getOutBytes().
    * @throws IOException
    */
-  public abstract void compute() throws IOException;
+  public abstract void compute(
+      OzoneClientConfig.ChecksumCombineMode combineMode) throws IOException;
 
   public ByteBuffer getOutByteBuffer() {
     return outByteBuffer;

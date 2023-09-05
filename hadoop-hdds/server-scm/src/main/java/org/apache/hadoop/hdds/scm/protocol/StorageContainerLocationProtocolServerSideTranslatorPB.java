@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
@@ -41,6 +43,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.FinalizeScmUpgradeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeRequestProto;
@@ -58,6 +62,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
@@ -96,6 +102,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ResetDeletedBlockRetryCountResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -638,6 +646,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setGetContainerCountResponse(getContainerCount(
                   request.getGetContainerCountRequest()))
           .build();
+      case GetClosedContainerCount:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerCountResponse(getClosedContainerCount(
+                request.getGetContainerCountRequest()))
+            .build();
       case GetContainerReplicas:
         return ScmContainerLocationResponse.newBuilder()
           .setCmdType(request.getCmdType())
@@ -646,6 +661,37 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
               request.getGetContainerReplicasRequest(),
               request.getVersion()))
           .build();
+      case GetFailedDeletedBlocksTransaction:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetFailedDeletedBlocksTxnResponse(getFailedDeletedBlocksTxn(
+                request.getGetFailedDeletedBlocksTxnRequest()
+            ))
+            .build();
+      case ResetDeletedBlockRetryCount:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setResetDeletedBlockRetryCountResponse(
+                  getResetDeletedBlockRetryCount(
+                      request.getResetDeletedBlockRetryCountRequest()))
+              .build();
+      case TransferLeadership:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setTransferScmLeadershipResponse(
+                  transferScmLeadership(
+                      request.getTransferScmLeadershipRequest()))
+              .build();
+      case DecommissionScm:
+        return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setDecommissionScmResponse(decommissionScm(
+                  request.getDecommissionScmRequest()))
+              .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -1137,5 +1183,46 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerCountResponseProto.newBuilder()
       .setContainerCount(impl.getContainerCount())
       .build();
+  }
+
+  public GetContainerCountResponseProto getClosedContainerCount(
+      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+          request) throws IOException {
+
+    return GetContainerCountResponseProto.newBuilder()
+        .setContainerCount(impl.getContainerCount(
+            HddsProtos.LifeCycleState.CLOSED))
+        .build();
+  }
+
+  public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
+      GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
+    long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
+    return GetFailedDeletedBlocksTxnResponseProto.newBuilder()
+        .addAllDeletedBlocksTransactions(
+            impl.getFailedDeletedBlockTxn(request.getCount(), startTxId))
+        .build();
+  }
+
+  public ResetDeletedBlockRetryCountResponseProto
+      getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
+      request) throws IOException {
+    return ResetDeletedBlockRetryCountResponseProto.newBuilder()
+        .setResetCount(impl.resetDeletedBlockRetryCount(
+            request.getTransactionIdList()))
+        .build();
+  }
+
+  public TransferLeadershipResponseProto transferScmLeadership(
+      TransferLeadershipRequestProto request) throws IOException {
+    String newLeaderId = request.getNewLeaderId();
+    impl.transferLeadership(newLeaderId);
+    return TransferLeadershipResponseProto.getDefaultInstance();
+  }
+
+  public DecommissionScmResponseProto decommissionScm(
+      DecommissionScmRequestProto request) throws IOException {
+    return impl.decommissionScm(
+        request.getScmId());
   }
 }

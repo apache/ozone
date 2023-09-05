@@ -53,10 +53,10 @@ One Ozone configuration (`ozone-site.xml`) can support multiple Ozone HA cluster
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
  
- ```
+```XML
 <property>
    <name>ozone.om.service.ids</name>
-   <value>cluster1,cluster2</value>
+   <value>cluster1</value>
 </property>
 ```
 
@@ -132,20 +132,6 @@ ozone om [global options (optional)] --bootstrap --force
 ```
 
 Note that using the _force_ option during bootstrap could crash the OM process if it does not have updated configurations.
-
-## OM Decommission
-
-To decommission an OM and remove the node from the OM HA ring, the following steps need to be executed.
-1. Stop the OzoneManager process only on the node which needs to be decommissioned. <p> **Note -** Do not stop the decommissioning OM if there are
-   only two OMs in the ring as both the OMs would be needed to reach consensus to update the Ratis configuration.</p>
-2. Add the _OM NodeId_ of the to be decommissioned OM node to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
-   other OMs.
-3. Run the following command to decommission an OM node.
-```shell
-ozone admin om decommission -id=<om-service-id> -nodeid=<decommissioning-om-node-id> -hostname=<decommissioning-om-node-address> [optional --force]
-```
-The _force_option will skip checking whether OM configurations in _ozone-site.xml_ have been updated with the decommissioned node added to
-_ozone.om.decommissioned.nodes_ property. <p>**Note -** It is recommended to bootstrap another OM node before decommissioning one to maintain HA.</p>
 
 ## References
 

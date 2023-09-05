@@ -26,13 +26,20 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -46,8 +53,25 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithParentObjectId {
+public final class OmKeyInfo extends WithParentObjectId
+    implements CopyObject<OmKeyInfo> {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
+
+  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
+  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+
+  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+    return new DelegatedCodec<>(
+        Proto2Codec.get(KeyInfo.class),
+        OmKeyInfo::getFromProtobuf,
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
+  }
+
+  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
+    LOG.info("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  }
+
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -58,6 +82,11 @@ public final class OmKeyInfo extends WithParentObjectId {
   private long modificationTime;
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
+  private final FileChecksum fileChecksum;
+  /**
+   * Support OFS use-case to identify if the key is a file or a directory.
+   */
+  private boolean isFile;
 
   /**
    * Represents leaf node name. This also will be used when the keyName is
@@ -78,7 +107,7 @@ public final class OmKeyInfo extends WithParentObjectId {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID) {
+      long objectID, long updateID, FileChecksum fileChecksum) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -92,6 +121,7 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.fileChecksum = fileChecksum;
   }
 
   @SuppressWarnings("parameternumber")
@@ -101,12 +131,14 @@ public final class OmKeyInfo extends WithParentObjectId {
             ReplicationConfig replicationConfig,
             Map<String, String> metadata,
             FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-            long parentObjectID, long objectID, long updateID) {
+            long parentObjectID, long objectID, long updateID,
+            FileChecksum fileChecksum, boolean isFile) {
     this(volumeName, bucketName, keyName, versions, dataSize,
             creationTime, modificationTime, replicationConfig, metadata,
-            encInfo, acls, objectID, updateID);
+            encInfo, acls, objectID, updateID, fileChecksum);
     this.fileName = fileName;
     this.parentObjectID = parentObjectID;
+    this.isFile = isFile;
   }
 
   public String getVolumeName() {
@@ -172,28 +204,45 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.modificationTime = Time.monotonicNow();
   }
 
-  /**
-   * updates the length of the each block in the list given.
-   * This will be called when the key is being committed to OzoneManager.
-   *
-   * @param locationInfoList list of locationInfo
-   */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
-      boolean isMpu) {
-    updateLocationInfoList(locationInfoList, isMpu, false);
+  public void setFile(boolean file) {
+    isFile = file;
+  }
+
+  public boolean isFile() {
+    return isFile;
+  }
+
+  public boolean isHsync() {
+    return metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID);
   }
 
   /**
    * updates the length of the each block in the list given.
    * This will be called when the key is being committed to OzoneManager.
+   * Return the uncommitted locationInfo to be deleted.
+   *
+   * @param locationInfoList list of locationInfo
+   * @return allocated but uncommitted locationInfos
+   */
+  public List<OmKeyLocationInfo> updateLocationInfoList(
+      List<OmKeyLocationInfo> locationInfoList, boolean isMpu) {
+    return updateLocationInfoList(locationInfoList, isMpu, false);
+  }
+
+  /**
+   * updates the length of the each block in the list given.
+   * This will be called when the key is being committed to OzoneManager.
+   * Return the uncommitted locationInfo to be deleted.
    *
    * @param locationInfoList list of locationInfo
    * @param isMpu a true represents multi part key, false otherwise
    * @param skipBlockIDCheck a true represents that the blockId verification
    *                         check should be skipped, false represents that
    *                         the blockId verification will be required
+   * @return allocated but uncommitted locationInfos
    */
-  public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList,
+  public List<OmKeyLocationInfo> updateLocationInfoList(
+      List<OmKeyLocationInfo> locationInfoList,
       boolean isMpu, boolean skipBlockIDCheck) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
@@ -202,51 +251,68 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     // Compare user given block location against allocatedBlockLocations
     // present in OmKeyInfo.
+    List<OmKeyLocationInfo> uncommittedBlocks;
     List<OmKeyLocationInfo> updatedBlockLocations;
     if (skipBlockIDCheck) {
       updatedBlockLocations = locationInfoList;
+      uncommittedBlocks = new ArrayList<>();
     } else {
-      updatedBlockLocations =
+      Pair<List<OmKeyLocationInfo>, List<OmKeyLocationInfo>> verifiedResult =
           verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
+      updatedBlockLocations = verifiedResult.getLeft();
+      uncommittedBlocks = verifiedResult.getRight();
     }
-    // Updates the latest locationList in the latest version only with
-    // given locationInfoList here.
-    // TODO : The original allocated list and the updated list here may vary
-    // as the containers on the Datanode on which the blocks were pre allocated
-    // might get closed. The diff of blocks between these two lists here
-    // need to be garbage collected in case the ozone client dies.
+
     keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
     updatedBlockLocations.forEach(omKeyLocationInfo -> omKeyLocationInfo
         .setCreateVersion(latestVersion));
     keyLocationInfoGroup.addAll(latestVersion, updatedBlockLocations);
+
+    return uncommittedBlocks;
   }
 
-  private List<OmKeyLocationInfo> verifyAndGetKeyLocations(
-      List<OmKeyLocationInfo> locationInfoList,
-      OmKeyLocationInfoGroup keyLocationInfoGroup) {
-
-    List<OmKeyLocationInfo> allocatedBlockLocations =
-        keyLocationInfoGroup.getBlocksLatestVersionOnly();
-    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
-
-    List<ContainerBlockID> existingBlockIDs = new ArrayList<>();
-    for (OmKeyLocationInfo existingLocationInfo : allocatedBlockLocations) {
-      BlockID existingBlockID = existingLocationInfo.getBlockID();
-      existingBlockIDs.add(existingBlockID.getContainerBlockID());
+  /**
+   *  1. Verify committed KeyLocationInfos
+   *  2. Find out the allocated but uncommitted KeyLocationInfos.
+   *
+   * @param locationInfoList committed KeyLocationInfos
+   * @param keyLocationInfoGroup allocated KeyLocationInfoGroup
+   * @return Pair of updatedOmKeyLocationInfo and uncommittedOmKeyLocationInfo
+   */
+  private Pair<List<OmKeyLocationInfo>, List<OmKeyLocationInfo>>
+      verifyAndGetKeyLocations(
+          List<OmKeyLocationInfo> locationInfoList,
+          OmKeyLocationInfoGroup keyLocationInfoGroup) {
+    // Only check ContainerBlockID here to avoid the mismatch of the pipeline
+    // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
+    // the pipeline field by default and bcsId would be updated in Ratis mode.
+    Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
+        new HashMap<>();
+    for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
+        getLocationList()) {
+      ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
+          getContainerBlockID();
+      // The case of overwriting value should never happen
+      allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
     }
 
+    List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
     for (OmKeyLocationInfo modifiedLocationInfo : locationInfoList) {
-      BlockID modifiedBlockID = modifiedLocationInfo.getBlockID();
-      if (existingBlockIDs.contains(modifiedBlockID.getContainerBlockID())) {
+      ContainerBlockID modifiedContainerBlockId =
+          modifiedLocationInfo.getBlockID().getContainerBlockID();
+      if (allocatedBlockLocations.containsKey(modifiedContainerBlockId)) {
         updatedBlockLocations.add(modifiedLocationInfo);
+        allocatedBlockLocations.remove(modifiedContainerBlockId);
       } else {
         LOG.warn("Unknown BlockLocation:{}, where the blockID of given "
             + "location doesn't match with the stored/allocated block of"
             + " keyName:{}", modifiedLocationInfo, keyName);
       }
     }
-    return updatedBlockLocations;
+    List<OmKeyLocationInfo> uncommittedLocationInfos = new ArrayList<>(
+        allocatedBlockLocations.values());
+    return Pair.of(updatedBlockLocations, uncommittedLocationInfos);
   }
 
   /**
@@ -355,6 +421,29 @@ public final class OmKeyInfo extends WithParentObjectId {
     this.replicationConfig = repConfig;
   }
 
+  public FileChecksum getFileChecksum() {
+    return fileChecksum;
+  }
+
+  @Override
+  public String toString() {
+    return "OmKeyInfo{" +
+        "volumeName='" + volumeName + '\'' +
+        ", bucketName='" + bucketName + '\'' +
+        ", keyName='" + keyName + '\'' +
+        ", dataSize=" + dataSize +
+        ", keyLocationVersions=" + keyLocationVersions +
+        ", creationTime=" + creationTime +
+        ", modificationTime=" + modificationTime +
+        ", replicationConfig=" + replicationConfig +
+        ", encInfo=" + (encInfo == null ? "null" : "<REDACTED>") +
+        ", fileChecksum=" + fileChecksum +
+        ", isFile=" + isFile +
+        ", fileName='" + fileName + '\'' +
+        ", acls=" + acls +
+        '}';
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
@@ -376,6 +465,9 @@ public final class OmKeyInfo extends WithParentObjectId {
     // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private long parentObjectID;
+    private FileChecksum fileChecksum;
+
+    private boolean isFile;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -483,12 +575,22 @@ public final class OmKeyInfo extends WithParentObjectId {
       return this;
     }
 
+    public Builder setFileChecksum(FileChecksum checksum) {
+      this.fileChecksum = checksum;
+      return this;
+    }
+
+    public Builder setFile(boolean isAFile) {
+      this.isFile = isAFile;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
               volumeName, bucketName, keyName, fileName,
               omKeyLocationInfoGroups, dataSize, creationTime,
               modificationTime, replicationConfig, metadata, encInfo, acls,
-              parentObjectID, objectID, updateID);
+              parentObjectID, objectID, updateID, fileChecksum, isFile);
     }
   }
 
@@ -577,6 +679,11 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentID(parentObjectID);
+
+    FileChecksumProto fileChecksumProto = OMPBHelper.convert(fileChecksum);
+    if (fileChecksumProto != null) {
+      kb.setFileChecksum(fileChecksumProto);
+    }
     if (StringUtils.isNotBlank(fullKeyName)) {
       kb.setKeyName(fullKeyName);
     } else {
@@ -585,10 +692,11 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
+    kb.setIsFile(isFile);
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) throws IOException {
     if (keyInfo == null) {
       return null;
     }
@@ -623,6 +731,15 @@ public final class OmKeyInfo extends WithParentObjectId {
     if (keyInfo.hasParentID()) {
       builder.setParentObjectID(keyInfo.getParentID());
     }
+    if (keyInfo.hasFileChecksum()) {
+      FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
+      builder.setFileChecksum(fileChecksum);
+    }
+
+    if (keyInfo.hasIsFile()) {
+      builder.setFile(keyInfo.getIsFile());
+    }
+
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();
@@ -638,7 +755,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         ", creationTime='" + creationTime + '\'' +
         ", objectID='" + objectID + '\'' +
         ", parentID='" + parentObjectID + '\'' +
-        ", replication='" + replicationConfig +
+        ", replication='" + replicationConfig + '\'' +
+        ", fileChecksum='" + fileChecksum +
         '}';
   }
 
@@ -675,6 +793,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   /**
    * Return a new copy of the object.
    */
+  @Override
   public OmKeyInfo copyObject() {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
@@ -688,7 +807,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
-        .setFileName(fileName);
+        .setFileName(fileName)
+        .setFile(isFile);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(
@@ -702,6 +822,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    }
+
+    if (fileChecksum != null) {
+      builder.setFileChecksum(fileChecksum);
     }
 
     return builder.build();

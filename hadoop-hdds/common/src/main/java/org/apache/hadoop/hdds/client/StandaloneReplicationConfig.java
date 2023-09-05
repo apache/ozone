@@ -121,4 +121,9 @@ public final class StandaloneReplicationConfig implements
   public String toString() {
     return REPLICATION_TYPE + "/" + replicationFactor;
   }
+
+  @Override
+  public String configFormat() {
+    return toString();
+  }
 }

@@ -17,20 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,85 +42,62 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   public static final Logger LOG =
       LoggerFactory.getLogger(DownloadAndImportReplicator.class);
 
+  private final ConfigurationSource conf;
+  private final ContainerDownloader downloader;
+  private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
 
-  private final ContainerController controller;
-
-  private final ContainerDownloader downloader;
-
-  private final TarContainerPacker packer;
-
   public DownloadAndImportReplicator(
-      ContainerSet containerSet,
-      ContainerController controller,
-      ContainerDownloader downloader,
-      TarContainerPacker packer) {
+      ConfigurationSource conf, ContainerSet containerSet,
+      ContainerImporter containerImporter,
+      ContainerDownloader downloader) {
+    this.conf = conf;
     this.containerSet = containerSet;
-    this.controller = controller;
     this.downloader = downloader;
-    this.packer = packer;
-  }
-
-  public void importContainer(long containerID, Path tarFilePath)
-      throws IOException {
-    try {
-      ContainerData originalContainerData;
-      try (FileInputStream tempContainerTarStream = new FileInputStream(
-          tarFilePath.toFile())) {
-        byte[] containerDescriptorYaml =
-            packer.unpackContainerDescriptor(tempContainerTarStream);
-        originalContainerData = ContainerDataYaml.readContainer(
-            containerDescriptorYaml);
-      }
-
-      try (FileInputStream tempContainerTarStream = new FileInputStream(
-          tarFilePath.toFile())) {
-
-        Container container = controller.importContainer(
-            originalContainerData, tempContainerTarStream, packer);
-
-        containerSet.addContainer(container);
-      }
-
-    } finally {
-      try {
-        Files.delete(tarFilePath);
-      } catch (Exception ex) {
-        LOG.error("Got exception while deleting downloaded container file: "
-            + tarFilePath.toAbsolutePath().toString(), ex);
-      }
-    }
+    this.containerImporter = containerImporter;
   }
 
   @Override
   public void replicate(ReplicationTask task) {
     long containerID = task.getContainerId();
+    if (containerSet.getContainer(containerID) != null) {
+      LOG.debug("Container {} has already been downloaded.", containerID);
+      task.setStatus(Status.SKIPPED);
+      return;
+    }
 
     List<DatanodeDetails> sourceDatanodes = task.getSources();
+    CopyContainerCompression compression =
+        CopyContainerCompression.getConf(conf);
 
-    LOG.info("Starting replication of container {} from {}", containerID,
-        sourceDatanodes);
+    LOG.info("Starting replication of container {} from {} using {}",
+        containerID, sourceDatanodes, compression);
 
-    // Wait for the download. This thread pool is limiting the parallel
-    // downloads, so it's ok to block here and wait for the full download.
-    Path path =
-        downloader.getContainerDataFromReplicas(containerID, sourceDatanodes);
-    if (path == null) {
-      task.setStatus(Status.FAILED);
-    } else {
-      try {
-        long bytes = Files.size(path);
-        LOG.info("Container {} is downloaded with size {}, starting to import.",
-                containerID, bytes);
-        task.setTransferredBytes(bytes);
-
-        importContainer(containerID, path);
-        LOG.info("Container {} is replicated successfully", containerID);
-        task.setStatus(Status.DONE);
-      } catch (IOException e) {
-        LOG.error("Container {} replication was unsuccessful.", containerID, e);
+    try {
+      HddsVolume targetVolume = containerImporter.chooseNextVolume();
+      // Wait for the download. This thread pool is limiting the parallel
+      // downloads, so it's ok to block here and wait for the full download.
+      Path tarFilePath =
+          downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
+              ContainerImporter.getUntarDirectory(targetVolume), compression);
+      if (tarFilePath == null) {
         task.setStatus(Status.FAILED);
+        return;
       }
+      long bytes = Files.size(tarFilePath);
+      LOG.info("Container {} is downloaded with size {}, starting to import.",
+              containerID, bytes);
+      task.setTransferredBytes(bytes);
+
+      containerImporter.importContainer(containerID, tarFilePath, targetVolume,
+          compression);
+
+      LOG.info("Container {} is replicated successfully", containerID);
+      task.setStatus(Status.DONE);
+    } catch (IOException e) {
+      LOG.error("Container {} replication was unsuccessful.", containerID, e);
+      task.setStatus(Status.FAILED);
     }
   }
+
 }

@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -117,7 +116,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getBlockTokenSecretManager(), repConfig, excludeList,
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
-            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
+            ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId(),
+            ozoneManager.getMetrics());
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -221,7 +221,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       long totalAllocatedSpace = QuotaUtil.getReplicatedSize(
           preAllocatedKeySize, repConfig) + QuotaUtil.getReplicatedSize(
           hadAllocatedKeySize, repConfig);
-      checkBucketQuotaInBytes(omBucketInfo, totalAllocatedSpace);
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          totalAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -234,7 +235,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKeyName),
-          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
+          CacheValue.get(trxnLogIndex, openKeyInfo));
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
@@ -280,6 +281,35 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates block allocation requests.
+   * We do not want to allow older clients to create block allocation requests
+   * for keys that are present in buckets which use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AllocateBlock
+  )
+  public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getAllocateBlockRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

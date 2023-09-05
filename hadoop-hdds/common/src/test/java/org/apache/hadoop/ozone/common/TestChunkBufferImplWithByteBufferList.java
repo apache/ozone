@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.collect.ImmutableList;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;

@@ -133,7 +133,7 @@ The following data is persisted in Ozone Manager side in a specific RocksDB dire
  * Multipart info table
    * Inflight uploads should be tracked
  * Deleted table
-  * To track the blocks which should be deleted from the datanodes
+   * To track the blocks which should be deleted from the datanodes
 
 ## Notable configurations
 

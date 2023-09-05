@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -34,6 +36,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+
 /**
  * Test for NSSummary manager.
  */
@@ -41,15 +46,20 @@ public class TestReconNamespaceSummaryManagerImpl {
   @ClassRule
   public static final TemporaryFolder TEMP_FOLDER = new TemporaryFolder();
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
   private static int[] testBucket;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeClass
   public static void setupOnce() throws Exception {
+    reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(TEMP_FOLDER.newFolder()),
+        TEMP_FOLDER.newFolder());
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(TEMP_FOLDER)
                     .withReconSqlDb()
+                    .withReconOm(reconOMMetadataManager)
                     .withContainerDB()
                     .build();
     reconNamespaceSummaryManager = reconTestInjector.getInstance(
@@ -104,9 +114,11 @@ public class TestReconNamespaceSummaryManagerImpl {
     hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1"));
     hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2"));
     hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3"));
+    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
     for (Map.Entry entry: hmap.entrySet()) {
-      reconNamespaceSummaryManager.storeNSSummary(
+      reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               (long)entry.getKey(), (NSSummary)entry.getValue());
     }
+    reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
   }
 }

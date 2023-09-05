@@ -75,7 +75,6 @@ public class TestDnRatisLogParser {
 
   @Test
   public void testRatisLogParsing() throws Exception {
-    cluster.stop();
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);

@@ -31,14 +31,18 @@ import java.io.File;
  */
 public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
-  private File dbDir;
+  private final File dbDir;
+  private final ConfigurationSource config;
 
   /**
    * @param dbPath The absolute path to the .db file corresponding to this
+   * @param config The ozone global configuration.
    * {@link DBDefinition}.
    */
-  protected AbstractDatanodeDBDefinition(String dbPath) {
+  protected AbstractDatanodeDBDefinition(String dbPath,
+      ConfigurationSource config) {
     this.dbDir = new File(dbPath);
+    this.config = config;
   }
 
   @Override
@@ -57,10 +61,8 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
             "No location config key available for datanode databases.");
   }
 
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
+  public ConfigurationSource getConfig() {
+    return config;
   }
 
   public abstract DBColumnFamilyDefinition<String, BlockData>

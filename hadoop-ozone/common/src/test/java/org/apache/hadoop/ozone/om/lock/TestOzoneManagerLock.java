@@ -22,10 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -77,6 +76,50 @@ public class TestOzoneManagerLock {
     }
   }
 
+  protected boolean acquireWriteLock(OzoneManagerLock lock,
+                                     OzoneManagerLock.Resource resource,
+                                     String[] resourceName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      return lock.acquireWriteHashedLock(resource,
+          generateResourceHashCode(resource, resourceName));
+    } else {
+      return lock.acquireWriteLock(resource, resourceName);
+    }
+  }
+
+  protected void releaseWriteLock(OzoneManagerLock lock,
+                                     OzoneManagerLock.Resource resource,
+                                     String[] resourceName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      lock.releaseWriteHashedLock(resource,
+          generateResourceHashCode(resource, resourceName));
+    } else {
+      lock.releaseWriteLock(resource, resourceName);
+    }
+  }
+
+  protected boolean acquireReadLock(OzoneManagerLock lock,
+                                     OzoneManagerLock.Resource resource,
+                                     String[] resourceName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      return lock.acquireReadHashedLock(resource,
+          generateResourceHashCode(resource, resourceName));
+    } else {
+      return lock.acquireReadLock(resource, resourceName);
+    }
+  }
+
+  protected void releaseReadLock(OzoneManagerLock lock,
+                                     OzoneManagerLock.Resource resource,
+                                     String[] resourceName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      lock.releaseReadHashedLock(resource,
+          generateResourceHashCode(resource, resourceName));
+    } else {
+      lock.releaseReadLock(resource, resourceName);
+    }
+  }
+
   private void testResourceReacquireLock(String[] resourceName,
       OzoneManagerLock.Resource resource) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
@@ -85,22 +128,22 @@ public class TestOzoneManagerLock {
     if (resource == OzoneManagerLock.Resource.USER_LOCK ||
         resource == OzoneManagerLock.Resource.S3_SECRET_LOCK ||
         resource == OzoneManagerLock.Resource.PREFIX_LOCK) {
-      lock.acquireWriteLock(resource, resourceName);
+      acquireWriteLock(lock, resource, resourceName);
       try {
-        lock.acquireWriteLock(resource, resourceName);
+        acquireWriteLock(lock, resource, resourceName);
         fail("reacquireResourceLock failed");
       } catch (RuntimeException ex) {
         String message = "cannot acquire " + resource.getName() + " lock " +
             "while holding [" + resource.getName() + "] lock(s).";
         Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
       }
-      lock.releaseWriteLock(resource, resourceName);
+      releaseWriteLock(lock, resource, resourceName);
       Assert.assertTrue(true);
     } else {
-      lock.acquireWriteLock(resource, resourceName);
-      lock.acquireWriteLock(resource, resourceName);
-      lock.releaseWriteLock(resource, resourceName);
-      lock.releaseWriteLock(resource, resourceName);
+      acquireWriteLock(lock, resource, resourceName);
+      acquireWriteLock(lock, resource, resourceName);
+      releaseWriteLock(lock, resource, resourceName);
+      releaseWriteLock(lock, resource, resourceName);
       Assert.assertTrue(true);
     }
   }
@@ -117,20 +160,20 @@ public class TestOzoneManagerLock {
         OzoneManagerLock.Resource.values()) {
       Stack<ResourceInfo> stack = new Stack<>();
       resourceName = generateResourceName(resource);
-      lock.acquireWriteLock(resource, resourceName);
+      acquireWriteLock(lock, resource, resourceName);
       stack.push(new ResourceInfo(resourceName, resource));
       for (OzoneManagerLock.Resource higherResource :
           OzoneManagerLock.Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           resourceName = generateResourceName(higherResource);
-          lock.acquireWriteLock(higherResource, resourceName);
+          acquireWriteLock(lock, higherResource, resourceName);
           stack.push(new ResourceInfo(resourceName, higherResource));
         }
       }
       // Now release locks
       while (!stack.empty()) {
         ResourceInfo resourceInfo = stack.pop();
-        lock.releaseWriteLock(resourceInfo.getResource(),
+        releaseWriteLock(lock, resourceInfo.getResource(),
             resourceInfo.getLockName());
       }
     }
@@ -146,9 +189,9 @@ public class TestOzoneManagerLock {
           OzoneManagerLock.Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           String[] resourceName = generateResourceName(higherResource);
-          lock.acquireWriteLock(higherResource, resourceName);
+          acquireWriteLock(lock, higherResource, resourceName);
           try {
-            lock.acquireWriteLock(resource, generateResourceName(resource));
+            acquireWriteLock(lock, resource, generateResourceName(resource));
             fail("testLockViolationsWithOneHigherLevelLock failed");
           } catch (RuntimeException ex) {
             String message = "cannot acquire " + resource.getName() + " lock " +
@@ -156,7 +199,7 @@ public class TestOzoneManagerLock {
             Assert.assertTrue(ex.getMessage(),
                 ex.getMessage().contains(message));
           }
-          lock.releaseWriteLock(higherResource, resourceName);
+          releaseWriteLock(lock, higherResource, resourceName);
         }
       }
     }
@@ -178,13 +221,13 @@ public class TestOzoneManagerLock {
           OzoneManagerLock.Resource.values()) {
         if (higherResource.getMask() > resource.getMask()) {
           resourceName = generateResourceName(higherResource);
-          lock.acquireWriteLock(higherResource, resourceName);
+          acquireWriteLock(lock, higherResource, resourceName);
           stack.push(new ResourceInfo(resourceName, higherResource));
           currentLocks.add(higherResource.getName());
           // try to acquire lower level lock
           try {
             resourceName = generateResourceName(resource);
-            lock.acquireWriteLock(resource, resourceName);
+            acquireWriteLock(lock, resource, resourceName);
           } catch (RuntimeException ex) {
             String message = "cannot acquire " + resource.getName() + " lock " +
                 "while holding " + currentLocks.toString() + " lock(s).";
@@ -197,7 +240,7 @@ public class TestOzoneManagerLock {
       // Now release locks
       while (!stack.empty()) {
         ResourceInfo resourceInfo = stack.pop();
-        lock.releaseWriteLock(resourceInfo.getResource(),
+        releaseWriteLock(lock, resourceInfo.getResource(),
             resourceInfo.getLockName());
       }
     }
@@ -222,7 +265,8 @@ public class TestOzoneManagerLock {
     if (resource == OzoneManagerLock.Resource.BUCKET_LOCK) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString()};
-    } else if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+    } else if ((resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) ||
+        (resource == OzoneManagerLock.Resource.SNAPSHOT_LOCK)) {
       return new String[]{UUID.randomUUID().toString(),
           UUID.randomUUID().toString(), UUID.randomUUID().toString()};
     } else {
@@ -230,7 +274,7 @@ public class TestOzoneManagerLock {
     }
   }
 
-  private String generateResourceLockName(OzoneManagerLock.Resource resource,
+  protected String generateResourceLockName(OzoneManagerLock.Resource resource,
                                           String... resources) {
     if (resources.length == 1 &&
         resource != OzoneManagerLock.Resource.BUCKET_LOCK) {
@@ -241,12 +285,60 @@ public class TestOzoneManagerLock {
       return OzoneManagerLockUtil.generateBucketLockName(resources[0],
           resources[1]);
     } else if (resources.length == 3 &&
+        resource == OzoneManagerLock.Resource.SNAPSHOT_LOCK) {
+      return OzoneManagerLockUtil.generateSnapshotLockName(resources[0],
+          resources[1], resources[2]);
+    } else if (resources.length == 3 &&
         resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
       return OzoneManagerLockUtil.generateKeyPathLockName(resources[0],
           resources[1], resources[2]);
     } else {
       throw new IllegalArgumentException("acquire lock is supported on single" +
-          " resource for all locks except for resource bucket");
+          " resource for all locks except for resource bucket/snapshot");
+    }
+  }
+
+  protected String generateResourceHashCode(OzoneManagerLock.Resource resource,
+                                          String[] resourceName) {
+    String resourceLockName = generateResourceLockName(resource, resourceName);
+    int resourceHashCode = resourceLockName.hashCode();
+    return String.valueOf(resourceHashCode);
+  }
+
+  protected String generateResourceHashCode(OzoneManagerLock.Resource resource,
+                                            String resourceLockName) {
+    return String.valueOf(resourceLockName.hashCode());
+  }
+
+  protected int getReadHoldCount(OzoneManagerLock lock,
+                                 OzoneManagerLock.Resource resource,
+                                 String resourceLockName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      return lock.getReadHoldCount(
+          generateResourceHashCode(resource, resourceLockName));
+    } else {
+      return lock.getReadHoldCount(resourceLockName);
+    }
+  }
+
+  protected int getWriteHoldCount(OzoneManagerLock lock,
+                                 OzoneManagerLock.Resource resource,
+                                 String resourceLockName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      return lock.getWriteHoldCount(
+          generateResourceHashCode(resource, resourceLockName));
+    } else {
+      return lock.getWriteHoldCount(resourceLockName);
+    }
+  }
+
+  protected boolean isWriteLockedByCurrentThread(OzoneManagerLock lock,
+      OzoneManagerLock.Resource resource, String resourceLockName) {
+    if (resource == OzoneManagerLock.Resource.KEY_PATH_LOCK) {
+      return lock.isWriteLockedByCurrentThread(
+          generateResourceHashCode(resource, resourceLockName));
+    } else {
+      return lock.isWriteLockedByCurrentThread(resourceLockName);
     }
   }
 
@@ -331,20 +423,20 @@ public class TestOzoneManagerLock {
     for (OzoneManagerLock.Resource resource :
         OzoneManagerLock.Resource.values()) {
       final String[] resourceName = generateResourceName(resource);
-      lock.acquireWriteLock(resource, resourceName);
+      acquireWriteLock(lock, resource, resourceName);
 
       AtomicBoolean gotLock = new AtomicBoolean(false);
       new Thread(() -> {
-        lock.acquireWriteLock(resource, resourceName);
+        acquireWriteLock(lock, resource, resourceName);
         gotLock.set(true);
-        lock.releaseWriteLock(resource, resourceName);
+        releaseWriteLock(lock, resource, resourceName);
       }).start();
       // Let's give some time for the new thread to run
       Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
       Assert.assertFalse(gotLock.get());
-      lock.releaseWriteLock(resource, resourceName);
+      releaseWriteLock(lock, resource, resourceName);
       // Since we have released the lock, the new thread should have the lock
       // now.
       // Let's give some time for the new thread to run
@@ -397,40 +489,45 @@ public class TestOzoneManagerLock {
   }
 
   private void testLockHoldCountUtil(OzoneManagerLock.Resource resource,
-                                         String[] resourceName,
-                                         String resourceLockName) {
+                                     String[] resourceName,
+                                     String resourceLockName) {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
 
-    assertEquals(0, lock.getReadHoldCount(resourceLockName));
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(1, lock.getReadHoldCount(resourceLockName));
+    assertEquals(0, getReadHoldCount(lock, resource, resourceLockName));
+    acquireReadLock(lock, resource, resourceName);
+    assertEquals(1, getReadHoldCount(lock, resource, resourceLockName));
 
-    lock.acquireReadLock(resource, resourceName);
-    assertEquals(2, lock.getReadHoldCount(resourceLockName));
+    acquireReadLock(lock, resource, resourceName);
+    assertEquals(2, getReadHoldCount(lock, resource, resourceLockName));
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(1, lock.getReadHoldCount(resourceLockName));
+    releaseReadLock(lock, resource, resourceName);
+    assertEquals(1, getReadHoldCount(lock, resource, resourceLockName));
 
-    lock.releaseReadLock(resource, resourceName);
-    assertEquals(0, lock.getReadHoldCount(resourceLockName));
+    releaseReadLock(lock, resource, resourceName);
+    assertEquals(0, getReadHoldCount(lock, resource, resourceLockName));
 
-    Assert.assertFalse(lock.isWriteLockedByCurrentThread(resourceLockName));
-    assertEquals(0, lock.getWriteHoldCount(resourceLockName));
-    lock.acquireWriteLock(resource, resourceName);
-    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceLockName));
-    assertEquals(1, lock.getWriteHoldCount(resourceLockName));
+    Assert.assertFalse(
+        isWriteLockedByCurrentThread(lock, resource, resourceLockName));
+    assertEquals(0, getWriteHoldCount(lock, resource, resourceLockName));
+    acquireWriteLock(lock, resource, resourceName);
+    Assert.assertTrue(
+        isWriteLockedByCurrentThread(lock, resource, resourceLockName));
+    assertEquals(1, getWriteHoldCount(lock, resource, resourceLockName));
 
-    lock.acquireWriteLock(resource, resourceName);
-    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceLockName));
-    assertEquals(2, lock.getWriteHoldCount(resourceLockName));
+    acquireWriteLock(lock, resource, resourceName);
+    Assert.assertTrue(
+        isWriteLockedByCurrentThread(lock, resource, resourceLockName));
+    assertEquals(2, getWriteHoldCount(lock, resource, resourceLockName));
 
-    lock.releaseWriteLock(resource, resourceName);
-    Assert.assertTrue(lock.isWriteLockedByCurrentThread(resourceLockName));
-    assertEquals(1, lock.getWriteHoldCount(resourceLockName));
+    releaseWriteLock(lock, resource, resourceName);
+    Assert.assertTrue(
+        isWriteLockedByCurrentThread(lock, resource, resourceLockName));
+    assertEquals(1, getWriteHoldCount(lock, resource, resourceLockName));
 
-    lock.releaseWriteLock(resource, resourceName);
-    Assert.assertFalse(lock.isWriteLockedByCurrentThread(resourceLockName));
-    assertEquals(0, lock.getWriteHoldCount(resourceLockName));
+    releaseWriteLock(lock, resource, resourceName);
+    Assert.assertFalse(
+        isWriteLockedByCurrentThread(lock, resource, resourceLockName));
+    assertEquals(0, getWriteHoldCount(lock, resource, resourceLockName));
   }
 
   @Test
@@ -455,13 +552,13 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
-        lock.acquireReadLock(resource, resourceName);
+        acquireReadLock(lock, resource, resourceName);
         try {
           Thread.sleep(500);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        lock.releaseReadLock(resource, resourceName);
+        releaseReadLock(lock, resource, resourceName);
       });
       threads[i].start();
     }
@@ -492,13 +589,13 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(() -> {
-        lock.acquireWriteLock(resource, resourceName);
+        acquireWriteLock(lock, resource, resourceName);
         try {
           Thread.sleep(100);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        lock.releaseWriteLock(resource, resourceName);
+        releaseWriteLock(lock, resource, resourceName);
       });
       threads[i].start();
     }
@@ -530,13 +627,13 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < readThreads.length; i++) {
       readThreads[i] = new Thread(() -> {
-        lock.acquireReadLock(resource, resourceName);
+        acquireReadLock(lock, resource, resourceName);
         try {
           Thread.sleep(500);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        lock.releaseReadLock(resource, resourceName);
+        releaseReadLock(lock, resource, resourceName);
       });
       readThreads[i].setName("ReadLockThread-" + i);
       readThreads[i].start();
@@ -544,13 +641,13 @@ public class TestOzoneManagerLock {
 
     for (int i = 0; i < writeThreads.length; i++) {
       writeThreads[i] = new Thread(() -> {
-        lock.acquireWriteLock(resource, resourceName);
+        acquireWriteLock(lock, resource, resourceName);
         try {
           Thread.sleep(100);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        lock.releaseWriteLock(resource, resourceName);
+        releaseWriteLock(lock, resource, resourceName);
       });
       writeThreads[i].setName("WriteLockThread-" + i);
       writeThreads[i].start();
@@ -590,307 +687,24 @@ public class TestOzoneManagerLock {
   }
 
   @Test
-  public void testKeyPathLockMultiThreading() throws Exception {
-    testSameKeyPathWriteLockMultiThreading(10, 100);
-    testDiffKeyPathWriteLockMultiThreading(10, 100);
-  }
-
-  private static class Counter {
-
-    private int count = 0;
-
-    public void incrementCount() {
-      count++;
-    }
-
-    public int getCount() {
-      return count;
-    }
-  }
-
-  // "/a/b/c/d/key1 - WLock - 1st iteration"
-  // "/a/b/c/d/key1 - WLock - 2nd iteration"  -- blocked
-  // "/a/b/c/d/key1 - WLock - 3rd iteration"  -- blocked
-  // "/a/b/c/d/key1 - WLock - 4th iteration"  -- blocked
-  // "/a/b/c/d/key1 - WLock - 5th iteration"  -- blocked
-  // (iterations are sequential)
-
-  public void testSameKeyPathWriteLockMultiThreading(int threadCount,
-                                                     int iterations)
-      throws InterruptedException {
-
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    Thread[] threads = new Thread[threadCount];
-    Counter counter = new Counter();
-    CountDownLatch countDownLatch = new CountDownLatch(threadCount);
-    List<Integer> listTokens = new ArrayList<>(threadCount);
-
-    for (int i = 0; i < threads.length; i++) {
-
-      threads[i] = new Thread(() -> {
-        String[] sampleResourceName =
-            new String[]{volumeName, bucketName, keyName};
-
-        testSameKeyPathWriteLockMultiThreadingUtil(iterations, resource, lock,
-            counter, countDownLatch,
-            listTokens,
-            sampleResourceName);
-      });
-
-      threads[i].start();
-    }
-
-    // Waiting for all the threads to finish execution (run method).
-    for (Thread t : threads) {
-      t.join();
-    }
-
-    // For example, threadCount = 10, iterations = 100. The expected counter
-    // value is 10 * 100
-    Assert.assertEquals(((long) threadCount) * iterations,
-        counter.getCount());
-    Assert.assertEquals(threadCount, listTokens.size());
-
-    // Thread-1 -> 1 * 100,
-    // Thread-2 -> 2 * 100 and so on.
-    for (int i = 1; i <= listTokens.size(); i++) {
-      Assert.assertEquals(Integer.valueOf(i * iterations),
-          listTokens.get(i - 1));
-    }
-  }
-
-  private void testSameKeyPathWriteLockMultiThreadingUtil(
-      int iterations, OzoneManagerLock.Resource resource, OzoneManagerLock lock,
-      Counter counter, CountDownLatch countDownLatch, List<Integer> listTokens,
-      String[] sampleResourceName) {
-
-    // Waiting for all the threads to be instantiated/to reach acquireWriteLock.
-    countDownLatch.countDown();
-    while (countDownLatch.getCount() > 0) {
-      try {
-        Thread.sleep(500);
-        LOG.info("countDown.getCount() -> " + countDownLatch.getCount());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-
-    // Now all threads have been instantiated.
-    Assert.assertEquals(0, countDownLatch.getCount());
-
-    lock.acquireWriteLock(resource, sampleResourceName);
-    LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
-
-    /**
-     * Critical Section. count = count + 1;
-     */
-    for (int idx = 0; idx < iterations; idx++) {
-      counter.incrementCount();
-    }
-
-    //  Sequence of tokens range from 1-100 (if iterations = 100) for each
-    //  thread. For example:
-    //  Thread-1 -> 1 - 100
-    //  Thread-2 -> 101 - 200 and so on.
-    listTokens.add(counter.getCount());
-
-    lock.releaseWriteLock(resource, sampleResourceName);
-    LOG.info("Write Lock Released by " + Thread.currentThread().getName());
-  }
-
-  // "/a/b/c/d/key1 - WLock - 1st iteration"
-  // "/a/b/c/d/key2 - WLock - 2nd iteration"  -- allowed
-  // "/a/b/c/d/key3 - WLock - 3rd iteration"  -- allowed
-  // "/a/b/c/d/key4 - WLock - 4th iteration"  -- allowed
-  // "/a/b/c/d/key5 - WLock - 5th iteration"  -- allowed
-  // (iterations are parallel)
-
-  public void testDiffKeyPathWriteLockMultiThreading(int threadCount,
-                                                     int iterations)
-      throws Exception {
-
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    Thread[] threads = new Thread[threadCount];
-    Counter counter = new Counter();
-    CountDownLatch countDown = new CountDownLatch(threadCount);
-
-    for (int i = 0; i < threads.length; i++) {
-
-      threads[i] = new Thread(() -> {
-        String keyName = UUID.randomUUID().toString();
-        String[] sampleResourceName =
-            new String[]{volumeName, bucketName, keyName};
-
-        testDiffKeyPathWriteLockMultiThreadingUtil(resource, lock, countDown,
-            sampleResourceName);
-      });
-
-      threads[i].start();
-    }
-
-    /**
-     * Waiting for all the threads to count down
-     */
-    GenericTestUtils.waitFor(() -> {
-      if (countDown.getCount() > 0) {
-        LOG.info("Waiting for the threads to count down {} ",
-            countDown.getCount());
-        return false;
-      }
-      return true; // all threads have finished counting down.
-    }, 3000, 120000); // 2 minutes
-
-    Assert.assertEquals(0, countDown.getCount());
-
-    for (Thread t : threads) {
-      t.join();
-    }
-
-    LOG.info("Expected = " + threadCount * iterations + ", Actual = " +
-        counter.getCount());
-  }
-
-  private void testDiffKeyPathWriteLockMultiThreadingUtil(
-      OzoneManagerLock.Resource resource,
-      OzoneManagerLock lock, CountDownLatch countDown,
-      String[] sampleResourceName) {
-
-    lock.acquireWriteLock(resource, sampleResourceName);
-    LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
-
-    // Waiting for all the threads to be instantiated/to reach acquireWriteLock.
-    countDown.countDown();
-    while (countDown.getCount() > 0) {
-      try {
-        Thread.sleep(500);
-        LOG.info("countDown.getCount() -> " + countDown.getCount());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-
-    Assert.assertEquals(1, lock.getCurrentLocks().size());
-
-    lock.releaseWriteLock(resource, sampleResourceName);
-    LOG.info("Write Lock Released by " + Thread.currentThread().getName());
-  }
-
-  @Test
-  public void testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK, higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
-
-    lock.acquireWriteLock(resource, resourceName);
+  public void testOMLockMetricsRecords() {
+    OMLockMetrics omLockMetrics = OMLockMetrics.create();
     try {
-      lock.acquireWriteLock(higherResource, higherResourceName);
-      fail("testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
-    }
-  }
+      MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
+      omLockMetrics.getMetrics(metricsCollector, true);
+      Assert.assertEquals(1, metricsCollector.getRecords().size());
 
-  @Test
-  public void testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK, higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
-
-    lock.acquireReadLock(resource, resourceName);
-    try {
-      lock.acquireWriteLock(higherResource, higherResourceName);
-      fail("testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
-    }
-  }
-
-  @Test
-  public void testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK, higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
-
-    lock.acquireReadLock(resource, resourceName);
-    try {
-      lock.acquireReadLock(higherResource, higherResourceName);
-      fail("testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
-    }
-  }
-
-  @Test
-  public void testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.Resource resource =
-        OzoneManagerLock.Resource.KEY_PATH_LOCK, higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
-
-    String[] resourceName = new String[]{volumeName, bucketName, keyName},
-        higherResourceName = new String[]{volumeName, bucketName};
-
-    lock.acquireWriteLock(resource, resourceName);
-    try {
-      lock.acquireReadLock(higherResource, higherResourceName);
-      fail("testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      Assert.assertTrue(ex.getMessage(), ex.getMessage().contains(message));
+      String omLockMetricsRecords = metricsCollector.getRecords().toString();
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("ReadLockHeldTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockWaitingTime"));
+      Assert.assertTrue(omLockMetricsRecords,
+          omLockMetricsRecords.contains("WriteLockHeldTime"));
+    } finally {
+      omLockMetrics.unRegister();
     }
   }
 }

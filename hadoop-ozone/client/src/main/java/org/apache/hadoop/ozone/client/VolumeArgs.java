@@ -106,6 +106,7 @@ public final class VolumeArgs {
   public List<OzoneAcl> getAcls() {
     return acls;
   }
+
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -118,6 +119,7 @@ public final class VolumeArgs {
   /**
    * Builder for OmVolumeArgs.
    */
+  @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private String adminName;
     private String ownerName;

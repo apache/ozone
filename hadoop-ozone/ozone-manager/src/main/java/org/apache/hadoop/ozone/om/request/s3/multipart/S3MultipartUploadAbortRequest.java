@@ -19,10 +19,8 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
@@ -170,11 +168,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      Iterator iter =
-          multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
-      while (iter.hasNext()) {
-        Map.Entry entry = (Map.Entry)iter.next();
-        PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
+      for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         quotaReleased += QuotaUtil.getReplicatedSize(
             iterPartKeyInfo.getPartKeyInfo().getDataSize(),
             omKeyInfo.getReplicationConfig());
@@ -186,10 +180,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // in delete table are not used by any read/write operations.
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(multipartOpenKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);
@@ -278,6 +272,35 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates S3 MPU abort requests.
+   * We do not want to allow older clients to abort MPU operations in
+   * buckets which use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.AbortMultiPartUpload
+  )
+  public static OMRequest blockMPUAbortWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getAbortMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getAbortMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

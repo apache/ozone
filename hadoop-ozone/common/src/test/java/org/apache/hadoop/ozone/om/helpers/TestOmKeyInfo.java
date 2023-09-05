@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -34,6 +35,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,7 +52,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 public class TestOmKeyInfo {
 
   @Test
-  public void protobufConversion() {
+  public void protobufConversion() throws IOException {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
@@ -58,10 +60,14 @@ public class TestOmKeyInfo {
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
     Assert.assertEquals(key, keyAfterSerialization);
+
+    Assert.assertFalse(key.isHsync());
+    key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+    Assert.assertTrue(key.isHsync());
   }
 
   @Test
-  public void getProtobufMessageEC() {
+  public void getProtobufMessageEC() throws IOException {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =
@@ -81,6 +87,7 @@ public class TestOmKeyInfo {
 
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
+    Assert.assertFalse(key.isHsync());
     omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     Assert.assertEquals(3, omKeyProto.getEcReplicationConfig().getData());
@@ -142,9 +149,9 @@ public class TestOmKeyInfo {
 
     OmKeyInfo cloneKey = key.copyObject();
 
-    // Because for OmKeyLocationInfoGroup we have not implemented equals()
-    // method, so it checks only references.
-    Assert.assertNotEquals(key, cloneKey);
+    // OmKeyLocationInfoGroup has now implemented equals() method.
+    // assertEquals should work now.
+    Assert.assertEquals(key, cloneKey);
 
     // Check each version content here.
     Assert.assertEquals(key.getKeyLocationVersions().size(),

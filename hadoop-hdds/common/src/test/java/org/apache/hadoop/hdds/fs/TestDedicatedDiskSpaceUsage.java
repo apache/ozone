@@ -18,16 +18,16 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.fs.TestDU.createFile;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link DedicatedDiskSpaceUsage}.
@@ -39,13 +39,13 @@ public class TestDedicatedDiskSpaceUsage {
 
   private static final int FILE_SIZE = 1024;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     FileUtil.fullyDelete(DIR);
     assertTrue(DIR.mkdirs());
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     FileUtil.fullyDelete(DIR);
   }

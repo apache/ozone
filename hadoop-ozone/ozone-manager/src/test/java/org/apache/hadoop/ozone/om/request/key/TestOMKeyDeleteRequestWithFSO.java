@@ -73,7 +73,13 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
         FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+    final long volumeId = omMetadataManager.getVolumeId(
+            omKeyInfo.getVolumeName());
+    final long bucketId = omMetadataManager.getBucketId(
+            omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+    return omMetadataManager.getOzonePathKey(
+            volumeId, bucketId, omKeyInfo.getParentObjectID(),
+            omKeyInfo.getFileName());
   }
 
   protected String addKeyToDirTable(String volumeName, String bucketName,

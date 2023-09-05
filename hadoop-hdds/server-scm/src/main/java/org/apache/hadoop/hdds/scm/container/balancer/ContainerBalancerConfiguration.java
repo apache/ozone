@@ -22,8 +22,11 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,11 +93,19 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
-  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "30m",
+  @Config(key = "move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
           "from source to target.")
-  private long moveTimeout = Duration.ofMinutes(30).toMillis();
+  private long moveTimeout = Duration.ofMinutes(65).toMillis();
+
+  @Config(key = "move.replication.timeout", type = ConfigType.TIME,
+      defaultValue = "50m", tags = {ConfigTag.BALANCER}, description = "The " +
+      "amount of time to allow a single container's replication from source " +
+      "to target as part of container move. For example, if \"hdds.container" +
+      ".balancer.move.timeout\" is 65 minutes, then out of those 65 minutes " +
+      "50 minutes will be the deadline for replication to complete.")
+  private long moveReplicationTimeout = Duration.ofMinutes(50).toMillis();
 
   @Config(key = "balancing.iteration.interval", type = ConfigType.TIME,
       defaultValue = "70m", tags = {ConfigTag.BALANCER}, description =
@@ -209,6 +220,10 @@ public final class ContainerBalancerConfiguration {
     return triggerDuEnable;
   }
 
+  public void setTriggerDuEnable(boolean enable) {
+    triggerDuEnable = enable;
+  }
+
   /**
    * Set the NetworkTopologyEnable value for Container Balancer.
    *
@@ -315,12 +330,28 @@ public final class ContainerBalancerConfiguration {
     this.moveTimeout = duration.toMillis();
   }
 
+  public void setMoveTimeout(long millis) {
+    this.moveTimeout = millis;
+  }
+
+  public Duration getMoveReplicationTimeout() {
+    return Duration.ofMillis(moveReplicationTimeout);
+  }
+
+  public void setMoveReplicationTimeout(long millis) {
+    this.moveReplicationTimeout = millis;
+  }
+
   public Duration getBalancingInterval() {
     return Duration.ofMillis(balancingInterval);
   }
 
   public void setBalancingInterval(Duration balancingInterval) {
     this.balancingInterval = balancingInterval.toMillis();
+  }
+
+  public void setBalancingInterval(long millis) {
+    this.balancingInterval = millis;
   }
 
   /**
@@ -389,5 +420,78 @@ public final class ContainerBalancerConfiguration {
         maxSizeEnteringTarget / OzoneConsts.GB,
         "Max Size Leaving Source per Iteration",
         maxSizeLeavingSource / OzoneConsts.GB);
+  }
+
+  ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
+    ContainerBalancerConfigurationProto.Builder builder =
+        ContainerBalancerConfigurationProto.newBuilder();
+
+    builder.setUtilizationThreshold(threshold)
+        .setDatanodesInvolvedMaxPercentagePerIteration(
+            maxDatanodesPercentageToInvolvePerIteration)
+        .setSizeMovedMaxPerIteration(maxSizeToMovePerIteration)
+        .setSizeEnteringTargetMax(maxSizeEnteringTarget)
+        .setSizeLeavingSourceMax(maxSizeLeavingSource)
+        .setIterations(iterations)
+        .setExcludeContainers(excludeContainers)
+        .setMoveTimeout(moveTimeout)
+        .setBalancingIterationInterval(balancingInterval)
+        .setIncludeDatanodes(includeNodes)
+        .setExcludeDatanodes(excludeNodes)
+        .setMoveNetworkTopologyEnable(networkTopologyEnable)
+        .setTriggerDuBeforeMoveEnable(triggerDuEnable)
+        .setMoveReplicationTimeout(moveReplicationTimeout);
+    return builder;
+  }
+
+  static ContainerBalancerConfiguration fromProtobuf(
+      @NotNull ContainerBalancerConfigurationProto proto,
+      @NotNull OzoneConfiguration ozoneConfiguration) {
+    ContainerBalancerConfiguration config =
+        ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
+    if (proto.hasUtilizationThreshold()) {
+      config.setThreshold(Double.parseDouble(proto.getUtilizationThreshold()));
+    }
+    if (proto.hasDatanodesInvolvedMaxPercentagePerIteration()) {
+      config.setMaxDatanodesPercentageToInvolvePerIteration(
+          proto.getDatanodesInvolvedMaxPercentagePerIteration());
+    }
+    if (proto.hasSizeMovedMaxPerIteration()) {
+      config.setMaxSizeToMovePerIteration(proto.getSizeMovedMaxPerIteration());
+    }
+    if (proto.hasSizeEnteringTargetMax()) {
+      config.setMaxSizeEnteringTarget(proto.getSizeEnteringTargetMax());
+    }
+    if (proto.hasSizeLeavingSourceMax()) {
+      config.setMaxSizeLeavingSource(proto.getSizeLeavingSourceMax());
+    }
+    if (proto.hasIterations()) {
+      config.setIterations(proto.getIterations());
+    }
+    if (proto.hasExcludeContainers()) {
+      config.setExcludeContainers(proto.getExcludeContainers());
+    }
+    if (proto.hasMoveTimeout()) {
+      config.setMoveTimeout(proto.getMoveTimeout());
+    }
+    if (proto.hasBalancingIterationInterval()) {
+      config.setBalancingInterval(proto.getBalancingIterationInterval());
+    }
+    if (proto.hasIncludeDatanodes()) {
+      config.setIncludeNodes(proto.getIncludeDatanodes());
+    }
+    if (proto.hasExcludeDatanodes()) {
+      config.setExcludeNodes(proto.getExcludeDatanodes());
+    }
+    if (proto.hasMoveNetworkTopologyEnable()) {
+      config.setNetworkTopologyEnable(proto.getMoveNetworkTopologyEnable());
+    }
+    if (proto.hasTriggerDuBeforeMoveEnable()) {
+      config.setTriggerDuEnable(proto.getTriggerDuBeforeMoveEnable());
+    }
+    if (proto.hasMoveReplicationTimeout()) {
+      config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
+    }
+    return config;
   }
 }

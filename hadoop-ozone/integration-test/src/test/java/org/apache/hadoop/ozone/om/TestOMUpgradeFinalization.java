@@ -35,9 +35,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -70,6 +72,7 @@ public class TestOMUpgradeFinalization {
   private OzoneManager ozoneManager;
   private ClientProtocol clientProtocol;
   private int fromLayoutVersion;
+  private OzoneClient client;
 
   /**
    * Defines a "from" layout version to finalize from.
@@ -110,8 +113,8 @@ public class TestOMUpgradeFinalization {
 
     cluster.waitForClusterToBeReady();
     ozoneManager = cluster.getOzoneManager();
-    ObjectStore objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
+    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    ObjectStore objectStore = client.getObjectStore();
     clientProtocol = objectStore.getClientProxy();
   }
 
@@ -120,6 +123,7 @@ public class TestOMUpgradeFinalization {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

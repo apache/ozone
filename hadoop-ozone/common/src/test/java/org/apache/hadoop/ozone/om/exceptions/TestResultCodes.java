@@ -39,7 +39,6 @@ public class TestResultCodes {
               protoBufValue), sameName(codeValue.name(), protoBufValue.name()));
       ResultCodes converted = ResultCodes.values()[protoBufValue.ordinal()];
       Assert.assertEquals(codeValue, converted);
-
     }
   }
 

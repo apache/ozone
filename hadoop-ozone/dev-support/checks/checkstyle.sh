@@ -21,7 +21,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx -Dcheckstyle.failOnViolation=false'
+MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx -Dcheckstyle.failOnViolation=false --no-transfer-progress'
 
 declare -i rc
 mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"

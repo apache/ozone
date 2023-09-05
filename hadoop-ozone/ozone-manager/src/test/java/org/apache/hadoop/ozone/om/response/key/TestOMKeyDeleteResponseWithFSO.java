@@ -33,9 +33,10 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
 
   @Override
   protected OMKeyDeleteResponse getOmKeyDeleteResponse(OmKeyInfo omKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse omResponse) {
+      OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
-        omKeyInfo, true, getOmBucketInfo(), false);
+        omKeyInfo, true, getOmBucketInfo(), false,
+        omMetadataManager.getVolumeId(volumeName));
   }
 
   @Override
@@ -56,7 +57,10 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
                     parentId, 100, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             keyName, omKeyInfo, -1, 50, omMetadataManager);
-    return omKeyInfo.getPath();
+    return omMetadataManager.getOzonePathKey(
+            omMetadataManager.getVolumeId(volumeName),
+            omMetadataManager.getBucketId(volumeName, bucketName),
+           omKeyInfo.getParentObjectID(), keyName);
   }
 
   @Override

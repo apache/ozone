@@ -18,8 +18,12 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -35,6 +39,8 @@ import java.util.Collection;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -127,13 +133,28 @@ public class TestRootedOzoneFileSystemWithFSO
         + root + "/b/c");
 
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
+    assertFalse(getFs().rename(dir2SourcePath, destinPath));
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = new Path(getBucketPath() + root + "/file1");
     ContractTestUtils.touch(getFs(), filePath);
     Path newDestinPath = new Path(filePath, "c");
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
+    assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
+  }
+
+  @Test
+  public void testKeyRenameToBucketLevel() throws IOException {
+    final String dir = "dir1";
+    final String key = dir + "/key1";
+    final Path source = new Path(getBucketPath(), key);
+    getFs().mkdirs(source);
+    final Path dest = new Path(String.valueOf(getBucketPath()));
+    LOG.info("Will move {} to {}", source, dest);
+    getFs().rename(source, getBucketPath());
+    assertTrue("Key rename failed",
+        getFs().exists(new Path(getBucketPath(), "key1")));
+    // cleanup
+    getFs().delete(dest, true);
   }
 
   @Test
@@ -172,7 +193,7 @@ public class TestRootedOzoneFileSystemWithFSO
       LOG.info("Created dir1 {}", subDir1);
       LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
       //  rename should fail and return false
-      Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+      assertFalse(getFs().rename(sourceRoot, subDir1));
     } finally {
       getFs().delete(sourceRoot, true);
     }
@@ -224,4 +245,45 @@ public class TestRootedOzoneFileSystemWithFSO
     Assert.assertTrue(deletes == prevDeletes + 1);
   }
 
+  /**
+   * Test the consistency of listStatusFSO with TableCache present.
+   */
+  @Test
+  public void testListStatusFSO() throws Exception {
+    // list keys batch size is 1024. Creating keys greater than the
+    // batch size to test batch listing of the keys.
+    int valueGreaterBatchSize = 1200;
+    Path parent = new Path(getBucketPath(), "testListStatusFSO");
+    for (int i = 0; i < valueGreaterBatchSize; i++) {
+      Path key = new Path(parent, "tempKey" + i);
+      ContractTestUtils.touch(getFs(), key);
+      /*
+      To add keys to the cache. listStatusFSO goes through the cache first.
+      The cache is not continuous and may be greater than the batch size.
+      This may cause inconsistency in the listing of keys.
+       */
+      getFs().rename(key, new Path(parent, "key" + i));
+    }
+
+    FileStatus[] fileStatuses = getFs().listStatus(
+        new Path(getBucketPath() + "/testListStatusFSO"));
+    Assert.assertEquals(valueGreaterBatchSize, fileStatuses.length);
+  }
+
+  @Test
+  public void testLeaseRecoverable() throws Exception {
+    // Create a file
+    final String dir = "dir1";
+    final String key = dir + "/key1";
+    final Path source = new Path(getBucketPath(), key);
+
+    LeaseRecoverable fs = (LeaseRecoverable)getFs();
+    FSDataOutputStream stream = getFs().create(source);
+    assertThrows(OMException.class, () -> fs.isFileClosed(source));
+    stream.write(1);
+    stream.hsync();
+    assertFalse(fs.isFileClosed(source));
+    assertTrue(fs.recoverLease(source));
+    assertTrue(fs.isFileClosed(source));
+  }
 }

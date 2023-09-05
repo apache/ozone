@@ -139,6 +139,26 @@ $ ozone sh volume list /
   ....
 } ]
 ```
+
+If the volume is empty, we can delete the volume using the command below. 
+
+```shell
+$ ozone sh volume delete /vol1
+Volume vol1 is deleted
+```
+
+If the volume contains any buckets or keys, we can delete the volume recursively. This will delete all keys and buckets within the volume, and then delete the volume itself.
+After running this command there is no way to recover deleted contents.
+
+```shell
+$ ozone sh volume delete -r /vol1
+This command will delete volume recursively.
+There is no recovery option after using this command, and no trash for FSO buckets.
+Delay is expected running this command.
+Enter 'yes' to proceed': yes
+Volume vol1 is deleted
+```
+
 ## Bucket operations
 
 Bucket is the second level of the object hierarchy, and is similar to AWS S3 buckets. Users can create buckets in volumes, if they have the necessary permissions.
@@ -163,6 +183,24 @@ $ ozone sh bucket info /vol1/bucket1
   "sourceVolume" : null,
   "sourceBucket" : null
 }
+```
+
+If the bucket is empty we can delete the bucket using the command below.
+
+```shell
+$ ozone sh bucket delete /vol1/bucket1
+Bucket bucket1 is deleted
+```
+
+If the bucket contains any keys, we can delete the bucket recursively. This will delete all the keys within the bucket, and then the bucket itself.
+After running this command there is no way to recover deleted contents.
+
+```shell
+$ ozone sh bucket delete -r /vol1/bucket1
+This command will delete bucket recursively.
+There is no recovery option after using this command, and deleted keys won't move to trash.
+Enter 'yes' to proceed': yes
+Bucket bucket1 is deleted
 ```
 
 [Transparent Data Encryption]({{< ref "security/SecuringTDE.md" >}}) can be enabled at the bucket level.
@@ -206,4 +244,76 @@ $ ozone sh key info /vol1/bucket1/README.md
 
 ```shell
 $ ozone sh key get /vol1/bucket1/README.md /tmp/
+```
+
+```shell
+$ ozone sh key delete /vol1/bucket1/key1
+```
+
+If the key is in an [FSO]({{< ref "feature/PrefixFSO.md">}}) bucket it will be moved to the trash when deleted. Below is the trash location:
+```shell
+$ /<volume>/<bucket>/.Trash/<user>
+```
+If the key is in an OBS bucket it will be permanently deleted.
+
+## Querying CLI Results
+
+Ozone CLI returns JSON responses. [jq](https://stedolan.github.io/jq/manual/) is a command line JSON processor that can be used to filter CLI output for desired information.
+
+For example:
+
+* List FSO buckets that are not links.
+```shell
+$ ozone sh bucket list /s3v | jq '.[] | select(.link==false and .bucketLayout=="FILE_SYSTEM_OPTIMIZED")'
+{
+  "metadata": {},
+  "volumeName": "s3v",
+  "name": "fso-bucket",
+  "storageType": "DISK",
+  "versioning": false,
+  "usedBytes": 0,
+  "usedNamespace": 0,
+  "creationTime": "2023-02-01T05:18:46.974Z",
+  "modificationTime": "2023-02-01T05:18:46.974Z",
+  "quotaInBytes": -1,
+  "quotaInNamespace": -1,
+  "bucketLayout": "FILE_SYSTEM_OPTIMIZED",
+  "owner": "om",
+  "link": false
+}
+```
+
+* List EC buckets with their replication config.
+```shell
+$ ozone sh bucket list /vol1 | jq -r '.[] | select(.replicationConfig.replicationType == "EC") | {"name": .name, "replicationConfig": .replicationConfig}'
+{
+  "name": "ec5",
+  "replicationConfig": {
+    "data": 3,
+    "parity": 2,
+    "ecChunkSize": 1048576,
+    "codec": "RS",
+    "replicationType": "EC",
+    "requiredNodes": 5
+  }
+}
+{
+  "name": "ec9",
+  "replicationConfig": {
+    "data": 6,
+    "parity": 3,
+    "ecChunkSize": 1048576,
+    "codec": "RS",
+    "replicationType": "EC",
+    "requiredNodes": 9
+  }
+}
+```
+
+* List names of encrypted buckets and their encryption key names in tab-separated-value format.
+```shell
+
+$ ozone sh bucket list /vol1 | jq -r '.[] | select(.encryptionKeyName != null) | [.name, .encryptionKeyName] | @tsv'
+ec5     key1
+encrypted-bucket        key1
 ```

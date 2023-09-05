@@ -18,11 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -33,7 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -121,10 +117,13 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
+      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+          volumeName, bucketName);
+
       // add all missing parents to dir table
       missingParentInfos = OMDirectoryCreateRequestWithFSO
-          .getAllMissingParentDirInfo(ozoneManager, keyArgs, pathInfoFSO,
-              transactionLogIndex);
+          .getAllMissingParentDirInfo(ozoneManager, keyArgs, bucketInfo,
+              pathInfoFSO, transactionLogIndex);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -145,22 +144,26 @@ public class S3InitiateMultipartUploadRequestWithFSO
           volumeName, bucketName, keyName,
           keyArgs.getMultipartUploadID());
 
+      final long volumeId = omMetadataManager.getVolumeId(volumeName);
+      final long bucketId = omMetadataManager.getBucketId(volumeName,
+              bucketName);
+
       String multipartOpenKey = omMetadataManager
-          .getMultipartKey(pathInfoFSO.getLastKnownParentId(),
-              pathInfoFSO.getLeafNodeName(), keyArgs.getMultipartUploadID());
+          .getMultipartKey(volumeId, bucketId,
+                  pathInfoFSO.getLastKnownParentId(),
+                  pathInfoFSO.getLeafNodeName(),
+                  keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
       // care of in the final complete multipart upload. AWS S3 behavior is
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
-      final OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
-          .get(omMetadataManager.getBucketKey(volumeName, bucketName));
       final ReplicationConfig replicationConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo != null ?
                   bucketInfo.getDefaultReplicationConfig() :
-                  null, ozoneManager.getDefaultReplicationConfig());
+                  null, ozoneManager);
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
@@ -179,20 +182,27 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
           .setOmKeyLocationInfos(Collections.singletonList(
-              new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-          .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+              new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+          .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfoFSO,
+              ozoneManager.getPrefixManager()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?
               OMPBHelper.convert(keyArgs.getFileEncryptionInfo()) : null)
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .build();
+      
+      // validate and update namespace for missing parent directory
+      if (null != missingParentInfos) {
+        checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
+        bucketInfo.incrUsedNamespace(missingParentInfos.size());
+      }
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
-              Optional.absent(), Optional.of(missingParentInfos),
-              transactionLogIndex);
+              volumeId, bucketId, transactionLogIndex,
+              missingParentInfos, null);
 
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
           multipartOpenKey, omKeyInfo, pathInfoFSO.getLeafNodeName(),
@@ -200,8 +210,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
 
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
-          new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
+          multipartKey, multipartKeyInfo, transactionLogIndex);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(
@@ -212,7 +221,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo, multipartKey,
-              missingParentInfos, getBucketLayout());
+              missingParentInfos, getBucketLayout(), volumeId, bucketId,
+              bucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

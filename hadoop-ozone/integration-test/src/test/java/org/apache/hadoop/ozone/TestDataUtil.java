@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Scanner;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -47,32 +49,32 @@ public final class TestDataUtil {
   private TestDataUtil() {
   }
 
-  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName) throws IOException {
-    return createVolumeAndBucket(cluster, volumeName, bucketName,
+    return createVolumeAndBucket(client, volumeName, bucketName,
         BucketLayout.LEGACY);
   }
 
-  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName, BucketLayout bucketLayout)
       throws IOException {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
-    builder.setBucketLayout(bucketLayout);
+    if (bucketLayout != null) {
+      builder.setBucketLayout(bucketLayout);
+    }
     omBucketArgs = builder.build();
 
-    return createVolumeAndBucket(cluster, volumeName, bucketName, bucketLayout,
+    return createVolumeAndBucket(client, volumeName, bucketName,
         omBucketArgs);
   }
 
-  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
-      String volumeName, String bucketName, BucketLayout bucketLayout,
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      String volumeName, String bucketName,
       BucketArgs omBucketArgs) throws IOException {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
 
     VolumeArgs volumeArgs =
         VolumeArgs.newBuilder().setAdmin(adminName).setOwner(userName).build();
@@ -97,10 +99,30 @@ public final class TestDataUtil {
   public static void createKey(OzoneBucket bucket, String keyName,
       ReplicationFactor repFactor, ReplicationType repType, String content)
       throws IOException {
+    ReplicationConfig repConfig = ReplicationConfig
+        .fromTypeAndFactor(repType, repFactor);
+    createKey(bucket, keyName, repConfig, content);
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+      ReplicationConfig repConfig, String content)
+      throws IOException {
     try (OutputStream stream = bucket
-        .createKey(keyName, content.length(), repType, repFactor,
+        .createKey(keyName, content.length(), repConfig,
             new HashMap<>())) {
       stream.write(content.getBytes(UTF_8));
+    }
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+      ReplicationFactor repFactor, ReplicationType repType,
+      ByteBuffer data) throws IOException {
+    ReplicationConfig repConfig = ReplicationConfig
+        .fromTypeAndFactor(repType, repFactor);
+    try (OutputStream stream = bucket
+        .createKey(keyName, data.capacity(), repConfig,
+            new HashMap<>())) {
+      stream.write(data.array());
     }
   }
 
@@ -111,19 +133,28 @@ public final class TestDataUtil {
     }
   }
 
-  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster)
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client)
       throws IOException {
-    return createVolumeAndBucket(cluster, BucketLayout.LEGACY);
+    return createVolumeAndBucket(client, BucketLayout.LEGACY);
   }
 
-  public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster,
+  public static OzoneBucket createBucket(OzoneClient client,
+      String vol, BucketArgs bucketArgs, String bukName)
+      throws IOException {
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneVolume volume = objectStore.getVolume(vol);
+    volume.createBucket(bukName, bucketArgs);
+    return volume.getBucket(bukName);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       BucketLayout bucketLayout) throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-        return createVolumeAndBucket(cluster, volumeName, bucketName,
+        return createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
       } catch (OMException e) {
         if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS

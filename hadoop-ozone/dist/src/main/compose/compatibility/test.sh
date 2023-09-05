@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:compat
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -30,7 +32,4 @@ execute_robot_test datanode compatibility/dn.robot
 execute_robot_test om compatibility/om.robot
 execute_robot_test recon compatibility/recon.robot
 execute_robot_test scm compatibility/scm.robot
-
-stop_docker_env
-
-generate_report
+execute_robot_test datanode compatibility/dn-one-rocksdb.robot

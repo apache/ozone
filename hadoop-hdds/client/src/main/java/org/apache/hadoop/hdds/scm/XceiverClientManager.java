@@ -46,6 +46,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
+
+import org.apache.hadoop.util.CacheMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +68,9 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
   private final ConfigurationSource conf;
+  private final ScmClientConfig clientConfig;
   private final Cache<String, XceiverClientSpi> clientCache;
+  private final CacheMetrics cacheMetrics;
   private List<X509Certificate> caCerts;
 
   private static XceiverClientMetrics metrics;
@@ -88,6 +92,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       List<X509Certificate> caCerts) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
+    this.clientConfig = clientConf;
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
@@ -97,6 +102,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     }
 
     this.clientCache = CacheBuilder.newBuilder()
+        .recordStats()
         .expireAfterAccess(staleThresholdMs, MILLISECONDS)
         .maximumSize(clientConf.getMaxSize())
         .removalListener(
@@ -115,6 +121,8 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     topologyAwareRead = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
+
+    cacheMetrics = CacheMetrics.create(clientCache, this);
   }
 
   @VisibleForTesting
@@ -236,7 +244,7 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
               break;
             case CHAINED:
             default:
-              throw new IOException("not implemented" + pipeline.getType());
+              throw new IOException("not implemented " + pipeline.getType());
             }
             client.connect();
             return client;
@@ -276,6 +284,10 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
     //closing is done through RemovalListener
     clientCache.invalidateAll();
     clientCache.cleanUp();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
+    }
+    cacheMetrics.unregister();
 
     if (metrics != null) {
       metrics.unRegister();
@@ -347,6 +359,37 @@ public class XceiverClientManager implements Closeable, XceiverClientFactory {
       this.maxSize = maxSize;
     }
 
+    public void setStaleThreshold(long threshold) {
+      this.staleThreshold = threshold;
+    }
+
+  }
+
+  /**
+   * Builder of ScmClientConfig.
+   */
+  public static class XceiverClientManagerConfigBuilder {
+
+    private int maxCacheSize;
+    private long staleThresholdMs;
+
+    public XceiverClientManagerConfigBuilder setMaxCacheSize(int maxCacheSize) {
+      this.maxCacheSize = maxCacheSize;
+      return this;
+    }
+
+    public XceiverClientManagerConfigBuilder setStaleThresholdMs(
+        long staleThresholdMs) {
+      this.staleThresholdMs = staleThresholdMs;
+      return this;
+    }
+
+    public ScmClientConfig build() {
+      ScmClientConfig clientConfig = new ScmClientConfig();
+      clientConfig.setMaxSize(this.maxCacheSize);
+      clientConfig.setStaleThreshold(this.staleThresholdMs);
+      return clientConfig;
+    }
   }
 
 }

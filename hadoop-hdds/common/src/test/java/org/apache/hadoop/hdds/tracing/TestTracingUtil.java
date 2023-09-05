@@ -17,15 +17,21 @@
  */
 package org.apache.hadoop.hdds.tracing;
 
+import io.jaegertracing.Configuration;
+import io.jaegertracing.internal.JaegerTracer;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
 import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
-import org.junit.Test;
 
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
-import static org.junit.Assert.assertEquals;
+import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for {@link TracingUtil}.
@@ -38,6 +44,19 @@ public class TestTracingUtil {
         tracingEnabled());
 
     assertEquals("Hello default", subject.defaultMethod());
+  }
+
+  @Test
+  public void testInitTracing() {
+    Configuration config = Configuration.fromEnv("testInitTracing");
+    JaegerTracer tracer = config.getTracerBuilder().build();
+    GlobalTracer.registerIfAbsent(tracer);
+    try (AutoCloseable scope = TracingUtil
+        .createActivatedSpan("initTracing")) {
+      exportCurrentSpan();
+    } catch (Exception e) {
+      fail("Should not get exception");
+    }
   }
 
   private static MutableConfigurationSource tracingEnabled() {

@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.protocolPB;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -38,9 +40,11 @@ public class OMInterServiceProtocolServerSideImpl implements
 
   private final OzoneManagerRatisServer omRatisServer;
   private final boolean isRatisEnabled;
+  private final OzoneManager ozoneManager;
 
-  public OMInterServiceProtocolServerSideImpl(
+  public OMInterServiceProtocolServerSideImpl(OzoneManager ozoneMgr,
       OzoneManagerRatisServer ratisServer, boolean enableRatis) {
+    this.ozoneManager = ozoneMgr;
     this.omRatisServer = ratisServer;
     this.isRatisEnabled = enableRatis;
   }
@@ -60,7 +64,7 @@ public class OMInterServiceProtocolServerSideImpl implements
           .build();
     }
 
-    checkLeaderStatus();
+    OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
 
     OMNodeDetails newOmNode = new OMNodeDetails.Builder()
         .setOMNodeId(request.getNodeId())
@@ -81,10 +85,5 @@ public class OMInterServiceProtocolServerSideImpl implements
     return BootstrapOMResponse.newBuilder()
         .setSuccess(true)
         .build();
-  }
-
-  private void checkLeaderStatus() throws ServiceException {
-    OzoneManagerRatisUtils.checkLeaderStatus(omRatisServer.checkLeaderStatus(),
-        omRatisServer.getRaftPeerId());
   }
 }

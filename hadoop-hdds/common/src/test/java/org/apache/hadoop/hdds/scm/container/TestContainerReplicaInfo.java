@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
@@ -46,17 +46,17 @@ public class TestContainerReplicaInfo {
 
     ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
 
-    Assert.assertEquals(proto.getContainerID(), info.getContainerID());
-    Assert.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
-    Assert.assertEquals(proto.getKeyCount(), info.getKeyCount());
-    Assert.assertEquals(proto.getPlaceOfBirth(),
+    Assertions.assertEquals(proto.getContainerID(), info.getContainerID());
+    Assertions.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
+    Assertions.assertEquals(proto.getKeyCount(), info.getKeyCount());
+    Assertions.assertEquals(proto.getPlaceOfBirth(),
         info.getPlaceOfBirth().toString());
-    Assert.assertEquals(DatanodeDetails.getFromProtoBuf(
+    Assertions.assertEquals(DatanodeDetails.getFromProtoBuf(
         proto.getDatanodeDetails()), info.getDatanodeDetails());
-    Assert.assertEquals(proto.getSequenceID(), info.getSequenceId());
-    Assert.assertEquals(proto.getState(), info.getState());
+    Assertions.assertEquals(proto.getSequenceID(), info.getSequenceId());
+    Assertions.assertEquals(proto.getState(), info.getState());
     // If replicaIndex is not in the proto, then -1 should be returned
-    Assert.assertEquals(-1, info.getReplicaIndex());
+    Assertions.assertEquals(-1, info.getReplicaIndex());
   }
 
   @Test
@@ -76,15 +76,15 @@ public class TestContainerReplicaInfo {
 
     ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
 
-    Assert.assertEquals(proto.getContainerID(), info.getContainerID());
-    Assert.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
-    Assert.assertEquals(proto.getKeyCount(), info.getKeyCount());
-    Assert.assertEquals(proto.getPlaceOfBirth(),
+    Assertions.assertEquals(proto.getContainerID(), info.getContainerID());
+    Assertions.assertEquals(proto.getBytesUsed(), info.getBytesUsed());
+    Assertions.assertEquals(proto.getKeyCount(), info.getKeyCount());
+    Assertions.assertEquals(proto.getPlaceOfBirth(),
         info.getPlaceOfBirth().toString());
-    Assert.assertEquals(DatanodeDetails.getFromProtoBuf(
+    Assertions.assertEquals(DatanodeDetails.getFromProtoBuf(
         proto.getDatanodeDetails()), info.getDatanodeDetails());
-    Assert.assertEquals(proto.getSequenceID(), info.getSequenceId());
-    Assert.assertEquals(proto.getState(), info.getState());
-    Assert.assertEquals(4, info.getReplicaIndex());
+    Assertions.assertEquals(proto.getSequenceID(), info.getSequenceId());
+    Assertions.assertEquals(proto.getState(), info.getState());
+    Assertions.assertEquals(4, info.getReplicaIndex());
   }
 }

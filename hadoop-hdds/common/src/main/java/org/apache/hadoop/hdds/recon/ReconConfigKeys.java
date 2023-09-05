@@ -32,10 +32,21 @@ public final class ReconConfigKeys {
 
   public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
 
+  public static final String OZONE_RECON_DB_DIR = "ozone.recon.db.dir";
+
+  public static final String OZONE_RECON_DB_DIRS_PERMISSIONS =
+      "ozone.recon.db.dirs.permissions";
+
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
+  // Fully qualified heatmap provider implementation class name key.
+  public static final String OZONE_RECON_HEATMAP_PROVIDER_KEY =
+      "ozone.recon.heatmap.provider";
+  public static final String OZONE_RECON_HEATMAP_ENABLE_KEY =
+      "ozone.recon.heatmap.enable";
+  public static final boolean OZONE_RECON_HEATMAP_ENABLE_DEFAULT = false;
   public static final String OZONE_RECON_ADDRESS_DEFAULT =
       "0.0.0.0:9891";
   public static final String OZONE_RECON_HTTP_ADDRESS_KEY =
@@ -52,7 +63,7 @@ public final class ReconConfigKeys {
       "0.0.0.0";
   public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9891;
   // Prometheus HTTP endpoint including port
-  // ex: http://localhost:9090
+  // ex: http://prometheus:9090
   public static final String OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT =
       "ozone.recon.prometheus.http.endpoint";
   /**
@@ -65,4 +76,10 @@ public final class ReconConfigKeys {
    */
   public static final String OZONE_RECON_ADMINISTRATORS =
       "ozone.recon.administrators";
+
+  public static final String OZONE_RECON_ADMINISTRATORS_GROUPS =
+      "ozone.recon.administrators.groups";
+
+  public static final String OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD
+      = "ozone.recon.task.safemode.wait.threshold";
 }

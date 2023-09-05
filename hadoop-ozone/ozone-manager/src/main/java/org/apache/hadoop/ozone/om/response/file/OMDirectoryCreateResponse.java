@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
@@ -49,15 +50,17 @@ public class OMDirectoryCreateResponse extends OmKeyResponse {
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
   private Result result;
+  private OmBucketInfo bucketInfo;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo dirKeyInfo,
       @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull Result result,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
     super(omResponse, bucketLayout);
     this.dirKeyInfo = dirKeyInfo;
     this.parentKeyInfos = parentKeyInfos;
     this.result = result;
+    this.bucketInfo = bucketInfo;
   }
 
   /**
@@ -89,6 +92,10 @@ public class OMDirectoryCreateResponse extends OmKeyResponse {
           dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
       omMetadataManager.getKeyTable(getBucketLayout())
           .putWithBatch(batchOperation, dirKey, dirKeyInfo);
+      String bucketKey = omMetadataManager.getBucketKey(
+          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, bucketInfo);
     } else if (Result.DIRECTORY_ALREADY_EXISTS == result) {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

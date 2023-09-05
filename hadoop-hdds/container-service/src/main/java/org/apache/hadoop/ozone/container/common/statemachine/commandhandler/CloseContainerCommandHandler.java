@@ -103,8 +103,13 @@ public class CloseContainerCommandHandler implements CommandHandler {
                   command.getEncodedToken());
           ozoneContainer.getWriteChannel()
               .submitRequest(request, closeCommand.getPipelineID());
+        } else if (closeCommand.getForce()) {
+          // Non-RATIS containers should have the force close flag set, so they
+          // are moved to CLOSED immediately rather than going to quasi-closed.
+          controller.closeContainer(containerId);
         } else {
-          controller.quasiCloseContainer(containerId);
+          controller.quasiCloseContainer(containerId,
+              "Ratis pipeline does not exist");
           LOG.info("Marking Container {} quasi closed", containerId);
         }
         break;
@@ -180,6 +185,16 @@ public class CloseContainerCommandHandler implements CommandHandler {
     if (invocationCount.get() > 0) {
       return totalTime / invocationCount.get();
     }
+    return 0;
+  }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime;
+  }
+
+  @Override
+  public int getQueuedCount() {
     return 0;
   }
 }

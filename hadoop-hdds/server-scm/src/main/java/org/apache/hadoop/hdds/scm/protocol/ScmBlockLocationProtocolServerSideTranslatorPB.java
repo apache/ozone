@@ -178,7 +178,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   }
 
   private Status exceptionToResponseStatus(IOException ex) {
-    if (ex instanceof SCMException) {
+    if (ex instanceof SCMException && ((SCMException) ex).getResult() != null) {
       return Status.values()[((SCMException) ex).getResult().ordinal()];
     } else {
       return Status.INTERNAL_ERROR;

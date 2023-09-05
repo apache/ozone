@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.protocol;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -116,7 +118,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<ContainerWithPipeline> getContainerWithPipelineBatch(
-      List<Long> containerIDs) throws IOException;
+      Iterable<? extends Long> containerIDs) throws IOException;
 
   /**
    * Ask SCM which containers of the given list exist.
@@ -309,6 +311,36 @@ public interface StorageContainerLocationProtocol extends Closeable {
   ScmInfo getScmInfo() throws IOException;
 
   /**
+   * Transfer the raft leadership.
+   *
+   * @param newLeaderId  the newLeaderId of the target expected leader
+   * @throws IOException
+   */
+  void transferLeadership(String newLeaderId) throws IOException;
+
+  /**
+   * Return the failed transactions of the Deleted blocks. A transaction is
+   * considered to be failed if it has been sent more than MAX_RETRY limit
+   * and its count is reset to -1.
+   *
+   * @param count Maximum num of returned transactions, if < 0. return all.
+   * @param startTxId The least transaction id to start with.
+   * @return a list of failed deleted block transactions.
+   * @throws IOException
+   */
+  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException;
+
+  /**
+   * Reset the failed deleted block retry count.
+   *
+   * @param txIDs transactionId list to be reset
+   * @return num of successful reset
+   * @throws IOException
+   */
+  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
    * Check if SCM is in safe mode.
    *
    * @return Returns true if SCM is in safe mode else returns false.
@@ -318,6 +350,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
       throws IOException;
+
   /**
    * Force SCM out of Safe mode.
    *
@@ -410,6 +443,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
+
   /**
    * Obtain a token which can be used to let datanodes verify authentication of
    * commands operating on {@code containerID}.
@@ -417,4 +451,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
   Token<?> getContainerToken(ContainerID containerID) throws IOException;
 
   long getContainerCount() throws IOException;
+
+  long getContainerCount(HddsProtos.LifeCycleState state)
+      throws IOException;
+
+  List<ContainerInfo> getListOfContainers(
+      long startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException;
+
+  DecommissionScmResponseProto decommissionScm(
+      String scmId) throws IOException;
 }

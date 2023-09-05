@@ -152,6 +152,9 @@ message CommandQueueReportProto {
 message SCMHeartbeatResponseProto {
   required string datanodeUUID = 1;
   repeated SCMCommandProto commands = 2;
+
+  // Same as term in SCMCommandProto
+  optional int64 term = 3;
 }
 
 message SCMNodeAddressList {
@@ -165,6 +168,7 @@ message SCMNodeAddressList {
 message NodeReportProto {
   repeated StorageReportProto storageReport = 1;
   repeated MetadataStorageReportProto metadataStorageReport = 2;
+  repeated StorageReportProto dbStorageReport = 3;
 }
 
 message StorageReportProto {
@@ -229,6 +233,7 @@ message ContainerReplicaProto {
   optional uint64 blockCommitSequenceId = 12;
   optional string originNodeId = 13;
   optional int32 replicaIndex = 14;
+  optional bool isEmpty = 15 [default = false];
 }
 
 message CommandStatusReportsProto {
@@ -342,6 +347,7 @@ message SCMCommandProto {
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
   optional string encodedToken = 16;
+  optional int64 deadlineMsSinceEpoch = 17;
 }
 
 /**
@@ -399,6 +405,12 @@ message DeleteContainerCommandProto {
   required int64 containerID = 1;
   required int64 cmdId = 2;
   required bool force = 3 [default = false];
+  optional int32 replicaIndex = 4;
+}
+
+enum ReplicationCommandPriority {
+  NORMAL = 1;
+  LOW = 2;
 }
 
 /**
@@ -408,6 +420,9 @@ message ReplicateContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
+  optional int32 replicaIndex = 4;
+  optional DatanodeDetailsProto target = 5;
+  optional ReplicationCommandPriority priority = 6 [default = NORMAL];
 }
 
 /**

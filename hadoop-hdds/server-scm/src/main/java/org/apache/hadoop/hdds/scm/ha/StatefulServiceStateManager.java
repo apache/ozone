@@ -53,6 +53,15 @@ public interface StatefulServiceStateManager {
   ByteString readConfiguration(String serviceName) throws IOException;
 
   /**
+   * Deletes the persisted configuration mapped to the specified serviceName.
+   * @param serviceName name of the {@link StatefulService}, obtained through
+   * {@link SCMService#getServiceName()}
+   * @throws IOException on failure
+   */
+  @Replicate
+  void deleteConfiguration(String serviceName) throws IOException;
+
+  /**
    * Sets the updated reference to the table when reloading SCM state.
    * @param statefulServiceConfig table from
    * {@link org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore}

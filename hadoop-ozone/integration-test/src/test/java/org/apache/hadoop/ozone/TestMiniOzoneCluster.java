@@ -18,23 +18,11 @@
 
 package org.apache.hadoop.ozone;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
@@ -42,33 +30,30 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
-import org.apache.hadoop.test.PathUtils;
-import org.apache.hadoop.test.TestGenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomUtils;
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.yaml.snakeyaml.Yaml;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases for mini ozone cluster.
@@ -79,18 +64,13 @@ public class TestMiniOzoneCluster {
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  private static final File TEST_ROOT = TestGenericTestUtils.getTestDir();
-  private static final File WRITE_TMP = new File(TEST_ROOT, "write");
-  private static final File READ_TMP = new File(TEST_ROOT, "read");
-
   @BeforeAll
-  public static void setup() {
+  static void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, TEST_ROOT.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setBoolean(DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
-    WRITE_TMP.mkdirs();
-    READ_TMP.mkdirs();
+    conf.set(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, "1s");
   }
 
   @AfterEach
@@ -98,12 +78,6 @@ public class TestMiniOzoneCluster {
     if (cluster != null) {
       cluster.shutdown();
     }
-  }
-
-  @AfterAll
-  public static void afterClass() {
-    FileUtils.deleteQuietly(WRITE_TMP);
-    FileUtils.deleteQuietly(READ_TMP);
   }
 
   @Test
@@ -137,90 +111,24 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  public void testDatanodeIDPersistent() throws Exception {
-    // Generate IDs for testing
-    DatanodeDetails id1 = randomDatanodeDetails();
-    id1.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 1));
-    assertWriteRead(id1);
-
-    // Add certificate serial  id.
-    id1.setCertSerialId("" + RandomUtils.nextLong());
-    assertWriteRead(id1);
-
-    // Read should return an empty value if file doesn't exist
-    File nonExistFile = new File(READ_TMP, "non_exist.id");
-    nonExistFile.delete();
-    try {
-      ContainerUtils.readDatanodeDetailsFrom(nonExistFile);
-      Assert.fail();
-    } catch (Exception e) {
-      assertTrue(e instanceof IOException);
-    }
-
-    // Read should fail if the file is malformed
-    File malformedFile = new File(READ_TMP, "malformed.id");
-    createMalformedIDFile(malformedFile);
-    try {
-      ContainerUtils.readDatanodeDetailsFrom(malformedFile);
-      fail("Read a malformed ID file should fail");
-    } catch (Exception e) {
-      assertTrue(e instanceof IOException);
-    }
-
-    // Test upgrade scenario - protobuf file instead of yaml
-    File protoFile = new File(WRITE_TMP, "valid-proto.id");
-    try (FileOutputStream out = new FileOutputStream(protoFile)) {
-      HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
-      proto.writeTo(out);
-    }
-    assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
-
-    id1.setInitialVersion(1);
-    assertWriteRead(id1);
-  }
-
-  private static void assertWriteRead(DatanodeDetails details)
-      throws IOException {
-    // Write a single ID to the file and read it out
-    File file = new File(WRITE_TMP, "valid-values.id");
-    file.delete();
-    ContainerUtils.writeDatanodeDetailsTo(details, file);
-
-    // Validate using yaml parser
-    Yaml yaml = new Yaml();
-    try {
-      yaml.load(new InputStreamReader(new FileInputStream(file),
-          StandardCharsets.UTF_8));
-    } catch (Exception e) {
-      Assert.fail("Failed parsing datanode id yaml.");
-    }
-
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
-
-    assertDetailsEquals(details, read);
-    assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
-  }
-
-  @Test
   public void testContainerRandomPort() throws IOException {
     OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
-    File testDir = PathUtils.getTestDir(TestOzoneContainer.class);
-    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
-        testDir.getAbsolutePath());
-    ozoneConf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        TEST_ROOT.toString());
 
     // Each instance of SM will create an ozone container
     // that bounds to a random port.
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, true);
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
         true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    ozoneConf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     List<DatanodeStateMachine> stateMachines = new ArrayList<>();
     try {
 
       for (int i = 0; i < 3; i++) {
         stateMachines.add(new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf, null, null, null));
+            randomDatanodeDetails(), ozoneConf));
       }
 
       //we need to start all the servers to get the fix ports
@@ -241,18 +149,18 @@ public class TestMiniOzoneCluster {
       for (DatanodeStateMachine dsm : stateMachines) {
         int readPort = dsm.getContainer().getReadChannel().getIPCPort();
 
-        assertNotEquals("Port number of the service is not updated", 0,
-            readPort);
+        assertNotEquals(0, readPort,
+            "Port number of the service is not updated");
 
-        assertTrue("Port of datanode service is conflicted with other server.",
-            ports.add(readPort));
+        assertTrue(ports.add(readPort),
+            "Port of datanode service is conflicted with other server.");
 
         int writePort = dsm.getContainer().getWriteChannel().getIPCPort();
 
-        assertNotEquals("Port number of the service is not updated", 0,
-            writePort);
-        assertTrue("Port of datanode service is conflicted with other server.",
-            ports.add(writePort));
+        assertNotEquals(0, writePort,
+            "Port number of the service is not updated");
+        assertTrue(ports.add(writePort),
+            "Port of datanode service is conflicted with other server.");
       }
 
     } finally {
@@ -265,11 +173,11 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
     try (
         DatanodeStateMachine sm1 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
         DatanodeStateMachine sm2 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
-            randomDatanodeDetails(), ozoneConf,  null, null, null);
+            randomDatanodeDetails(), ozoneConf);
     ) {
       HashSet<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));
@@ -281,20 +189,19 @@ public class TestMiniOzoneCluster {
     }
   }
 
-  private void createMalformedIDFile(File malformedFile)
-      throws IOException {
-    malformedFile.delete();
-    DatanodeDetails id = randomDatanodeDetails();
-    ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
-
-    FileOutputStream out = null;
-    try {
-      out = new FileOutputStream(malformedFile);
-      out.write("malformed".getBytes(StandardCharsets.UTF_8));
-    } finally {
-      if (out != null) {
-        out.close();
-      }
+  @Test
+  public void testKeepPortsWhenRestartDN() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .build();
+    cluster.waitForClusterToBeReady();
+    DatanodeDetails before =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    cluster.restartHddsDatanode(0, true);
+    DatanodeDetails after =
+        cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    for (Port.Name name : Port.Name.ALL_PORTS) {
+      assertEquals(before.getPort(name), after.getPort(name));
     }
   }
 
@@ -325,7 +232,7 @@ public class TestMiniOzoneCluster {
     for (int i = 0; i < 20; i++) {
       for (EndpointStateMachine endpoint :
           dnStateMachine.getConnectionManager().getValues()) {
-        Assert.assertEquals(
+        assertEquals(
             EndpointStateMachine.EndPointStates.GETVERSION,
             endpoint.getState());
       }
@@ -340,7 +247,7 @@ public class TestMiniOzoneCluster {
     // DN should be in HEARTBEAT state after registering with the SCM
     for (EndpointStateMachine endpoint :
         dnStateMachine.getConnectionManager().getValues()) {
-      Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+      assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
   }
@@ -360,22 +267,23 @@ public class TestMiniOzoneCluster {
         .build();
     cluster.waitForClusterToBeReady();
 
+    final String name = MiniOzoneClusterImpl.class.getSimpleName()
+        + "-" + cluster.getClusterId();
+    assertEquals(name, cluster.getName());
+
+    final String baseDir = GenericTestUtils.getTempPath(name);
+    assertEquals(baseDir, cluster.getBaseDir());
+
+
     List<StorageVolume> volumeList = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getVolumeSet()
         .getVolumesList();
 
-    Assert.assertEquals(3, volumeList.size());
+    assertEquals(3, volumeList.size());
 
-    volumeList.forEach(storageVolume -> Assert.assertEquals(
+    volumeList.forEach(storageVolume -> assertEquals(
             (long) StorageSize.parse(reservedSpace).getValue(),
-            storageVolume.getVolumeInfo().getReservedInBytes()));
+            storageVolume.getVolumeInfo().get().getReservedInBytes()));
   }
 
-  private static void assertDetailsEquals(DatanodeDetails expected,
-      DatanodeDetails actual) {
-    assertEquals(expected, actual);
-    assertEquals(expected.getCertSerialId(), actual.getCertSerialId());
-    assertEquals(expected.getProtoBufMessage(), actual.getProtoBufMessage());
-    assertEquals(expected.getInitialVersion(), actual.getInitialVersion());
-  }
 }

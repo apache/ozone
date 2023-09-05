@@ -45,6 +45,7 @@ public class AuditLogger {
   private static final String FQCN = AuditLogger.class.getName();
   private static final Marker WRITE_MARKER = AuditMarker.WRITE.getMarker();
   private static final Marker READ_MARKER = AuditMarker.READ.getMarker();
+  private static final Marker AUTH_MARKER = AuditMarker.AUTH.getMarker();
   private final AtomicReference<Set<String>> debugCmdSetRef =
       new AtomicReference<>(new HashSet<>());
   public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
@@ -84,6 +85,11 @@ public class AuditLogger {
 
   public void logWriteFailure(AuditMessage msg) {
     this.logger.logIfEnabled(FQCN, Level.ERROR, WRITE_MARKER, msg,
+        msg.getThrowable());
+  }
+
+  public void logAuthFailure(AuditMessage msg) {
+    this.logger.logIfEnabled(FQCN, Level.ERROR, AUTH_MARKER, msg,
         msg.getThrowable());
   }
 

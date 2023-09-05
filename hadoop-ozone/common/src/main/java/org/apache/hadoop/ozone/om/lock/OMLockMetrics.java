@@ -203,5 +203,7 @@ public final class OMLockMetrics implements MetricsSource {
     MetricsRecordBuilder builder = collector.addRecord(SOURCE_NAME);
     readLockHeldTimeMsStat.snapshot(builder, all);
     readLockWaitingTimeMsStat.snapshot(builder, all);
+    writeLockHeldTimeMsStat.snapshot(builder, all);
+    writeLockWaitingTimeMsStat.snapshot(builder, all);
   }
 }

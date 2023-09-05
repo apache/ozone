@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
+import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +92,24 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
+  public String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
+    checkLayoutVersion(container);
+    File chunkFile = getChunkFile(container, blockID, null);
+    return chunkFile.getAbsolutePath();
+  }
+
+  @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+          Container container, BlockID blockID, ContainerMetrics metrics)
+          throws StorageContainerException {
+    checkLayoutVersion(container);
+    File chunkFile = getChunkFile(container, blockID, null);
+    return new KeyValueStreamDataChannel(chunkFile,
+        container.getContainerData(), metrics);
+  }
+
+  @Override
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
@@ -117,22 +137,24 @@ public class FilePerBlockStrategy implements ChunkManager {
         .getContainerData();
 
     File chunkFile = getChunkFile(container, blockID, info);
-    boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
     long offset = info.getOffset();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
-          info, overwrite, stage, chunkFile);
-    }
 
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
+    boolean overwrite;
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
+      overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
+          info, overwrite, stage, chunkFile);
     }
 
     // check whether offset matches block file length if its an overwrite

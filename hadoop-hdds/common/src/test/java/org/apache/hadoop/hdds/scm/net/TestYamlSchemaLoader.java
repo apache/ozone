@@ -17,74 +17,72 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-import java.util.Collection;
+import java.io.FileNotFoundException;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Test the node schema loader. */
-@RunWith(Parameterized.class)
+@Timeout(30)
 public class TestYamlSchemaLoader {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestYamlSchemaLoader.class);
-  private ClassLoader classLoader =
+  private final ClassLoader classLoader =
       Thread.currentThread().getContextClassLoader();
 
-  public TestYamlSchemaLoader(String schemaFile, String errMsg) {
-    try {
-      String filePath = classLoader.getResource(
-          "./networkTopologyTestFiles/" + schemaFile).getPath();
-      NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
-      fail("expect exceptions");
-    } catch (Throwable e) {
-      assertTrue(e.getMessage().contains(errMsg));
-    }
+  public static Stream<Arguments> getSchemaFiles() {
+    return Stream.of(
+        arguments("multiple-root.yaml", "Multiple root"),
+        arguments("middle-leaf.yaml", "Leaf node in the middle")
+    );
   }
 
-  @Rule
-  public Timeout testTimeout = Timeout.seconds(30);
-
-  @Parameters
-  public static Collection<Object[]> getSchemaFiles() {
-    Object[][] schemaFiles = new Object[][]{
-        {"multiple-root.yaml", "Multiple root"},
-        {"middle-leaf.yaml", "Leaf node in the middle"},
-    };
-    return Arrays.asList(schemaFiles);
+  @ParameterizedTest
+  @MethodSource("getSchemaFiles")
+  public void loadSchemaFromFile(String schemaFile, String errMsg) {
+    String filePath = classLoader.getResource(
+        "./networkTopologyTestFiles/" + schemaFile).getPath();
+    Throwable e = assertThrows(IllegalArgumentException.class, () ->
+        NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
+    assertTrue(e.getMessage().contains(errMsg));
   }
-
 
   @Test
   public void testGood() {
-    try {
-      String filePath = classLoader.getResource(
-              "./networkTopologyTestFiles/good.yaml").getPath();
-      NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
-    } catch (Throwable e) {
-      fail("should succeed");
-    }
+    String filePath = classLoader.getResource(
+        "./networkTopologyTestFiles/good.yaml").getPath();
+    assertDoesNotThrow(() ->
+        NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
   }
 
   @Test
   public void testNotExist() {
     String filePath = classLoader.getResource(
         "./networkTopologyTestFiles/good.yaml").getPath() + ".backup";
-    try {
-      NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
-      fail("should fail");
-    } catch (Throwable e) {
-      assertTrue(e.getMessage().contains("not found"));
-    }
+    Throwable e = assertThrows(FileNotFoundException.class, () ->
+        NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
+    assertTrue(e.getMessage().contains("not found"));
   }
 
+  @Test
+  public void testDefaultYaml() {
+    String filePath = classLoader.getResource(
+        "network-topology-default.yaml").getPath();
+    NodeSchemaLoader.NodeSchemaLoadResult result =
+        assertDoesNotThrow(() ->
+            NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
+    assertEquals(3, result.getSchemaList().size());
+  }
 }

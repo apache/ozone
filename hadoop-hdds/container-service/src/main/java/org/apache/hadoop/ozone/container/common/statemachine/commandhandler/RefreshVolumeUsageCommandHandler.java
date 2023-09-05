@@ -70,4 +70,14 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
     return invocations == 0 ?
         0 : totalTime.get() / invocations;
   }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime.get();
+  }
+
+  @Override
+  public int getQueuedCount() {
+    return 0;
+  }
 }

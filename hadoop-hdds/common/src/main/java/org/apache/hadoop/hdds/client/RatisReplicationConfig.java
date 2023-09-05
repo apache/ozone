@@ -29,7 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 
 /**
- * Replication configuration for EC replication.
+ * Replication configuration for Ratis replication.
  */
 public final class RatisReplicationConfig
     implements ReplicatedReplicationConfig {
@@ -118,5 +118,10 @@ public final class RatisReplicationConfig
   @Override
   public String toString() {
     return REPLICATION_TYPE.name() + "/" + replicationFactor;
+  }
+
+  @Override
+  public String configFormat() {
+    return toString();
   }
 }

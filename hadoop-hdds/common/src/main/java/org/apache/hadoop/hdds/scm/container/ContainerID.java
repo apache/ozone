@@ -15,23 +15,35 @@
  * the License.
  *
  */
-
 package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
  * <p>
  * We are creating a specific type for this to avoid mixing this with
  * normal integers in code.
+ * <p>
+ * This class is immutable.
  */
 public final class ContainerID implements Comparable<ContainerID> {
+  private static final Codec<ContainerID> CODEC = new DelegatedCodec<>(
+      LongCodec.get(), ContainerID::valueOf, c -> c.id,
+      DelegatedCodec.CopyType.SHALLOW);
+
+  public static final ContainerID MIN = ContainerID.valueOf(0);
+
+  public static Codec<ContainerID> getCodec() {
+    return CODEC;
+  }
 
   private final long id;
 
@@ -73,7 +85,7 @@ public final class ContainerID implements Comparable<ContainerID> {
    */
   @Deprecated
   public byte[] getBytes() {
-    return Longs.toByteArray(id);
+    return LongCodec.get().toPersistedFormat(id);
   }
 
   public HddsProtos.ContainerID getProtobuf() {

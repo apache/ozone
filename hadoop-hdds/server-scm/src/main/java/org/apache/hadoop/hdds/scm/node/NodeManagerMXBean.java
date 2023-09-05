@@ -42,4 +42,10 @@ public interface NodeManagerMXBean {
    */
   Map<String, Long> getNodeInfo();
 
+  /**
+   * @return Get the NodeStatus table information  like hostname,
+   * Commissioned State & Operational State column for dataNode
+   */
+  Map<String, Map<String, String>> getNodeStatusInfo();
+
 }

@@ -43,13 +43,13 @@ public interface BlockInputStreamFactory {
    * @param token The block Access Token
    * @param verifyChecksum Whether to verify checksums or not.
    * @param xceiverFactory Factory to create the xceiver in the client
-   * @param refreshFunction Function to refresh the pipeline if needed
+   * @param refreshFunction Function to refresh the block location if needed
    * @return BlockExtendedInputStream of the correct type.
    */
   BlockExtendedInputStream create(ReplicationConfig repConfig,
       BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
        XceiverClientFactory xceiverFactory,
-       Function<BlockID, Pipeline> refreshFunction);
+       Function<BlockID, BlockLocationInfo> refreshFunction);
 
 }

@@ -21,6 +21,9 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,21 +46,22 @@ public final class OmKeyArgs implements Auditable {
   private final String multipartUploadID;
   private final int multipartUploadPartNumber;
   private Map<String, String> metadata;
-  private boolean refreshPipeline;
   private boolean sortDatanodesInPipeline;
   private List<OzoneAcl> acls;
   private boolean latestVersionLocation;
   private boolean recursive;
   private boolean headOp;
+  private boolean forceUpdateContainerCacheFromSCM;
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
       long dataSize, ReplicationConfig replicationConfig,
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
-      Map<String, String> metadataMap, boolean refreshPipeline,
+      Map<String, String> metadataMap,
       List<OzoneAcl> acls, boolean sortDatanode,
-      boolean latestVersionLocation, boolean recursive, boolean headOp) {
+      boolean latestVersionLocation, boolean recursive, boolean headOp,
+      boolean forceUpdateContainerCacheFromSCM) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -68,12 +72,12 @@ public final class OmKeyArgs implements Auditable {
     this.multipartUploadID = uploadID;
     this.multipartUploadPartNumber = partNumber;
     this.metadata = metadataMap;
-    this.refreshPipeline = refreshPipeline;
     this.acls = acls;
     this.sortDatanodesInPipeline = sortDatanode;
     this.latestVersionLocation = latestVersionLocation;
     this.recursive = recursive;
     this.headOp = headOp;
+    this.forceUpdateContainerCacheFromSCM = forceUpdateContainerCacheFromSCM;
   }
 
   public boolean getIsMultipartKey() {
@@ -132,10 +136,6 @@ public final class OmKeyArgs implements Auditable {
     return locationInfoList;
   }
 
-  public boolean getRefreshPipeline() {
-    return refreshPipeline;
-  }
-
   public boolean getSortDatanodes() {
     return sortDatanodesInPipeline;
   }
@@ -150,6 +150,10 @@ public final class OmKeyArgs implements Auditable {
 
   public boolean isHeadOp() {
     return headOp;
+  }
+
+  public boolean isForceUpdateContainerCacheFromSCM() {
+    return forceUpdateContainerCacheFromSCM;
   }
 
   @Override
@@ -185,10 +189,26 @@ public final class OmKeyArgs implements Auditable {
         .setMultipartUploadID(multipartUploadID)
         .setMultipartUploadPartNumber(multipartUploadPartNumber)
         .addAllMetadata(metadata)
-        .setRefreshPipeline(refreshPipeline)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setHeadOp(headOp)
         .setLatestVersionLocation(latestVersionLocation)
-        .setAcls(acls);
+        .setAcls(acls)
+        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
+  }
+
+  @NotNull
+  public KeyArgs toProtobuf() {
+    return KeyArgs.newBuilder()
+        .setVolumeName(getVolumeName())
+        .setBucketName(getBucketName())
+        .setKeyName(getKeyName())
+        .setDataSize(getDataSize())
+        .setSortDatanodes(getSortDatanodes())
+        .setLatestVersionLocation(getLatestVersionLocation())
+        .setHeadOp(isHeadOp())
+        .setForceUpdateContainerCacheFromSCM(
+            isForceUpdateContainerCacheFromSCM())
+        .build();
   }
 
   /**
@@ -205,12 +225,12 @@ public final class OmKeyArgs implements Auditable {
     private String multipartUploadID;
     private int multipartUploadPartNumber;
     private Map<String, String> metadata = new HashMap<>();
-    private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
     private List<OzoneAcl> acls;
     private boolean recursive;
     private boolean headOp;
+    private boolean forceUpdateContainerCacheFromSCM;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -272,8 +292,11 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setRefreshPipeline(boolean refresh) {
-      this.refreshPipeline = refresh;
+    public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
+      addAllMetadata(metadatamap);
+      if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
+      }
       return this;
     }
 
@@ -297,12 +320,18 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
+      this.forceUpdateContainerCacheFromSCM = value;
+      return this;
+    }
+
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize,
           replicationConfig, locationInfoList, isMultipartKey,
           multipartUploadID,
-          multipartUploadPartNumber, metadata, refreshPipeline, acls,
-          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp);
+          multipartUploadPartNumber, metadata, acls,
+          sortDatanodesInPipeline, latestVersionLocation, recursive, headOp,
+          forceUpdateContainerCacheFromSCM);
     }
 
   }

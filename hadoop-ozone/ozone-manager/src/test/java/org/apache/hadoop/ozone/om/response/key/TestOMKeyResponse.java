@@ -18,12 +18,17 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
@@ -67,7 +72,7 @@ public class TestOMKeyResponse {
     OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();
@@ -78,10 +83,34 @@ public class TestOMKeyResponse {
     clientID = 1000L;
     random = new Random();
     keysToDelete = null;
+
+    final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+            .setVolume(volumeName)
+            .setAdminName("admin")
+            .setOwnerName("owner")
+            .setObjectID(System.currentTimeMillis())
+            .build();
+
+    omMetadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+            CacheValue.get(1, volumeArgs));
+
+    omBucketInfo = OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setObjectID(System.currentTimeMillis())
+            .setStorageType(StorageType.DISK)
+            .setIsVersionEnabled(false)
+            .build();
+
+    omMetadataManager.getBucketTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getBucketKey(
+                    volumeName, bucketName)),
+            CacheValue.get(1, omBucketInfo));
   }
 
   @NotNull
-  protected String getOpenKeyName() {
+  protected String getOpenKeyName()  throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
             clientID);
   }

@@ -39,9 +39,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import javax.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -70,6 +75,7 @@ public class TestS3GatewayMetrics {
   private static final String ACL_MARKER = "acl";
   private static final String CONTENT = "0123456789";
   private S3GatewayMetrics metrics;
+  private ContainerRequestContext context;
 
 
   @Before
@@ -93,6 +99,12 @@ public class TestS3GatewayMetrics {
         "STANDARD");
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
+
+    context = Mockito.mock(ContainerRequestContext.class);
+    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
+    Mockito.when(context.getUriInfo().getQueryParameters())
+        .thenReturn(new MultivaluedHashMap<>());
+    keyEndpoint.setContext(context);
   }
 
   /**
@@ -147,7 +159,10 @@ public class TestS3GatewayMetrics {
           null, "random", null,
           null, null);
       fail();
-    } catch (OS3Exception e) {
+    } catch (OS3Exception ex) {
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
+      assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
+          ex.getErrorMessage());
     }
 
     long curMetric = metrics.getGetBucketFailure();
@@ -363,8 +378,9 @@ public class TestS3GatewayMetrics {
     keyEndpoint.put(bucketName, keyName, CONTENT
         .length(), 1, null, body);
     // GET the key from the bucket
-    keyEndpoint.get(bucketName, keyName, null, 0,
-        null, body);
+    Response response = keyEndpoint.get(bucketName, keyName, null, 0, null);
+    StreamingOutput stream = (StreamingOutput) response.getEntity();
+    stream.write(new ByteArrayOutputStream());
     long curMetric = metrics.getGetKeySuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -375,7 +391,7 @@ public class TestS3GatewayMetrics {
     // Fetching a non-existent key
     try {
       keyEndpoint.get(bucketName, "unknownKey", null, 0,
-          null, null);
+          null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_KEY.getCode(), ex.getCode());
@@ -507,7 +523,7 @@ public class TestS3GatewayMetrics {
 
     // Listing out the parts by providing the uploadID
     keyEndpoint.get(bucketName, keyName,
-        uploadID, 3, null, null);
+        uploadID, 3, null);
     long curMetric = metrics.getListPartsSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -519,7 +535,7 @@ public class TestS3GatewayMetrics {
     try {
       // Listing out the parts by providing the uploadID after aborting
       keyEndpoint.get(bucketName, keyName,
-          "wrong_id", 3, null, null);
+          "wrong_id", 3, null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());

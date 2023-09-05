@@ -36,45 +36,51 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.hamcrest.MatcherAssert;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.util.Lists;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.matchesPattern;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.when;
 
 /**
  * Test for the scm container rack aware placement.
  */
-@RunWith(Parameterized.class)
 public class TestSCMContainerPlacementRackScatter {
   private NetworkTopology cluster;
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
-  private final Integer datanodeCount;
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
   // policy with fallback capability
@@ -84,18 +90,59 @@ public class TestSCMContainerPlacementRackScatter {
   private SCMContainerPlacementMetrics metrics;
   private static final int NODE_PER_RACK = 5;
 
-  public TestSCMContainerPlacementRackScatter(Integer count) {
-    this.datanodeCount = count;
+  private static IntStream numDatanodes() {
+    return IntStream.concat(IntStream.rangeClosed(3, 15),
+        IntStream.of(20, 25, 30));
   }
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> setupDatanodes() {
-    return Arrays.asList(new Object[][] {{3}, {4}, {5}, {6}, {7}, {8}, {9},
-        {10}, {11}, {12}, {13}, {14}, {15}, {20}, {25}, {30}});
+  private void updateStorageInDatanode(int dnIndex, long used, long remaining) {
+    StorageReportProto storage = HddsTestUtils.createStorageReport(
+            dnInfos.get(dnIndex).getUuid(),
+            "/data1-" + dnInfos.get(dnIndex).getUuidString(),
+            STORAGE_CAPACITY, used, remaining, null);
+    dnInfos.get(dnIndex).updateStorageReports(
+            new ArrayList<>(Arrays.asList(storage)));
   }
 
-  @Before
-  public void setup() {
+  private void setup(int datanodeCount) {
+    setup(datanodeCount, NODE_PER_RACK);
+  }
+
+  /**
+   * Sets up cluster in a way such that there's one datanode per rack, except
+   * the last rack, which has datanodesInLastRackCount number of datanodes.
+   * @param rackCount number of racks this cluster should have, including the
+   * last rack
+   * @param datanodesInLastRackCount number of datanodes that should be in
+   * the last rack
+   */
+  private void setupOneDatanodePerRackWithExtraInLastRack(int rackCount,
+      int datanodesInLastRackCount) {
+    setupConfiguration();
+
+    String rack = "/rack";
+    String hostname = "node";
+    // add a datanode per rack to each rack except the last one
+    for (int i = 0; i < rackCount - 1; i++) {
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.createDatanodeDetails(
+              hostname + i, rack + i);
+      setupDatanode(datanodeDetails);
+    }
+
+    // add datanodesInLastRackCount number of datanodes to the last rack
+    for (int i = 0; i < datanodesInLastRackCount; i++) {
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.createDatanodeDetails(
+              hostname + (rackCount - 1 + i), rack + (rackCount - 1));
+      setupDatanode(datanodeDetails);
+    }
+
+    createMocksAndUpdateStorageReports(
+        rackCount - 1 + datanodesInLastRackCount);
+  }
+
+  private void setupConfiguration() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     // We are using small units here
@@ -105,7 +152,10 @@ public class TestSCMContainerPlacementRackScatter {
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
     cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+  }
 
+  private void setup(int datanodeCount, int nodesPerRack) {
+    setupConfiguration();
     // build datanodes, and network topology
     String rack = "/rack";
     String hostname = "node";
@@ -113,28 +163,40 @@ public class TestSCMContainerPlacementRackScatter {
       // Totally 6 racks, each has 5 datanodes
       DatanodeDetails datanodeDetails =
           MockDatanodeDetails.createDatanodeDetails(
-          hostname + i, rack + (i / NODE_PER_RACK));
-      DatanodeInfo datanodeInfo = new DatanodeInfo(
-          datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
-
-      StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      MetadataStorageReportProto metaStorage1 =
-          HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
-          STORAGE_CAPACITY, 0, 100L, null);
-      datanodeInfo.updateStorageReports(
-          new ArrayList<>(Arrays.asList(storage1)));
-      datanodeInfo.updateMetaDataStorageReports(
-          new ArrayList<>(Arrays.asList(metaStorage1)));
-
-      datanodes.add(datanodeDetails);
-      cluster.add(datanodeDetails);
-      dnInfos.add(datanodeInfo);
+              hostname + i, rack + (i / nodesPerRack));
+      setupDatanode(datanodeDetails);
     }
 
+    createMocksAndUpdateStorageReports(datanodeCount);
+  }
+
+  /**
+   * Adds the datanode to class level data structures and Network Topology.
+   * Creates a DatanodeInfo object and storage reports for it.
+   * @param datanodeDetails the datanode to setup
+   */
+  private void setupDatanode(DatanodeDetails datanodeDetails) {
+    datanodes.add(datanodeDetails);
+    cluster.add(datanodeDetails);
+    DatanodeInfo datanodeInfo = new DatanodeInfo(
+        datanodeDetails, NodeStatus.inServiceHealthy(),
+        UpgradeUtils.defaultLayoutVersionProto());
+
+    StorageReportProto storage1 = HddsTestUtils.createStorageReport(
+        datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+        STORAGE_CAPACITY, 0, 100L, null);
+    MetadataStorageReportProto metaStorage1 =
+        HddsTestUtils.createMetadataStorageReport(
+            "/metadata1-" + datanodeInfo.getUuidString(),
+            STORAGE_CAPACITY, 0, 100L, null);
+    datanodeInfo.updateStorageReports(
+        new ArrayList<>(Collections.singletonList(storage1)));
+    datanodeInfo.updateMetaDataStorageReports(
+        new ArrayList<>(Collections.singletonList(metaStorage1)));
+    dnInfos.add(datanodeInfo);
+  }
+
+  private void createMocksAndUpdateStorageReports(int datanodeCount) {
     if (datanodeCount > 4) {
       StorageReportProto storage2 = HddsTestUtils.createStorageReport(
           dnInfos.get(2).getUuid(),
@@ -181,25 +243,32 @@ public class TestSCMContainerPlacementRackScatter {
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
 
     // create placement policy instances
-    metrics = SCMContainerPlacementMetrics.create();
     policy = new SCMContainerPlacementRackScatter(
         nodeManager, conf, cluster, true, metrics);
   }
 
-  @After
+  @BeforeEach
+  public void init() {
+    metrics = SCMContainerPlacementMetrics.create();
+  }
+
+  @AfterEach
   public void teardown() {
     metrics.unRegister();
   }
 
-  @Test
-  public void chooseNodeWithNoExcludedNodes() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithNoExcludedNodes(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     int rackLevel = cluster.getMaxLevel() - 1;
     int rackNum = cluster.getNumOfNodes(rackLevel);
 
@@ -208,21 +277,21 @@ public class TestSCMContainerPlacementRackScatter {
     int nodeNum = 1;
     List<DatanodeDetails> datanodeDetails =
         policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
 
     // 2 replicas
     nodeNum = 2;
     datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertTrue(!cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertTrue(!cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)) || (datanodeCount <= NODE_PER_RACK));
 
     //  3 replicas
     nodeNum = 3;
     if (datanodeCount > nodeNum) {
       datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails),
           Math.min(nodeNum, rackNum));
     }
 
@@ -230,31 +299,48 @@ public class TestSCMContainerPlacementRackScatter {
     nodeNum = 5;
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount >= NODE_PER_RACK);
-      datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
-          Math.min(nodeNum, rackNum));
+      if (datanodeCount == 6) {
+        int finalNodeNum = nodeNum;
+        SCMException e = assertThrows(SCMException.class,
+                () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
+        assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+      } else {
+        datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
+        Assertions.assertEquals(nodeNum, datanodeDetails.size());
+        Assertions.assertEquals(getRackSize(datanodeDetails),
+                Math.min(nodeNum, rackNum));
+      }
     }
 
     //  10 replicas
     nodeNum = 10;
     if (datanodeCount > nodeNum) {
       assumeTrue(datanodeCount > 2 * NODE_PER_RACK);
-      datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
-      Assert.assertEquals(nodeNum, datanodeDetails.size());
-      Assert.assertEquals(getRackSize(datanodeDetails),
-          Math.min(nodeNum, rackNum));
+      if (datanodeCount == 11) {
+        int finalNodeNum = nodeNum;
+        SCMException e = assertThrows(SCMException.class,
+                () -> policy.chooseDatanodes(null, null, finalNodeNum, 0, 15));
+        assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+      } else {
+        datanodeDetails = policy.chooseDatanodes(null, null, nodeNum, 0, 15);
+        Assertions.assertEquals(nodeNum, datanodeDetails.size());
+        Assertions.assertEquals(getRackSize(datanodeDetails),
+                Math.min(nodeNum, rackNum));
+      }
     }
   }
 
-  @Test
-  public void chooseNodeWithExcludedNodes() throws SCMException {
-    int rackLevel = cluster.getMaxLevel() - 1;
-    int rackNum = cluster.getNumOfNodes(rackLevel);
-    int totalNum;
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithExcludedNodes(int datanodeCount)
+      throws SCMException {
     // test choose new datanodes for under replicated pipeline
     // 3 replicas, two existing datanodes on same rack
     assumeTrue(datanodeCount > NODE_PER_RACK);
+    setup(datanodeCount);
+    int rackLevel = cluster.getMaxLevel() - 1;
+    int rackNum = cluster.getNumOfNodes(rackLevel);
+    int totalNum;
     int nodeNum = 1;
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
 
@@ -262,10 +348,10 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(1));
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         excludedNodes.get(0)));
-    Assert.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         excludedNodes.get(1)));
 
     // 3 replicas, one existing datanode
@@ -275,8 +361,8 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(0));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
         Math.min(totalNum, rackNum));
 
     // 3 replicas, two existing datanodes on different rack
@@ -287,8 +373,8 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.add(datanodes.get(5));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
         Math.min(totalNum, rackNum));
 
     // 5 replicas, one existing datanode
@@ -296,11 +382,20 @@ public class TestSCMContainerPlacementRackScatter {
     totalNum = 5;
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
-    datanodeDetails = policy.chooseDatanodes(
-        excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-        Math.min(totalNum, rackNum));
+    if (datanodeCount == 6) {
+      int finalNodeNum = nodeNum;
+      SCMException e = assertThrows(SCMException.class,
+              () -> policy.chooseDatanodes(excludedNodes, null,
+                      finalNodeNum, 0, 15));
+      assertEquals(FAILED_TO_FIND_HEALTHY_NODES, e.getResult());
+    } else {
+      datanodeDetails = policy.chooseDatanodes(
+              excludedNodes, null, nodeNum, 0, 15);
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+              Math.min(totalNum, rackNum));
+    }
+
 
     // 5 replicas, two existing datanodes on different rack
     nodeNum = 3;
@@ -308,15 +403,40 @@ public class TestSCMContainerPlacementRackScatter {
     excludedNodes.clear();
     excludedNodes.add(datanodes.get(0));
     excludedNodes.add(datanodes.get(5));
-    datanodeDetails = policy.chooseDatanodes(
-        excludedNodes, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(getRackSize(datanodeDetails, excludedNodes),
-        Math.min(totalNum, rackNum));
+    if (datanodeCount == 6) {
+      /*
+      * when datanodeCount is 6, the clusterMap will be
+      * /rack0/node0
+      * /rack0/node1
+      * /rack0/node2
+      * /rack0/node3
+      * /rack0/node4
+      * /rack1/node5
+      * if we select node0 and node5 as the excluded datanode,
+      * only datanode in rack0 will be chosen when calling
+      * `policy.chooseDatanodes` and the placement will not be
+      *  met since there are two racks exist, but only one
+      * of them is chosen
+      * */
+      SCMException e = assertThrows(SCMException.class,
+          () -> policy.chooseDatanodes(excludedNodes, null, 3, 0, 15));
+      String message = e.getMessage();
+      assertTrue(message.contains("Chosen nodes size: 2, but required nodes " +
+          "to choose: 3 do not match."));
+    } else {
+      datanodeDetails = policy.chooseDatanodes(
+          excludedNodes, null, nodeNum, 0, 15);
+      Assertions.assertEquals(nodeNum, datanodeDetails.size());
+      Assertions.assertEquals(getRackSize(datanodeDetails, excludedNodes),
+          Math.min(totalNum, rackNum));
+    }
   }
 
-  @Test
-  public void chooseNodeWithFavoredNodes() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void chooseNodeWithFavoredNodes(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     int nodeNum = 1;
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
     List<DatanodeDetails> favoredNodes = new ArrayList<>();
@@ -325,11 +445,11 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(0));
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
         favoredNodes.get(0).getNetworkFullPath());
 
-    // no overlap between excludedNodes and favoredNodes, favoredNodes can been
+    // no overlap between excludedNodes and favoredNodes, favoredNodes can be
     // chosen.
     excludedNodes.clear();
     favoredNodes.clear();
@@ -337,8 +457,8 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(1));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(datanodeDetails.get(0).getNetworkFullPath(),
         favoredNodes.get(0).getNetworkFullPath());
 
     // there is overlap between excludedNodes and favoredNodes, favoredNodes
@@ -349,13 +469,15 @@ public class TestSCMContainerPlacementRackScatter {
     favoredNodes.add(datanodes.get(0));
     datanodeDetails = policy.chooseDatanodes(
         excludedNodes, favoredNodes, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertFalse(datanodeDetails.get(0).getNetworkFullPath()
-        .equals(favoredNodes.get(0).getNetworkFullPath()));
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertNotEquals(datanodeDetails.get(0).getNetworkFullPath(),
+        favoredNodes.get(0).getNetworkFullPath());
   }
 
-  @Test
-  public void testNoInfiniteLoop() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void testNoInfiniteLoop(int datanodeCount) {
+    setup(datanodeCount);
     int nodeNum = 1;
 
     try {
@@ -363,7 +485,7 @@ public class TestSCMContainerPlacementRackScatter {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -372,15 +494,17 @@ public class TestSCMContainerPlacementRackScatter {
     long tryCount = metrics.getDatanodeChooseAttemptCount();
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
-    Assert.assertEquals(totalRequest, nodeNum);
-    Assert.assertEquals(successCount, 0);
-    MatcherAssert.assertThat("Not enough try", tryCount,
-        greaterThanOrEqualTo((long) nodeNum));
-    Assert.assertEquals(compromiseCount, 0);
+    Assertions.assertEquals(totalRequest, nodeNum);
+    Assertions.assertEquals(successCount, 0);
+    Assertions.assertTrue(tryCount >= nodeNum, "Not enough try");
+    Assertions.assertEquals(compromiseCount, 0);
   }
 
-  @Test
-  public void testDatanodeWithDefaultNetworkLocation() throws SCMException {
+  @ParameterizedTest
+  @MethodSource("numDatanodes")
+  public void testDatanodeWithDefaultNetworkLocation(int datanodeCount)
+      throws SCMException {
+    setup(datanodeCount);
     String hostname = "node";
     List<DatanodeInfo> dnInfoList = new ArrayList<>();
     List<DatanodeDetails> dataList = new ArrayList<>();
@@ -410,10 +534,10 @@ public class TestSCMContainerPlacementRackScatter {
       clusterMap.add(dn);
       dnInfoList.add(dnInfo);
     }
-    Assert.assertEquals(dataList.size(), StringUtils.countMatches(
+    Assertions.assertEquals(dataList.size(), StringUtils.countMatches(
         clusterMap.toString(), NetConstants.DEFAULT_RACK));
     for (DatanodeInfo dn: dnInfoList) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
 
@@ -424,14 +548,16 @@ public class TestSCMContainerPlacementRackScatter {
             true, metrics);
     List<DatanodeDetails> datanodeDetails =
         newPolicy.chooseDatanodes(null, null, nodeNum, 0, 15);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
-    Assert.assertEquals(1, getRackSize(datanodeDetails));
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(1, getRackSize(datanodeDetails));
   }
 
-  @Test
-  public void testvalidateContainerPlacement() {
+  @ParameterizedTest
+  @ValueSource(ints = {15, 20, 25, 30})
+  public void testValidateContainerPlacement(int datanodeCount) {
     // Only run this test for the full set of DNs. 5 DNs per rack on 6 racks.
     assumeTrue(datanodeCount >= 15);
+    setup(datanodeCount);
     List<DatanodeDetails> dns = new ArrayList<>();
     // First 5 node are on the same rack
     dns.add(datanodes.get(0));
@@ -465,9 +591,169 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(0, stat.misReplicationCount());
   }
 
+  public List<DatanodeDetails> getDatanodes(List<Integer> dnIndexes) {
+    return dnIndexes.stream().map(datanodes::get).collect(Collectors.toList());
+  }
+
+  private void assertPlacementPolicySatisfied(List<DatanodeDetails> usedDns,
+      List<DatanodeDetails> additionalNodes,
+      List<DatanodeDetails> excludedNodes, int requiredNodes,
+      boolean isSatisfied, int misReplication) {
+    assertFalse(excludedNodes.stream().anyMatch(additionalNodes::contains));
+    ContainerPlacementStatus stat = policy.validateContainerPlacement(
+            Stream.of(usedDns, additionalNodes)
+                    .flatMap(List::stream).collect(Collectors.toList()),
+            requiredNodes);
+    assertEquals(isSatisfied, stat.isPolicySatisfied());
+    assertEquals(misReplication, stat.misReplicationCount());
+  }
+
   @Test
-  public void testvalidateContainerPlacementSingleRackCluster() {
-    assumeTrue(datanodeCount == 5);
+  public void testPipelineProviderRackScatter() throws SCMException {
+    setup(3, 1);
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // Test for pipeline provider placement when number of racks less than
+  // number of node required and nodes cannot be scattered.  In this case
+  // the placement spreads the nodes as much as possible.  In one case
+  // 3 nodes required and 2 racks placing 2 in one 1 in another.  When
+  // only 1 rack placing all nodes in same rack.
+  @Test
+  public void testPipelineProviderRackScatterFallback() throws SCMException {
+    setup(3, 2);
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
+    List<DatanodeDetails> usedDns = new ArrayList<>();
+    List<DatanodeDetails> excludedDns = new ArrayList<>();
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+
+    setup(3, 3);
+    additionalNodes = policy.chooseDatanodes(usedDns,
+        excludedDns, null, 3, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 3,
+        true, 0);
+  }
+
+  // add test for pipeline engagement
+
+  @Test
+  public void testValidChooseNodesWithUsedNodes() throws SCMException {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+    List<DatanodeDetails> additionalNodes = policy.chooseDatanodes(usedDns,
+            excludedDns, null, 2, 0, 5);
+    assertPlacementPolicySatisfied(usedDns, additionalNodes, excludedDns, 4,
+            true, 0);
+  }
+
+  /**
+   * The expectation is that one datanode should be chosen, even though the
+   * placement policy ideally requires two more racks.
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-9011">...</a>
+   */
+  @Test
+  public void shouldChooseNodeIfNodesRequiredLessThanAdditionalRacksRequired()
+      throws SCMException {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+
+    List<DatanodeDetails> chosenNodes =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNodes.size());
+    /*
+    The chosen node should be node4 from the third rack because we prefer to
+    choose from racks that don't have used or excluded nodes.
+     */
+    Assertions.assertEquals(datanodes.get(4), chosenNodes.get(0));
+  }
+
+  /**
+   * Scenario:
+   * rack0 -> node0
+   * rack1 -> node1
+   * rack2 -> node2
+   * rack3 -> node3
+   * rack4 -> node4
+   * rack5 -> node5, node6
+   * <p>
+   * node0, node1, node5, node6 are used nodes. node2 is excluded. We are
+   * asking the placement policy for one more node. Expectation is that an
+   * SCMException should be thrown if fallback is false because we're asking
+   * for one more node while placement policy requires two more racks. Else,
+   * either node3 or node4 should be returned.
+   */
+  @Test
+  public void shouldChooseNodeWhenOneNodeRequiredAndTwoRacksRequired()
+      throws SCMException {
+    setupOneDatanodePerRackWithExtraInLastRack(6, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1, 5,
+        5));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+
+    List<DatanodeDetails> chosenNode =
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 1, 0, 5);
+    Assertions.assertEquals(1, chosenNode.size());
+    Assertions.assertTrue(chosenNode.get(0).equals(datanodes.get(3)) ||
+        chosenNode.get(0).equals(datanodes.get(4)));
+  }
+
+  @Test
+  public void testChooseNodesWithInsufficientNodesAvailable() {
+    setup(5, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(2));
+    SCMException exception = Assertions.assertThrows(SCMException.class, () ->
+        policy.chooseDatanodes(usedDns, excludedDns,
+            null, 3, 0, 5));
+    assertThat(exception.getMessage(),
+        matchesPattern("^No enough datanodes to choose.*"));
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+        exception.getResult());
+  }
+
+  /**
+   * Simulate a scenario with three racks and two datanodes per rack.
+   * Two new nodes are required and the only available ones are on the same
+   * rack. The expectation is that both these nodes on the same rack should be
+   * chosen, since max replicas allowed per rack in this situation is 2.
+   */
+  @Test
+  public void chooseNodesOnTheSameRackWhenInSufficientRacks()
+      throws SCMException {
+    setup(6, 2);
+    List<DatanodeDetails> usedDns = getDatanodes(Lists.newArrayList(0, 1));
+    updateStorageInDatanode(4, 99, 1);
+    List<DatanodeDetails> excludedDns = getDatanodes(Lists.newArrayList(5));
+
+    List<DatanodeDetails> chosenDatanodes =
+        policy.chooseDatanodes(usedDns, excludedDns, null, 2, 0, 5);
+
+    Assertions.assertEquals(2, chosenDatanodes.size());
+    for (DatanodeDetails dn : chosenDatanodes) {
+      Assertions.assertTrue(
+          dn.equals(datanodes.get(2)) || dn.equals(datanodes.get(3)));
+    }
+  }
+
+  @Test
+  public void testValidateContainerPlacementSingleRackCluster() {
+    final int datanodeCount = 5;
+    setup(datanodeCount);
 
     // All nodes are on the same rack in this test, and the cluster only has
     // one rack.
@@ -496,7 +782,8 @@ public class TestSCMContainerPlacementRackScatter {
 
   @Test
   public void testExcludedNodesOverlapsOutOfServiceNodes() throws SCMException {
-    assumeTrue(datanodeCount == 6);
+    final int datanodeCount = 6;
+    setup(datanodeCount);
 
     // DN 5 is out of service
     dnInfos.get(5).setNodeStatus(new NodeStatus(DECOMMISSIONED, HEALTHY));
@@ -514,7 +801,7 @@ public class TestSCMContainerPlacementRackScatter {
 
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(
         excludedNodes, null, nodeNum, 0, 5);
-    Assert.assertEquals(nodeNum, datanodeDetails.size());
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

@@ -18,21 +18,21 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
-import org.mockito.junit.MockitoJUnitRunner;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -40,14 +40,15 @@ import javax.management.ObjectName;
 /**
  * Test generic layout management init and APIs.
  */
-@RunWith(MockitoJUnitRunner.class)
 public class TestAbstractLayoutVersionManager {
 
   @Spy
   private AbstractLayoutVersionManager<LayoutFeature> versionManager;
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
+  @BeforeEach
+  public void setup() {
+    MockitoAnnotations.initMocks(this);
+  }
 
   @Test
   public void testInitializationWithFeaturesToBeFinalized() throws  Exception {
@@ -82,12 +83,11 @@ public class TestAbstractLayoutVersionManager {
   }
 
   @Test
-  public void testInitFailsIfNotEnoughLayoutFeaturesForVersion()
-      throws Exception {
-    exception.expect(IOException.class);
-    exception.expectMessage("Cannot initialize VersionManager.");
+  public void testInitFailsIfNotEnoughLayoutFeaturesForVersion() {
 
-    versionManager.init(3, getTestLayoutFeatures(2));
+    assertThrowsExactly(IOException.class,
+        () -> versionManager.init(3, getTestLayoutFeatures(2)),
+        "Cannot initialize VersionManager.");
   }
 
   @Test
@@ -114,23 +114,21 @@ public class TestAbstractLayoutVersionManager {
   @Test
   public void testFeatureFinalizationFailsIfTheFinalizedFeatureIsNotTheNext()
       throws IOException {
-    exception.expect(IllegalArgumentException.class);
-
     LayoutFeature[] lfs = getTestLayoutFeatures(3);
     versionManager.init(1, lfs);
 
-    versionManager.finalized(lfs[2]);
+    assertThrows(IllegalArgumentException.class,
+        () -> versionManager.finalized(lfs[2]));
   }
 
   @Test
   public void testFeatureFinalizationFailsIfFeatureIsAlreadyFinalized()
       throws IOException {
-    exception.expect(IllegalArgumentException.class);
-
     LayoutFeature[] lfs = getTestLayoutFeatures(3);
     versionManager.init(1, lfs);
 
-    versionManager.finalized(lfs[0]);
+    assertThrows(IllegalArgumentException.class,
+        () -> versionManager.finalized(lfs[0]));
   }
 
   @Test

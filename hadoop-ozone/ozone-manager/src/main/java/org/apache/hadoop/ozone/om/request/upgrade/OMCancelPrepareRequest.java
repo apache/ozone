@@ -62,9 +62,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
-      String username = getOmRequest().getUserInfo().getUserName();
-      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(username)) {
-        throw new OMException("Access denied for user " + username + ". " +
+      if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(createUGI())) {
+        throw new OMException("Access denied for user "
+            + createUGI() + ". " +
             "Superuser privilege is required to cancel ozone manager " +
             "preparation.",
             OMException.ResultCodes.ACCESS_DENIED);

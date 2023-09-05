@@ -89,6 +89,14 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     return cachedValue.get();
   }
 
+  public void incrementUsedSpace(long usedSpace) {
+    cachedValue.addAndGet(usedSpace);
+  }
+
+  public void decrementUsedSpace(long reclaimedSpace) {
+    cachedValue.addAndGet(-1 * reclaimedSpace);
+  }
+
   public void start() {
     if (executor != null) {
       long initialDelay = cachedValue.get() > 0 ? refresh.toMillis() : 0;

@@ -17,13 +17,14 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
 import {showDataFetchError} from 'utils/common';
 import './diskUsage.less';
+import moment from 'moment';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -56,6 +57,11 @@ interface IDUState {
   inputPath: string;
   displayLimit: number;
 }
+
+let cancelPieSignal: AbortController
+let cancelSummarySignal: AbortController
+let cancelQuotaSignal: AbortController;
+let cancelKeyMetadataSignal: AbortController;
 
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
@@ -93,6 +99,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
   handleSubmit = _e => {
     // Avoid empty request trigger 400 response
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ]);
+
     if (!this.state.inputPath) {
       this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
       return;
@@ -104,6 +117,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   // The returned path is passed in, which should have been
   // normalized by the backend
   goBack = (e, path) => {
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ]);
+
     if (!path || path === '/') {
       return;
     }
@@ -124,7 +144,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       isLoading: true
     });
     const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
-    axios.get(duEndpoint).then(response => {
+    const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
+    cancelPieSignal = controller;
+    request.then(response => {
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
@@ -152,26 +174,39 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         subpaths.push(other);
       }
 
-      const pathLabels = subpaths.map(subpath => {
-        // The return subPath must be normalized in a format with
-        // a leading slash and without trailing slash
-        const pieces = subpath.path.split('/');
-        const subpathName = pieces[pieces.length - 1];
-        // Differentiate key without trailing slash
-        return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
-      });
+      let pathLabels, values, percentage, sizeStr, pieces, subpathName;
 
-      const values = subpaths.map(subpath => {
-        return subpath.size / dataSize;
-      });
+      if (duResponse.subPathCount === 0 || subpaths === 0) {
+        pieces = duResponse && duResponse.path != null && duResponse.path.split('/');
+        subpathName = pieces[pieces.length - 1];
+        pathLabels = [subpathName];
+        values = [0.1];
+        percentage = [100.00];
+        sizeStr = [this.byteToSize(duResponse.size, 1)];
+      }
+      else {
+        pathLabels = subpaths.map(subpath => {
+          // The return subPath must be normalized in a format with
+          // a leading slash and without trailing slash
+          pieces = subpath.path.split('/');
+          subpathName = pieces[pieces.length - 1];
+          // Differentiate key without trailing slash
+          return (subpath.isKey || subpathName === OTHER_PATH_NAME) ? subpathName : subpathName + '/';
+        });
 
-      const percentage = values.map(value => {
-        return (value * 100).toFixed(2);
-      });
+        values = subpaths.map(subpath => {
+          return subpath.size / dataSize;
+        });
 
-      const sizeStr = subpaths.map(subpath => {
-        return this.byteToSize(subpath.size, 1);
-      });
+        percentage = values.map(value => {
+          return (value * 100).toFixed(2);
+        });
+
+        sizeStr = subpaths.map(subpath => {
+          return this.byteToSize(subpath.size, 1);
+        });
+      }
+    
       this.setState({
         // Normalized path
         isLoading: false,
@@ -207,6 +242,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
   }
 
+  componentWillUnmount(): void {
+    cancelRequests([
+      cancelPieSignal,
+      cancelSummarySignal,
+      cancelQuotaSignal,
+      cancelKeyMetadataSignal
+    ]);
+  }
+
   clickPieSection(e, curPath: string): void {
     const subPath: string = e.points[0].label;
     if (subPath === OTHER_PATH_NAME) {
@@ -220,6 +264,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   refreshCurPath(e, path: string): void {
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal
+    ]);
+
     if (!path) {
       return;
     }
@@ -243,14 +293,19 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     const summaryEndpoint = `/api/v1/namespace/summary?path=${path}`;
     const keys = [];
     const values = [];
-    axios.get(summaryEndpoint).then(response => {
+
+    const { request: summaryRequest, controller: summaryNewController } = AxiosGetHelper(summaryEndpoint, cancelSummarySignal);
+    cancelSummarySignal = summaryNewController;
+    summaryRequest.then(response => {
       const summaryResponse = response.data;
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
-      if (summaryResponse.type === 'KEY') {
+      if (summaryResponse.countStats.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
-        axios.get(keyEndpoint).then(response => {
+        const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
+        cancelKeyMetadataSignal = metadataNewController;
+        metadataRequest.then(response => {
           keys.push('File Size');
           values.push(this.byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
@@ -272,29 +327,139 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         return;
       }
 
-      if (summaryResponse.status === 'PATH_NOT_FOUND') {
+      if (summaryResponse.countStats.status === 'PATH_NOT_FOUND') {
         showDataFetchError(`Invalid Path: ${path}`);
         return;
       }
 
-      if (summaryResponse.numVolume !== -1) {
+      if (summaryResponse.countStats.numVolume !== -1) {
         keys.push('Volumes');
-        values.push(summaryResponse.numVolume);
+        values.push(summaryResponse.countStats.numVolume);
       }
 
-      if (summaryResponse.numBucket !== -1) {
+      if (summaryResponse.countStats.numBucket !== -1) {
         keys.push('Buckets');
-        values.push(summaryResponse.numBucket);
+        values.push(summaryResponse.countStats.numBucket);
       }
 
-      if (summaryResponse.numDir !== -1) {
+      if (summaryResponse.countStats.numDir !== -1) {
         keys.push('Total Directories');
-        values.push(summaryResponse.numDir);
+        values.push(summaryResponse.countStats.numDir);
       }
 
-      if (summaryResponse.numKey !== -1) {
+      if (summaryResponse.countStats.numKey !== -1) {
         keys.push('Total Keys');
-        values.push(summaryResponse.numKey);
+        values.push(summaryResponse.countStats.numKey);
+      }
+
+      if (summaryResponse.objectInfo.bucketName && summaryResponse.objectInfo.bucketName !== -1) {
+        keys.push('Bucket Name');
+        values.push(summaryResponse.objectInfo.bucketName);
+      }
+
+      if (summaryResponse.objectInfo.bucketLayout && summaryResponse.objectInfo.bucketLayout !== -1) {
+        keys.push('Bucket Layout');
+        values.push(summaryResponse.objectInfo.bucketLayout);
+      }
+
+      if (summaryResponse.objectInfo.creationTime && summaryResponse.objectInfo.creationTime !== -1) {
+        keys.push('Creation Time');
+        values.push(moment(summaryResponse.objectInfo.creationTime).format('ll LTS'));
+      }
+
+      if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
+        keys.push('Data Size');
+        values.push(this.byteToSize(summaryResponse.objectInfo.dataSize, 3));
+      }
+
+      if (summaryResponse.objectInfo.encInfo && summaryResponse.objectInfo.encInfo !== -1) {
+        keys.push('ENC Info');
+        values.push(summaryResponse.objectInfo.encInfo);
+      }
+
+      if (summaryResponse.objectInfo.fileName && summaryResponse.objectInfo.fileName !== -1) {
+        keys.push('File Name');
+        values.push(summaryResponse.objectInfo.fileName);
+      }
+
+      if (summaryResponse.objectInfo.keyName && summaryResponse.objectInfo.keyName !== -1) {
+        keys.push('Key Name');
+        values.push(summaryResponse.objectInfo.keyName);
+      }
+
+      if (summaryResponse.objectInfo.modificationTime && summaryResponse.objectInfo.modificationTime !== -1) {
+        keys.push('Modification Time');
+        values.push(moment(summaryResponse.objectInfo.modificationTime).format('ll LTS'));
+      }
+
+      if (summaryResponse.objectInfo.name && summaryResponse.objectInfo.name !== -1) {
+        keys.push('Name');
+        values.push(summaryResponse.objectInfo.name);
+      }
+
+      if (summaryResponse.objectInfo.owner && summaryResponse.objectInfo.owner !== -1) {
+        keys.push('Owner');
+        values.push(summaryResponse.objectInfo.owner);
+      }
+
+      if (summaryResponse.objectInfo.quotaInBytes && summaryResponse.objectInfo.quotaInBytes !== -1) {
+        keys.push('Quota In Bytes');
+        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
+      }
+
+      if (summaryResponse.objectInfo.quotaInNamespace && summaryResponse.objectInfo.quotaInNamespace !== -1) {
+        keys.push('Quota In Namespace');
+        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationFactor && summaryResponse.objectInfo.replicationConfig.replicationFactor !== -1) {
+        keys.push('Replication Factor');
+        values.push(summaryResponse.objectInfo.replicationConfig.replicationFactor);
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationType && summaryResponse.objectInfo.replicationConfig.replicationType !== -1) {
+        keys.push('Replication Type');
+        values.push(summaryResponse.objectInfo.replicationConfig.replicationType);
+      }
+
+      if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.requiredNodes && summaryResponse.objectInfo.replicationConfig.requiredNodes !== -1) {
+        keys.push('Replication Required Nodes');
+        values.push(summaryResponse.objectInfo.replicationConfig.requiredNodes);
+      }
+      
+      if (summaryResponse.objectInfo.sourceBucket && summaryResponse.objectInfo.sourceBucket !== -1) {
+        keys.push('Source Bucket');
+        values.push(summaryResponse.objectInfo.sourceBucket);
+      }
+
+      if (summaryResponse.objectInfo.sourceVolume && summaryResponse.objectInfo.sourceVolume !== -1) {
+        keys.push('Source Volume');
+        values.push(summaryResponse.objectInfo.sourceVolume);
+      }
+
+      if (summaryResponse.objectInfo.storageType && summaryResponse.objectInfo.storageType !== -1) {
+        keys.push('Storage Type');
+        values.push(summaryResponse.objectInfo.storageType);
+      }
+
+      if (summaryResponse.objectInfo.usedBytes && summaryResponse.objectInfo.usedBytes !== -1) {
+        keys.push('Used Bytes');
+        values.push(summaryResponse.objectInfo.usedBytes);
+      }
+
+      if (summaryResponse.objectInfo.usedNamespace && summaryResponse.objectInfo.usedNamespace !== -1) {
+        keys.push('Used NameSpaces');
+        values.push(summaryResponse.objectInfo.usedNamespace);
+      }
+
+      if (summaryResponse.objectInfo.volumeName && summaryResponse.objectInfo.volumeName !== -1) {
+        keys.push('Volume Name');
+        values.push(summaryResponse.objectInfo.volumeName);
+      }
+
+      if (summaryResponse.objectInfo.volume && summaryResponse.objectInfo.volume !== -1) {
+        keys.push('Volume');
+        values.push(summaryResponse.objectInfo.volume);
       }
 
       // Show the right drawer
@@ -312,7 +477,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
-    axios.get(quotaEndpoint).then(response => {
+    const { request: quotaRequest, controller: quotaNewController } = AxiosGetHelper(quotaEndpoint, cancelQuotaSignal);
+    cancelQuotaSignal = quotaNewController;
+    quotaRequest.then(response => {
       const quotaResponse = response.data;
 
       if (quotaResponse.status === 'PATH_NOT_FOUND') {
@@ -407,32 +574,31 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  ((duResponse.size > 0 && duResponse.subPathCount === 0) ?
-                    <div style={{height: 800}}>
-                      <br/> {' '}
-                      <h3>This object is a key with a file size of {this.byteToSize(duResponse.size, 1)}.<br/> {' '}
-                        You can also view its metadata details by clicking the top right button.
-                      </h3>
-                    </div> :
+                  <div style={{height: 1000}}>
                     <Plot
                       data={plotData}
                       layout={
                         {
-                          width: 800,
+                          width: 1200,
                           height: 750,
                           font: {
-                            family: 'Arial',
-                            size: 14
+                            family: 'Roboto, sans-serif',
+                            size: 15
                           },
                           showlegend: true,
+                          legend: {
+                            "x": 1.2,
+                            "xanchor": "right"
+                          },
                           title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
                         }
                       }
-                      onClick={e => this.clickPieSection(e, returnPath)}/>) :
-                  <div style={{height: 800}}><br/>
-                    <h3>This object is empty. Add files to it to see a visualization on disk usage.<br/> {' '}
+                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
+                  </div>
+                    :
+                  <div style={{height: 800}} className='metadatainformation'><br/>
+                    This object is empty. Add files to it to see a visualization on disk usage.{' '}<br/>
                       You can also view its metadata details by clicking the top right button.
-                    </h3>
                   </div>}
                 <DetailPanel path={returnPath} keys={panelKeys} values={panelValues} visible={showPanel}/>
               </Row>

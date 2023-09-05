@@ -18,14 +18,15 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for DefaultUpgradeFinalizationExecutor.
@@ -33,7 +34,7 @@ import org.junit.Test;
 public class TestDefaultUpgradeFinalizationExecutor {
 
   @Test
-  public void testPreFinalizeFailureThrowsException() throws Exception {
+  public void testPreFinalizeFailureThrowsException() {
     AbstractLayoutVersionManager mockLvm =
         mock(AbstractLayoutVersionManager.class);
     when(mockLvm.needsFinalization()).thenReturn(true);
@@ -49,7 +50,8 @@ public class TestDefaultUpgradeFinalizationExecutor {
       }
 
       @Override
-      public void finalizeUpgrade(Object service) {
+      public void finalizeLayoutFeature(LayoutFeature layoutFeatture,
+          Object service) {
       }
 
       @Override
@@ -59,8 +61,9 @@ public class TestDefaultUpgradeFinalizationExecutor {
 
     DefaultUpgradeFinalizationExecutor executor =
         new DefaultUpgradeFinalizationExecutor();
-    LambdaTestUtils.intercept(IOException.class,
-        "Failure!", () -> executor.execute(new Object(), uf));
+    IOException ioException = assertThrows(IOException.class,
+        () -> executor.execute(new Object(), uf));
+    assertEquals("Failure!", ioException.getMessage());
   }
 
   @Test
@@ -82,7 +85,7 @@ public class TestDefaultUpgradeFinalizationExecutor {
           }
 
           @Override
-          public void finalizeUpgrade(Object service) {
+          public void finalizeLayoutFeature(LayoutFeature lf, Object service) {
           }
 
           @Override

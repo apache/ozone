@@ -97,7 +97,7 @@ public class RequestValidations {
             m.getName(), m.getDeclaringClass().getPackage().getName(),
             m.getDeclaringClass().getSimpleName());
         validatedResponse =
-            (OMResponse) m.invoke(null, request, response, context);
+            (OMResponse) m.invoke(null, request, validatedResponse, context);
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new ServiceException(e);
@@ -110,5 +110,4 @@ public class RequestValidations {
         .filter(c -> c.shouldApply(request, context))
         .collect(Collectors.toList());
   }
-
 }

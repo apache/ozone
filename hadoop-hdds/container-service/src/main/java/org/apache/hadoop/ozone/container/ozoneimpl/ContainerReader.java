@@ -35,6 +35,10 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+    .ContainerDataProto.State.RECOVERING;
+
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,17 +77,18 @@ public class ContainerReader implements Runnable {
   private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
+  private final boolean shouldDeleteRecovering;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-      ConfigurationSource conf
-  ) {
+      ConfigurationSource conf, boolean shouldDeleteRecovering) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
+    this.shouldDeleteRecovering = shouldDeleteRecovering;
   }
 
   @Override
@@ -207,6 +212,19 @@ public class ContainerReader implements Runnable {
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
             config);
+        if (kvContainer.getContainerState() == RECOVERING) {
+          if (shouldDeleteRecovering) {
+            cleanupContainer(hddsVolume, kvContainer);
+            kvContainer.delete();
+            LOG.info("Delete recovering container {}.",
+                kvContainer.getContainerData().getContainerID());
+          }
+          return;
+        }
+        if (kvContainer.getContainerState() == DELETED) {
+          cleanupContainer(hddsVolume, kvContainer);
+          return;
+        }
         containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
@@ -219,6 +237,23 @@ public class ContainerReader implements Runnable {
       throw new StorageContainerException("Unrecognized ContainerType " +
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
+    }
+  }
+
+  private void cleanupContainer(
+      HddsVolume volume, KeyValueContainer kvContainer) {
+    try {
+      LOG.info("Finishing delete of container {}.",
+          kvContainer.getContainerData().getContainerID());
+      // container information from db is removed for V3
+      // and container moved to tmp folder
+      // then container content removed from tmp folder
+      KeyValueContainerUtil.removeContainer(kvContainer.getContainerData(),
+          volume.getConf());
+      kvContainer.delete();
+    } catch (IOException ex) {
+      LOG.warn("Failed to remove deleted container {}.",
+          kvContainer.getContainerData().getContainerID(), ex);
     }
   }
 }

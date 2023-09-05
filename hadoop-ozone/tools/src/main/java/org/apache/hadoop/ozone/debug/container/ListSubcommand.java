@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-import java.util.Iterator;
 import java.util.concurrent.Callable;
 
 import static org.apache.hadoop.ozone.debug.container.ContainerCommands.outputContainer;
@@ -42,9 +41,7 @@ public class ListSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     parent.loadContainersFromVolumes();
 
-    Iterator<Container<?>> containerIt = parent.getController().getContainers();
-    while (containerIt.hasNext()) {
-      Container container = containerIt.next();
+    for (Container<?> container : parent.getController().getContainers()) {
       outputContainer(container.getContainerData());
     }
 

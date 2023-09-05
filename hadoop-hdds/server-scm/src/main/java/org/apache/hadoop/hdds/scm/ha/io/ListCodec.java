@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -51,8 +52,11 @@ public class ListCodec implements Codec {
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
+      // If argument type is the generic interface, then determine a
+      // concrete implementation.
+      Class<?> concreteType = (type == List.class) ? ArrayList.class : type;
 
-      List<Object> result = (List<Object>) type.newInstance();
+      List<Object> result = (List<Object>) concreteType.newInstance();
       final ListArgument listArgs = (ListArgument) ReflectionUtil
           .getMethod(ListArgument.class, "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
@@ -66,7 +70,7 @@ public class ListCodec implements Codec {
         IllegalAccessException | InvocationTargetException |
         ClassNotFoundException ex) {
       throw new InvalidProtocolBufferException(
-          "GeneratedMessage cannot be decoded: " + ex.getMessage());
+          "Message cannot be decoded: " + ex.getMessage());
     }
   }
 }

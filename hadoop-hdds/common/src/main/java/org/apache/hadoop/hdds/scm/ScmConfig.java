@@ -71,18 +71,34 @@ public class ScmConfig {
           "The full name of class which implements "
           + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or "
-          + "allocate container. If not set, "
+          + "allocate Ratis containers. If not set, "
           + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
           + "RandomPipelineChoosePolicy will be used as default value."
   )
   private String pipelineChoosePolicyName;
 
+  @Config(key = "ec.pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+              + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+              + "The class decides which pipeline will be used when "
+              + "selecting an EC Pipeline. If not set, "
+              + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+              + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String ecPipelineChoosePolicyName;
+
   @Config(key = "block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "20000",
+      defaultValue = "100000",
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
           "Maximum number of blocks which SCM processes during an interval. "
+              + "The block num is counted at the replica level."
               + "If SCM has 100000 blocks which need to be deleted and the "
               + "configuration is 5000 then it would only send 5000 blocks "
               + "for deletion to the datanodes."
@@ -137,6 +153,10 @@ public class ScmConfig {
     this.pipelineChoosePolicyName = pipelineChoosePolicyName;
   }
 
+  public void setECPipelineChoosePolicyName(String policyName) {
+    this.ecPipelineChoosePolicyName = policyName;
+  }
+
   public void setBlockDeletionLimit(int blockDeletionLimit) {
     this.blockDeletionLimit = blockDeletionLimit;
   }
@@ -155,6 +175,10 @@ public class ScmConfig {
 
   public String getPipelineChoosePolicyName() {
     return pipelineChoosePolicyName;
+  }
+
+  public String getECPipelineChoosePolicyName() {
+    return ecPipelineChoosePolicyName;
   }
 
   public int getBlockDeletionLimit() {

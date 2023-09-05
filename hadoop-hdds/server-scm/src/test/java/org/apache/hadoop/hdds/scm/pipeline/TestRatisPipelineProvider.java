@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.Assume;
 import org.junit.jupiter.api.Test;
@@ -54,11 +55,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -85,7 +89,7 @@ public class TestRatisPipelineProvider {
   public void init(int maxPipelinePerNode, OzoneConfiguration conf)
       throws Exception {
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestRatisPipelineProvider.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -104,7 +108,8 @@ public class TestRatisPipelineProvider {
         stateManager, conf);
   }
 
-  private void cleanup() throws Exception {
+  @AfterEach
+  void cleanup() throws Exception {
     if (dbStore != null) {
       dbStore.close();
     }
@@ -124,7 +129,8 @@ public class TestRatisPipelineProvider {
   }
 
   private void createPipelineAndAssertions(
-      HddsProtos.ReplicationFactor factor) throws IOException {
+      HddsProtos.ReplicationFactor factor)
+      throws IOException, TimeoutException {
     Pipeline pipeline = provider.create(RatisReplicationConfig
         .getInstance(factor));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
@@ -155,14 +161,12 @@ public class TestRatisPipelineProvider {
   public void testCreatePipelineWithFactorThree() throws Exception {
     init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.THREE);
-    cleanup();
   }
 
   @Test
   public void testCreatePipelineWithFactorOne() throws Exception {
     init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.ONE);
-    cleanup();
   }
 
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
@@ -196,7 +200,6 @@ public class TestRatisPipelineProvider {
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
     assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
-    cleanup();
   }
 
   @Test
@@ -214,7 +217,6 @@ public class TestRatisPipelineProvider {
         createListOfNodes(factor.getNumber()));
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.OPEN);
-    cleanup();
   }
 
   @Test
@@ -238,7 +240,6 @@ public class TestRatisPipelineProvider {
 
     Assertions.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
     Assertions.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
-    cleanup();
   }
 
   @Test
@@ -287,7 +288,6 @@ public class TestRatisPipelineProvider {
     assertTrue(
         nodes.stream().anyMatch(membersOfClosedPipelines::contains),
         "at least 1 node should have been from members of closed pipelines");
-    cleanup();
   }
 
   @Test
@@ -314,6 +314,23 @@ public class TestRatisPipelineProvider {
     }
   }
 
+  @Test
+  // Test pipeline provider with RackScatter policy cannot create
+  // pipeline due to nodes with full pipeline engagement.
+  public void testFactorTHREEPipelineRackScatterEngagement()
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        SCMContainerPlacementRackScatter.class.getCanonicalName());
+    conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "0");
+    init(0, conf);
+    List<DatanodeDetails> excludedNodes = new ArrayList<>();
+
+    Assertions.assertThrows(SCMException.class, () ->
+        provider.create(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            excludedNodes, Collections.EMPTY_LIST));
+  }
 
   @Test
   public void testCreatePipelinesWhenNotEnoughSpace() throws Exception {
@@ -353,13 +370,12 @@ public class TestRatisPipelineProvider {
         Assertions.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
       }
     }
-    cleanup();
   }
 
   private void addPipeline(
       List<DatanodeDetails> dns,
       Pipeline.PipelineState open, ReplicationConfig replicationConfig)
-      throws IOException {
+      throws IOException, TimeoutException {
     Pipeline openPipeline = Pipeline.newBuilder()
         .setReplicationConfig(replicationConfig)
         .setNodes(dns)

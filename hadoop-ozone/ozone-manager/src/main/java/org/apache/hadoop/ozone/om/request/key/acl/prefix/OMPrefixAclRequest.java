@@ -21,13 +21,13 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 import java.io.IOException;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -105,6 +105,11 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
 
       omPrefixInfo = operationResult.getOmPrefixInfo();
+      if (omPrefixInfo == null) {
+        throw new OMException(
+            "No prefix info for the prefix path: " + prefixPath,
+            OMException.ResultCodes.PREFIX_NOT_FOUND);
+      }
       omPrefixInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // As for remove acl list, for a prefix if after removing acl from
@@ -114,13 +119,12 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
           omPrefixInfo.getAcls().size() == 0) {
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
+            CacheValue.get(trxnLogIndex));
       } else {
         // update cache.
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            new CacheValue<>(Optional.of(omPrefixInfo),
-                trxnLogIndex));
+            CacheValue.get(trxnLogIndex, omPrefixInfo));
       }
 
       opResult  = operationResult.isSuccess();

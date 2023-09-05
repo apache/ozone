@@ -60,7 +60,8 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
   /**
    * Choose datanodes called by the SCM to choose the datanode.
    *
-   *
+   * @param usedNodes - list of the datanodes to already chosen in the
+   *                      pipeline.
    * @param excludedNodes - list of the datanodes to exclude.
    * @param favoredNodes - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
@@ -70,13 +71,15 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @throws SCMException  SCMException
    */
   @Override
-  public List<DatanodeDetails> chooseDatanodes(
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
-      final int nodesRequired,
-      long metadataSizeRequired, long dataSizeRequired) throws SCMException {
+  protected List<DatanodeDetails> chooseDatanodesInternal(
+          List<DatanodeDetails> usedNodes,
+          List<DatanodeDetails> excludedNodes,
+          List<DatanodeDetails> favoredNodes, final int nodesRequired,
+          long metadataSizeRequired, long dataSizeRequired)
+          throws SCMException {
     List<DatanodeDetails> healthyNodes =
-        super.chooseDatanodes(excludedNodes, favoredNodes, nodesRequired,
-            metadataSizeRequired, dataSizeRequired);
+        super.chooseDatanodesInternal(usedNodes, excludedNodes, favoredNodes,
+                nodesRequired, metadataSizeRequired, dataSizeRequired);
 
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;

@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /**
@@ -79,10 +80,11 @@ public class AbstractContainerReportHandler {
    * @param publisher EventPublisher instance
    * @throws IOException
    * @throws InvalidStateTransitionException
+   * @throws TimeoutException
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     ContainerInfo container = getContainerManager().getContainer(
         ContainerID.valueOf(replicaProto.getContainerID()));
     processContainerReplica(
@@ -99,11 +101,12 @@ public class AbstractContainerReportHandler {
    * @param publisher EventPublisher instance
    *
    * @throws IOException In case of any Exception while processing the report
+   * @throws TimeoutException In case of timeout while updating container state
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo containerInfo,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
     final ContainerID containerId = containerInfo.containerID();
 
     if (logger.isDebugEnabled()) {
@@ -156,6 +159,7 @@ public class AbstractContainerReportHandler {
         getOtherReplicas(containerInfo.containerID(), newSource);
     long usedBytes = newReplica.getUsed();
     long keyCount = newReplica.getKeyCount();
+
     for (ContainerReplica r : otherReplicas) {
       usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
       keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
@@ -235,12 +239,13 @@ public class AbstractContainerReportHandler {
    * @param replica ContainerReplica
    * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
+   * @throws TimeoutException In case of timeout while updating container state
    */
   private boolean updateContainerState(final DatanodeDetails datanode,
                                     final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException, InvalidStateTransitionException, TimeoutException {
 
     final ContainerID containerId = container.containerID();
     boolean ignored = false;
@@ -252,10 +257,11 @@ public class AbstractContainerReportHandler {
        * any other state.
        */
       if (replica.getState() != State.OPEN) {
-        logger.warn("Container {} is in OPEN state, but the datanode {} " +
-            "reports an {} replica.", containerId,
-            datanode, replica.getState());
-        // Should we take some action?
+        logger.info("Moving OPEN container {} to CLOSING state, datanode {} " +
+                "reported {} replica with index {}.", containerId, datanode,
+            replica.getState(), replica.getReplicaIndex());
+        containerManager.updateContainerState(containerId,
+            LifeCycleEvent.FINALIZE);
       }
       break;
     case CLOSING:
@@ -285,10 +291,27 @@ public class AbstractContainerReportHandler {
       }
 
       if (replica.getState() == State.CLOSED) {
-        logger.info("Moving container {} to CLOSED state, datanode {} " +
-            "reported CLOSED replica.", containerId, datanode);
         Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
+
+        /*
+        For an EC container, only the first index and the parity indexes are
+        guaranteed to have block data. So, update the container's state in SCM
+        only if replica index is one of these indexes.
+         */
+        if (container.getReplicationType()
+            .equals(HddsProtos.ReplicationType.EC)) {
+          int replicaIndex = replica.getReplicaIndex();
+          int dataNum =
+              ((ECReplicationConfig)container.getReplicationConfig()).getData();
+          if (replicaIndex != 1 && replicaIndex <= dataNum) {
+            break;
+          }
+        }
+
+        logger.info("Moving container {} to CLOSED state, datanode {} " +
+            "reported CLOSED replica with index {}.", containerId, datanode,
+            replica.getReplicaIndex());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
       }
@@ -357,6 +380,7 @@ public class AbstractContainerReportHandler {
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
+        .setEmpty(replicaProto.getIsEmpty())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

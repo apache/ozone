@@ -14,8 +14,40 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-
+<html>
+<head><title>DataNode UI</title></head>
+<body>
 <table class="table table-bordered table-striped" class="col-md-6">
     <tbody>
     </tbody>
 </table>
+
+<h2>Volume Information</h2>
+<table class="table table-bordered table-striped" class="col-md-6">
+    <thead>
+    <tr>
+        <th>Directory</th>
+        <th>Storage Type</th>
+        <th>Volume Type</th>
+        <th>Used Space</th>
+        <th>Available Space</th>
+        <th>Reserved</th>
+        <th>Total Capacity</th>
+        <th>State</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr ng-repeat="volumeInfo in $ctrl.dnmetrics">
+        <td>{{volumeInfo["tag.StorageDirectory"]}}</td>
+        <td>{{volumeInfo["tag.StorageType"]}}</td>
+        <td>{{volumeInfo["tag.VolumeType"]}}</td>
+        <td>{{volumeInfo.Used}}</td>
+        <td>{{volumeInfo.Available}}</td>
+        <td>{{volumeInfo.Reserved}}</td>
+        <td>{{volumeInfo.TotalCapacity}}</td>
+        <td>{{volumeInfo["tag.VolumeState"]}}</td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>

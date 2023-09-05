@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +26,6 @@ import org.slf4j.LoggerFactory;
  * Credential in the AWS authorization header.
  * Ref: https://docs.aws.amazon.com/AmazonS3/latest/API/
  * sigv4-auth-using-authorization-header.html
- *
  */
 public class Credential {
   private static final Logger LOG = LoggerFactory.getLogger(Credential.class);
@@ -41,23 +39,24 @@ public class Credential {
 
   /**
    * Construct Credential Object.
+   *
    * @param cred
    */
-  Credential(String cred) throws OS3Exception {
+  Credential(String cred) throws MalformedResourceException {
     this.credential = cred;
     parseCredential();
   }
 
   /**
    * Parse credential value.
-   *
+   * <p>
    * Sample credential value:
    * Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request
    *
    * @throws OS3Exception
    */
   @SuppressWarnings("StringSplitter")
-  public void parseCredential() throws OS3Exception {
+  public void parseCredential() throws MalformedResourceException {
     String[] split = credential.split("/");
     switch (split.length) {
     case 5:
@@ -78,9 +77,8 @@ public class Credential {
       awsRequest = split[5].trim();
       return;
     default:
-      LOG.error("Credentials not in expected format. credential:{}",
-          credential);
-      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_HEADER, credential);
+      throw new MalformedResourceException(
+          "Credentials not in expected format.", credential);
     }
   }
 

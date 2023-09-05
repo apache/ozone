@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+<aspectj>
+  <aspects>
+    <aspect name="org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureAspect"/>
+    <aspect name="org.apache.hadoop.ozone.om.snapshot.RequireSnapshotFeatureStateAspect"/>
+    <weaver options="-verbose -showWeaveInfo">
+      <!-- TODO: Auto generate this class list later. This list should include whichever classes that have methods with one or more Aspect annotations like @DisallowedUntilLayoutVersion, @BelongsToLayoutVersion and @RequireSnapshotFeatureState. -->
+      <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler"/>
+      <include within="org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB"/>
+    </weaver>
+  </aspects>
+</aspectj>

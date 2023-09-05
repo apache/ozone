@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.Message;
 
 /**
  * Factory class to construct {@link ReportPublisher} for a report.
@@ -35,7 +35,7 @@ import com.google.protobuf.GeneratedMessage;
 public class ReportPublisherFactory {
 
   private final ConfigurationSource conf;
-  private final Map<Class<? extends GeneratedMessage>,
+  private final Map<Class<? extends Message>,
       Class<? extends ReportPublisher>> report2publisher;
 
   /**
@@ -65,7 +65,7 @@ public class ReportPublisherFactory {
    * @return report publisher
    */
   public ReportPublisher getPublisherFor(
-      Class<? extends GeneratedMessage> report) {
+      Class<? extends Message> report) {
     Class<? extends ReportPublisher> publisherClass =
         report2publisher.get(report);
     if (publisherClass == null) {

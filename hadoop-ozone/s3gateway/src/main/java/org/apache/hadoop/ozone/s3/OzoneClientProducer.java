@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -66,7 +67,8 @@ public class OzoneClientProducer {
   @Produces
   public synchronized OzoneClient createClient() throws WebApplicationException,
       IOException {
-    client = getClient(ozoneConfiguration);      
+    ozoneConfiguration.set("ozone.om.group.rights", "NONE");
+    client = getClient(ozoneConfiguration);
     return client;
   }
 
@@ -82,6 +84,10 @@ public class OzoneClientProducer {
       if (signatureInfo.getVersion() == Version.V4) {
         stringToSign =
             StringToSignProducer.createSignatureBase(signatureInfo, context);
+      } else {
+        LOG.debug("Unsupported AWS signature version: {}",
+                signatureInfo.getVersion());
+        throw S3_AUTHINFO_CREATION_ERROR;
       }
 
       String awsAccessId = signatureInfo.getAwsAccessId();
@@ -91,9 +97,11 @@ public class OzoneClientProducer {
         throw ACCESS_DENIED;
       }
 
+      // Note: userPrincipal is initialized to be the same value as accessId,
+      //  could be updated later in RpcClient#getS3Volume
       return new S3Auth(stringToSign,
           signatureInfo.getSignature(),
-          awsAccessId);
+          awsAccessId, awsAccessId);
     } catch (OS3Exception ex) {
       LOG.debug("Error during Client Creation: ", ex);
       throw wrapOS3Exception(ex);
@@ -130,7 +138,7 @@ public class OzoneClientProducer {
   public void setSignatureParser(SignatureProcessor awsSignatureProcessor) {
     this.signatureProcessor = awsSignatureProcessor;
   }
-    
+
   private WebApplicationException wrapOS3Exception(OS3Exception os3Exception) {
     return new WebApplicationException(os3Exception.getErrorMessage(),
         os3Exception,

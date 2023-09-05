@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -41,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
@@ -101,6 +102,7 @@ public class TestCloseContainerByPipeline {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -120,7 +122,7 @@ public class TestCloseContainerByPipeline {
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
-            .setKeyName(keyName).setRefreshPipeline(true).build();
+            .setKeyName(keyName).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
@@ -178,7 +180,6 @@ public class TestCloseContainerByPipeline {
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName("standalone")
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -236,7 +237,7 @@ public class TestCloseContainerByPipeline {
         setBucketName("test")
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setDataSize(1024)
-        .setKeyName("ratis").setRefreshPipeline(true).build();
+        .setKeyName("ratis").build();
 
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -250,7 +251,7 @@ public class TestCloseContainerByPipeline {
     List<DatanodeDetails> datanodes = pipeline.getNodes();
     Assert.assertEquals(3, datanodes.size());
 
-    List<ReferenceCountedDB> metadataStores = new ArrayList<>(datanodes.size());
+    List<DBHandle> metadataStores = new ArrayList<>(datanodes.size());
     for (DatanodeDetails details : datanodes) {
       Assert.assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
@@ -264,7 +265,7 @@ public class TestCloseContainerByPipeline {
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
           .getContainer(containerID);
-      try (ReferenceCountedDB store = BlockUtils.getDB(
+      try (DBHandle store = BlockUtils.getDB(
           (KeyValueContainerData) dnContainer.getContainerData(), conf)) {
         metadataStores.add(store);
       }
@@ -302,7 +303,6 @@ public class TestCloseContainerByPipeline {
             .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
             .setDataSize(1024)
             .setKeyName(keyName)
-            .setRefreshPipeline(true)
             .build();
 
     OmKeyLocationInfo omKeyLocationInfo =

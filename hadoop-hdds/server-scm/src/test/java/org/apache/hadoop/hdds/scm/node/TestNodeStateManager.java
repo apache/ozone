@@ -22,7 +22,10 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -37,6 +40,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -57,9 +62,15 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 
 public class TestNodeStateManager {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TestNodeStateManager.class);
+
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
+  private SCMContext scmContext;
+  private int scmSlv;
+  private int scmMlv;
 
   @BeforeEach
   public void setUp() {
@@ -79,14 +90,22 @@ public class TestNodeStateManager {
         return new char[0];
       }
     };
+    // Make NodeStateManager behave as if SCM has completed finalization,
+    // unless a test changes the value of this variable.
+    scmContext = SCMContext.emptyContext();
+    scmContext.setFinalizationCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_COMPLETE);
     eventPublisher = new MockEventPublisher();
+    scmSlv = maxLayoutVersion();
+    scmMlv = maxLayoutVersion();
     LayoutVersionManager mockVersionManager =
         Mockito.mock(HDDSLayoutVersionManager.class);
     Mockito.when(mockVersionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+        .thenReturn(scmMlv);
     Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager);
+        .thenReturn(scmSlv);
+    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
+        scmContext);
   }
 
   @Test
@@ -196,7 +215,7 @@ public class TestNodeStateManager {
     assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
 
-    // Transition back to healthy from dead
+    // Transition to healthy readonly from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
@@ -213,6 +232,37 @@ public class TestNodeStateManager {
     assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
         eventPublisher.getLastEvent());
+
+    // Another health check run should move the node to healthy since its
+    // metadata layout version matches SCM's.
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
+    eventPublisher.clearEvents();
+
+    // Test how node state manager handles datanodes with lower metadata
+    // layout version based on SCM's finalization checkpoint.
+    dni.updateLastKnownLayoutVersion(
+        UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
+    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
+      scmContext.setFinalizationCheckpoint(checkpoint);
+      LOG.info("Testing datanode state from current SCM finalization " +
+          "checkpoint: {}", checkpoint);
+      nsm.checkNodesHealth();
+
+      // Datanodes should not be moved to healthy readonly until the SCM has
+      // finished updating its metadata layout version as part of finalization.
+      if (checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+        assertEquals(NodeState.HEALTHY_READONLY,
+            nsm.getNodeStatus(dn).getHealth());
+        assertEquals(SCMEvents.HEALTHY_READONLY_NODE,
+            eventPublisher.getLastEvent());
+      } else {
+        assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+        assertNull(eventPublisher.getLastEvent());
+      }
+    }
   }
 
   @Test
@@ -299,6 +349,43 @@ public class TestNodeStateManager {
       nsm.setNodeOperationalState(dn, s);
       assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
     }
+  }
+
+  @Test
+  public void testUpdateNode() throws NodeAlreadyExistsException,
+          NodeNotFoundException {
+    UUID dnUuid = UUID.randomUUID();
+    String ipAddress = "1.2.3.4";
+    String hostName = "test-host";
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+            layoutVersionProto =
+            UpgradeUtils.toLayoutVersionProto(1, 2);
+    DatanodeDetails dn = DatanodeDetails.newBuilder()
+            .setUuid(dnUuid)
+            .setIpAddress(ipAddress)
+            .setHostName(hostName)
+            .setPersistedOpState(HddsProtos.NodeOperationalState.IN_MAINTENANCE)
+            .build();
+    nsm.addNode(dn, layoutVersionProto);
+
+    String newIpAddress = "2.3.4.5";
+    String newHostName = "new-host";
+    StorageContainerDatanodeProtocolProtos.LayoutVersionProto
+            newLayoutVersionProto = UpgradeUtils.defaultLayoutVersionProto();
+    DatanodeDetails newDn = DatanodeDetails.newBuilder()
+            .setUuid(dnUuid)
+            .setIpAddress(newIpAddress)
+            .setHostName(newHostName)
+            .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+            .build();
+    nsm.updateNode(newDn, newLayoutVersionProto);
+
+    DatanodeInfo updatedDn = nsm.getNode(dn);
+    assertEquals(newIpAddress, updatedDn.getIpAddress());
+    assertEquals(newHostName, updatedDn.getHostName());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+            updatedDn.getPersistedOpState());
+    assertEquals(NodeStatus.inServiceHealthy(), updatedDn.getNodeStatus());
   }
 
   private DatanodeDetails generateDatanode() {

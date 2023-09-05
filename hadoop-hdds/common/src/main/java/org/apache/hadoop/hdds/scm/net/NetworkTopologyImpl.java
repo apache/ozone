@@ -27,12 +27,12 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
@@ -117,6 +117,59 @@ public class NetworkTopologyImpl implements NetworkTopology {
   }
 
   /**
+   * Update a leaf node. It is called when a datanode needs to be updated.
+   * If the old datanode does not exist, then just add the new datanode.
+   * @param oldNode node to be updated; can be null
+   * @param newNode node to update to; cannot be null
+   */
+  @Override
+  public void update(Node oldNode, Node newNode) {
+    Preconditions.checkArgument(newNode != null, "newNode cannot be null");
+    if (oldNode != null && oldNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update an inner node: "
+                      + oldNode.getNetworkFullPath());
+    }
+
+    if (newNode instanceof InnerNode) {
+      throw new IllegalArgumentException(
+              "Not allowed to update a leaf node to an inner node: "
+                      + newNode.getNetworkFullPath());
+    }
+
+    int newDepth = NetUtils.locationToDepth(newNode.getNetworkLocation()) + 1;
+    // Check depth
+    if (maxLevel != newDepth) {
+      throw new InvalidTopologyException("Failed to update to " +
+              newNode.getNetworkFullPath()
+              + ": Its path depth is not "
+              + maxLevel);
+    }
+
+    netlock.writeLock().lock();
+    boolean add;
+    try {
+      boolean exist = false;
+      if (oldNode != null) {
+        exist = containsNode(oldNode);
+      }
+      if (exist) {
+        clusterTree.remove(oldNode);
+      }
+
+      add = clusterTree.add(newNode);
+    } finally {
+      netlock.writeLock().unlock();
+    }
+    if (add) {
+      LOG.info("Updated to the new node: {}", newNode.getNetworkFullPath());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("NetworkTopology became:\n{}", this);
+      }
+    }
+  }
+
+  /**
    * Remove a node from the network topology. This will be called when a
    * existing datanode is removed from the system.
    * @param node node to be removed; cannot be null
@@ -150,15 +203,19 @@ public class NetworkTopologyImpl implements NetworkTopology {
     Preconditions.checkArgument(node != null, "node cannot be null");
     netlock.readLock().lock();
     try {
-      Node parent = node.getParent();
-      while (parent != null && parent != clusterTree) {
-        parent = parent.getParent();
-      }
-      if (parent == clusterTree) {
-        return true;
-      }
+      return containsNode(node);
     } finally {
       netlock.readLock().unlock();
+    }
+  }
+
+  private boolean containsNode(Node node) {
+    Node parent = node.getParent();
+    while (parent != null && parent != clusterTree) {
+      parent = parent.getParent();
+    }
+    if (parent == clusterTree) {
+      return true;
     }
     return false;
   }
@@ -519,11 +576,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Start choosing node[scope = {}, index = {}, excludedScopes = "
               + "{}, excludedNodes = {}, affinityNode = {}, ancestorGen = {}",
-          scope, leafIndex, (excludedScopes == null ? "" :
-              excludedScopes.stream().collect(Collectors.joining(", "))),
-          (excludedNodes == null ? "" : excludedNodes.stream()
-              .map(Object::toString).collect(Collectors.joining(", "))),
-          affinityNode == null ? "" : affinityNode.toString(), ancestorGen);
+          scope, leafIndex,
+          excludedScopes == null ? "" : excludedScopes,
+          excludedNodes == null ? "" : excludedNodes,
+          affinityNode == null ? "" : affinityNode, ancestorGen);
     }
 
     String finalScope = scope;
@@ -544,6 +600,10 @@ public class NetworkTopologyImpl implements NetworkTopology {
       ancestorGen = 0;
     }
     Node scopeNode = getNode(finalScope);
+    if (scopeNode == null) {
+      throw new IllegalArgumentException(String.format("No nodes with Scope: " +
+              "%s exists", finalScope));
+    }
 
     // check overlap of excludedScopes and finalScope
     List<String> mutableExcludedScopes = null;
@@ -556,8 +616,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
         }
         // excludeScope and finalScope share nothing case
         if (scopeNode.isAncestor(s)) {
-          if (mutableExcludedScopes.stream().
-              noneMatch(n -> getNode(s).isDescendant(n))) {
+          Node node = getNode(s);
+          if (node != null &&
+              mutableExcludedScopes.stream().noneMatch(node::isDescendant)) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -565,7 +626,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
 
     // clone excludedNodes before remove duplicate in it
-    Collection<Node> mutableExNodes = new ArrayList<>();
+    Collection<Node> mutableExNodes = new LinkedHashSet<>();
 
     // add affinity node to mutableExNodes
     if (affinityNode != null) {
@@ -575,8 +636,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
     // Remove duplicate in excludedNodes
     if (excludedNodes != null) {
       mutableExNodes.addAll(excludedNodes);
-      mutableExNodes =
-          mutableExNodes.stream().distinct().collect(Collectors.toList());
     }
 
     // remove duplicate in mutableExNodes and mutableExcludedScopes
@@ -827,7 +886,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
   private void checkExcludedScopes(List<String> excludedScopes) {
     if (!CollectionUtils.isEmpty(excludedScopes)) {
-      excludedScopes.stream().forEach(scope -> {
+      excludedScopes.forEach(scope -> {
         if (scope.startsWith(SCOPE_REVERSE_STR)) {
           throw new IllegalArgumentException("excludedScope " + scope +
               " cannot start with " + SCOPE_REVERSE_STR);

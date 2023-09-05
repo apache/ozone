@@ -25,4 +25,8 @@
     <filter-name>guiceFilter</filter-name>
     <url-pattern>/*</url-pattern>
   </filter-mapping>
+  <mime-mapping>
+    <extension>woff2</extension>
+    <mime-type>font/woff2</mime-type>
+  </mime-mapping>
 </web-app>

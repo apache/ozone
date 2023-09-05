@@ -19,6 +19,9 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,6 +51,10 @@ public class TestContainerPlacementStatusDefault {
     stat = new ContainerPlacementStatusDefault(3, 2, 3);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+
+    stat = new ContainerPlacementStatusDefault(3, 2, 3);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
   }
 
   @Test
@@ -60,11 +67,24 @@ public class TestContainerPlacementStatusDefault {
     // Zero rack, but need 2 - shouldn't really happen in practice
     stat = new ContainerPlacementStatusDefault(0, 2, 1);
     assertFalse(stat.isPolicySatisfied());
-    assertEquals(2, stat.misReplicationCount());
+    assertEquals(1, stat.misReplicationCount());
 
     stat = new ContainerPlacementStatusDefault(2, 3, 3);
     assertFalse(stat.isPolicySatisfied());
     assertEquals(1, stat.misReplicationCount());
+
+    stat = new ContainerPlacementStatusDefault(2, 4, 3, 1, Arrays.asList(1, 3));
+    assertFalse(stat.isPolicySatisfied());
+    assertEquals(2, stat.misReplicationCount());
+
+    stat = new ContainerPlacementStatusDefault(1, 4, 3, 1, Arrays.asList(1, 2));
+    assertFalse(stat.isPolicySatisfied());
+    assertEquals(2, stat.misReplicationCount());
+
+    stat = new ContainerPlacementStatusDefault(2, 2, 3, 2, Arrays.asList(3, 1));
+    assertFalse(stat.isPolicySatisfied());
+    assertEquals(1, stat.misReplicationCount());
+
   }
 
 }

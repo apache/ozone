@@ -34,7 +34,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
  * set quota of the bucket.
  */
 @Command(name = "setquota",
-    description = "Set quota of the buckets")
+    description = "Set quota of the buckets. At least one of the " +
+        "quota set flag is mandatory.")
 public class SetQuotaHandler extends BucketHandler {
 
   @CommandLine.Mixin
@@ -50,15 +51,22 @@ public class SetQuotaHandler extends BucketHandler {
         .getBucket(bucketName);
     long spaceQuota = bucket.getQuotaInBytes();
     long namespaceQuota = bucket.getQuotaInNamespace();
-
+    boolean isOptionPresent = false;
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInBytes())) {
       spaceQuota = OzoneQuota.parseSpaceQuota(
           quotaOptions.getQuotaInBytes()).getQuotaInBytes();
+      isOptionPresent = true;
     }
 
     if (!Strings.isNullOrEmpty(quotaOptions.getQuotaInNamespace())) {
       namespaceQuota = OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace();
+      isOptionPresent = true;
+    }
+
+    if (!isOptionPresent) {
+      throw new IOException(
+          "At least one of the quota set flag is required.");
     }
 
     if (bucket.getQuotaInNamespace() == OLD_QUOTA_DEFAULT ||

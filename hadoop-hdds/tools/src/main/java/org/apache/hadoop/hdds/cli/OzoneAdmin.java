@@ -31,8 +31,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import picocli.CommandLine;
 
-import java.util.function.Supplier;
-
 /**
  * Ozone Admin Command line tool.
  */
@@ -87,12 +85,9 @@ public class OzoneAdmin extends GenericCli {
   }
 
   @Override
-  public void execute(String[] argv) {
+  public int execute(String[] argv) {
     TracingUtil.initTracing("shell", createOzoneConfiguration());
-    TracingUtil.executeInNewSpan("main",
-        (Supplier<Void>) () -> {
-          super.execute(argv);
-          return null;
-        });
+    return TracingUtil.executeInNewSpan("main",
+        () -> super.execute(argv));
   }
 }

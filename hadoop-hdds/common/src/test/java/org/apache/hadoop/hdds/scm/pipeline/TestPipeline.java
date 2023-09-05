@@ -19,8 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
@@ -29,6 +28,8 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.V0_PORTS
 import static org.apache.hadoop.hdds.protocol.TestDatanodeDetails.assertPorts;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for {@link Pipeline}.
@@ -58,16 +59,15 @@ public class TestPipeline {
 
     //when EC config is empty/null
     HddsProtos.Pipeline protobufMessage = subject.getProtobufMessage(1);
-    Assert.assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
+    assertEquals(0, protobufMessage.getEcReplicationConfig().getData());
 
 
     //when EC config is NOT empty
     subject = MockPipeline.createEcPipeline();
 
     protobufMessage = subject.getProtobufMessage(1);
-    Assert.assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
-    Assert
-        .assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
+    assertEquals(3, protobufMessage.getEcReplicationConfig().getData());
+    assertEquals(2, protobufMessage.getEcReplicationConfig().getParity());
 
   }
 
@@ -78,37 +78,37 @@ public class TestPipeline {
     Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);
 
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      Assert.assertEquals(pipeline.getReplicaIndex(dn),
+      assertEquals(pipeline.getReplicaIndex(dn),
           reloadedPipeline.getReplicaIndex(dn));
     }
   }
 
   @Test
-  public void testECPipelineIsAlwaysHealthy() throws IOException {
+  public void testECPipelineIsAlwaysHealthy() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
-    Assert.assertTrue(pipeline.isHealthy());
+    assertTrue(pipeline.isHealthy());
   }
 
   @Test
   public void testBuilderCopiesAllFieldsFromOtherPipeline() {
     Pipeline original = MockPipeline.createEcPipeline();
     Pipeline copied = Pipeline.newBuilder(original).build();
-    Assert.assertEquals(original.getId(), copied.getId());
-    Assert.assertEquals(original.getReplicationConfig(),
+    assertEquals(original.getId(), copied.getId());
+    assertEquals(original.getReplicationConfig(),
         copied.getReplicationConfig());
-    Assert.assertEquals(original.getPipelineState(), copied.getPipelineState());
-    Assert.assertEquals(original.getId(), copied.getId());
-    Assert.assertEquals(original.getId(), copied.getId());
-    Assert.assertEquals(original.getId(), copied.getId());
-    Assert.assertEquals(original.getNodeSet(), copied.getNodeSet());
-    Assert.assertEquals(original.getNodesInOrder(), copied.getNodesInOrder());
-    Assert.assertEquals(original.getLeaderId(), copied.getLeaderId());
-    Assert.assertEquals(original.getCreationTimestamp(),
+    assertEquals(original.getPipelineState(), copied.getPipelineState());
+    assertEquals(original.getId(), copied.getId());
+    assertEquals(original.getId(), copied.getId());
+    assertEquals(original.getId(), copied.getId());
+    assertEquals(original.getNodeSet(), copied.getNodeSet());
+    assertEquals(original.getNodesInOrder(), copied.getNodesInOrder());
+    assertEquals(original.getLeaderId(), copied.getLeaderId());
+    assertEquals(original.getCreationTimestamp(),
         copied.getCreationTimestamp());
-    Assert.assertEquals(original.getSuggestedLeaderId(),
+    assertEquals(original.getSuggestedLeaderId(),
         copied.getSuggestedLeaderId());
     for (DatanodeDetails dn : original.getNodes()) {
-      Assert.assertEquals(original.getReplicaIndex(dn),
+      assertEquals(original.getReplicaIndex(dn),
           copied.getReplicaIndex(dn));
     }
   }

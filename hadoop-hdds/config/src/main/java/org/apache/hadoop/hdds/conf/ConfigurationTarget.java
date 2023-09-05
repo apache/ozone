@@ -36,8 +36,16 @@ public interface ConfigurationTarget {
     set(name, Long.toString(value));
   }
 
+  default void setDouble(String name, double value) {
+    set(name, Double.toString(value));
+  }
+
   default void setBoolean(String name, boolean value) {
     set(name, Boolean.toString(value));
+  }
+
+  default <T extends Enum<T>> void setEnum(String name, T value) {
+    set(name, value.name());
   }
 
   default void setTimeDuration(String name, long value, TimeUnit unit) {

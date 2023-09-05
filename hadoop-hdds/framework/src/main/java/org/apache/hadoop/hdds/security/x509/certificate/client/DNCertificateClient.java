@@ -19,12 +19,24 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.security.KeyPair;
+import java.util.function.Consumer;
+
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * Certificate client for DataNodes.
@@ -35,14 +47,19 @@ public class DNCertificateClient extends DefaultCertificateClient {
       LoggerFactory.getLogger(DNCertificateClient.class);
 
   public static final String COMPONENT_NAME = "dn";
+  private final DatanodeDetails dn;
 
-  public DNCertificateClient(SecurityConfig securityConfig,
-      String certSerialId) {
-    super(securityConfig, LOG, certSerialId, COMPONENT_NAME);
-  }
-
-  public DNCertificateClient(SecurityConfig securityConfig) {
-    super(securityConfig, LOG, null, COMPONENT_NAME);
+  public DNCertificateClient(
+      SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient,
+      DatanodeDetails datanodeDetails,
+      String certSerialId,
+      Consumer<String> saveCertId,
+      Runnable shutdown
+  ) {
+    super(securityConfig, scmSecurityClient, LOG, certSerialId, COMPONENT_NAME,
+        saveCertId, shutdown);
+    this.dn = datanodeDetails;
   }
 
   /**
@@ -55,9 +72,33 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    return super.getCSRBuilder()
+    CertificateSignRequest.Builder builder = super.getCSRBuilder()
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
+
+    try {
+      String hostname = InetAddress.getLocalHost().getCanonicalHostName();
+      String subject = UserGroupInformation.getCurrentUser()
+          .getShortUserName() + "@" + hostname;
+      builder.setCA(false)
+          .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
+          .setConfiguration(getSecurityConfig())
+          .setSubject(subject);
+
+      LOG.info("Created csr for DN-> subject:{}", subject);
+      return builder;
+    } catch (Exception e) {
+      LOG.error("Failed to get hostname or current user", e);
+      throw new CertificateException("Failed to get hostname or current user",
+          e, CSR_ERROR);
+    }
+  }
+
+  @Override
+  public SCMGetCertResponseProto getCertificateSignResponse(
+      PKCS10CertificationRequest csr) throws IOException {
+    return getScmSecureClient().getDataNodeCertificateChain(
+        dn.getProtoBufMessage(), getEncodedString(csr));
   }
 
   @Override

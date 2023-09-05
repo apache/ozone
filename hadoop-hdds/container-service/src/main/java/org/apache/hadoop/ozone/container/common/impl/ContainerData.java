@@ -101,6 +101,10 @@ public abstract class ContainerData {
 
   private String checksum;
 
+  private boolean isEmpty;
+
+  private int replicaIndex;
+
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
    * eg. in prior versions). */
@@ -154,6 +158,7 @@ public abstract class ContainerData {
     this.maxSize = size;
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
+    this.isEmpty = false;
     setChecksumTo0ByteArray();
   }
 
@@ -161,6 +166,7 @@ public abstract class ContainerData {
     this(source.getContainerType(), source.getContainerID(),
         source.getLayoutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
+    replicaIndex = source.replicaIndex;
   }
 
   /**
@@ -191,6 +197,14 @@ public abstract class ContainerData {
    */
   public synchronized ContainerDataProto.State getState() {
     return state;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
+  }
+
+  public void setReplicaIndex(int replicaIndex) {
+    this.replicaIndex = replicaIndex;
   }
 
   /**
@@ -425,7 +439,12 @@ public abstract class ContainerData {
     long unused = getMaxSize() - getBytesUsed();
 
     this.writeBytes.addAndGet(bytes);
-
+    /*
+       Increase the cached Used Space in VolumeInfo as it
+       maybe not updated, DU or DedicatedDiskSpaceUsage runs
+       periodically to update the Used Space in VolumeInfo.
+     */
+    this.getVolume().incrementUsedSpace(bytes);
     // only if container size < max size
     if (committedSpace && unused > 0) {
       //with this write, container size might breach max size
@@ -530,6 +549,18 @@ public abstract class ContainerData {
    */
   public long getBlockCount() {
     return this.blockCount.get();
+  }
+
+  public boolean isEmpty() {
+    return isEmpty;
+  }
+
+  /**
+   * Indicates that this container has no more data, and is eligible for
+   * deletion. Once this flag is set on a container, it cannot leave this state.
+   */
+  public void markAsEmpty() {
+    this.isEmpty = true;
   }
 
   /**

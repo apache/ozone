@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -59,13 +58,14 @@ public class S3MultipartUploadCompleteRequestWithFSO
 
   @Override
   protected void checkDirectoryAlreadyExists(OzoneManager ozoneManager,
-      String volumeName, String bucketName, String keyName,
+      OmBucketInfo omBucketInfo, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
 
     Path keyPath = Paths.get(keyName);
     OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
         OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
-            volumeName, bucketName, keyName, keyPath);
+            omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(),
+            keyName, keyPath);
     // Check for directory exists with same name, if it exists throw error.
     if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
       throw new OMException("Can not Complete MPU for file: " + keyName +
@@ -119,7 +119,11 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getOzonePathKey(parentId, fileName);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    return omMetadataManager.getOzonePathKey(volumeId, bucketId,
+            parentId, fileName);
   }
 
   @Override
@@ -136,7 +140,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
       fileName = filePath.toString();
     }
 
-    return omMetadataManager.getMultipartKey(parentId, fileName, uploadID);
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+
+    return omMetadataManager.getMultipartKey(volumeId, bucketId,
+            parentId, fileName, uploadID);
   }
 
   @Override
@@ -152,12 +161,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected OMClientResponse getOmClientResponse(String multipartKey,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> unUsedParts, OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo oldKeyVersionsToDelete) {
+      List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
+      long volumeId, long bucketId) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
-        multipartKey, dbMultipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, oldKeyVersionsToDelete);
+        multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
+        getBucketLayout(), omBucketInfo, volumeId, bucketId);
   }
 
   @Override

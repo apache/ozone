@@ -161,7 +161,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
         dataLength, BLOCK_SIZE);
     List<BlockExtendedInputStream> blockStreams =
-        keyInputStream.getBlockStreams();
+        keyInputStream.getPartStreams();
     Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
 
     int readBlockLength = 0;
@@ -410,7 +410,9 @@ public class TestKeyInputStream extends TestInputStreamBase {
         .setKeyName(keyName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
-    OmKeyInfo keyInfo = getCluster().getOzoneManager().lookupKey(keyArgs);
+    OmKeyInfo keyInfo = getCluster().getOzoneManager()
+        .getKeyInfo(keyArgs, false)
+        .getKeyInfo();
 
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     Assert.assertNotNull(locations);

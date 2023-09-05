@@ -32,7 +32,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics {
+public class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -63,11 +63,15 @@ public class OMMetrics {
   private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
+  private @Metric MutableCounterLong numKeyHSyncs;
   private @Metric MutableCounterLong numBlockAllocations;
   private @Metric MutableCounterLong numGetServiceLists;
   private @Metric MutableCounterLong numBucketS3Lists;
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
+  private @Metric MutableCounterLong numSnapshotCreates;
+  private @Metric MutableCounterLong numSnapshotDeletes;
+  private @Metric MutableCounterLong numSnapshotLists;
 
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
@@ -78,11 +82,15 @@ public class OMMetrics {
   private @Metric MutableCounterLong numOpenKeyDeleteRequests;
   private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
   private @Metric MutableCounterLong numOpenKeysDeleted;
+  private @Metric MutableCounterLong numOpenKeysCleaned;
+  private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
 
   private @Metric MutableCounterLong numAddAcl;
   private @Metric MutableCounterLong numSetAcl;
   private @Metric MutableCounterLong numGetAcl;
   private @Metric MutableCounterLong numRemoveAcl;
+  private @Metric MutableCounterLong numSetTime;
+  private @Metric MutableCounterLong numGetKeyInfo;
 
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
@@ -115,12 +123,52 @@ public class OMMetrics {
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
+  private @Metric MutableCounterLong numSnapshotCreateFails;
+  private @Metric MutableCounterLong numSnapshotDeleteFails;
+  private @Metric MutableCounterLong numSnapshotListFails;
+  private @Metric MutableCounterLong numSnapshotActive;
+  private @Metric MutableCounterLong numSnapshotDeleted;
+  private @Metric MutableCounterLong numSnapshotReclaimed;
+
+  // Number of tenant operations attempted
+  private @Metric MutableCounterLong numTenantOps;
+  // Metrics for a total number of tenants
+  private @Metric MutableCounterLong numTenants;
+  // Metrics for tenant create operation
+  private @Metric MutableCounterLong numTenantCreates;
+  private @Metric MutableCounterLong numTenantCreateFails;
+  // Metrics for tenant delete operation
+  private @Metric MutableCounterLong numTenantDeletes;
+  private @Metric MutableCounterLong numTenantDeleteFails;
+  // Metrics for tenant assign user operation
+  private @Metric MutableCounterLong numTenantAssignUsers;
+  private @Metric MutableCounterLong numTenantAssignUserFails;
+  // Metrics for tenant revoke user operation
+  private @Metric MutableCounterLong numTenantRevokeUsers;
+  private @Metric MutableCounterLong numTenantRevokeUserFails;
+  // Metrics for tenant assign admin operation
+  private @Metric MutableCounterLong numTenantAssignAdmins;
+  private @Metric MutableCounterLong numTenantAssignAdminFails;
+  // Metrics for tenant revoke admin operation
+  private @Metric MutableCounterLong numTenantRevokeAdmins;
+  private @Metric MutableCounterLong numTenantRevokeAdminFails;
+  // Metric for tenant list operation
+  private @Metric MutableCounterLong numTenantLists;
+  // Metric for tenant get user info
+  private @Metric MutableCounterLong numTenantGetUserInfos;
+  // Metric for list users in tenant operation
+  private @Metric MutableCounterLong numTenantTenantUserLists;
+
+  private @Metric MutableCounterLong numRecoverLease;
 
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
   private @Metric MutableCounterLong numCreateFileFails;
   private @Metric MutableCounterLong numLookupFileFails;
   private @Metric MutableCounterLong numListStatusFails;
+  private @Metric MutableCounterLong getNumGetKeyInfoFails;
+
+  private @Metric MutableCounterLong numRecoverLeaseFails;
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
@@ -165,6 +213,12 @@ public class OMMetrics {
   //FSO Metrics
   private @Metric MutableCounterLong numDirs;
   private @Metric MutableCounterLong numFiles;
+
+  //EC Metrics
+  private @Metric MutableCounterLong ecKeyCreateTotal;
+  private @Metric MutableCounterLong ecKeyCreateFailsTotal;
+  private @Metric MutableCounterLong ecBucketCreateTotal;
+  private @Metric MutableCounterLong ecBucketCreateFailsTotal;
 
   private final DBCheckpointMetrics dbCheckpointMetrics;
 
@@ -342,6 +396,7 @@ public class OMMetrics {
     numBucketLists.incr();
   }
 
+  @Override
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
@@ -390,6 +445,69 @@ public class OMMetrics {
     numCompleteMultipartUploads.incr();
   }
 
+  public void incNumSnapshotCreates() {
+    numSnapshotCreates.incr();
+  }
+
+  public void incNumSnapshotCreateFails() {
+    numSnapshotCreateFails.incr();
+  }
+
+  public void incNumSnapshotDeletes() {
+    numSnapshotDeletes.incr();
+  }
+
+  public void incNumSnapshotDeleteFails() {
+    numSnapshotDeleteFails.incr();
+  }
+
+  public void incNumSnapshotLists() {
+    numSnapshotLists.incr();
+  }
+
+  public void incNumSnapshotListFails() {
+    numSnapshotListFails.incr();
+  }
+
+  public void setNumSnapshotActive(long num) {
+    long currVal = numSnapshotActive.value();
+    numSnapshotActive.incr(num - currVal);
+  }
+
+  public void incNumSnapshotActive() {
+    numSnapshotActive.incr();
+  }
+
+  public void decNumSnapshotActive() {
+    numSnapshotActive.incr(-1);
+  }
+
+  public void setNumSnapshotDeleted(long num) {
+    long currVal = numSnapshotDeleted.value();
+    numSnapshotDeleted.incr(num - currVal);
+  }
+
+  public void incNumSnapshotDeleted() {
+    numSnapshotDeleted.incr();
+  }
+
+  public void decNumSnapshotDeleted() {
+    numSnapshotDeleted.incr(-1);
+  }
+
+  public void setNumSnapshotReclaimed(long num) {
+    long currVal = numSnapshotReclaimed.value();
+    numSnapshotReclaimed.incr(num - currVal);
+  }
+
+  public void incNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr();
+  }
+
+  public void decNumSnapshotReclaimed() {
+    numSnapshotReclaimed.incr(-1);
+  }
+
   public void incNumCompleteMultipartUploadFails() {
     numCompleteMultipartUploadFails.incr();
   }
@@ -416,12 +534,91 @@ public class OMMetrics {
     numListMultipartUploadParts.incr();
   }
 
+  public void incNumTenants() {
+    numTenants.incr();
+  }
+
+  public void decNumTenants() {
+    numTenants.incr(-1);
+  }
+
+  public void incNumTenantCreates() {
+    numTenantOps.incr();
+    numTenantCreates.incr();
+  }
+
+  public void incNumTenantCreateFails() {
+    numTenantCreateFails.incr();
+  }
+
+  public void incNumTenantDeletes() {
+    numTenantOps.incr();
+    numTenantDeletes.incr();
+  }
+
+  public void incNumTenantDeleteFails() {
+    numTenantDeleteFails.incr();
+  }
+
+  public void incNumTenantAssignUsers() {
+    numTenantOps.incr();
+    numTenantAssignUsers.incr();
+  }
+
+  public void incNumTenantAssignUserFails() {
+    numTenantAssignUserFails.incr();
+  }
+
+  public void incNumTenantRevokeUsers() {
+    numTenantOps.incr();
+    numTenantRevokeUsers.incr();
+  }
+
+  public void incNumTenantRevokeUserFails() {
+    numTenantRevokeUserFails.incr();
+  }
+
+  public void incNumTenantAssignAdmins() {
+    numTenantOps.incr();
+    numTenantAssignAdmins.incr();
+  }
+
+  public void incNumTenantAssignAdminFails() {
+    numTenantAssignAdminFails.incr();
+  }
+
+  public void incNumTenantRevokeAdmins() {
+    numTenantOps.incr();
+    numTenantRevokeAdmins.incr();
+  }
+
+  public void incNumTenantRevokeAdminFails() {
+    numTenantRevokeAdminFails.incr();
+  }
+
+  public void incNumTenantLists() {
+    numTenantOps.incr();
+    numTenantLists.incr();
+  }
+
+  public void incNumTenantGetUserInfos() {
+    numTenantOps.incr();
+    numTenantGetUserInfos.incr();
+  }
+
+  public void incNumTenantUserLists() {
+    numTenantOps.incr();
+    numTenantTenantUserLists.incr();
+  }
+
+  @Override
   public void incNumGetFileStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numGetFileStatus.incr();
   }
 
+  @Override
   public void incNumGetFileStatusFails() {
     numGetFileStatusFails.incr();
   }
@@ -446,22 +643,26 @@ public class OMMetrics {
     numCreateFileFails.incr();
   }
 
+  @Override
   public void incNumLookupFile() {
     numKeyOps.incr();
     numFSOps.incr();
     numLookupFile.incr();
   }
 
+  @Override
   public void incNumLookupFileFails() {
     numLookupFileFails.incr();
   }
 
+  @Override
   public void incNumListStatus() {
     numKeyOps.incr();
     numFSOps.incr();
     numListStatus.incr();
   }
 
+  @Override
   public void incNumListStatusFails() {
     numListStatusFails.incr();
   }
@@ -519,11 +720,13 @@ public class OMMetrics {
     numKeyAllocateFails.incr();
   }
 
+  @Override
   public void incNumKeyLookups() {
     numKeyOps.incr();
     numKeyLookup.incr();
   }
 
+  @Override
   public void incNumKeyLookupFails() {
     numKeyLookupFails.incr();
   }
@@ -551,6 +754,11 @@ public class OMMetrics {
     numKeyCommits.incr();
   }
 
+  public void incNumKeyHSyncs() {
+    numKeyOps.incr();
+    numKeyHSyncs.incr();
+  }
+
   public void incNumKeyCommitFails() {
     numKeyCommitFails.incr();
   }
@@ -567,6 +775,7 @@ public class OMMetrics {
     numBucketListFails.incr();
   }
 
+  @Override
   public void incNumKeyListFails() {
     numKeyListFails.incr();
   }
@@ -595,6 +804,14 @@ public class OMMetrics {
     numOpenKeysDeleted.incr();
   }
 
+  public void incNumOpenKeysCleaned(int delta) {
+    numOpenKeysCleaned.incr(delta);
+  }
+
+  public void incNumOpenKeysHSyncCleaned() {
+    numOpenKeysHSyncCleaned.incr();
+  }
+
   public void incNumOpenKeyDeleteRequestFails() {
     numOpenKeyDeleteRequestFails.incr();
   }
@@ -607,12 +824,28 @@ public class OMMetrics {
     numSetAcl.incr();
   }
 
+  @Override
   public void incNumGetAcl() {
     numGetAcl.incr();
   }
 
   public void incNumRemoveAcl() {
     numRemoveAcl.incr();
+  }
+
+  public void incNumSetTime() {
+    numSetTime.incr();
+  }
+
+  @Override
+  public void incNumGetKeyInfo() {
+    numGetKeyInfo.incr();
+    numKeyOps.incr();
+  }
+
+  @Override
+  public void incNumGetKeyInfoFails() {
+    getNumGetKeyInfoFails.incr();
   }
 
   @VisibleForTesting
@@ -821,6 +1054,11 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyHSyncs() {
+    return numKeyHSyncs.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyCommitFails() {
     return numKeyCommitFails.value();
   }
@@ -883,6 +1121,14 @@ public class OMMetrics {
     return numOpenKeysDeleted.value();
   }
 
+  public long getNumOpenKeysCleaned() {
+    return numOpenKeysCleaned.value();
+  }
+
+  public long getNumOpenKeysHSyncCleaned() {
+    return numOpenKeysHSyncCleaned.value();
+  }
+
   public long getNumOpenKeyDeleteRequestFails() {
     return numOpenKeyDeleteRequestFails.value();
   }
@@ -902,6 +1148,103 @@ public class OMMetrics {
   public long getNumRemoveAcl() {
     return numRemoveAcl.value();
   }
+
+  public long getNumTenantOps() {
+    return numTenantOps.value();
+  }
+
+  public long getNumTenants() {
+    return numTenants.value();
+  }
+
+  public long getNumTenantCreates() {
+    return numTenantCreates.value();
+  }
+
+  public long getNumTenantCreateFails() {
+    return numTenantCreateFails.value();
+  }
+
+  public long getNumTenantDeletes() {
+    return numTenantDeletes.value();
+  }
+
+  public long getNumTenantDeleteFails() {
+    return numTenantDeleteFails.value();
+  }
+
+  public long getNumTenantAssignUsers() {
+    return numTenantAssignUsers.value();
+  }
+
+  public long getNumTenantAssignUserFails() {
+    return numTenantAssignUserFails.value();
+  }
+
+  public long getNumTenantRevokeUsers() {
+    return numTenantRevokeUsers.value();
+  }
+
+  public long getNumTenantRevokeUserFails() {
+    return numTenantRevokeUserFails.value();
+  }
+
+  public long getNumTenantAssignAdmins() {
+    return numTenantAssignAdmins.value();
+  }
+
+  public long getNumTenantAssignAdminFails() {
+    return numTenantAssignAdminFails.value();
+  }
+
+  public long getNumTenantRevokeAdmins() {
+    return numTenantRevokeAdmins.value();
+  }
+
+  public long getNumTenantRevokeAdminFails() {
+    return numTenantRevokeAdminFails.value();
+  }
+
+  public long getNumTenantLists() {
+    return numTenantLists.value();
+  }
+
+  public long getNumTenantGetUserInfos() {
+    return numTenantGetUserInfos.value();
+  }
+
+  public long getNumTenantTenantUserLists() {
+    return numTenantTenantUserLists.value();
+  }
+
+  public long getNumSnapshotCreates() {
+    return numSnapshotCreates.value();
+  }
+
+  public long getNumSnapshotLists() {
+    return numSnapshotLists.value();
+  }
+
+  public long getNumSnapshotCreateFails() {
+    return numSnapshotCreateFails.value();
+  }
+
+  public long getNumSnapshotListFails() {
+    return numSnapshotListFails.value();
+  }
+
+  public long getNumSnapshotActive() {
+    return numSnapshotActive.value();
+  }
+
+  public long getNumSnapshotDeleted() {
+    return numSnapshotDeleted.value();
+  }
+
+  public long getNumSnapshotReclaimed() {
+    return numSnapshotReclaimed.value();
+  }
+
 
   public void incNumTrashRenames() {
     numTrashRenames.incr();
@@ -987,7 +1330,36 @@ public class OMMetrics {
     numTrashAtomicDirDeletes.incr();
   }
 
+  public void incEcKeysTotal() {
+    ecKeyCreateTotal.incr();
+  }
+
+  public void incEcBucketsTotal() {
+    ecBucketCreateTotal.incr();
+  }
+
+  public void incEcKeyCreateFailsTotal() {
+    ecKeyCreateFailsTotal.incr();
+  }
+
+  public void incEcBucketCreateFailsTotal() {
+    ecBucketCreateFailsTotal.incr();
+  }
+
+  public void incNumRecoverLease() {
+    numKeyOps.incr();
+    numFSOps.incr();
+    numRecoverLease.incr();
+  }
+
+  public void incNumRecoverLeaseFails() {
+    numRecoverLeaseFails.incr();
+  }
+
   public void unRegister() {
+    if (dbCheckpointMetrics != null) {
+      dbCheckpointMetrics.unRegister();
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

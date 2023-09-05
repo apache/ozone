@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -57,6 +59,13 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
+  public void batchStoreNSSummaries(BatchOperation batch,
+                                    long objectId, NSSummary nsSummary)
+      throws IOException {
+    nsSummaryTable.putWithBatch(batch, objectId, nsSummary);
+  }
+
+  @Override
   public void deleteNSSummary(long objectId) throws IOException {
     nsSummaryTable.delete(objectId);
   }
@@ -64,6 +73,12 @@ public class ReconNamespaceSummaryManagerImpl
   @Override
   public NSSummary getNSSummary(long objectId) throws IOException {
     return nsSummaryTable.get(objectId);
+  }
+
+  @Override
+  public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
+      throws IOException {
+    this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
   }
 
   public Table getNSSummaryTable() {

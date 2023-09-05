@@ -23,11 +23,11 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -50,18 +50,23 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 public class S3MultipartUploadCompleteResponseWithFSO
         extends S3MultipartUploadCompleteResponse {
 
+  private long volumeId;
+  private long bucketId;
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCompleteResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
       @Nonnull String multipartOpenKey,
       @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> unUsedParts,
+      @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
       @Nonnull BucketLayout bucketLayout,
-      @Nonnull OmBucketInfo omBucketInfo,
-      RepeatedOmKeyInfo keysToDelete) {
-    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        bucketLayout, omBucketInfo, keysToDelete);
+      @CheckForNull OmBucketInfo omBucketInfo,
+      @Nonnull long volumeId, @Nonnull long bucketId) {
+    super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
+        allKeyInfoToRemove, bucketLayout, omBucketInfo);
+    this.volumeId = volumeId;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -83,7 +88,8 @@ public class S3MultipartUploadCompleteResponseWithFSO
             getOmKeyInfo().getBucketName(), getOmKeyInfo().getKeyName());
 
     OMFileRequest
-        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo());
+        .addToFileTable(omMetadataManager, batchOperation, getOmKeyInfo(),
+            volumeId, bucketId);
 
     return ozoneKey;
 

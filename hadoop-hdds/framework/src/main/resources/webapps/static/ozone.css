@@ -53,7 +53,36 @@ body {
 .sortorder.reverse:after {
     content: '\25bc';   // BLACK DOWN-POINTING TRIANGLE
 }
-
+.sorting:after {
+    opacity: 0.2;
+    content: "\e150";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: block;
+    font-family: 'Glyphicons Halflings';
+ }
+.sortasc:after {
+     opacity: 0.5;
+     content: "\e155";
+     position: absolute;
+     top: 8px;
+     right: 8px;
+     display: block;
+     font-family: 'Glyphicons Halflings';
+ }
+ .sortdesc:after {
+     opacity: 0.5;
+     content: "\e156";
+     position: absolute;
+     top: 8px;
+     right: 8px;
+     display: block;
+     font-family: 'Glyphicons Halflings';
+ }
+.nodeStausInfo {
+    position: relative;
+ }
 .wrap-table{
     word-wrap: break-word;
     table-layout: fixed;

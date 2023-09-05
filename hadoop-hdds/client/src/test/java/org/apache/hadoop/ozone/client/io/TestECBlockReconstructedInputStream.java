@@ -23,10 +23,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -39,6 +39,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.
@@ -54,7 +55,7 @@ public class TestECBlockReconstructedInputStream {
   private ExecutorService ecReconstructExecutor =
       Executors.newFixedThreadPool(3);
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     repConfig = new ECReplicationConfig(3, 2);
     streamFactory = new ECStreamTestUtil.TestBlockInputStreamFactory();
@@ -63,7 +64,7 @@ public class TestECBlockReconstructedInputStream {
     dataGenerator = new SplittableRandom(randomSeed);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     ecReconstructExecutor.shutdownNow();
   }
@@ -86,7 +87,7 @@ public class TestECBlockReconstructedInputStream {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
-        Assert.assertEquals(12345L, stream.getLength());
+        Assertions.assertEquals(12345L, stream.getLength());
       }
     }
   }
@@ -100,7 +101,7 @@ public class TestECBlockReconstructedInputStream {
       try (ECBlockReconstructedInputStream stream =
           new ECBlockReconstructedInputStream(repConfig, bufferPool,
               stripeStream)) {
-        Assert.assertEquals(new BlockID(1, 1), stream.getBlockID());
+        Assertions.assertEquals(new BlockID(1, 1), stream.getBlockID());
       }
     }
   }
@@ -132,19 +133,19 @@ public class TestECBlockReconstructedInputStream {
           int expectedRead = Math.min(blockLength - totalRead, readBufferSize);
           long read = stream.read(b);
           totalRead += read;
-          Assert.assertEquals(expectedRead, read);
+          Assertions.assertEquals(expectedRead, read);
           ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
           b.clear();
         }
         // Next read should be EOF
         b.clear();
         long read = stream.read(b);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
         // Seek back to zero and read again to ensure the buffers are
         // re-allocated after being freed at the end of block.
         stream.seek(0);
         read = stream.read(b);
-        Assert.assertEquals(readBufferSize, read);
+        Assertions.assertEquals(readBufferSize, read);
         dataGenerator = new SplittableRandom(randomSeed);
         ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
       }
@@ -180,7 +181,7 @@ public class TestECBlockReconstructedInputStream {
           int expectedRead = Math.min(blockLength - totalRead, readBufferSize);
           long read = stream.read(b);
           totalRead += read;
-          Assert.assertEquals(expectedRead, read);
+          Assertions.assertEquals(expectedRead, read);
           ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
           b.clear();
           stream.unbuffer();
@@ -188,7 +189,7 @@ public class TestECBlockReconstructedInputStream {
         // Next read should be EOF
         b.clear();
         long read = stream.read(b);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
       }
     }
   }
@@ -215,12 +216,12 @@ public class TestECBlockReconstructedInputStream {
         ByteBuffer b = ByteBuffer.allocate(readBufferSize);
         dataGenerator = new SplittableRandom(randomSeed);
         long read = stream.read(b);
-        Assert.assertEquals(blockLength, read);
+        Assertions.assertEquals(blockLength, read);
         ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
         b.clear();
         // Next read should be EOF
         read = stream.read(b);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
       }
     }
   }
@@ -252,10 +253,10 @@ public class TestECBlockReconstructedInputStream {
           if (val == -1) {
             break;
           }
-          Assert.assertEquals(dataGenerator.nextInt(255), val);
+          Assertions.assertEquals(dataGenerator.nextInt(255), val);
           totalRead += 1;
         }
-        Assert.assertEquals(blockLength, totalRead);
+        Assertions.assertEquals(blockLength, totalRead);
       }
     }
   }
@@ -286,13 +287,13 @@ public class TestECBlockReconstructedInputStream {
           int expectedRead = Math.min(blockLength - totalRead, 1024);
           long read = stream.read(buf, 0, buf.length);
           totalRead += read;
-          Assert.assertEquals(expectedRead, read);
+          Assertions.assertEquals(expectedRead, read);
           ECStreamTestUtil.assertBufferMatches(
               ByteBuffer.wrap(buf, 0, (int)read), dataGenerator);
         }
         // Next read should be EOF
         long read = stream.read(buf, 0, buf.length);
-        Assert.assertEquals(-1, read);
+        Assertions.assertEquals(-1, read);
       }
     }
   }
@@ -324,19 +325,14 @@ public class TestECBlockReconstructedInputStream {
           resetAndAdvanceDataGenerator(seekPosition);
           long expectedRead = Math.min(stream.getRemaining(), readBufferSize);
           long read = stream.read(b);
-          Assert.assertEquals(expectedRead, read);
+          Assertions.assertEquals(expectedRead, read);
           ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
           seekPosition = random.nextInt(blockLength);
           stream.seek(seekPosition);
           b.clear();
         }
         // Seeking beyond EOF should give an error
-        try {
-          stream.seek(blockLength + 1);
-          Assert.fail("Seek beyond EOF should error");
-        } catch (IOException e) {
-          // expected
-        }
+        assertThrows(IOException.class, () -> stream.seek(blockLength + 1));
       }
     }
   }

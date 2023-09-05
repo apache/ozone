@@ -20,16 +20,24 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.ColumnFamilyOptions;
+import org.junit.Assert;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
 
 /**
  * Tests RDBStore creation.
@@ -83,7 +91,7 @@ public class TestDBStoreBuilder {
         .setName("Test.db")
         .setPath(tempDir)
         .addTable("FIRST")
-        .addTable("FIRST", new ColumnFamilyOptions())
+        .addTable("FIRST", new ManagedColumnFamilyOptions())
         .build();
     // Building should succeed without error.
 
@@ -152,5 +160,130 @@ public class TestDBStoreBuilder {
     }
   }
 
+  @Test
+  public void builderWithColumnFamilyOptions(@TempDir Path tempDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
+    File newFolder = new File(tempDir.toString() + "/newFolder");
 
+    if (!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+
+    String sampleTableName = "sampleTable";
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            String.class, StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
+      {
+        ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
+        // reverse the default option for check
+        cfOptions.setForceConsistencyChecks(
+            !cfOptions.forceConsistencyChecks());
+        sampleTable.setCfOptions(cfOptions);
+      }
+
+      @Override
+      public String getName() {
+        return "sampleDB";
+      }
+
+      @Override
+      public String getLocationConfigKey() {
+        return null;
+      }
+
+      @Override
+      public File getDBLocation(ConfigurationSource conf) {
+        return null;
+      }
+    };
+
+    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
+        .setName("SampleStore").setPath(newFolder.toPath()).build()) {
+      Assert.assertTrue(dbStore instanceof RDBStore);
+
+      RDBStore rdbStore = (RDBStore) dbStore;
+      Collection<RocksDatabase.ColumnFamily> cfFamilies =
+          rdbStore.getColumnFamilies();
+
+      // we also have the default column family, so there are 2
+      Assert.assertEquals(2, cfFamilies.size());
+
+      boolean checked = false;
+      for (RocksDatabase.ColumnFamily cfFamily : cfFamilies) {
+        if (Arrays.equals(cfFamily.getHandle().getName(),
+            sampleTableName.getBytes(StandardCharsets.UTF_8))) {
+          // get the default value
+          boolean defaultValue = new ManagedColumnFamilyOptions()
+              .forceConsistencyChecks();
+
+          // the value should be different from the default value
+          Assert.assertNotEquals(cfFamily.getHandle().getDescriptor()
+              .getOptions().forceConsistencyChecks(), defaultValue);
+          checked = true;
+        }
+      }
+      Assert.assertTrue(checked);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIfAutoCompactionDisabled(boolean disableAutoCompaction,
+          @TempDir Path tempDir)
+          throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
+    File newFolder = new File(tempDir.toString(), "newFolder");
+
+    if (!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+
+    String sampleTableName = "sampleTable";
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
+            StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
+      @Override
+      public String getName() {
+        return "sampleDB";
+      }
+
+      @Override
+      public String getLocationConfigKey() {
+        return null;
+      }
+
+      @Override
+      public File getDBLocation(ConfigurationSource conf) {
+        return null;
+      }
+    };
+
+    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
+            .setName("SampleStore")
+            .disableDefaultCFAutoCompaction(disableAutoCompaction)
+            .setPath(newFolder.toPath()).build()) {
+      Assert.assertTrue(dbStore instanceof RDBStore);
+
+      RDBStore rdbStore = (RDBStore) dbStore;
+      Collection<RocksDatabase.ColumnFamily> cfFamilies =
+              rdbStore.getColumnFamilies();
+
+      // we also have the default column family, so there are 2
+      Assert.assertEquals(2, cfFamilies.size());
+
+      for (RocksDatabase.ColumnFamily cfFamily : cfFamilies) {
+        // the value should be different from the default value
+        Assertions.assertEquals(cfFamily.getHandle().getDescriptor()
+                .getOptions().disableAutoCompactions(),
+                disableAutoCompaction);
+      }
+    }
+  }
 }

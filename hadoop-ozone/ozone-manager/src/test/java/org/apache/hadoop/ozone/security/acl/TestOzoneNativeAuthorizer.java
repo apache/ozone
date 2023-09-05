@@ -16,11 +16,12 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import com.google.common.base.Optional;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,10 +54,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
@@ -85,20 +87,17 @@ import static org.junit.Assert.assertTrue;
 @RunWith(Parameterized.class)
 public class TestOzoneNativeAuthorizer {
 
-  private static OzoneConfiguration ozConfig;
-  private String vol;
-  private String buck;
+  private static final List<String> ADMIN_USERNAMES = singletonList("om");
+  private static File testDir;
+  private final String vol;
+  private final String buck;
   private String key;
-  private String prefix;
-  private ACLType parentDirUserAcl;
-  private ACLType parentDirGroupAcl;
+  private final String prefix;
+  private final ACLType parentDirUserAcl;
+  private final ACLType parentDirGroupAcl;
   private boolean expectedAclResult;
 
   private static OzoneManagerProtocol writeClient;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
   private static UserGroupInformation adminUgi;
@@ -107,7 +106,6 @@ public class TestOzoneNativeAuthorizer {
   private OzoneObj volObj;
   private OzoneObj buckObj;
   private OzoneObj keyObj;
-  private OzoneObj prefixObj;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -142,28 +140,32 @@ public class TestOzoneNativeAuthorizer {
 
   @BeforeClass
   public static void setup() throws Exception {
-    ozConfig = new OzoneConfiguration();
+    OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
+    testDir = GenericTestUtils.getRandomizedTestDir();
+    ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
     OmTestManagers omTestManagers =
         new OmTestManagers(ozConfig);
     metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    prefixManager = omTestManagers.getPrefixManager();
-    keyManager = omTestManagers.getKeyManager();
+    VolumeManager volumeManager = omTestManagers.getVolumeManager();
+    BucketManager bucketManager = omTestManagers.getBucketManager();
+    PrefixManager prefixManager = omTestManagers.getPrefixManager();
+    KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
-        keyManager, prefixManager,
-        Collections.singletonList("om"));
+        keyManager, prefixManager, new OzoneAdmins(ADMIN_USERNAMES));
     adminUgi = UserGroupInformation.createUserForTesting("om",
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
         new String[]{"test"});
+  }
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    FileUtils.deleteDirectory(testDir);
   }
 
   private void createKey(String volume,
@@ -276,7 +278,7 @@ public class TestOzoneNativeAuthorizer {
 
   @Test
   public void testCheckAccessForPrefix() throws Exception {
-    prefixObj = new OzoneObjInfo.Builder()
+    OzoneObj prefixObj = new OzoneObjInfo.Builder()
         .setVolumeName(vol)
         .setBucketName(buck)
         .setPrefixName(prefix)
@@ -311,7 +313,7 @@ public class TestOzoneNativeAuthorizer {
     omVolumeArgs.setAcls(ozoneAcls);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private void setBucketAcl(List<OzoneAcl> ozoneAcls) throws IOException {
@@ -321,7 +323,7 @@ public class TestOzoneNativeAuthorizer {
     omBucketInfo.setAcls(ozoneAcls);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private void addVolumeAcl(OzoneAcl ozoneAcl) throws IOException {
@@ -332,7 +334,7 @@ public class TestOzoneNativeAuthorizer {
     omVolumeArgs.addAcl(ozoneAcl);
 
     metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+        CacheValue.get(1L, omVolumeArgs));
   }
 
   private void addBucketAcl(OzoneAcl ozoneAcl) throws IOException {
@@ -342,7 +344,7 @@ public class TestOzoneNativeAuthorizer {
     omBucketInfo.addAcl(ozoneAcl);
 
     metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+        CacheValue.get(1L, omBucketInfo));
   }
 
   private void resetAclsAndValidateAccess(OzoneObj obj,
@@ -361,29 +363,29 @@ public class TestOzoneNativeAuthorizer {
     List<ACLType> allAcls = Arrays.stream(ACLType.values()).
         collect(Collectors.toList());
 
-    /**
+    /*
      * 1. Reset default acls to an acl.
      * 2. Test if user/group has access only to it.
      * 3. Add remaining acls one by one and then test
      *    if user/group has access to them.
-     * */
+     */
     for (ACLType a1 : allAcls) {
       OzoneAcl newAcl = new OzoneAcl(accessType, getAclName(accessType), a1,
           ACCESS);
 
       // Reset acls to only one right.
       if (obj.getResourceType() == VOLUME) {
-        setVolumeAcl(Collections.singletonList(newAcl));
+        setVolumeAcl(singletonList(newAcl));
       } else if (obj.getResourceType() == BUCKET) {
-        setBucketAcl(Collections.singletonList(newAcl));
+        setBucketAcl(singletonList(newAcl));
       } else {
-        aclImplementor.setAcl(obj, Collections.singletonList(newAcl));
+        aclImplementor.setAcl(obj, singletonList(newAcl));
       }
 
 
       // Fetch current acls and validate.
       acls = aclImplementor.getAcl(obj);
-      assertTrue(acls.size() == 1);
+      assertEquals(1, acls.size());
       assertTrue(acls.contains(newAcl));
 
       // Special handling for ALL.
@@ -397,16 +399,17 @@ public class TestOzoneNativeAuthorizer {
         validateNone(obj, builder);
         continue;
       }
+
       String msg = "Acl to check:" + a1 + " accessType:" +
           accessType + " path:" + obj.getPath();
-      if (a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)) {
-        assertEquals(msg, nativeAuthorizer.getOzoneAdmins().contains(user),
-            nativeAuthorizer.checkAccess(obj,
-                builder.setAclRights(a1).build()));
-      } else {
-        assertEquals(msg, expectedAclResult, nativeAuthorizer.checkAccess(obj,
-            builder.setAclRights(a1).build()));
-      }
+      RequestContext context = builder.setAclRights(a1).build();
+      boolean expectedResult =
+          a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)
+              ? ADMIN_USERNAMES.contains(user)
+              : expectedAclResult;
+      assertEquals(msg, expectedResult,
+          nativeAuthorizer.checkAccess(obj, context));
+
       List<ACLType> aclsToBeValidated =
           Arrays.stream(ACLType.values()).collect(Collectors.toList());
       List<ACLType> aclsToBeAdded =
@@ -433,8 +436,9 @@ public class TestOzoneNativeAuthorizer {
         if (!a2.equals(a1)) {
 
           acls = aclImplementor.getAcl(obj);
-          List right = acls.stream().map(a -> a.getAclList()).collect(
-              Collectors.toList());
+          List<List<ACLType>> right = acls.stream()
+              .map(OzoneAcl::getAclList)
+              .collect(Collectors.toList());
           assertFalse("Did not expect client to have " + a2 + " acl. " +
                   "Current acls found:" + right + ". Type:" + accessType + ","
                   + " name:" + (accessType == USER ? user : group),
@@ -511,8 +515,6 @@ public class TestOzoneNativeAuthorizer {
 
   /**
    * Helper function to test acl rights with user/group had ALL acl bit set.
-   * @param obj
-   * @param builder
    */
   private void validateAll(OzoneObj obj, RequestContext.Builder
       builder) throws OMException {
@@ -520,21 +522,17 @@ public class TestOzoneNativeAuthorizer {
     allAcls.remove(ALL);
     allAcls.remove(NONE);
     RequestContext ctx = builder.build();
-    boolean expectedResult = expectedAclResult;
-    if (nativeAuthorizer.getOzoneAdmins().contains(
-        ctx.getClientUgi().getUserName())) {
-      expectedResult = true;
-    }
+    String userName = ctx.getClientUgi().getUserName();
+    boolean expectedResult = expectedAclResult
+        || ADMIN_USERNAMES.contains(userName);
     for (ACLType a : allAcls) {
-      assertEquals("User should have right " + a + ".",
+      assertEquals("User " + userName + " should have right " + a + ".",
           expectedResult, nativeAuthorizer.checkAccess(obj, ctx));
     }
   }
 
   /**
    * Helper function to test acl rights with user/group had NONE acl bit set.
-   * @param obj
-   * @param builder
    */
   private void validateNone(OzoneObj obj, RequestContext.Builder
       builder) throws OMException {

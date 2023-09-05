@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
@@ -66,7 +67,6 @@ public class TestOzoneManagerStateMachine {
         Mockito.mock(OzoneManagerRatisServer.class);
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
     // Allow testing of prepare pre-append gate.
-    when(ozoneManager.isAdmin(any(String.class))).thenReturn(true);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
 
@@ -74,7 +74,8 @@ public class TestOzoneManagerStateMachine {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.newFolder().getAbsolutePath().toString());
 
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf,
+        ozoneManager);
 
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
@@ -270,8 +271,12 @@ public class TestOzoneManagerStateMachine {
         .setCreateKeyRequest(CreateKeyRequest.newBuilder().setKeyArgs(args))
         .setCmdType(Type.CreateKey)
         .setClientId("123")
+        .setUserInfo(UserInfo
+            .newBuilder()
+            .setUserName("user")
+            .setHostName("localhost")
+            .setRemoteAddress("127.0.0.1"))
         .build();
-
     // Without prepare enabled, the txn should be returned unaltered.
     TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
     TransactionContext returnedTrx =
@@ -288,6 +293,11 @@ public class TestOzoneManagerStateMachine {
                 .setArgs(PrepareRequestArgs.getDefaultInstance()))
         .setCmdType(Type.Prepare)
         .setClientId("123")
+        .setUserInfo(UserInfo
+            .newBuilder()
+            .setUserName("user")
+            .setHostName("localhost")
+            .setRemoteAddress("127.0.0.1"))
         .build();
 
     submittedTrx = mockTransactionContext(prepareRequest);

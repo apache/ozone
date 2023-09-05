@@ -17,103 +17,80 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.FileNotFoundException;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.Collection;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Test the node schema loader. */
-@RunWith(Enclosed.class)
+@Timeout(2)
 public class TestNodeSchemaLoader {
 
   /**
    * Parameterized test cases for various error conditions.
    */
-  @RunWith(Parameterized.class)
-  public static class ParameterizedTests {
+  public static Stream<Arguments> getSchemaFiles() {
+    return Stream.of(
+        arguments("enforce-error.xml", "layer without prefix defined"),
+        arguments("invalid-cost.xml", "Cost should be positive number or 0"),
+        arguments("multiple-leaf.xml", "Multiple LEAF layers are found"),
+        arguments("multiple-root.xml", "Multiple ROOT layers are found"),
+        arguments("no-leaf.xml", "No LEAF layer is found"),
+        arguments("no-root.xml", "No ROOT layer is found"),
+        arguments("path-layers-size-mismatch.xml",
+            "Topology path depth doesn't match layer element numbers"),
+        arguments("path-with-id-reference-failure.xml",
+            "No layer found for id"),
+        arguments("unknown-layer-type.xml", "Unsupported layer type"),
+        arguments("wrong-path-order-1.xml",
+            "Topology path doesn't start with ROOT layer"),
+        arguments("wrong-path-order-2.xml",
+            "Topology path doesn't end with LEAF layer"),
+        arguments("no-topology.xml", "no or multiple <topology> element"),
+        arguments("multiple-topology.xml", "no or multiple <topology> element"),
+        arguments("invalid-version.xml", "Bad layoutversion value"),
+        arguments("external-entity.xml", "accessExternalDTD")
+    );
+  }
 
-    private final String schemaFile;
-    private final String errMsg;
-
-    @Rule
-    public Timeout testTimeout = Timeout.seconds(2);
-
-    @Parameters
-    public static Collection<Object[]> getSchemaFiles() {
-      Object[][] schemaFiles = new Object[][]{
-          {"enforce-error.xml", "layer without prefix defined"},
-          {"invalid-cost.xml", "Cost should be positive number or 0"},
-          {"multiple-leaf.xml", "Multiple LEAF layers are found"},
-          {"multiple-root.xml", "Multiple ROOT layers are found"},
-          {"no-leaf.xml", "No LEAF layer is found"},
-          {"no-root.xml", "No ROOT layer is found"},
-          {"path-layers-size-mismatch.xml",
-              "Topology path depth doesn't match layer element numbers"},
-          {"path-with-id-reference-failure.xml",
-              "No layer found for id"},
-          {"unknown-layer-type.xml", "Unsupported layer type"},
-          {"wrong-path-order-1.xml",
-              "Topology path doesn't start with ROOT layer"},
-          {"wrong-path-order-2.xml",
-              "Topology path doesn't end with LEAF layer"},
-          {"no-topology.xml", "no or multiple <topology> element"},
-          {"multiple-topology.xml", "no or multiple <topology> element"},
-          {"invalid-version.xml", "Bad layoutversion value"},
-          {"external-entity.xml", "accessExternalDTD"},
-      };
-      return Arrays.asList(schemaFiles);
-    }
-
-    public ParameterizedTests(String schemaFile, String errMsg) {
-      this.schemaFile = schemaFile;
-      this.errMsg = errMsg;
-    }
-
-    @Test
-    public void testInvalid() {
-      String filePath = getClassloaderResourcePath(schemaFile);
-      Exception e = assertThrows(IllegalArgumentException.class,
-          () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
-      assertMessageContains(e.getMessage(), errMsg, schemaFile);
-    }
+  @ParameterizedTest
+  @MethodSource("getSchemaFiles")
+  public void testInvalid(String schemaFile, String errMsg) {
+    String filePath = getClassloaderResourcePath(schemaFile);
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
+    assertMessageContains(e.getMessage(), errMsg, schemaFile);
   }
 
   /**
    * Test cases that do not use the parameters, should be executed only once.
    */
-  public static class NonParameterizedTests {
 
-    private static final String VALID_SCHEMA_FILE = "good.xml";
+  private static final String VALID_SCHEMA_FILE = "good.xml";
 
-    @Rule
-    public Timeout testTimeout = Timeout.seconds(2);
+  @Test
+  public void testGood() throws Exception {
+    String filePath = getClassloaderResourcePath(VALID_SCHEMA_FILE);
+    NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
+  }
 
-    @Test
-    public void testGood() throws Exception {
-      String filePath = getClassloaderResourcePath(VALID_SCHEMA_FILE);
-      NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath);
-    }
-
-    @Test
-    public void testNotExist() {
-      String filePath = getClassloaderResourcePath(VALID_SCHEMA_FILE)
-          .replace(VALID_SCHEMA_FILE, "non-existent.xml");
-      Exception e = assertThrows(FileNotFoundException.class,
-          () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
-      assertMessageContains(e.getMessage(), "not found", "non-existent.xml");
-    }
+  @Test
+  public void testNotExist() {
+    String filePath = getClassloaderResourcePath(VALID_SCHEMA_FILE)
+        .replace(VALID_SCHEMA_FILE, "non-existent.xml");
+    Exception e = assertThrows(FileNotFoundException.class,
+        () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
+    assertMessageContains(e.getMessage(), "not found", "non-existent.xml");
   }
 
   private static void assertMessageContains(

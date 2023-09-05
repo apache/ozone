@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -54,7 +53,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -134,9 +132,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
+      long clientID = multipartCommitUploadPartRequest.getClientID();
+
       // check acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.WRITE, clientID);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -149,8 +149,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-
-      long clientID = multipartCommitUploadPartRequest.getClientID();
 
       openKey = getOpenKey(volumeName, bucketName, keyName, omMetadataManager,
               clientID);
@@ -202,7 +200,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           getOmRequest().getVersion()));
 
       // Add this part information in to multipartKeyInfo.
-      multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
+      multipartKeyInfo.addPartKeyInfo(partKeyInfo.build());
 
       // Set the UpdateID to current transactionLogIndex
       multipartKeyInfo.setUpdateID(trxnLogIndex,
@@ -219,18 +217,22 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // read/write requests that info for validation.
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo),
-              trxnLogIndex));
+          CacheValue.get(trxnLogIndex, multipartKeyInfo));
 
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(openKey),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+          CacheValue.get(trxnLogIndex));
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // TODO: S3MultipartUpload did not check quota and did not add nameSpace,
-      //  we need to fix these issues in HDDS-6650.
+      if (null != oldPartKeyInfo) {
+        OmKeyInfo partKeyToBeDeleted =
+            OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
+        correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
+      }
+      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+          correctedSpace);
       omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(
@@ -353,6 +355,35 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  /**
+   * Validates S3 MPU commit part requests.
+   * We do not want to allow older clients to commit MPU keys to buckets which
+   * use non LEGACY layouts.
+   *
+   * @param req - the request to validate
+   * @param ctx - the validation context
+   * @return the validated request
+   * @throws OMException if the request is invalid
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CommitMultiPartUpload
+  )
+  public static OMRequest blockMPUCommitWithBucketLayoutFromOldClient(
+      OMRequest req, ValidationContext ctx) throws IOException {
+    if (req.getCommitMultiPartUploadRequest().hasKeyArgs()) {
+      KeyArgs keyArgs = req.getCommitMultiPartUploadRequest().getKeyArgs();
+
+      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
+        BucketLayout bucketLayout = ctx.getBucketLayout(
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
+        bucketLayout.validateSupportedOperation();
       }
     }
     return req;

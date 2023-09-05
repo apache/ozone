@@ -18,28 +18,38 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.DATANODE_UUID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,8 +61,15 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueHandlerWithUnhealthyContainer.class);
 
+  private IncrementalReportSender<Container> mockIcrSender;
+
+  @BeforeEach
+  public void init() {
+    mockIcrSender = Mockito.mock(IncrementalReportSender.class);
+  }
+
   @Test
-  public void testRead() throws IOException {
+  public void testRead() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -60,11 +77,11 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         handler.handleReadContainer(
             getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer),
             container);
-    assertThat(response.getResult(), is(SUCCESS));
+    assertEquals(SUCCESS, response.getResult());
   }
 
   @Test
-  public void testGetBlock() throws IOException {
+  public void testGetBlock() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -72,11 +89,11 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         handler.handleGetBlock(
             getDummyCommandRequestProto(ContainerProtos.Type.GetBlock),
             container);
-    assertThat(response.getResult(), is(UNKNOWN_BCSID));
+    assertEquals(UNKNOWN_BCSID, response.getResult());
   }
 
   @Test
-  public void testGetCommittedBlockLength() throws IOException {
+  public void testGetCommittedBlockLength() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -85,11 +102,11 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.GetCommittedBlockLength),
             container);
-    assertThat(response.getResult(), is(UNKNOWN_BCSID));
+    assertEquals(UNKNOWN_BCSID, response.getResult());
   }
 
   @Test
-  public void testReadChunk() throws IOException {
+  public void testReadChunk() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -98,11 +115,11 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.ReadChunk),
             container, null);
-    assertThat(response.getResult(), is(UNKNOWN_BCSID));
+    assertEquals(UNKNOWN_BCSID, response.getResult());
   }
 
   @Test
-  public void testGetSmallFile() throws IOException {
+  public void testGetSmallFile() {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
@@ -111,12 +128,54 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
             getDummyCommandRequestProto(
                 ContainerProtos.Type.GetSmallFile),
             container);
-    assertThat(response.getResult(), is(UNKNOWN_BCSID));
+    assertEquals(UNKNOWN_BCSID, response.getResult());
+  }
+
+  @Test
+  void testNPEFromPutBlock() throws IOException {
+    KeyValueContainer container = new KeyValueContainer(
+        mock(KeyValueContainerData.class),
+        new OzoneConfiguration());
+    KeyValueHandler subject = getDummyHandler();
+
+    BlockID blockID = getTestBlockID(1);
+    ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+        getWriteChunkRequest(MockPipeline.createSingleNodePipeline(),
+            blockID, 123);
+    ContainerProtos.ContainerCommandResponseProto response =
+        subject.handle(
+            getPutBlockRequest(writeChunkRequest),
+            container, null);
+    assertEquals(CONTAINER_INTERNAL_ERROR, response.getResult());
+  }
+
+  @Test
+  public void testMarkContainerUnhealthyInFailedVolume() throws IOException {
+    KeyValueHandler handler = getDummyHandler();
+    KeyValueContainerData mockContainerData = mock(KeyValueContainerData.class);
+    HddsVolume mockVolume = mock(HddsVolume.class);
+    Mockito.when(mockContainerData.getVolume()).thenReturn(mockVolume);
+    KeyValueContainer container = new KeyValueContainer(
+        mockContainerData, new OzoneConfiguration());
+
+    // When volume is failed, the call to mark the container unhealthy should
+    // be ignored.
+    Mockito.when(mockVolume.isFailed()).thenReturn(true);
+    handler.markContainerUnhealthy(container,
+        ContainerTestUtils.getUnhealthyScanResult());
+    Mockito.verify(mockIcrSender, Mockito.never()).send(Mockito.any());
+
+    // When volume is healthy, ICR should be sent when container is marked
+    // unhealthy.
+    Mockito.when(mockVolume.isFailed()).thenReturn(false);
+    handler.markContainerUnhealthy(container,
+        ContainerTestUtils.getUnhealthyScanResult());
+    Mockito.verify(mockIcrSender, Mockito.atMostOnce()).send(Mockito.any());
   }
 
   // -- Helper methods below.
 
-  private KeyValueHandler getDummyHandler() throws IOException {
+  private KeyValueHandler getDummyHandler() {
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
@@ -130,7 +189,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(MutableVolumeSet.class),
-        mock(ContainerMetrics.class), TestHddsDispatcher.NO_OP_ICR_SENDER);
+        mock(ContainerMetrics.class), mockIcrSender);
   }
 
   private KeyValueContainer getMockUnhealthyContainer() {
@@ -142,5 +201,4 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         .ContainerDataProto.newBuilder().setContainerID(1).build());
     return new KeyValueContainer(containerData, new OzoneConfiguration());
   }
-
 }
