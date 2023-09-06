@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -142,7 +142,7 @@ public class StateContext {
    *
    * For non-HA mode, term of SCMCommand will be 0.
    */
-  private Optional<Long> termOfLeaderSCM = Optional.empty();
+  private OptionalLong termOfLeaderSCM = OptionalLong.empty();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -152,6 +152,8 @@ public class StateContext {
   private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
   private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+  
+  private final int maxCommandQueueLimit;
   /**
    * Constructs a StateContext.
    *
@@ -163,6 +165,9 @@ public class StateContext {
       DatanodeStateMachine.DatanodeStates
           state, DatanodeStateMachine parent) {
     this.conf = conf;
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    maxCommandQueueLimit = dnConf.getCommandQueueLimit();
     this.state = state;
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
@@ -720,10 +725,9 @@ public class StateContext {
 
     // if commandQueue is not empty, init termOfLeaderSCM
     // with the largest term found in commandQueue
-    commandQueue.stream()
+    termOfLeaderSCM = commandQueue.stream()
         .mapToLong(SCMCommand::getTerm)
-        .max()
-        .ifPresent(term -> termOfLeaderSCM = Optional.of(term));
+        .max();
   }
 
   /**
@@ -731,12 +735,27 @@ public class StateContext {
    * Always record the latest term that has seen.
    */
   private void updateTermOfLeaderSCM(SCMCommand<?> command) {
+    updateTermOfLeaderSCM(command.getTerm());
+  }
+
+  public void updateTermOfLeaderSCM(final long newTerm) {
     if (!termOfLeaderSCM.isPresent()) {
-      LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-    termOfLeaderSCM = Optional.of(
-        Long.max(termOfLeaderSCM.get(), command.getTerm()));
+
+    final long currentTerm = termOfLeaderSCM.getAsLong();
+    if (currentTerm < newTerm) {
+      setTermOfLeaderSCM(newTerm);
+    }
+  }
+
+  @VisibleForTesting
+  public void setTermOfLeaderSCM(long term) {
+    termOfLeaderSCM = OptionalLong.of(term);
+  }
+
+  public OptionalLong getTermOfLeaderSCM() {
+    return termOfLeaderSCM;
   }
 
   /**
@@ -759,13 +778,14 @@ public class StateContext {
         }
 
         updateTermOfLeaderSCM(command);
-        if (command.getTerm() == termOfLeaderSCM.get()) {
+        final long currentTerm = termOfLeaderSCM.getAsLong();
+        if (command.getTerm() == currentTerm) {
           return command;
         }
 
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
-            command, command.getTerm(), termOfLeaderSCM.get());
+            command, command.getTerm(), currentTerm);
       }
     } finally {
       lock.unlock();
@@ -780,6 +800,12 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
+      if (commandQueue.size() >= maxCommandQueueLimit) {
+        LOG.warn("Ignore command as command queue crosses max limit {}.",
+            maxCommandQueueLimit);
+        return;
+      }
+      updateTermOfLeaderSCM(command);
       commandQueue.add(command);
     } finally {
       lock.unlock();

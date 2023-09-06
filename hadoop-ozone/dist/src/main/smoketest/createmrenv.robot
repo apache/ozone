@@ -18,7 +18,7 @@ Documentation       Create directories required for MR test
 Library             OperatingSystem
 Resource            commonlib.robot
 Resource            lib/fs.robot
-Test Timeout        2 minute
+Test Timeout        5 minutes
 
 
 *** Variables ***
@@ -32,7 +32,7 @@ Create volume
     ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --space-quota 100TB --namespace-quota 100
                     Should not contain  ${result}       Failed
 Create bucket
-                    Execute             ozone sh bucket create /${volume}/${bucket} --layout FILE_SYSTEM_OPTIMIZED
+                    Execute             ozone sh bucket create /${volume}/${bucket} --space-quota 1TB --layout FILE_SYSTEM_OPTIMIZED
 
 *** Test Cases ***
 Create test volume, bucket and key

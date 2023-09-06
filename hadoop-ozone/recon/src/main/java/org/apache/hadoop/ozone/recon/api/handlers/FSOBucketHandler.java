@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -29,6 +30,8 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -42,7 +45,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * Class for handling FSO buckets.
  */
 public class FSOBucketHandler extends BucketHandler {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(FSOBucketHandler.class);
   private final long volumeId;
   private final long bucketId;
   
@@ -143,7 +147,7 @@ public class FSOBucketHandler extends BucketHandler {
         }
         OmKeyInfo keyInfo = kv.getValue();
         if (keyInfo != null) {
-          totalDU += getKeySizeWithReplication(keyInfo);
+          totalDU += keyInfo.getReplicatedSize();
         }
       }
     }
@@ -212,7 +216,7 @@ public class FSOBucketHandler extends BucketHandler {
           diskUsage.setSize(keyInfo.getDataSize());
 
           if (withReplica) {
-            long keyDU = getKeySizeWithReplication(keyInfo);
+            long keyDU = keyInfo.getReplicatedSize();
             keyDataSizeWithReplica += keyDU;
             diskUsage.setSizeWithReplica(keyDU);
           }
@@ -256,7 +260,9 @@ public class FSOBucketHandler extends BucketHandler {
               getBucketObjectId(names), dirObjectId, names[i]);
       OmDirectoryInfo dirInfo =
               getOmMetadataManager().getDirectoryTable().getSkipCache(dirKey);
-      dirObjectId = dirInfo.getObjectID();
+      if (null != dirInfo) {
+        dirObjectId = dirInfo.getObjectID();
+      }
     }
     return dirObjectId;
   }
@@ -276,4 +282,23 @@ public class FSOBucketHandler extends BucketHandler {
         parentObjectId, fileName);
     return getOmMetadataManager().getFileTable().getSkipCache(ozoneKey);
   }
+
+  @Override
+  public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
+    String path = OM_KEY_PREFIX;
+    path += String.join(OM_KEY_PREFIX, names);
+    Preconditions.checkArgument(
+        names.length >= 3,
+        "Path should be a directory: %s", path);
+    long parentObjectId = getDirObjectId(names, names.length - 1);
+    String dirKey = getOmMetadataManager().getOzonePathKey(
+        getVolumeObjectId(names),
+        getBucketObjectId(names),
+        parentObjectId,
+        names[names.length - 1]);
+    OmDirectoryInfo dirInfo = getOmMetadataManager()
+        .getDirectoryTable().getSkipCache(dirKey);
+    return dirInfo;
+  }
+
 }

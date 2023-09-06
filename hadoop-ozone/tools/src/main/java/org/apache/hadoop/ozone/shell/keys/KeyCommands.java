@@ -49,7 +49,8 @@ import picocli.CommandLine.ParentCommand;
         AddAclKeyHandler.class,
         RemoveAclKeyHandler.class,
         SetAclKeyHandler.class,
-        GetAclKeyHandler.class
+        GetAclKeyHandler.class,
+        ChecksumKeyHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

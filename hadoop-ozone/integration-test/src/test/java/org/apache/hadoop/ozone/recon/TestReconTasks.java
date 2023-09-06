@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -87,6 +88,41 @@ public class TestReconTasks {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void testSyncSCMContainerInfo() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            cluster.getReconServer().getReconStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ContainerManager reconContainerManager = reconScm.getContainerManager();
+    final ContainerInfo container1 = scmContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    final ContainerInfo container2 = scmContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    reconContainerManager.allocateContainer(
+        RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE), "admin");
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    scmContainerManager.updateContainerState(container1.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    scmContainerManager.updateContainerState(container2.containerID(),
+        HddsProtos.LifeCycleEvent.CLOSE);
+    int scmContainersCount = scmContainerManager.getContainers().size();
+    int reconContainersCount = reconContainerManager
+        .getContainers().size();
+    Assert.assertNotEquals(scmContainersCount, reconContainersCount);
+    reconScm.syncWithSCMContainerInfo();
+    reconContainersCount = reconContainerManager
+        .getContainers().size();
+    Assert.assertEquals(scmContainersCount, reconContainersCount);
   }
 
   @Test

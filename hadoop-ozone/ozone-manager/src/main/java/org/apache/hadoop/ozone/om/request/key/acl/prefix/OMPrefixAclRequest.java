@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 import java.io.IOException;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -120,13 +119,12 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
           omPrefixInfo.getAcls().size() == 0) {
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
+            CacheValue.get(trxnLogIndex));
       } else {
         // update cache.
         omMetadataManager.getPrefixTable().addCacheEntry(
             new CacheKey<>(prefixPath),
-            new CacheValue<>(Optional.of(omPrefixInfo),
-                trxnLogIndex));
+            CacheValue.get(trxnLogIndex, omPrefixInfo));
       }
 
       opResult  = operationResult.isSuccess();

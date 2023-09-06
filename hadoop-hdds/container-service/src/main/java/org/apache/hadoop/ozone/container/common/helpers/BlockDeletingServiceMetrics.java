@@ -23,7 +23,8 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -44,6 +45,34 @@ public final class BlockDeletingServiceMetrics {
 
   @Metric(about = "The number of failed delete blocks.")
   private MutableCounterLong failureCount;
+
+  @Metric(about = "The number of out of order delete block transaction.")
+  private MutableCounterLong outOfOrderDeleteBlockTransactionCount;
+
+  @Metric(about = "The total number of blocks pending for processing.")
+  private MutableGaugeLong totalPendingBlockCount;
+
+  @Metric(about = "The total number of DeleteBlockTransaction received")
+  private MutableCounterLong receivedTransactionCount;
+
+  @Metric(about = "The total number of DeleteBlockTransaction" +
+      " that is a retry Transaction")
+  private MutableCounterLong receivedRetryTransactionCount;
+
+  @Metric(about = "The total number of Container received to be processed")
+  private MutableCounterLong receivedContainerCount;
+
+  @Metric(about = "The total number of blocks received to be processed.")
+  private MutableGaugeLong receivedBlockCount;
+
+  @Metric(about = "The total number of blocks marked count.")
+  private MutableGaugeLong markedBlockCount;
+
+  @Metric(about = "The total number of blocks chosen to be deleted.")
+  private MutableGaugeLong totalBlockChosenCount;
+
+  @Metric(about = "The total number of Container chosen to be deleted.")
+  private MutableGaugeLong totalContainerChosenCount;
 
   private BlockDeletingServiceMetrics() {
   }
@@ -79,6 +108,38 @@ public final class BlockDeletingServiceMetrics {
     this.failureCount.incr();
   }
 
+  public void incrReceivedTransactionCount(long count) {
+    receivedTransactionCount.incr(count);
+  }
+
+  public void incrReceivedRetryTransactionCount(long count) {
+    receivedRetryTransactionCount.incr(count);
+  }
+
+  public void incrReceivedContainerCount(long count) {
+    receivedContainerCount.incr(count);
+  }
+
+  public void incrTotalBlockChosenCount(long count) {
+    totalBlockChosenCount.incr(count);
+  }
+
+  public void incrTotalContainerChosenCount(long count) {
+    totalContainerChosenCount.incr(count);
+  }
+
+  public void incrReceivedBlockCount(long count) {
+    receivedBlockCount.incr(count);
+  }
+
+  public void incrMarkedBlockCount(long count) {
+    markedBlockCount.incr(count);
+  }
+
+  public void setTotalPendingBlockCount(long count) {
+    this.totalPendingBlockCount.set(count);
+  }
+
   public long getSuccessCount() {
     return successCount.value();
   }
@@ -91,12 +152,50 @@ public final class BlockDeletingServiceMetrics {
     return failureCount.value();
   }
 
+  public void incOutOfOrderDeleteBlockTransactionCount() {
+    this.outOfOrderDeleteBlockTransactionCount.incr();
+  }
+
+  public long getOutOfOrderDeleteBlockTransactionCount() {
+    return outOfOrderDeleteBlockTransactionCount.value();
+  }
+
+  public long getTotalPendingBlockCount() {
+    return totalPendingBlockCount.value();
+  }
+
+  public long getTotalBlockChosenCount() {
+    return totalBlockChosenCount.value();
+  }
+
+  public long getTotalContainerChosenCount() {
+    return totalContainerChosenCount.value();
+  }
+
   @Override
   public String toString() {
     StringBuffer buffer = new StringBuffer();
     buffer.append("successCount = " + successCount.value()).append("\t")
         .append("successBytes = " + successBytes.value()).append("\t")
-        .append("failureCount = " + failureCount.value()).append("\t");
+        .append("failureCount = " + failureCount.value()).append("\t")
+        .append("outOfOrderDeleteBlockTransactionCount = "
+            + outOfOrderDeleteBlockTransactionCount.value()).append("\t")
+        .append("totalPendingBlockCount = "
+            + totalPendingBlockCount.value()).append("\t")
+        .append("totalBlockChosenCount = "
+            + totalBlockChosenCount.value()).append("\t")
+        .append("totalContainerChosenCount = "
+            + totalContainerChosenCount.value()).append("\t")
+        .append("receivedTransactionCount = "
+            + receivedTransactionCount.value()).append("\t")
+        .append("receivedRetryTransactionCount = "
+            + receivedRetryTransactionCount.value()).append("\t")
+        .append("receivedContainerCount = "
+            + receivedContainerCount.value()).append("\t")
+        .append("receivedBlockCount = "
+            + receivedBlockCount.value()).append("\t")
+        .append("markedBlockCount = "
+            + markedBlockCount.value()).append("\t");
     return buffer.toString();
   }
 }

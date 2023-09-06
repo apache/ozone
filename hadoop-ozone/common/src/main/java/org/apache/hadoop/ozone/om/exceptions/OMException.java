@@ -259,6 +259,11 @@ public class OMException extends IOException {
 
     FEATURE_NOT_ENABLED,
 
+    INVALID_SNAPSHOT_ERROR,
+    CONTAINS_SNAPSHOT,
+    SSL_CONNECTION_FAILURE,
+    RENAME_OPEN_FILE,
+    
     INVALID_PATH
   }
 }

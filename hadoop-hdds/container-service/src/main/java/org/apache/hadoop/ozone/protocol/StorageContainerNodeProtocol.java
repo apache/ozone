@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -68,10 +69,24 @@ public interface StorageContainerNodeProtocol {
    * Send heartbeat to indicate the datanode is alive and doing well.
    * @param datanodeDetails - Datanode ID.
    * @param layoutVersionInfo - Layout Version Proto.
-   * @return SCMheartbeat response list
+   * @return Commands to be sent to the datanode.
+   */
+  default List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                    LayoutVersionProto layoutVersionInfo) {
+    return processHeartbeat(datanodeDetails, layoutVersionInfo, null);
+  };
+
+  /**
+   * Send heartbeat to indicate the datanode is alive and doing well.
+   * @param datanodeDetails - Datanode ID.
+   * @param layoutVersionInfo - Layout Version Proto.
+   * @param queueReport - The CommandQueueReportProto report from the
+   *                    heartbeating datanode.
+   * @return Commands to be sent to the datanode.
    */
   List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                    LayoutVersionProto layoutVersionInfo);
+      LayoutVersionProto layoutVersionInfo,
+      CommandQueueReportProto queueReport);
 
   /**
    * Check if node is registered or not.

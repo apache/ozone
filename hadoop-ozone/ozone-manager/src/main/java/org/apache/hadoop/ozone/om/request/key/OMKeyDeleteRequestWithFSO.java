@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -109,9 +108,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      OzoneFileStatus keyStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
-                      bucketName, keyName, 0);
+      OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, keyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       if (keyStatus == null) {
         throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
@@ -145,12 +144,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         // Update dir cache.
         omMetadataManager.getDirectoryTable().addCacheEntry(
                 new CacheKey<>(ozonePathKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
+                CacheValue.get(trxnLogIndex));
       } else {
         // Update table cache.
         omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
                 new CacheKey<>(ozonePathKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
+                CacheValue.get(trxnLogIndex));
       }
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);

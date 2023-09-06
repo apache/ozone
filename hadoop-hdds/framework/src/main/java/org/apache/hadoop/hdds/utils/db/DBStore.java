@@ -27,6 +27,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -95,6 +96,11 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @param sync if true will sync the outstanding I/Os to the disk.
    */
   void flushLog(boolean sync) throws IOException;
+
+  /**
+   * Returns the RocksDB checkpoint differ.
+   */
+  RocksDBCheckpointDiffer getRocksDBCheckpointDiffer();
 
   /**
    * Compact the entire database.
@@ -175,29 +181,16 @@ public interface DBStore extends Closeable, BatchOperationHandler {
   Map<Integer, String> getTableNames();
 
   /**
-   * Get Codec registry.
-   * @return codec registry.
-   */
-  CodecRegistry getCodecRegistry();
-
-  /**
    * Get data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @return
-   * @throws SequenceNumberNotFoundException
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws SequenceNumberNotFoundException;
+      throws IOException;
 
   /**
    * Get limited data written to DB since a specific sequence number.
-   * @param sequenceNumber
-   * @param limitCount
-   * @return
-   * @throws SequenceNumberNotFoundException
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws SequenceNumberNotFoundException;
+      throws IOException;
 
   /**
    * Return if the underlying DB is closed. This call is thread safe.

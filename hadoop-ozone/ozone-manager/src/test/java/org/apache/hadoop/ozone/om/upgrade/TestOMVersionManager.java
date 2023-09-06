@@ -83,10 +83,10 @@ public class TestOMVersionManager {
   public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
       throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
-    int currVersion = Integer.MIN_VALUE;
+    int currVersion = -1;
     OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
-      assertTrue(currVersion < lf.layoutVersion());
+      assertEquals(currVersion + 1, lf.layoutVersion());
       currVersion = lf.layoutVersion();
       lastFeature = lf;
     }

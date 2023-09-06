@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.failure.FailureManager;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -246,8 +247,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setStorageSize(
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           0, org.apache.hadoop.hdds.conf.StorageUnit.MB);
-      conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
-          TimeUnit.MILLISECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, 10,
           TimeUnit.SECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 20,
@@ -272,6 +271,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           conf.getObject(ReplicationManagerConfiguration.class);
       replicationConf.setInterval(Duration.ofSeconds(10));
       replicationConf.setEventTimeout(Duration.ofSeconds(20));
+      replicationConf.setDatanodeTimeoutOffset(0);
       conf.setFromObject(replicationConf);
       conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
@@ -296,8 +296,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
-
       DefaultMetricsSystem.setMiniClusterMode(true);
+      DatanodeStoreCache.setMiniClusterMode();
+
       initializeConfiguration();
       if (numOfOMs > 1) {
         initOMRatisConf();

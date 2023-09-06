@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Set;
@@ -38,8 +40,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
  */
 public class ECReplicationCheckHandler extends AbstractCheck {
 
-  public ECReplicationCheckHandler() {
-  }
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ECReplicationCheckHandler.class);
 
   @Override
   public boolean handle(ContainerCheckRequest request) {
@@ -51,30 +53,42 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     ContainerInfo container = request.getContainerInfo();
     ContainerID containerID = container.containerID();
     ContainerHealthResult health = checkHealth(request);
+    LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
     if (health.getHealthState() == ContainerHealthResult.HealthState.HEALTHY) {
       // If the container is healthy, there is nothing else to do in this
       // handler so return as unhandled so any further handlers will be tried.
       return false;
     }
-    // TODO - should the report have a HEALTHY state, rather than just bad
-    //        states? It would need to be added to legacy RM too.
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
-      report.incrementAndSample(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       if (underHealth.isUnrecoverable()) {
-        // TODO - do we need a new health state for unrecoverable EC?
+        if (underHealth.isMissing()) {
+          report.incrementAndSample(
+              ReplicationManagerReport.HealthState.MISSING, containerID);
+        } else {
+          // A container which is unrecoverable but not missing must have too
+          // many unhealthy replicas. Therefore it is UNHEALTHY rather than
+          // missing.
+          report.incrementAndSample(
+              ReplicationManagerReport.HealthState.UNHEALTHY, containerID);
+        }
+      } else {
         report.incrementAndSample(
-            ReplicationManagerReport.HealthState.MISSING, containerID);
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       }
-      // TODO - if it is unrecoverable, should we return false to other
-      //        handlers can be tried?
-      if (!underHealth.isSufficientlyReplicatedAfterPending() &&
-          !underHealth.isUnrecoverable()) {
+      if (!underHealth.isReplicatedOkAfterPending() &&
+          (!underHealth.isUnrecoverable()
+              || underHealth.hasUnreplicatedOfflineIndexes())) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
+          + "is [{}]. isUnrecoverable is [{}]. isMissing is [{}]. "
+          + "hasUnreplicatedOfflineIndexes is [{}]",
+          container, underHealth.isReplicatedOkAfterPending(),
+          underHealth.isUnrecoverable(), underHealth.isMissing(),
+          underHealth.hasUnreplicatedOfflineIndexes());
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
@@ -82,13 +96,18 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.OVER_REPLICATED, containerID);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
-      if (!overHealth.isSufficientlyReplicatedAfterPending()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
+      LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending "
+          + "is [{}]", container, overHealth.isReplicatedOkAfterPending());
       return true;
     }
-    // Should not get here, but incase it does the container is not healthy,
+
+    // Should not get here, but in case it does the container is not healthy,
     // but is also not under or over replicated.
+    LOG.warn("Container {} is not healthy but is not under or over replicated" +
+        ". Should not happen.", container);
     return false;
   }
 
@@ -106,20 +125,27 @@ public class ECReplicationCheckHandler extends AbstractCheck {
     if (!replicaCount.isSufficientlyReplicated(false)) {
       List<Integer> missingIndexes = replicaCount.unavailableIndexes(false);
       int remainingRedundancy = repConfig.getParity();
-      boolean dueToDecommission = true;
+      boolean dueToOutOfService = true;
       if (missingIndexes.size() > 0) {
         // The container has reduced redundancy and will need reconstructed
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under
         // replication is not caused only by decommission, we say it is not
         // due to decommission/
-        dueToDecommission = false;
+        dueToOutOfService = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
-      return new ContainerHealthResult.UnderReplicatedHealthResult(
-          container, remainingRedundancy, dueToDecommission,
-          replicaCount.isSufficientlyReplicated(true),
-          replicaCount.isUnrecoverable());
+      ContainerHealthResult.UnderReplicatedHealthResult result =
+          new ContainerHealthResult.UnderReplicatedHealthResult(
+              container, remainingRedundancy, dueToOutOfService,
+              replicaCount.isSufficientlyReplicated(true),
+              replicaCount.isUnrecoverable());
+      if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
+          || replicaCount.maintenanceOnlyIndexes(true).size() > 0) {
+        result.setHasUnReplicatedOfflineIndexes(true);
+      }
+      result.setIsMissing(replicaCount.isMissing());
+      return result;
     }
 
     if (replicaCount.isOverReplicated(false)) {
@@ -128,7 +154,9 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           .OverReplicatedHealthResult(container, overRepIndexes.size(),
           !replicaCount.isOverReplicated(true));
     }
+
     // No issues detected, so return healthy.
     return new ContainerHealthResult.HealthyResult(container);
   }
+
 }

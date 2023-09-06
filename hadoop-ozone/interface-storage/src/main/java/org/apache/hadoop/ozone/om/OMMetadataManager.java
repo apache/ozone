@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
@@ -39,11 +40,10 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -82,7 +82,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @return OzoneManagerLock
    */
-  OzoneManagerLock getLock();
+  IOzoneManagerLock getLock();
 
   /**
    * Returns the epoch associated with current OM process.
@@ -176,11 +176,13 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * this prefix will be included in the result.
    * @param maxNumOfBuckets the maximum number of buckets to return. It ensures
    * the size of the result will not exceed this limit.
+   * @param hasSnapshot set the flag to list buckets which have snapshot.
    * @return a list of buckets.
    * @throws IOException
    */
   List<OmBucketInfo> listBuckets(String volumeName, String startBucket,
-      String bucketPrefix, int maxNumOfBuckets)
+                                 String bucketPrefix, int maxNumOfBuckets,
+                                 boolean hasSnapshot)
       throws IOException;
 
   /**
@@ -222,6 +224,19 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * List snapshots in a volume/bucket.
+   * @param volumeName     volume name
+   * @param bucketName     bucket name
+   * @param snapshotPrefix snapshot prefix to match
+   * @param prevSnapshot   start of the list, this snapshot is excluded
+   * @param maxListResult  max numbet of snapshots to return
+   * @return list of snapshot
+   */
+  List<SnapshotInfo> listSnapshot(
+      String volumeName, String bucketName, String snapshotPrefix,
+      String prevSnapshot, int maxListResult) throws IOException;
+
+  /**
    * Recover trash allows the user to recover the keys
    * that were marked as deleted, but not actually deleted by Ozone Manager.
    * @param volumeName - The volume name.
@@ -249,29 +264,24 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the key
-   * name and all its associated block IDs. A pending deletion key is stored
-   * with #deleting# prefix in OM DB.
-   *
-   * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} represent keys and blocks.
-   * @throws IOException
-   */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
-
-  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *
    * @param count The maximum number of open keys to return.
    * @param expireThreshold The threshold of open key expire age.
    * @param bucketLayout The type of open keys to get (e.g. DEFAULT or FSO).
-   * @return a {@link List} of {@link OpenKeyBucket}, the expired open keys.
+   * @return the expired open keys.
    * @throws IOException
    */
-  List<OpenKeyBucket> getExpiredOpenKeys(Duration expireThreshold, int count,
+  ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
       BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Retrieve RWLock for the table.
+   * @param tableName table name.
+   * @return ReentrantReadWriteLock
+   */
+  ReentrantReadWriteLock getTableLock(String tableName);
 
   /**
    * Returns the user Table.
@@ -356,12 +366,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   Table<String, OmMultipartKeyInfo> getMultipartInfoTable();
 
-  /**
-   * Gets the S3 Secrets table.
-   * @return Table
-   */
-  Table<String, S3SecretValue> getS3SecretTable();
-
   Table<String, TransactionInfo> getTransactionInfoTable();
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
@@ -369,6 +373,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, OmDBUserPrincipalInfo> getPrincipalToAccessIdsTable();
 
   Table<String, OmDBTenantState> getTenantStateTable();
+
+  Table<String, SnapshotInfo> getSnapshotInfoTable();
+
+  Table<String, String> getSnapshotRenamedTable();
 
   /**
    * Gets the OM Meta table.
@@ -448,6 +456,31 @@ public interface OMMetadataManager extends DBStoreHAManager {
   String getOzonePathKey(long volumeId, long bucketId,
                          long parentObjectId, String pathComponentName);
 
+  default String getOzonePathKey(long volumeId, long bucketId,
+      OmDirectoryInfo dir) {
+    return getOzonePathKey(volumeId, bucketId,
+        dir.getParentObjectID(), dir.getName());
+  }
+
+  /**
+   * Given ozone path key, component id, return the corresponding 
+   * DB path key for delete table.
+   *
+   * @param objectId - object Id
+   * @param pathKey   - path key of component
+   * @return DB Delete directory key as String.
+   */
+  String getOzoneDeletePathKey(long objectId, String pathKey);
+
+  /**
+   * Given ozone delete path key return the corresponding
+   * DB path key for directory table.
+   *
+   * @param ozoneDeletePath - ozone delete path
+   * @return DB directory key as String.
+   */
+  String getOzoneDeletePathDirKey(String ozoneDeletePath);
+
   /**
    * Returns DB key name of an open file in OM metadata store. Should be
    * #open# prefix followed by actual leaf node name.
@@ -461,6 +494,18 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOpenFileName(long volumeId, long bucketId,
                          long parentObjectId, String fileName, long id);
+
+
+  /**
+   * Given a volume, bucket and a objectID, return the DB key name in
+   * snapshotRenamedTable.
+   *
+   * @param volume   - volume name
+   * @param bucket   - bucket name
+   * @param objectID - objectID of the key
+   * @return DB rename key as String.
+   */
+  String getRenameKey(String volume, String bucket, long objectID);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.
@@ -502,4 +547,10 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   long getBucketId(String volume, String bucket) throws IOException;
 
+  /**
+   * Returns List<{@link BlockGroup}> for a key in the deletedTable.
+   * @param deletedKey - key to be purged from the deletedTable
+   * @return {@link BlockGroup}
+   */
+  List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
 }

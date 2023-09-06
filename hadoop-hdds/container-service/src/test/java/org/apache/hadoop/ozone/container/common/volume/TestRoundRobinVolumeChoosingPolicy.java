@@ -18,10 +18,12 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -80,6 +82,8 @@ public class TestRoundRobinVolumeChoosingPolicy {
   @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
+    FileUtil.fullyDelete(new File(VOLUME_1));
+    FileUtil.fullyDelete(new File(VOLUME_2));
   }
 
   @Test

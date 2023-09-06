@@ -147,7 +147,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
     DatanodeDetails datanodeDetails =
-        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+        nodeManager.getNodeByUuid(dnFromReport.getUuid());
     if (datanodeDetails == null) {
       LOG.warn("Received container report from unknown datanode {}",
           dnFromReport);
@@ -209,8 +209,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   /**
-   * Processes the ContainerReport, unknown container reported
-   * that will be deleted by SCM.
+   * Processes the ContainerReport.
+   * Any unknown container reported by DN and not present in SCM
+   * containerSet will either be logged as an error or deleted based on
+   * unknownContainerHandleAction.
    *
    * @param datanodeDetails Datanode from which this report was received
    * @param container ContainerInfo representing the container

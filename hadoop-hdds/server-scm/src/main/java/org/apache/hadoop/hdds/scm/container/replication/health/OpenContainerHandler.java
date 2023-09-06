@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Set;
 
@@ -36,7 +38,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManage
  */
 public class OpenContainerHandler extends AbstractCheck {
 
-  private ReplicationManager replicationManager;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OpenContainerHandler.class);
+
+  private final ReplicationManager replicationManager;
 
   public OpenContainerHandler(ReplicationManager replicationManager) {
     this.replicationManager = replicationManager;
@@ -46,10 +51,14 @@ public class OpenContainerHandler extends AbstractCheck {
   public boolean handle(ContainerCheckRequest request) {
     ContainerInfo containerInfo = request.getContainerInfo();
     if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN) {
+      LOG.debug("Checking open container {} in OpenContainerHandler",
+          containerInfo);
       if (!isOpenContainerHealthy(
           containerInfo, request.getContainerReplicas())) {
         // This is an unhealthy open container, so we need to trigger the
         // close process on it.
+        LOG.debug("Container {} is open but unhealthy. Triggering close.",
+            containerInfo);
         request.getReport().incrementAndSample(
             ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
             containerInfo.containerID());

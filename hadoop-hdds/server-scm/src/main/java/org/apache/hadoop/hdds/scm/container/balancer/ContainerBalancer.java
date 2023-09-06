@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
@@ -30,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -38,6 +39,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * under-utilized datanodes.
  */
 public class ContainerBalancer extends StatefulService {
+
+  private static final AtomicInteger ID = new AtomicInteger();
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
@@ -227,7 +230,7 @@ public class ContainerBalancer extends StatefulService {
               ozoneConfiguration);
       validateConfiguration(configuration);
       this.config = configuration;
-      startBalancingThread(proto.getNextIterationIndex());
+      startBalancingThread(proto.getNextIterationIndex(), true);
     } finally {
       lock.unlock();
     }
@@ -247,8 +250,7 @@ public class ContainerBalancer extends StatefulService {
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, IOException,
-      TimeoutException {
+      InvalidContainerBalancerConfigurationException, IOException {
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -258,7 +260,7 @@ public class ContainerBalancer extends StatefulService {
       this.config = configuration;
 
       //start balancing task
-      startBalancingThread(0);
+      startBalancingThread(0, false);
     } finally {
       lock.unlock();
     }
@@ -267,14 +269,16 @@ public class ContainerBalancer extends StatefulService {
   /**
    * Starts a new balancing thread asynchronously.
    */
-  private void startBalancingThread(int nextIterationIndex) {
+  private void startBalancingThread(int nextIterationIndex,
+      boolean delayStart) {
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
-        config);
-    currentBalancingThread = new Thread(task);
-    currentBalancingThread.setName("ContainerBalancerTask");
-    currentBalancingThread.setDaemon(true);
-    currentBalancingThread.start();
-    LOG.info("Starting Container Balancer... {}", this);
+        config, delayStart);
+    Thread thread = new Thread(task);
+    thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
+    thread.setDaemon(true);
+    thread.start();
+    currentBalancingThread = thread;
+    LOG.info("Starting Container Balancer {}... {}", thread, this);
   }
 
   /**
@@ -323,6 +327,7 @@ public class ContainerBalancer extends StatefulService {
             "stopping");
         return;
       }
+      LOG.info("Trying to stop ContainerBalancer in this SCM.");
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -337,6 +342,7 @@ public class ContainerBalancer extends StatefulService {
     // to avoid locking others waiting
     // wait for balancingThread to die with interrupt
     balancingThread.interrupt();
+    LOG.info("Container Balancer waiting for {} to stop", balancingThread);
     try {
       balancingThread.join();
     } catch (InterruptedException exception) {
@@ -351,13 +357,13 @@ public class ContainerBalancer extends StatefulService {
    * "stop" command.
    */
   public void stopBalancer()
-      throws IOException, IllegalContainerBalancerStateException,
-      TimeoutException {
+      throws IOException, IllegalContainerBalancerStateException {
     Thread balancingThread;
     lock.lock();
     try {
       validateState(true);
       saveConfiguration(config, false, 0);
+      LOG.info("Trying to stop ContainerBalancer service.");
       task.stop();
       balancingThread = currentBalancingThread;
     } finally {
@@ -368,7 +374,7 @@ public class ContainerBalancer extends StatefulService {
 
   public void saveConfiguration(ContainerBalancerConfiguration configuration,
                                 boolean shouldRun, int index)
-      throws IOException, TimeoutException {
+      throws IOException {
     config = configuration;
     saveConfiguration(configuration.toProtobufBuilder()
         .setShouldRun(shouldRun)
@@ -407,7 +413,19 @@ public class ContainerBalancer extends StatefulService {
     if (conf.getBalancingInterval().toMillis() <= refreshPeriod) {
       LOG.warn("hdds.container.balancer.balancing.iteration.interval {} " +
               "should be greater than hdds.datanode.du.refresh.period {}",
-          conf.getBalancingInterval(), refreshPeriod);
+          conf.getBalancingInterval().toMillis(), refreshPeriod);
+    }
+
+    // "move.replication.timeout" should be lesser than "move.timeout"
+    if (conf.getMoveReplicationTimeout().toMillis() >=
+        conf.getMoveTimeout().toMillis()) {
+      LOG.warn("hdds.container.balancer.move.replication.timeout {} should " +
+              "be less than hdds.container.balancer.move.timeout {}.",
+          conf.getMoveReplicationTimeout().toMinutes(),
+          conf.getMoveTimeout().toMinutes());
+      throw new InvalidContainerBalancerConfigurationException(
+          "hdds.container.balancer.move.replication.timeout should " +
+          "be less than hdds.container.balancer.move.timeout.");
     }
   }
 
@@ -415,11 +433,16 @@ public class ContainerBalancer extends StatefulService {
     return metrics;
   }
 
+  @VisibleForTesting
+  Thread getCurrentBalancingThread() {
+    return currentBalancingThread;
+  }
+
   @Override
   public String toString() {
     String status = String.format("%nContainer Balancer status:%n" +
         "%-30s %s%n" +
-        "%-30s %b%n", "Key", "Value", "Running", getBalancerStatus());
+        "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
   }
 }

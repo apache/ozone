@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +42,10 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +55,26 @@ import com.google.common.base.Preconditions;
  * Represents a group of datanodes which store a container.
  */
 public final class Pipeline {
+  /**
+   * This codec is inconsistent since
+   * deserialize(serialize(original)) does not equal to original
+   * -- the creation time may change.
+   */
+  private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(HddsProtos.Pipeline.class),
+      Pipeline::getFromProtobufSetCreationTimestamp,
+      p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      DelegatedCodec.CopyType.UNSUPPORTED);
+
+  public static Codec<Pipeline> getCodec() {
+    return CODEC;
+  }
 
   private static final Logger LOG = LoggerFactory.getLogger(Pipeline.class);
   private final PipelineID id;
   private final ReplicationConfig replicationConfig;
 
-  private PipelineState state;
+  private final PipelineState state;
   private Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
@@ -153,6 +172,11 @@ public final class Pipeline {
     this.leaderId = leaderId;
   }
 
+  /** @return the number of datanodes in this pipeline. */
+  public int size() {
+    return nodeStatus.size();
+  }
+
   /**
    * Returns the list of nodes which form this pipeline.
    *
@@ -216,18 +240,46 @@ public final class Pipeline {
   }
 
   public DatanodeDetails getFirstNode() throws IOException {
+    return getFirstNode(null);
+  }
+
+  public DatanodeDetails getFirstNode(Set<DatanodeDetails> excluded)
+      throws IOException {
+    if (excluded == null) {
+      excluded = Collections.emptySet();
+    }
     if (nodeStatus.isEmpty()) {
       throw new IOException(String.format("Pipeline=%s is empty", id));
     }
-    return nodeStatus.keySet().iterator().next();
+    for (DatanodeDetails d : nodeStatus.keySet()) {
+      if (!excluded.contains(d)) {
+        return d;
+      }
+    }
+    throw new IOException(String.format(
+        "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
   public DatanodeDetails getClosestNode() throws IOException {
+    return getClosestNode(null);
+  }
+
+  public DatanodeDetails getClosestNode(Set<DatanodeDetails> excluded)
+      throws IOException {
+    if (excluded == null) {
+      excluded = Collections.emptySet();
+    }
     if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
-      return getFirstNode();
+      return getFirstNode(excluded);
     }
-    return nodesInOrder.get().get(0);
+    for (DatanodeDetails d : nodesInOrder.get()) {
+      if (!excluded.contains(d)) {
+        return d;
+      }
+    }
+    throw new IOException(String.format(
+        "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
   public boolean isClosed() {
@@ -348,6 +400,14 @@ public final class Pipeline {
     return builder.build();
   }
 
+  static Pipeline getFromProtobufSetCreationTimestamp(
+      HddsProtos.Pipeline proto) throws UnknownPipelineStateException {
+    final Pipeline pipeline = getFromProtobuf(proto);
+    // When SCM is restarted, set Creation time with current time.
+    pipeline.setCreationTimestamp(Instant.now());
+    return pipeline;
+  }
+
   public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
@@ -408,7 +468,7 @@ public final class Pipeline {
     return new EqualsBuilder()
         .append(id, that.id)
         .append(replicationConfig, that.replicationConfig)
-        .append(getNodes(), that.getNodes())
+        .append(nodeStatus.keySet(), that.nodeStatus.keySet())
         .isEquals();
   }
 
@@ -508,6 +568,12 @@ public final class Pipeline {
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
+      if (nodesInOrder != null) {
+        // nodesInOrder may belong to another pipeline, avoid overwriting it
+        nodesInOrder = new LinkedList<>(nodesInOrder);
+        // drop nodes no longer part of the pipeline
+        nodesInOrder.retainAll(nodes);
+      }
       return this;
     }
 

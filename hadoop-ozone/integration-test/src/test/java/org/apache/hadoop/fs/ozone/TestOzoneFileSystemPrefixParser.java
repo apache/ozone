@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.debug.PrefixParser;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -69,8 +70,10 @@ public class TestOzoneFileSystemPrefixParser {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    try (OzoneClient client = cluster.newClient()) {
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    }
 
     String rootPath = String
         .format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,

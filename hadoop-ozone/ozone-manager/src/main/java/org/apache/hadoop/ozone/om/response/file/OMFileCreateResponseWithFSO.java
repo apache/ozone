@@ -87,6 +87,12 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
         omMetadataMgr.getDirectoryTable().putWithBatch(batchOp, parentKey,
                 parentDirInfo);
       }
+
+      String bucketKey = omMetadataMgr.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataMgr.getBucketTable().putWithBatch(batchOp,
+          bucketKey, getOmBucketInfo());
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),

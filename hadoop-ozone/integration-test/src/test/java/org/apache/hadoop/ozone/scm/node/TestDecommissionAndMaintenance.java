@@ -36,10 +36,12 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneClusterProvider;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -91,7 +93,7 @@ public class TestDecommissionAndMaintenance {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDecommissionAndMaintenance.class);
 
-  private static int numOfDatanodes = 7;
+  private static final int DATANODE_COUNT = 7;
   private static String bucketName = "bucket1";
   private static String volName = "vol1";
   private static RatisReplicationConfig ratisRepConfig =
@@ -105,6 +107,7 @@ public class TestDecommissionAndMaintenance {
   private PipelineManager pm;
   private StorageContainerManager scm;
 
+  private OzoneClient client;
   private ContainerOperationClient scmClient;
 
   private static MiniOzoneClusterProvider clusterProvider;
@@ -126,8 +129,6 @@ public class TestDecommissionAndMaintenance {
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         1, SECONDS);
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT,
-        10, SECONDS);
     conf.setTimeDuration(
         ScmConfigKeys.OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL,
         1, SECONDS);
@@ -142,7 +143,7 @@ public class TestDecommissionAndMaintenance {
     conf.setFromObject(replicationConf);
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes);
+        .setNumDatanodes(DATANODE_COUNT);
 
     clusterProvider = new MiniOzoneClusterProvider(conf, builder, 7);
   }
@@ -158,12 +159,15 @@ public class TestDecommissionAndMaintenance {
   public void setUp() throws Exception {
     cluster = clusterProvider.provide();
     setManagers();
-    bucket = TestDataUtil.createVolumeAndBucket(cluster, volName, bucketName);
+    client = cluster.newClient();
+    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
     scmClient = new ContainerOperationClient(cluster.getConf());
   }
 
   @AfterEach
   public void tearDown() throws InterruptedException, IOException {
+    IOUtils.close(LOG, client);
+    IOUtils.close(LOG, scmClient);
     if (cluster != null) {
       clusterProvider.destroy(cluster);
     }
@@ -582,8 +586,9 @@ public class TestDecommissionAndMaintenance {
     cluster.restartStorageContainerManager(false);
     setManagers();
 
-    GenericTestUtils.waitFor(()
-        -> nm.getNodeCount(IN_SERVICE, null) == 5, 200, 30000);
+    GenericTestUtils.waitFor(
+        () -> nm.getNodeCount(IN_SERVICE, null) == DATANODE_COUNT - 1,
+        200, 30000);
 
     // Ensure there are 3 replicas not including the dead node, indicating a new
     // replica was created

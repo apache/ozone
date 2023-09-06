@@ -26,19 +26,27 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
-import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.Preconditions;
+
+import static java.util.Collections.emptyList;
 
 /**
  * This class creates and manages pool of n buffers.
  */
 public class BufferPool {
 
-  private List<ChunkBuffer> bufferList;
+  private static final BufferPool EMPTY = new BufferPool(0, 0);
+
+  private final List<ChunkBuffer> bufferList;
   private int currentBufferIndex;
   private final int bufferSize;
   private final int capacity;
   private final Function<ByteBuffer, ByteString> byteStringConversion;
+
+  public static BufferPool empty() {
+    return EMPTY;
+  }
 
   public BufferPool(int bufferSize, int capacity) {
     this(bufferSize, capacity,
@@ -49,7 +57,7 @@ public class BufferPool {
       Function<ByteBuffer, ByteString> byteStringConversion) {
     this.capacity = capacity;
     this.bufferSize = bufferSize;
-    bufferList = new ArrayList<>(capacity);
+    bufferList = capacity == 0 ? emptyList() : new ArrayList<>(capacity);
     currentBufferIndex = -1;
     this.byteStringConversion = byteStringConversion;
   }
@@ -72,26 +80,33 @@ public class BufferPool {
    * chunk size.
    */
   public ChunkBuffer allocateBuffer(int increment) {
-    currentBufferIndex++;
-    Preconditions.checkArgument(currentBufferIndex <= capacity - 1);
+    final int nextBufferIndex = currentBufferIndex + 1;
+
+    Preconditions.assertTrue(nextBufferIndex < capacity, () ->
+        "next index: " + nextBufferIndex + " >= capacity: " + capacity);
+
+    currentBufferIndex = nextBufferIndex;
+
     if (currentBufferIndex < bufferList.size()) {
       return getBuffer(currentBufferIndex);
     } else {
       final ChunkBuffer newBuffer = ChunkBuffer.allocate(bufferSize, increment);
       bufferList.add(newBuffer);
-      Preconditions.checkArgument(bufferList.size() <= capacity);
       return newBuffer;
     }
   }
 
   void releaseBuffer(ChunkBuffer chunkBuffer) {
+    Preconditions.assertTrue(!bufferList.isEmpty(), "empty buffer list");
+    Preconditions.assertSame(bufferList.get(0), chunkBuffer,
+        "only the first buffer can be released");
+    Preconditions.assertTrue(currentBufferIndex >= 0,
+        () -> "current buffer: " + currentBufferIndex);
+
     // always remove from head of the list and append at last
     final ChunkBuffer buffer = bufferList.remove(0);
-    // Ensure the buffer to be removed is always at the head of the list.
-    Preconditions.checkArgument(buffer == chunkBuffer);
     buffer.clear();
     bufferList.add(buffer);
-    Preconditions.checkArgument(currentBufferIndex >= 0);
     currentBufferIndex--;
   }
 
@@ -101,7 +116,7 @@ public class BufferPool {
   }
 
   public void checkBufferPoolEmpty() {
-    Preconditions.checkArgument(computeBufferData() == 0);
+    Preconditions.assertSame(0, computeBufferData(), "total buffer size");
   }
 
   public long computeBufferData() {
@@ -130,5 +145,9 @@ public class BufferPool {
 
   public int getCapacity() {
     return capacity;
+  }
+
+  public int getBufferSize() {
+    return bufferSize;
   }
 }

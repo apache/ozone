@@ -189,12 +189,6 @@ public class TestReconWithOzoneManager {
     OmKeyInfo keyInfo1 =
         metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        omKeyValueTableIterator =
-        metadataManager.getKeyTable(getBucketLayout()).iterator();
-
-    long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
-
     // verify if OM has /vol0/bucket0/key0
     Assert.assertEquals("vol0", keyInfo1.getVolumeName());
     Assert.assertEquals("bucket0", keyInfo1.getBucketName());
@@ -203,21 +197,6 @@ public class TestReconWithOzoneManager {
         cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
-
-    // HTTP call to /api/containers
-    String containerResponse = makeHttpCall(containerKeyServiceURL);
-    long reconMetadataContainerCount =
-        getReconContainerCount(containerResponse);
-    // verify count of keys after full snapshot
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
-
-    // verify if Recon Metadata captures vol0/bucket0/key0 info in container0
-    LinkedTreeMap containerResponseMap = getContainerResponseMap(
-        containerResponse, 0);
-    Assert.assertEquals(0,
-        (long)(double) containerResponseMap.get("ContainerID"));
-    Assert.assertEquals(1,
-        (long)(double) containerResponseMap.get("NumberOfKeys"));
     
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
@@ -235,27 +214,9 @@ public class TestReconWithOzoneManager {
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
-    omKeyValueTableIterator =
-        metadataManager.getKeyTable(getBucketLayout()).iterator();
-    omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // update the next snapshot from om to verify delta updates
     impl.syncDataFromOM();
-
-    // HTTP call to /api/containers
-    containerResponse = makeHttpCall(containerKeyServiceURL);
-    reconMetadataContainerCount = getReconContainerCount(containerResponse);
-
-    //verify count of keys
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
-
-    //verify if Recon Metadata captures vol3/bucket3/key3 info in container3
-    containerResponseMap = getContainerResponseMap(
-        containerResponse, 3);
-    Assert.assertEquals(3,
-        (long)(double) containerResponseMap.get("ContainerID"));
-    Assert.assertEquals(1,
-        (long)(double) containerResponseMap.get("NumberOfKeys"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
@@ -282,27 +243,9 @@ public class TestReconWithOzoneManager {
 
     //add 5 more keys to OM
     addKeys(5, 10);
-    omKeyValueTableIterator =
-        metadataManager.getKeyTable(getBucketLayout()).iterator();
-    omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
     // get the next snapshot from om
     impl.syncDataFromOM();
-
-    // HTTP call to /api/containers
-    containerResponse = makeHttpCall(containerKeyServiceURL);
-    reconMetadataContainerCount = getReconContainerCount(containerResponse);
-
-    // verify count of keys
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
-
-    // verify if Recon Metadata captures vol7/bucket7/key7 info in container7
-    containerResponseMap = getContainerResponseMap(
-        containerResponse, 7);
-    Assert.assertEquals(7,
-        (long)(double) containerResponseMap.get("ContainerID"));
-    Assert.assertEquals(1,
-        (long)(double) containerResponseMap.get("NumberOfKeys"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())

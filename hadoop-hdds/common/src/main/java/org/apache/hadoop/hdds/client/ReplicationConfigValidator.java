@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -33,46 +33,50 @@ import java.util.regex.Pattern;
 public class ReplicationConfigValidator {
 
   @Config(key = "allowed-configs",
-      defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4))$",
+      defaultValue = "^((STANDALONE|RATIS)/(ONE|THREE))|"
+          + "(EC/(3-2|6-3|10-4)-(512|1024|2048|4096)k)"
+          + "$",
       type = ConfigType.STRING,
       description = "Regular expression to restrict enabled " +
           "replication schemes",
       tags = ConfigTag.STORAGE)
   private String validationPattern;
 
-  private Pattern validationRegexp;
+  private Pattern compiledValidationPattern;
+
+  public void disableValidation() {
+    setValidationPattern("");
+  }
+
+  public void setValidationPattern(String pattern) {
+    if (!Objects.equals(pattern, validationPattern)) {
+      validationPattern = pattern;
+      compilePattern();
+    }
+  }
 
   @PostConstruct
   public void init() {
+    compilePattern();
+  }
+
+  private void compilePattern() {
     if (validationPattern != null && !validationPattern.equals("")) {
-      validationRegexp = Pattern.compile(validationPattern);
+      compiledValidationPattern = Pattern.compile(validationPattern);
+    } else {
+      compiledValidationPattern = null;
     }
   }
 
   public ReplicationConfig validate(ReplicationConfig replicationConfig) {
-    if (validationRegexp == null) {
+    if (compiledValidationPattern == null) {
       return replicationConfig;
     }
-    if (!validationRegexp.matcher(
-            replicationConfig.configFormat()).matches()) {
-      String replication = replicationConfig.getReplication();
-      if (HddsProtos.ReplicationType.EC ==
-                replicationConfig.getReplicationType()) {
-        ECReplicationConfig ecConfig =
-              (ECReplicationConfig) replicationConfig;
-        replication =  ecConfig.getCodec() + "-" + ecConfig.getData() +
-                "-" + ecConfig.getParity() + "-{CHUNK_SIZE}";
-        //EC type checks data-parity
-        throw new IllegalArgumentException(
-                "Invalid data-parity replication config " +
-                        "for type " + replicationConfig.getReplicationType() +
-                        " and replication " + replication + "." +
-                        " Supported data-parity are 3-2,6-3,10-4");
-      }
-      //Non-EC type
+    String input = replicationConfig.configFormat();
+    if (!compiledValidationPattern.matcher(input).matches()) {
       throw new IllegalArgumentException("Invalid replication config " +
-              "for type " + replicationConfig.getReplicationType() +
-              " and replication " + replication);
+          input + ". Config must match the pattern defined by " +
+          "ozone.replication.allowed-configs (" + validationPattern + ")");
     }
     return replicationConfig;
   }

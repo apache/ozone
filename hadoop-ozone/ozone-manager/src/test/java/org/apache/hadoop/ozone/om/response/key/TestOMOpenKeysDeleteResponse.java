@@ -109,19 +109,26 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
 
     createAndCommitResponse(keysToDelete, Status.OK);
 
-    for (String key: keysToDelete.keySet()) {
+    for (Map.Entry<String, OmKeyInfo> entry: keysToDelete.entrySet()) {
       // These keys should have been moved from the open key table to the
       // delete table.
       Assert.assertFalse(
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(key));
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
+              entry.getKey()));
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          entry.getValue().getObjectID(), entry.getKey());
+      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(deleteKey));
     }
 
-    for (String key: keysToKeep.keySet()) {
+    for (Map.Entry<String, OmKeyInfo> entry: keysToKeep.entrySet()) {
       // These keys should not have been moved out of the open key table.
       Assert.assertTrue(
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
+          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
+              entry.getKey()));
+      String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+          entry.getValue().getObjectID(), entry.getKey());
+      Assert.assertFalse(omMetadataManager.getDeletedTable()
+          .isExist(deleteKey));
     }
   }
 

@@ -22,41 +22,49 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import org.apache.commons.fileupload.FileItemIterator;
+import org.apache.commons.fileupload.FileItemStream;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.fileupload.util.Streams;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar.gz)
+ * Provides the current checkpoint Snapshot of the OM/SCM DB. (tar)
  */
-public class DBCheckpointServlet extends HttpServlet {
+public class DBCheckpointServlet extends HttpServlet
+    implements BootstrapStateHandler {
 
+  private static final String FIELD_NAME =
+      OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]";
   private static final Logger LOG =
       LoggerFactory.getLogger(DBCheckpointServlet.class);
   private static final long serialVersionUID = 1L;
@@ -67,6 +75,8 @@ public class DBCheckpointServlet extends HttpServlet {
   private boolean aclEnabled;
   private boolean isSpnegoEnabled;
   private transient OzoneAdmins admins;
+  private transient BootstrapStateHandler.Lock lock;
+  private transient File bootstrapTempData;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -80,11 +90,29 @@ public class DBCheckpointServlet extends HttpServlet {
     if (dbStore == null) {
       LOG.error(
           "Unable to set metadata snapshot request. DB Store is null");
+      throw new ServletException("DB Store is null");
     }
 
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
+    lock = new Lock();
+
+    // Create a directory for temp bootstrap data
+    File dbLocation = dbStore.getDbLocation();
+    if (dbLocation == null) {
+      throw new NullPointerException("dblocation null");
+    }
+    String tempData = dbLocation.getParent();
+    if (tempData == null) {
+      throw new NullPointerException("tempData dir is null");
+    }
+    bootstrapTempData = Paths.get(tempData,
+        "temp-bootstrap-data").toFile();
+    if (!bootstrapTempData.exists() &&
+        !bootstrapTempData.mkdirs()) {
+      throw new ServletException("Failed to make:" + bootstrapTempData);
+    }
   }
 
   private boolean hasPermission(UserGroupInformation user) {
@@ -98,15 +126,13 @@ public class DBCheckpointServlet extends HttpServlet {
   }
 
   /**
-   * Process a GET request for the DB checkpoint snapshot.
-   *
-   * @param request  The servlet request we are processing
-   * @param response The servlet response we are creating
+   * Generates Snapshot checkpoint as tar ball.
+   * @param request the HTTP servlet request
+   * @param response the HTTP servlet response
+   * @param isFormData indicator whether request is form data
    */
-  @Override
-  public void doGet(HttpServletRequest request, HttpServletResponse response) {
-
-    LOG.info("Received request to obtain DB checkpoint snapshot");
+  private void generateSnapshotCheckpoint(HttpServletRequest request,
+      HttpServletResponse response, boolean isFormData) {
     if (dbStore == null) {
       LOG.error(
           "Unable to process metadata snapshot request. DB Store is null");
@@ -145,16 +171,33 @@ public class DBCheckpointServlet extends HttpServlet {
     }
 
     DBCheckpoint checkpoint = null;
-    try {
 
-      boolean flush = false;
-      String flushParam =
-          request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
-      if (StringUtils.isNotEmpty(flushParam)) {
-        flush = Boolean.valueOf(flushParam);
-      }
+    boolean flush = false;
+    String flushParam =
+        request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
+    if (StringUtils.isNotEmpty(flushParam)) {
+      flush = Boolean.parseBoolean(flushParam);
+    }
 
-      checkpoint = dbStore.getCheckpoint(flush);
+    List<String> receivedSstList = new ArrayList<>();
+    List<String> excludedSstList = new ArrayList<>();
+    String[] sstParam = isFormData ?
+        parseFormDataParameters(request) : request.getParameterValues(
+        OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
+    if (sstParam != null) {
+      receivedSstList.addAll(
+          Arrays.stream(sstParam)
+              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct()
+              .collect(Collectors.toList()));
+      LOG.info("Received excluding SST {}", receivedSstList);
+    }
+
+    Path tmpdir = null;
+    try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
+      tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
+          "bootstrap-data-");
+      checkpoint = getCheckpoint(tmpdir, flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
             "Checkpoint request returned null.");
@@ -168,19 +211,27 @@ public class DBCheckpointServlet extends HttpServlet {
       if (file == null) {
         return;
       }
-      response.setContentType("application/x-tgz");
+      response.setContentType("application/x-tar");
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
-               file.toString() + ".tgz\"");
+               file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDBCheckpointToStream(checkpoint,
-          response.getOutputStream());
+      writeDbDataToStream(checkpoint, request,
+          response.getOutputStream(), receivedSstList, excludedSstList, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
+
+      LOG.info("Excluded SST {} from the latest checkpoint.",
+          excludedSstList);
+      if (!excludedSstList.isEmpty()) {
+        dbMetrics.incNumIncrementalCheckpoint();
+      }
+      dbMetrics.setLastCheckpointStreamingNumSSTExcluded(
+          excludedSstList.size());
       dbMetrics.setLastCheckpointStreamingTimeTaken(duration);
       dbMetrics.incNumCheckpoints();
     } catch (Exception e) {
@@ -189,6 +240,14 @@ public class DBCheckpointServlet extends HttpServlet {
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       dbMetrics.incNumCheckpointFails();
     } finally {
+      try {
+        if (tmpdir != null) {
+          FileUtils.deleteDirectory(tmpdir.toFile());
+        }
+      } catch (IOException e) {
+        LOG.error("unable to delete: " + tmpdir);
+      }
+
       if (checkpoint != null) {
         try {
           checkpoint.cleanupCheckpoint();
@@ -200,53 +259,116 @@ public class DBCheckpointServlet extends HttpServlet {
     }
   }
 
-  /**
-   * Write DB Checkpoint to an output stream as a compressed file (tgz).
-   *
-   * @param checkpoint  checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
-   */
-  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
-      OutputStream destination)
+  public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
       throws IOException {
-
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-          new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
-          }
-        }
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
-    }
+    return dbStore.getCheckpoint(flush);
   }
 
-  private static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
+  /**
+   * Parses request form data parameters.
+   * @param request the HTTP servlet request
+   * @return array of parsed sst form data parameters for exclusion
+   */
+  private static String[] parseFormDataParameters(HttpServletRequest request) {
+    ServletFileUpload upload = new ServletFileUpload();
+    List<String> sstParam = new ArrayList<>();
+
+    try {
+      FileItemIterator iter = upload.getItemIterator(request);
+      while (iter.hasNext()) {
+        FileItemStream item = iter.next();
+        if (!item.isFormField() || !FIELD_NAME.equals(item.getFieldName())) {
+          continue;
+        }
+
+        sstParam.add(Streams.asString(item.openStream()));
+      }
+    } catch (Exception e) {
+      LOG.warn("Exception occured during form data parsing {}", e.getMessage());
     }
-    archiveOutputStream.closeArchiveEntry();
+
+    return sstParam.size() == 0 ? null : sstParam.toArray(new String[0]);
+  }
+
+  /**
+   * Process a GET request for the DB checkpoint snapshot.
+   *
+   * @param request  The servlet request we are processing
+   * @param response The servlet response we are creating
+   */
+  @Override
+  public void doGet(HttpServletRequest request, HttpServletResponse response) {
+    LOG.info("Received GET request to obtain DB checkpoint snapshot");
+
+    generateSnapshotCheckpoint(request, response, false);
+  }
+
+  /**
+   * Process a POST request for the DB checkpoint snapshot.
+   *
+   * @param request  The servlet request we are processing
+   * @param response The servlet response we are creating
+   */
+  @Override
+  public void doPost(HttpServletRequest request, HttpServletResponse response) {
+    LOG.info("Received POST request to obtain DB checkpoint snapshot");
+
+    if (!ServletFileUpload.isMultipartContent(request)) {
+      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      return;
+    }
+
+    generateSnapshotCheckpoint(request, response, true);
+  }
+
+  /**
+   * Write checkpoint to the stream.
+   *
+   * @param checkpoint The checkpoint to be written.
+   * @param ignoredRequest The httpRequest which generated this checkpoint.
+   *        (Parameter is ignored in this class but used in child classes).
+   * @param destination The stream to write to.
+   * @param toExcludeList the files to be excluded
+   * @param excludedList  the files excluded
+   *
+   */
+  public void writeDbDataToStream(DBCheckpoint checkpoint,
+      HttpServletRequest ignoredRequest,
+      OutputStream destination,
+      List<String> toExcludeList,
+      List<String> excludedList, Path tmpdir)
+      throws IOException, InterruptedException {
+    Objects.requireNonNull(toExcludeList);
+    Objects.requireNonNull(excludedList);
+
+    writeDBCheckpointToStream(checkpoint, destination,
+        toExcludeList, excludedList);
+  }
+
+  public DBStore getDbStore() {
+    return dbStore;
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
+  }
+
+  /**
+   * This lock is a no-op but can overridden by child classes.
+   */
+  public static class Lock extends BootstrapStateHandler.Lock {
+    public Lock() {
+    }
+
+    @Override
+    public BootstrapStateHandler.Lock lock()
+        throws InterruptedException {
+      return this;
+    }
+
+    @Override
+    public void unlock() {
+    }
   }
 }

@@ -42,13 +42,17 @@ public class HDDSLayoutVersionManager extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HDDSLayoutVersionManager.class);
-  private static final String[] HDDS_CLASS_UPGRADE_PACKAGES = new String[]{
+  private static final Object[] HDDS_CLASS_UPGRADE_PACKAGES = new Object[] {
       "org.apache.hadoop.hdds.scm.server",
-      "org.apache.hadoop.ozone.container"};
+      "org.apache.hadoop.ozone.container",
+  };
+
+  private static final Reflections HDDS_UPGRADE_REFLECTIONS =
+      new Reflections(HDDS_CLASS_UPGRADE_PACKAGES);
 
   public HDDSLayoutVersionManager(int layoutVersion) throws IOException {
     init(layoutVersion, HDDSLayoutFeature.values());
-    registerUpgradeActions(HDDS_CLASS_UPGRADE_PACKAGES);
+    registerUpgradeActions(getAnnotatedTypes(HDDS_UPGRADE_REFLECTIONS));
   }
 
   public static int maxLayoutVersion() {
@@ -56,14 +60,19 @@ public class HDDSLayoutVersionManager extends
     return features[features.length - 1].layoutVersion();
   }
 
+  @VisibleForTesting
+  void registerUpgradeActions(Object... classNames) {
+    registerUpgradeActions(getAnnotatedTypes(new Reflections(classNames)));
+  }
+
+  private static Set<Class<?>> getAnnotatedTypes(Reflections reflections) {
+    return reflections.getTypesAnnotatedWith(UpgradeActionHdds.class);
+  }
+
   /**
    * Scan classpath and register all actions to layout features.
    */
-  @VisibleForTesting
-  void registerUpgradeActions(String[] packageNames) {
-    Reflections reflections = new Reflections(packageNames);
-    Set<Class<?>> typesAnnotatedWith =
-        reflections.getTypesAnnotatedWith(UpgradeActionHdds.class);
+  private void registerUpgradeActions(Set<Class<?>> typesAnnotatedWith) {
     typesAnnotatedWith.forEach(actionClass -> {
       if (HDDSUpgradeAction.class.isAssignableFrom(actionClass)) {
         try {

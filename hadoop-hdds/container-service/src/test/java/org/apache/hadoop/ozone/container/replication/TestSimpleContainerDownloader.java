@@ -18,46 +18,52 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Timeout;
+import org.junit.rules.TemporaryFolder;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test SimpleContainerDownloader.
  */
 public class TestSimpleContainerDownloader {
 
-  private static final String SUCCESS_PATH = "downloaded";
+  @Rule
+  public final TemporaryFolder tempDir = new TemporaryFolder();
 
   @Test
   public void testGetContainerDataFromReplicasHappyPath() throws Exception {
 
     //GIVEN
     List<DatanodeDetails> datanodes = createDatanodes();
-
-    SimpleContainerDownloader downloader =
-        createDownloaderWithPredefinedFailures(true);
+    TestingContainerDownloader downloader =
+        TestingContainerDownloader.successful();
 
     //WHEN
-    final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+    Path result = downloader.getContainerDataFromReplicas(1L, datanodes,
+        tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     Assertions.assertEquals(datanodes.get(0).getUuidString(),
         result.toString());
+    downloader.verifyAllClientsClosed();
   }
 
   @Test
@@ -67,17 +73,19 @@ public class TestSimpleContainerDownloader {
     //GIVEN
     List<DatanodeDetails> datanodes = createDatanodes();
 
-    SimpleContainerDownloader downloader =
-        createDownloaderWithPredefinedFailures(true, datanodes.get(0));
+    TestingContainerDownloader downloader =
+        TestingContainerDownloader.immediateFailureFor(datanodes.get(0));
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
     Assertions.assertEquals(datanodes.get(1).getUuidString(),
         result.toString());
+    downloader.verifyAllClientsClosed();
   }
 
   @Test
@@ -86,17 +94,19 @@ public class TestSimpleContainerDownloader {
     //GIVEN
     List<DatanodeDetails> datanodes = createDatanodes();
 
-    SimpleContainerDownloader downloader =
-        createDownloaderWithPredefinedFailures(false, datanodes.get(0));
+    TestingContainerDownloader downloader =
+        TestingContainerDownloader.delayedFailureFor(datanodes.get(0));
 
     //WHEN
     final Path result =
-        downloader.getContainerDataFromReplicas(1L, datanodes);
+        downloader.getContainerDataFromReplicas(1L, datanodes,
+            tempDir.newFolder().toPath(), NO_COMPRESSION);
 
     //THEN
     //first datanode is failed, second worked
     Assertions.assertEquals(datanodes.get(1).getUuidString(),
         result.toString());
+    downloader.verifyAllClientsClosed();
   }
 
   /**
@@ -104,29 +114,19 @@ public class TestSimpleContainerDownloader {
    */
   @Test
   @Timeout(10)
-  public void testRandomSelection()
-      throws ExecutionException, InterruptedException {
+  public void testRandomSelection() throws Exception {
 
     //GIVEN
     final List<DatanodeDetails> datanodes = createDatanodes();
 
-    SimpleContainerDownloader downloader =
-        new SimpleContainerDownloader(new OzoneConfiguration(), null) {
-
-          @Override
-          protected CompletableFuture<Path> downloadContainer(
-              long containerId, DatanodeDetails datanode
-          ) {
-            //download is always successful.
-            return CompletableFuture
-                .completedFuture(Paths.get(datanode.getUuidString()));
-          }
-        };
+    TestingContainerDownloader downloader =
+        TestingContainerDownloader.randomOrder();
 
     //WHEN executed, THEN at least once the second datanode should be
     //returned.
     for (int i = 0; i < 10000; i++) {
-      Path path = downloader.getContainerDataFromReplicas(1L, datanodes);
+      Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
+          tempDir.newFolder().toPath(), NO_COMPRESSION);
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
@@ -136,58 +136,7 @@ public class TestSimpleContainerDownloader {
     Assertions.fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
-  }
-
-  /**
-   * Creates downloader which fails with datanodes in the arguments.
-   *
-   * @param directException if false the exception will be wrapped in the
-   *                        returning future.
-   */
-  private SimpleContainerDownloader createDownloaderWithPredefinedFailures(
-      boolean directException,
-      DatanodeDetails... failedDatanodes
-  ) {
-
-    ConfigurationSource conf = new OzoneConfiguration();
-
-    final List<DatanodeDetails> datanodes =
-        Arrays.asList(failedDatanodes);
-
-    return new SimpleContainerDownloader(conf, null) {
-
-      //for retry testing we use predictable list of datanodes.
-      @Override
-      protected List<DatanodeDetails> shuffleDatanodes(
-          List<DatanodeDetails> sourceDatanodes
-      ) {
-        //turn off randomization
-        return sourceDatanodes;
-      }
-
-      @Override
-      protected CompletableFuture<Path> downloadContainer(
-          long containerId,
-          DatanodeDetails datanode
-      ) {
-
-        if (datanodes.contains(datanode)) {
-          if (directException) {
-            throw new RuntimeException("Unavailable datanode");
-          } else {
-            return CompletableFuture.supplyAsync(() -> {
-              throw new RuntimeException("Unavailable datanode");
-            });
-          }
-        } else {
-
-          //path includes the dn id to make it possible to assert.
-          return CompletableFuture.completedFuture(
-              Paths.get(datanode.getUuidString()));
-        }
-
-      }
-    };
+    downloader.verifyAllClientsClosed();
   }
 
   private List<DatanodeDetails> createDatanodes() {
@@ -196,5 +145,98 @@ public class TestSimpleContainerDownloader {
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     return datanodes;
+  }
+
+  private static final class TestingContainerDownloader
+      extends SimpleContainerDownloader {
+
+    private final List<DatanodeDetails> failedDatanodes;
+    private final boolean disableShuffle;
+    private final boolean directException;
+    private final List<GrpcReplicationClient> clients = new LinkedList<>();
+
+    private final AtomicReference<DatanodeDetails> datanodeRef =
+        new AtomicReference<>();
+
+    static TestingContainerDownloader randomOrder() {
+      return new TestingContainerDownloader(false, false);
+    }
+
+    static TestingContainerDownloader successful() {
+      return new TestingContainerDownloader(true, false);
+    }
+
+    static TestingContainerDownloader immediateFailureFor(
+        DatanodeDetails... failedDatanodes) {
+      return new TestingContainerDownloader(true, true, failedDatanodes);
+    }
+
+    static TestingContainerDownloader delayedFailureFor(
+        DatanodeDetails... failedDatanodes) {
+      return new TestingContainerDownloader(true, false, failedDatanodes);
+    }
+
+    /**
+     * Creates downloader which fails with datanodes in the arguments.
+     *
+     * @param directException if false the exception will be wrapped in the
+     *                        returning future.
+     */
+    private TestingContainerDownloader(
+        boolean disableShuffle, boolean directException,
+        DatanodeDetails... failedDatanodes) {
+      super(new OzoneConfiguration(), null);
+      this.disableShuffle = disableShuffle;
+      this.directException = directException;
+      this.failedDatanodes = Arrays.asList(failedDatanodes);
+    }
+
+    @Override
+    protected List<DatanodeDetails> shuffleDatanodes(
+        List<DatanodeDetails> sourceDatanodes
+    ) {
+      return disableShuffle ? sourceDatanodes //turn off randomization
+          : super.shuffleDatanodes(sourceDatanodes);
+    }
+
+    @Override
+    protected GrpcReplicationClient createReplicationClient(
+        DatanodeDetails datanode, CopyContainerCompression compression) {
+      datanodeRef.set(datanode);
+      GrpcReplicationClient client = mock(GrpcReplicationClient.class);
+      clients.add(client);
+      return client;
+    }
+
+    @Override
+    protected CompletableFuture<Path> downloadContainer(
+        GrpcReplicationClient client,
+        long containerId, Path downloadPath) {
+
+      DatanodeDetails datanode = datanodeRef.get();
+      Assertions.assertNotNull(datanode);
+
+      if (failedDatanodes.contains(datanode)) {
+        if (directException) {
+          throw new RuntimeException("Unavailable datanode");
+        } else {
+          return CompletableFuture.supplyAsync(() -> {
+            throw new RuntimeException("Unavailable datanode");
+          });
+        }
+      } else {
+
+        //path includes the dn id to make it possible to assert.
+        return CompletableFuture.completedFuture(
+            Paths.get(datanode.getUuidString()));
+      }
+
+    }
+
+    private void verifyAllClientsClosed() throws Exception {
+      for (GrpcReplicationClient each : clients) {
+        verify(each).close();
+      }
+    }
   }
 }

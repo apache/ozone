@@ -24,11 +24,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -46,22 +51,28 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
@@ -75,12 +86,16 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
+
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
@@ -150,7 +165,13 @@ public class TestContainerPersistence {
     containerSet = new ContainerSet(1000);
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    createDbInstancesForTestIfNeeded(volumeSet, SCM_ID, SCM_ID, conf);
+    // Initialize volume directories.
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
+        volumeSet.getVolumesList())) {
+      boolean success = StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID,
+          conf, null, null);
+      Assert.assertTrue(success);
+    }
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
         null);
@@ -253,52 +274,253 @@ public class TestContainerPersistence {
   }
 
   @Test
-  public void testDeleteContainer() throws Exception {
-    long testContainerID1 = getTestContainerID();
-    Thread.sleep(100);
-    long testContainerID2 = getTestContainerID();
-
-    Container container1 = addContainer(containerSet, testContainerID1);
-    container1.close();
-
-    Container container2 = addContainer(containerSet, testContainerID2);
-
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
-
-    container1.delete();
-    containerSet.removeContainer(testContainerID1);
-    Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-
+  public void testAddingBlockToDeletedContainer() throws Exception {
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
-      return;
-    }
+    assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+
+    long testContainerID = getTestContainerID();
+    Thread.sleep(100);
+
+    Container<KeyValueContainerData> container =
+        addContainer(containerSet, testContainerID);
+    container.close();
+
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+
+    KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
+    container.delete();
+    containerSet.removeContainer(testContainerID);
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
 
     // Adding block to a deleted container should fail.
     exception.expect(StorageContainerException.class);
     exception.expectMessage("Error opening DB.");
-    BlockID blockID1 = ContainerTestHelper.getTestBlockID(testContainerID1);
-    BlockData someKey1 = new BlockData(blockID1);
-    someKey1.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
-    blockManager.putBlock(container1, someKey1);
+    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
+    BlockData someKey = new BlockData(blockID);
+    someKey.setChunks(new LinkedList<>());
+    blockManager.putBlock(container, someKey);
+  }
+
+  @Test
+  public void testDeleteNonEmptyContainer() throws Exception {
+    long testContainerID = getTestContainerID();
+    Container<KeyValueContainerData> container =
+        addContainer(containerSet, testContainerID);
+    container.close();
+
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
 
     // Deleting a non-empty container should fail.
-    BlockID blockID2 = ContainerTestHelper.getTestBlockID(testContainerID2);
-    BlockData someKey2 = new BlockData(blockID2);
-    someKey2.setChunks(new LinkedList<ContainerProtos.ChunkInfo>());
-    blockManager.putBlock(container2, someKey2);
+    BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
+    BlockData someKey = new BlockData(blockID);
+    someKey.setChunks(new LinkedList<>());
+    blockManager.putBlock(container, someKey);
+
+    // KeyValueHandler setup
+    String datanodeId = UUID.randomUUID().toString();
+
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    AtomicInteger icrReceived = new AtomicInteger(0);
+
+    KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        datanodeId, containerSet, volumeSet, metrics,
+        c -> icrReceived.incrementAndGet());
 
     exception.expect(StorageContainerException.class);
     exception.expectMessage(
-        "Container cannot be deleted because it is not empty.");
-    container2.delete();
+        "Non-force deletion of non-empty container is not allowed.");
+    kvHandler.deleteContainer(container, false);
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+  }
+
+  @Test
+  public void testDeleteContainer() throws IOException {
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+    long testContainerID = getTestContainerID();
+    Container<KeyValueContainerData> container = addContainer(containerSet,
+        testContainerID);
+    BlockID blockID = addBlockToContainer(container);
+    container.close();
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+    KeyValueContainerData containerData = container.getContainerData();
+
+    // Block data and metadata tables should have data.
+    assertContainerInSchema3DB(containerData, blockID);
+
+    KeyValueContainerUtil.removeContainerDB(
+        container.getContainerData(),
+        container.getContainerData().getVolume().getConf());
+    container.delete();
+    containerSet.removeContainer(testContainerID);
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID));
+
+    // Block data and metadata tables should be cleared.
+    assertContainerNotInSchema3DB(containerData, blockID);
+  }
+
+  private void assertContainerInSchema3DB(KeyValueContainerData containerData,
+      BlockID testBlock) throws IOException {
+    // This test is only valid for schema v3. Earlier schemas will have their
+    // own RocksDB that is deleted with the container.
+    if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, BlockData> blockTable = store.getBlockDataTable();
+      Table<String, Long> metadataTable = store.getMetadataTable();
+
+      // Block data and metadata tables should have data.
+      Assertions.assertNotNull(blockTable
+          .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
+      Assertions.assertNotNull(metadataTable
+          .getIfExist(containerData.getBlockCountKey()));
+    }
+  }
+
+  private void assertContainerNotInSchema3DB(
+      KeyValueContainerData containerData, BlockID testBlock)
+      throws IOException {
+    // This test is only valid for schema v3. Earlier schemas will have their
+    // own RocksDB that is deleted with the container.
+    if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+      return;
+    }
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      DatanodeStoreSchemaThreeImpl store = (DatanodeStoreSchemaThreeImpl)
+          dbHandle.getStore();
+      Table<String, BlockData> blockTable = store.getBlockDataTable();
+      Table<String, Long> metadataTable = store.getMetadataTable();
+
+      // Block data and metadata tables should have data.
+      Assertions.assertNull(blockTable
+          .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
+      Assertions.assertNull(metadataTable
+          .getIfExist(containerData.getBlockCountKey()));
+    }
+  }
+
+  private BlockID addBlockToContainer(
+      Container<KeyValueContainerData> container) throws IOException {
+    BlockID blockID = ContainerTestHelper.getTestBlockID(
+            container.getContainerData().getContainerID());
+    ChunkInfo info = writeChunkHelper(blockID);
+    BlockData blockData = new BlockData(blockID);
+    List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
+    chunkList.add(info.getProtoBufMessage());
+    blockData.setChunks(chunkList);
+    blockManager.putBlock(container, blockData);
+
+    return blockID;
+  }
+
+  /**
+   * If SchemaV3 is enabled, HddsVolume has already been
+   * formatted and initialized in
+   * setupPaths#createDbInstancesForTestIfNeeded.
+   * @throws Exception
+   */
+  @Test
+  public void testDeleteContainerWithRenaming()
+      throws Exception {
+    // Set up container 1.
+    long testContainerID1 = getTestContainerID();
+    Container<KeyValueContainerData> container1 =
+        addContainer(containerSet, testContainerID1);
+    BlockID container1Block = addBlockToContainer(container1);
+    container1.close();
+    KeyValueContainerData container1Data = container1.getContainerData();
+    assertContainerInSchema3DB(container1Data, container1Block);
+
+    // Set up container 2.
+    long testContainerID2 = getTestContainerID();
+    Container<KeyValueContainerData> container2 =
+        addContainer(containerSet, testContainerID2);
+    BlockID container2Block = addBlockToContainer(container2);
+    container2.close();
+    KeyValueContainerData container2Data = container2.getContainerData();
+    assertContainerInSchema3DB(container2Data, container2Block);
+
+    Assert.assertTrue(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID1));
     Assert.assertTrue(containerSet.getContainerMapCopy()
         .containsKey(testContainerID2));
+
+    // Since this test only uses one volume, both containers will reside in
+    // the same volume.
+    HddsVolume hddsVolume = container1Data.getVolume();
+    // Volume setup should have created the tmp directory for container
+    // deletion.
+    File volumeTmpDir = hddsVolume.getTmpDir();
+    Assert.assertTrue(String.format("Volume level tmp dir %s not created.",
+            volumeTmpDir), volumeTmpDir.exists());
+    File deletedContainerDir = hddsVolume.getDeletedContainerDir();
+    Assert.assertTrue(String.format("Volume level container deleted directory" +
+        " %s not created.", deletedContainerDir), deletedContainerDir.exists());
+
+    // Move containers to delete directory. RocksDB should not yet be updated.
+    KeyValueContainerUtil.moveToDeletedContainerDir(container1Data, hddsVolume);
+    assertContainerInSchema3DB(container1Data, container1Block);
+    KeyValueContainerUtil.moveToDeletedContainerDir(container2Data, hddsVolume);
+    assertContainerInSchema3DB(container2Data, container2Block);
+
+    // Both containers should be present in the deleted directory.
+    File[] deleteDirFilesArray = deletedContainerDir.listFiles();
+    Assert.assertNotNull(deleteDirFilesArray);
+    Set<File> deleteDirFiles = Arrays.stream(deleteDirFilesArray)
+        .collect(Collectors.toSet());
+    Assert.assertEquals(2, deleteDirFiles.size());
+
+    File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container1Data, hddsVolume).toFile();
+    Assert.assertTrue(deleteDirFiles.contains(container1Dir));
+    File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container2Data, hddsVolume).toFile();
+    Assert.assertTrue(deleteDirFiles.contains(container2Dir));
+
+    // Delete container1 from the disk. Container2 should remain in the
+    // deleted containers directory.
+    KeyValueContainerUtil.removeContainerDB(
+        container1.getContainerData(),
+        container1.getContainerData().getVolume().getConf());
+    container1.delete();
+    assertContainerNotInSchema3DB(container1Data, container1Block);
+    assertContainerInSchema3DB(container2Data, container2Block);
+
+    // Check the delete directory again. Only container 2 should remain.
+    deleteDirFilesArray = deletedContainerDir.listFiles();
+    Assert.assertNotNull(deleteDirFilesArray);
+    Assert.assertEquals(1, deleteDirFilesArray.length);
+    Assert.assertEquals(deleteDirFilesArray[0], container2Dir);
+
+    // Delete container2 from the disk.
+    KeyValueContainerUtil.removeContainerDB(
+        container2.getContainerData(),
+        container2.getContainerData().getVolume().getConf());
+    container2.delete();
+    assertContainerNotInSchema3DB(container1Data, container1Block);
+    assertContainerNotInSchema3DB(container2Data, container2Block);
+
+    // Remove containers from containerSet
+    containerSet.removeContainer(testContainerID1);
+    containerSet.removeContainer(testContainerID2);
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID1));
+    Assert.assertFalse(containerSet.getContainerMapCopy()
+        .containsKey(testContainerID2));
+
+    // Deleted containers directory should now be empty.
+    deleteDirFilesArray = deletedContainerDir.listFiles();
+    Assert.assertNotNull(deleteDirFilesArray);
+    Assert.assertEquals(0, deleteDirFilesArray.length);
   }
 
   @Test

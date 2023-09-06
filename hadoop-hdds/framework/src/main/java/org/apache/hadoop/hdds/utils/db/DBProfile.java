@@ -121,6 +121,31 @@ public enum DBProfile {
     public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
       return SSD.getBlockBasedTableConfig();
     }
+  },
+  TEST {
+    @Override
+    public String toString() {
+      return "TEST";
+    }
+
+    @Override
+    public ManagedDBOptions getDBOptions() {
+      ManagedDBOptions dbOptions = SSD.getDBOptions();
+      return dbOptions;
+    }
+
+    @Override
+    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+      cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
+      cfOptions.setDisableAutoCompactions(true);
+      return cfOptions;
+    }
+
+    @Override
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
+      return SSD.getBlockBasedTableConfig();
+    }
   };
 
   public static long toLong(double value) {

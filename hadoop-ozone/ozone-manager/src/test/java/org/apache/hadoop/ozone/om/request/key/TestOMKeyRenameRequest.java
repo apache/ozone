@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -37,26 +40,37 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 /**
  * Tests RenameKey request.
  */
+@SuppressWarnings("checkstyle:VisibilityModifier")
 public class TestOMKeyRenameRequest extends TestOMKeyRequest {
+  protected OmKeyInfo fromKeyInfo;
+  protected String fromKeyName;
+  protected String toKeyName;
+  protected String dbToKey;
+
+  @Before
+  public void createParentKey() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    fromKeyName = new Path("fromKey").toString();
+    toKeyName = new Path("toKey").toString();
+    fromKeyInfo = getOmKeyInfo(fromKeyName);
+    dbToKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
+  }
 
   @Test
   public void testPreExecute() throws Exception {
-    doPreExecute(createRenameKeyRequest(UUID.randomUUID().toString()));
+    doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
-    String toKeyName = UUID.randomUUID().toString();
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
-
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+            volumeName, bucketName, fromKeyName, toKeyName));
+    String dbFromKey = addKeyToTable(fromKeyInfo);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+            getOMKeyRenameRequest(modifiedOmRequest);
 
     OMClientResponse omKeyRenameResponse =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -65,34 +79,24 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omKeyRenameResponse.getOMResponse().getStatus());
 
-    String key = omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
     // Original key should be deleted, toKey should exist.
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(key);
+    Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(dbFromKey));
 
-    Assert.assertNull(omKeyInfo);
+    OmKeyInfo toKeyInfo =
+            omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
 
-    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
-        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName));
-
-    Assert.assertNotNull(omKeyInfo);
-
-    // For new key modification time should be updated.
+    Assert.assertNotNull(toKeyInfo);
 
     KeyArgs keyArgs = modifiedOmRequest.getRenameKeyRequest().getKeyArgs();
 
-    Assert.assertEquals(keyArgs.getModificationTime(),
-        omKeyInfo.getModificationTime());
-
-    // KeyName should be updated in OmKeyInfo to toKeyName.
-    Assert.assertEquals(omKeyInfo.getKeyName(), toKeyName);
+    assertModificationTime(keyArgs.getModificationTime());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
-    String toKeyName = UUID.randomUUID().toString();
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
 
     // Add only volume and bucket entry to DB.
 
@@ -114,9 +118,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    String toKeyName = UUID.randomUUID().toString();
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName));
 
     OMKeyRenameRequest omKeyRenameRequest =
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
@@ -131,9 +134,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    String toKeyName = UUID.randomUUID().toString();
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, "not_exist_bucket", fromKeyName, toKeyName));
 
     // Add only volume entry to DB.
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
@@ -151,9 +153,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
-    String toKeyName = "";
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
+    String invalidToKeyName = "";
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, invalidToKeyName));
 
     // Add only volume and bucket entry to DB.
 
@@ -175,10 +177,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithFromKeyInvalid() throws Exception {
-    String toKeyName = UUID.randomUUID().toString();
-    keyName = "";
-    OMRequest modifiedOmRequest =
-        doPreExecute(createRenameKeyRequest(toKeyName));
+    String invalidToKeyName = "";
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, invalidToKeyName, toKeyName));
 
     // Add only volume and bucket entry to DB.
 
@@ -207,7 +208,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(originalOmRequest, getBucketLayout());
+            getOMKeyRenameRequest(originalOmRequest);
 
     OMRequest modifiedOmRequest = omKeyRenameRequest.preExecute(ozoneManager);
 
@@ -225,12 +226,13 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
    * Create OMRequest which encapsulates RenameKeyRequest.
    * @return OMRequest
    */
-  private OMRequest createRenameKeyRequest(String toKeyName) {
-    KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName(keyName)
-        .setVolumeName(volumeName).setBucketName(bucketName).build();
+  protected OMRequest createRenameKeyRequest(
+      String volume, String bucket, String fromKey, String toKey) {
+    KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName(fromKey)
+        .setVolumeName(volume).setBucketName(bucket).build();
 
     RenameKeyRequest renameKeyRequest = RenameKeyRequest.newBuilder()
-            .setKeyArgs(keyArgs).setToKeyName(toKeyName).build();
+            .setKeyArgs(keyArgs).setToKeyName(toKey).build();
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
@@ -238,4 +240,31 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey).build();
   }
 
+  protected OmKeyInfo getOmKeyInfo(String keyName) {
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationType, replicationFactor, 0L);
+  }
+
+  protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
+    OMRequestTestUtils.addKeyToTable(false, false, keyInfo, clientID, 0L,
+        omMetadataManager);
+    return getDBKeyName(keyInfo);
+  }
+
+  protected OMKeyRenameRequest getOMKeyRenameRequest(OMRequest omRequest) {
+    return new OMKeyRenameRequest(omRequest, getBucketLayout());
+  }
+
+  protected String getDBKeyName(OmKeyInfo keyName) throws IOException {
+    return omMetadataManager.getOzoneKey(keyName.getVolumeName(),
+        keyName.getBucketName(), keyName.getKeyName());
+  }
+
+  protected void assertModificationTime(long except)
+      throws IOException {
+    // For new key modification time should be updated.
+    OmKeyInfo toKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
+    Assert.assertEquals(except, toKeyInfo.getModificationTime());
+  }
 }

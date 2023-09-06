@@ -64,12 +64,16 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
     if (containerInfo.getState() != HddsProtos.LifeCycleState.QUASI_CLOSED) {
       return false;
     }
+    LOG.debug("Checking container {} in QuasiClosedContainerHandler",
+        containerInfo);
 
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     if (canForceCloseContainer(containerInfo, replicas)) {
       forceCloseContainer(containerInfo, replicas);
       return true;
     } else {
+      LOG.debug("Container {} cannot be force closed and is stuck in " +
+              "QUASI_CLOSED", containerInfo);
       request.getReport().incrementAndSample(
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
           containerInfo.containerID());

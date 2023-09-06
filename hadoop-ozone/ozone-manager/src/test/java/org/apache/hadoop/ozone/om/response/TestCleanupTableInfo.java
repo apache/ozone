@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
+import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -151,6 +151,8 @@ public class TestCleanupTableInfo {
     Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
     // OmKeyResponse is an abstract class that does not need CleanupTable.
     subTypes.remove(OmKeyResponse.class);
+    // OMEchoRPCWriteResponse does not need CleanupTable.
+    subTypes.remove(OMEchoRPCWriteResponse.class);
     subTypes.forEach(aClass -> {
       Assert.assertTrue(aClass + " does not have annotation of" +
               " CleanupTableInfo",
@@ -246,7 +248,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getVolumeTable().put(volumeKey, volumeArgs);
     om.getMetadataManager().getVolumeTable().addCacheEntry(
         new CacheKey<>(volumeKey),
-        new CacheValue<>(Optional.of(volumeArgs), 2)
+        CacheValue.get(2, volumeArgs)
     );
   }
 
@@ -264,7 +266,7 @@ public class TestCleanupTableInfo {
     om.getMetadataManager().getBucketTable().put(bucketKey, bucketInfo);
     om.getMetadataManager().getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey),
-        new CacheValue<>(Optional.of(bucketInfo), 1)
+        CacheValue.get(1, bucketInfo)
     );
   }
 
@@ -284,7 +286,7 @@ public class TestCleanupTableInfo {
       Assert.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    return spy(new OmMetadataManagerImpl(conf));
+    return spy(new OmMetadataManagerImpl(conf, null));
   }
 
   private OMFileCreateRequest anOMFileCreateRequest() {

@@ -296,6 +296,7 @@ public class OMRangerBGSyncService extends BackgroundService {
    * @return true if completed successfully, false if any exception is thrown.
    */
   public synchronized boolean triggerRangerSyncOnce() {
+    int attempt = 0;
     try {
       long dbOzoneServiceVersion = getOMDBRangerServiceVersion();
       long rangerOzoneServiceVersion = getRangerOzoneServicePolicyVersion();
@@ -319,14 +320,11 @@ public class OMRangerBGSyncService extends BackgroundService {
       // A maximum of MAX_ATTEMPT times will be attempted each time the sync
       // service is run. MAX_ATTEMPT should at least be 2 to make sure OM DB
       // has the up-to-date Ranger service version most of the times.
-      int attempt = 0;
       while (dbOzoneServiceVersion != rangerOzoneServiceVersion) {
 
         if (++attempt > MAX_ATTEMPT) {
-          if (LOG.isDebugEnabled()) {
-            LOG.warn("Reached maximum number of attempts ({}). Abort",
-                MAX_ATTEMPT);
-          }
+          LOG.warn("Reached maximum number of attempts ({}). Abort",
+              MAX_ATTEMPT);
           break;
         }
 
@@ -350,9 +348,12 @@ public class OMRangerBGSyncService extends BackgroundService {
       }
     } catch (IOException | ServiceException e) {
       LOG.warn("Exception during Ranger Sync", e);
-      // TODO: Check for specific exception once switched to
-      //  RangerRestMultiTenantAccessController
       return false;
+    } finally {
+      if (attempt > 0) {
+        LOG.info("Finished executing Multi-Tenancy Ranger Sync run # {} after" +
+            "{} attempts.", runCount.get(), attempt);
+      }
     }
 
     return true;
@@ -424,7 +425,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     clearPolicyAndRoleMaps();
 
 
-    withReadLock(() -> {
+    withOptimisticRead(() -> {
       try {
         loadAllPoliciesAndRoleNamesFromRanger(baseVersion);
         loadAllRolesFromRanger();
@@ -526,7 +527,8 @@ public class OMRangerBGSyncService extends BackgroundService {
       return;
     }
     if (!ozoneManager.isLeaderReady()) {
-      throw new OMNotLeaderException("This OM is no longer the leader. Abort");
+      throw new OMNotLeaderException(
+          ozoneManager.getOmRatisServer().getRaftPeerId());
     }
   }
 
@@ -561,16 +563,29 @@ public class OMRangerBGSyncService extends BackgroundService {
   }
 
   /**
-   * Helper function to run the block with read lock held.
+   * Helper function to retry the block until it completes without a write lock
+   * being acquired during its execution. The block will be retried
+   * {@link this#MAX_ATTEMPT} times.
    */
-  private void withReadLock(Runnable block) throws IOException {
-    // Acquire authorizer (Ranger) read lock
-    long stamp = authorizerLock.tryReadLockThrowOnTimeout();
-    try {
+  private void withOptimisticRead(Runnable block) throws IOException {
+    // Acquire a stamp that will be used to check if a write occurred while we
+    // were reading.
+    // If a tenant modification is made while we are reading,
+    // retry the read operation with a new stamp until we are able to read the
+    // state without a write operation interrupting.
+    int attempt = 0;
+    boolean readSuccess = false;
+    while (!readSuccess && attempt < MAX_ATTEMPT) {
+      long stamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
       block.run();
-    } finally {
-      // Release authorizer (Ranger) read lock
-      authorizerLock.unlockRead(stamp);
+      readSuccess = authorizerLock.validateOptimisticRead(stamp);
+      attempt++;
+    }
+
+    if (!readSuccess) {
+      throw new IOException("Failed to read state for Ranger background sync" +
+          " without an interrupting write operation after " + attempt +
+          " attempts.");
     }
   }
 

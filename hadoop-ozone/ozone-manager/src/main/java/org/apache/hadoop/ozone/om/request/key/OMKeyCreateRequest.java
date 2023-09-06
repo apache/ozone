@@ -25,11 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -48,8 +46,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -96,6 +92,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
     // Verify key name
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
          .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
                  OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
@@ -137,7 +134,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .resolveReplicationConfigPreference(type, factor,
               keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
@@ -150,7 +147,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+              ozoneManager.getOMNodeId(),
+              ozoneManager.getMetrics());
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
@@ -200,7 +198,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OzoneLockStrategy ozoneLockStrategy = getOzoneLockStrategy(ozoneManager);
     OmKeyInfo omKeyInfo = null;
-    OmBucketInfo omBucketInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
 
     boolean acquireLock = false;
@@ -233,23 +230,23 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
 
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      OmBucketInfo bucketInfo =
+          getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
-      List< OzoneAcl > inheritAcls;
       if (LOG.isDebugEnabled()) {
         LOG.debug("BucketName: {}, BucketLayout: {}",
             bucketInfo.getBucketName(), bucketInfo.getBucketLayout());
       }
+
+      OMFileRequest.OMPathInfo pathInfo = null;
+
       if (bucketInfo.getBucketLayout()
           .shouldNormalizePaths(ozoneManager.getEnableFileSystemPaths())) {
-        OMFileRequest.OMPathInfo pathInfo =
-            OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-                bucketName, keyName, Paths.get(keyName));
+        pathInfo = OMFileRequest.verifyFilesInPath(omMetadataManager,
+            volumeName, bucketName, keyName, Paths.get(keyName));
         OMFileRequest.OMDirectoryResult omDirectoryResult =
             pathInfo.getDirectoryResult();
-        inheritAcls = pathInfo.getAcls();
 
         // Check if a file or directory exists with same key name.
         if (omDirectoryResult == DIRECTORY_EXISTS) {
@@ -264,13 +261,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
         missingParentInfos = OMDirectoryCreateRequest
             .getAllParentInfo(ozoneManager, keyArgs,
-                pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
+                pathInfo.getMissingParents(), bucketInfo,
+                pathInfo, trxnLogIndex);
 
-        // Add cache entries for the prefix directories.
-        // Skip adding for the file key itself, until Key Commit.
-        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-            bucketName, Optional.absent(), Optional.of(missingParentInfos),
-            trxnLogIndex);
         numMissingParents = missingParentInfos.size();
       }
 
@@ -278,11 +271,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
               bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager.getDefaultReplicationConfig());
+              ozoneManager);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.getPrefixManager(), bucketInfo, pathInfo, trxnLogIndex,
           ozoneManager.getObjectIdFromTxId(trxnLogIndex),
           ozoneManager.isRatisEnabled(), replicationConfig);
 
@@ -297,7 +290,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .collect(Collectors.toList());
       omKeyInfo.appendNewBlocks(newLocationList, false);
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // Here we refer to the implementation of HDFS:
       // If the key size is 600MB, when createKey, keyLocationInfo in
       // keyLocationList is 3, and  the every pre-allocated block length is
@@ -309,15 +301,24 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
-      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, 1L);
+      checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
+          preAllocatedSpace);
+      checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      bucketInfo.incrUsedNamespace(numMissingParents);
+
+      if (numMissingParents > 0) {
+        // Add cache entries for the prefix directories.
+        // Skip adding for the file key itself, until Key Commit.
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, bucketInfo.getBucketLayout(),
+            null, missingParentInfos, trxnLogIndex);
+      }
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOpenKeyName),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+          dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
@@ -327,7 +328,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
+          omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

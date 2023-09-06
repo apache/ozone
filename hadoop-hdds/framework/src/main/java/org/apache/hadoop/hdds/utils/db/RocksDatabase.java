@@ -17,9 +17,14 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.BooleanTriFunction;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedIngestExternalFileOptions;
@@ -33,6 +38,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
+import org.rocksdb.KeyMayExist;
+import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,10 +47,14 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,11 +76,15 @@ import static org.rocksdb.RocksDB.listColumnFamilies;
  * When there is a {@link RocksDBException} with error,
  * this class will close the underlying {@link org.rocksdb.RocksObject}s.
  */
-public final class RocksDatabase {
+public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
-  static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+  public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
 
+  private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
+      new HashMap<>();
+
+  private final StackTraceElement[] stackTrace;
 
   static IOException toIOException(Object name, String op, RocksDBException e) {
     return HddsServerUtil.toIOException(name + ": Failed to " + op, e);
@@ -138,6 +153,7 @@ public final class RocksDatabase {
         db = ManagedRocksDB.open(dbOptions, dbFile.getAbsolutePath(),
             descriptors, handles);
       }
+      dbNameToCfHandleMap.put(db.get().getName(), handles);
       // init a column family map.
       AtomicLong counter = new AtomicLong(0);
       for (ColumnFamilyHandle h : handles) {
@@ -228,7 +244,7 @@ public final class RocksDatabase {
       }
     }
 
-    public long getLatestSequenceNumber() {
+    public long getLatestSequenceNumber() throws IOException {
       return RocksDatabase.this.getLatestSequenceNumber();
     }
 
@@ -267,7 +283,8 @@ public final class RocksDatabase {
       return codec.fromPersistedFormat(nameBytes);
     }
 
-    protected ColumnFamilyHandle getHandle() {
+    @VisibleForTesting
+    public ColumnFamilyHandle getHandle() {
       return handle;
     }
 
@@ -290,6 +307,11 @@ public final class RocksDatabase {
 
     public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
         throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut array key {}", bytes2String(key));
+        LOG.debug("batchPut array value {}", bytes2String(value));
+      }
+
       assertClosed();
       try {
         counter.incrementAndGet();
@@ -300,7 +322,26 @@ public final class RocksDatabase {
         counter.decrementAndGet();
       }
     }
-    
+
+    public void batchPut(ManagedWriteBatch writeBatch, ByteBuffer key,
+        ByteBuffer value) throws IOException {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("batchPut buffer key {}", bytes2String(key.duplicate()));
+        LOG.debug("batchPut buffer value {}", bytes2String(value.duplicate()));
+      }
+
+      assertClosed();
+      try {
+        counter.incrementAndGet();
+        writeBatch.put(getHandle(), key.duplicate(), value);
+      } catch (RocksDBException e) {
+        throw toIOException(this, "batchPut ByteBuffer key "
+            + bytes2String(key), e);
+      } finally {
+        counter.decrementAndGet();
+      }
+    }
+
     public void markClosed() {
       isClosed.set(true);
     }
@@ -339,10 +380,18 @@ public final class RocksDatabase {
     this.descriptors = descriptors;
     this.columnFamilies = columnFamilies;
     this.counter = counter;
+    this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
+  @Override
   public void close() {
     if (isClosed.compareAndSet(false, true)) {
+      // Wait for all background work to be cancelled first. e.g. RDB compaction
+      db.get().cancelAllBackgroundWork(true);
+
+      // Then close all attached listeners
+      dbOptions.listeners().forEach(listener -> listener.close());
+
       if (columnFamilies != null) {
         columnFamilies.values().stream().forEach(f -> f.markClosed());
       }
@@ -427,17 +476,55 @@ public final class RocksDatabase {
     }
   }
 
+  public void put(ColumnFamily family, ByteBuffer key, ByteBuffer value)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().put(family.getHandle(), writeOptions, key, value);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "put " + bytes2String(key), e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   public void flush() throws IOException {
     assertClose();
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
       counter.incrementAndGet();
       options.setWaitForFlush(true);
       db.get().flush(options);
+      for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+        db.get().flush(options, columnFamily.handle);
+      }
     } catch (RocksDBException e) {
       closeOnError(e, true);
       throw toIOException(this, "flush", e);
     } finally {
       counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * @param cfName columnFamily on which flush will run.
+   */
+  public void flush(String cfName) throws IOException {
+    assertClose();
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+    try (ManagedFlushOptions options = new ManagedFlushOptions()) {
+      options.setWaitForFlush(true);
+      if (handle != null) {
+        db.get().flush(options, handle);
+      } else {
+        LOG.error("Provided column family doesn't exist."
+            + " Calling flush on null columnFamily");
+        flush();
+      }
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "flush", e);
     }
   }
 
@@ -467,39 +554,146 @@ public final class RocksDatabase {
     }
   }
 
-  RocksCheckpoint createCheckpoint() {
-    return new RocksCheckpoint();
-  }
-
-  /**
-   * @return false if the key definitely does not exist in the database;
-   *         otherwise, return true.
-   * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
-   */
-  public boolean keyMayExist(ColumnFamily family, byte[] key)
+  public void compactRangeDefault(final ManagedCompactRangeOptions options)
       throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
-      return db.get().keyMayExist(family.getHandle(), key, null);
+      db.get().compactRange(null, null, null, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    assertClose();
+    compactRangeDefault(options);
+    for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
+      compactRange(columnFamily, null, null, options);
+    }
+  }
+
+  public int getLiveFilesMetaDataSize() throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData().size();
     } finally {
       counter.decrementAndGet();
     }
   }
 
   /**
+   * @param cfName columnFamily on which compaction will run.
+   */
+  public void compactRange(String cfName) throws IOException {
+    assertClose();
+    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+    try {
+      if (handle != null) {
+        db.get().compactRange(handle);
+      } else {
+        LOG.error("Provided column family doesn't exist."
+            + " Calling compactRange on null columnFamily");
+        db.get().compactRange();
+      }
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    }
+  }
+
+  private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
+      throws IOException {
+    assertClose();
+    for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
+      try {
+        String table = new String(cf.getName(), StandardCharsets.UTF_8);
+        if (cfName.equals(table)) {
+          return cf;
+        }
+      } catch (RocksDBException e) {
+        closeOnError(e, true);
+        throw toIOException(this, "columnFamilyHandle.getName", e);
+      }
+    }
+    return null;
+  }
+
+  public void compactRange(ColumnFamily family, final byte[] begin,
+      final byte[] end, final ManagedCompactRangeOptions options)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().compactRange(family.getHandle(), begin, end, options);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      throw toIOException(this, "compactRange", e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public List<LiveFileMetaData> getLiveFilesMetaData() throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      return db.get().getLiveFilesMetaData();
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  RocksCheckpoint createCheckpoint() {
+    return new RocksCheckpoint();
+  }
+
+  /**
+   * - When the key definitely does not exist in the database,
+   *   this method returns null.
+   * - When the key is found in memory,
+   *   this method returns a supplier
+   *   and {@link Supplier#get()}} returns the value.
+   * - When this method returns a supplier
+   *   but {@link Supplier#get()} returns null,
+   *   the key may or may not exist in the database.
+   *
    * @return the null if the key definitely does not exist in the database;
    *         otherwise, return a {@link Supplier}.
    * @see org.rocksdb.RocksDB#keyMayExist(ColumnFamilyHandle, byte[], Holder)
    */
-  public Supplier<byte[]> keyMayExistHolder(ColumnFamily family,
-      byte[] key) throws IOException {
+  Supplier<byte[]> keyMayExist(ColumnFamily family, byte[] key)
+      throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
       final Holder<byte[]> out = new Holder<>();
       return db.get().keyMayExist(family.getHandle(), key, out) ?
           out::getValue : null;
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  Supplier<Integer> keyMayExist(ColumnFamily family,
+      ByteBuffer key, ByteBuffer out) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      final KeyMayExist result = db.get().keyMayExist(
+          family.getHandle(), key, out);
+      switch (result.exists) {
+      case kNotExist: return null;
+      case kExistsWithValue: return () -> result.valueLength;
+      case kExistsWithoutValue: return () -> null;
+      default:
+        throw new IllegalStateException(
+            "Unexpected KeyMayExistEnum case " + result.exists);
+      }
     } finally {
       counter.decrementAndGet();
     }
@@ -513,11 +707,43 @@ public final class RocksDatabase {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
-  public byte[] get(ColumnFamily family, byte[] key) throws IOException {
+  byte[] get(ColumnFamily family, byte[] key) throws IOException {
     assertClose();
     try {
       counter.incrementAndGet();
       return db.get().get(family.getHandle(), key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "get " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  /**
+   * Get the value mapped to the given key.
+   *
+   * @param family the table to get from.
+   * @param key the buffer containing the key.
+   * @param outValue the buffer to store the output value.
+   *                 When the buffer size is smaller than the size of the value,
+   *                 partial result will be written.
+   * @return null if the key is not found;
+   *         otherwise, return the size (possibly 0) of the value.
+   * @throws IOException if the db is closed or the db throws an exception.
+   * @see org.rocksdb.RocksDB#get(ColumnFamilyHandle, org.rocksdb.ReadOptions,
+   *                              ByteBuffer, ByteBuffer)
+   */
+  Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
+      throws IOException {
+    assertClose();
+    try (ManagedReadOptions options = new ManagedReadOptions()) {
+      counter.incrementAndGet();
+      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      LOG.debug("get: size={}, remaining={}",
+          size, outValue.asReadOnlyBuffer().remaining());
+      return size == ManagedRocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
       closeOnError(e, true);
       final String message = "get " + bytes2String(key) + " from " + family;
@@ -604,7 +830,8 @@ public final class RocksDatabase {
     }
   }
 
-  public long getLatestSequenceNumber() {
+  public long getLatestSequenceNumber() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLatestSequenceNumber();
@@ -669,9 +896,122 @@ public final class RocksDatabase {
     }
   }
 
+  public void delete(ColumnFamily family, ByteBuffer key) throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().delete(family.getHandle(), writeOptions, key);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "delete " + bytes2String(key) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
+  public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
+      throws IOException {
+    assertClose();
+    try {
+      counter.incrementAndGet();
+      db.get().deleteRange(family.getHandle(), beginKey, endKey);
+    } catch (RocksDBException e) {
+      closeOnError(e, true);
+      final String message = "delete range " + bytes2String(beginKey) +
+          " to " + bytes2String(endKey) + " from " + family;
+      throw toIOException(this, message, e);
+    } finally {
+      counter.decrementAndGet();
+    }
+  }
+
   @Override
   public String toString() {
     return name;
   }
 
+  @VisibleForTesting
+  public List<LiveFileMetaData> getSstFileList() throws IOException {
+    assertClose();
+    return db.get().getLiveFilesMetaData();
+  }
+
+  /**
+   * return the max compaction level of sst files in the db.
+   * @return level
+   */
+  private int getLastLevel() throws IOException {
+    return getSstFileList().stream()
+        .max(Comparator.comparing(LiveFileMetaData::level)).get().level();
+  }
+
+  /**
+   * Deletes sst files which do not correspond to prefix
+   * for given table.
+   * @param prefixPairs, a list of pair (TableName,prefixUsed).
+   */
+  public void deleteFilesNotMatchingPrefix(
+      List<Pair<String, String>> prefixPairs,
+      BooleanTriFunction<String, String, String, Boolean> filterFunction)
+      throws IOException, RocksDBException {
+    assertClose();
+    for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
+      String sstFileColumnFamily =
+          new String(liveFileMetaData.columnFamilyName(),
+              StandardCharsets.UTF_8);
+      int lastLevel = getLastLevel();
+      for (Pair<String, String> prefixPair : prefixPairs) {
+        String columnFamily = prefixPair.getKey();
+        String prefixForColumnFamily = prefixPair.getValue();
+        if (!sstFileColumnFamily.equals(columnFamily)) {
+          continue;
+        }
+        // RocksDB #deleteFile API allows only to delete the last level of
+        // SST Files. Any level < last level won't get deleted and
+        // only last file of level 0 can be deleted
+        // and will throw warning in the rocksdb manifest.
+        // Instead, perform the level check here
+        // itself to avoid failed delete attempts for lower level files.
+        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
+          continue;
+        }
+        String firstDbKey =
+            new String(liveFileMetaData.smallestKey(), StandardCharsets.UTF_8);
+        String lastDbKey =
+            new String(liveFileMetaData.largestKey(), StandardCharsets.UTF_8);
+        boolean isKeyWithPrefixPresent =
+            filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
+        if (!isKeyWithPrefixPresent) {
+          LOG.info("Deleting sst file {} corresponding to column family"
+                  + " {} from db: {}", liveFileMetaData.fileName(),
+              StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
+              db.get().getName());
+          db.deleteFile(liveFileMetaData);
+        }
+      }
+    }
+  }
+
+  public static Map<String, List<ColumnFamilyHandle>> getCfHandleMap() {
+    return dbNameToCfHandleMap;
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    if (!isClosed()) {
+      String warning = "RocksDatabase is not closed properly.";
+      if (LOG.isDebugEnabled()) {
+        String debugMessage = String.format("%n StackTrace for unclosed " +
+            "RocksDatabase instance: %s", Arrays.toString(stackTrace));
+        warning = warning.concat(debugMessage);
+      }
+      LOG.warn(warning);
+    }
+    super.finalize();
+  }
+
+  public ManagedRocksDB getManagedRocksDb() {
+    return db;
+  }
 }

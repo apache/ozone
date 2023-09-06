@@ -30,6 +30,10 @@ import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 
+import java.io.FilterOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
 /**
  * Filter used to add jaeger tracing span.
  */
@@ -60,19 +64,36 @@ public class TracingFilter implements ContainerRequestFilter,
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    Scope scope = (Scope)requestContext.getProperty(TRACING_SCOPE);
+    final Scope scope = (Scope) requestContext.getProperty(TRACING_SCOPE);
+    final Span span = (Span) requestContext.getProperty(TRACING_SPAN);
+    // HDDS-7064: Operation performed while writing StreamingOutput response
+    // should only be closed once the StreamingOutput callback has completely
+    // written the data to the destination
+    OutputStream out = responseContext.getEntityStream();
+    if (out != null) {
+      responseContext.setEntityStream(new FilterOutputStream(out) {
+        @Override
+        public void close() throws IOException {
+          super.close();
+          finishAndClose(scope, span);
+        }
+      });
+    } else {
+      finishAndClose(scope, span);
+    }
+  }
+
+  private static void finishAndClose(Scope scope, Span span) {
     if (scope != null) {
       scope.close();
     }
-    Span span = (Span) requestContext.getProperty(TRACING_SPAN);
     if (span != null) {
       span.finish();
     }
-
     finishAndCloseActiveSpan();
   }
 
-  private void finishAndCloseActiveSpan() {
+  private static void finishAndCloseActiveSpan() {
     ScopeManager scopeManager = GlobalTracer.get().scopeManager();
     if (scopeManager != null && scopeManager.activeSpan() != null) {
       scopeManager.activeSpan().finish();

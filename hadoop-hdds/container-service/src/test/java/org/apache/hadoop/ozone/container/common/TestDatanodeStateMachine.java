@@ -81,6 +81,10 @@ public class TestDatanodeStateMachine {
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, true);
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        true);
+    conf.setBoolean(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
     serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
@@ -153,8 +157,7 @@ public class TestDatanodeStateMachine {
   public void testStartStopDatanodeStateMachine() throws IOException,
       InterruptedException, TimeoutException {
     try (DatanodeStateMachine stateMachine =
-        new DatanodeStateMachine(getNewDatanodeDetails(), conf, null, null,
-            null)) {
+        new DatanodeStateMachine(getNewDatanodeDetails(), conf)) {
       stateMachine.startDaemon();
       SCMConnectionManager connectionManager =
           stateMachine.getConnectionManager();
@@ -214,11 +217,9 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.STANDALONE,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     datanodeDetails.setPort(port);
-    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
-
+    ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
-             new DatanodeStateMachine(datanodeDetails, conf, null, null,
-                 null)) {
+             new DatanodeStateMachine(datanodeDetails, conf)) {
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -340,8 +341,7 @@ public class TestDatanodeStateMachine {
     datanodeDetails.setPort(port);
 
     try (DatanodeStateMachine stateMachine =
-             new DatanodeStateMachine(datanodeDetails, conf, null, null,
-                 null)) {
+             new DatanodeStateMachine(datanodeDetails, conf)) {
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -399,7 +399,7 @@ public class TestDatanodeStateMachine {
       perTestConf.setStrings(entry.getKey(), entry.getValue());
       LOG.info("Test with {} = {}", entry.getKey(), entry.getValue());
       try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(
-          getNewDatanodeDetails(), perTestConf, null, null, null)) {
+          getNewDatanodeDetails(), perTestConf)) {
         DatanodeStateMachine.DatanodeStates currentState =
             stateMachine.getContext().getState();
         Assertions.assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -424,6 +424,8 @@ public class TestDatanodeStateMachine {
         DatanodeDetails.Port.Name.RATIS, 0);
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
+    DatanodeDetails.Port streamPort = DatanodeDetails.newPort(
+        DatanodeDetails.Port.Name.RATIS_DATASTREAM, 0);
     return DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setHostName("localhost")
@@ -431,6 +433,7 @@ public class TestDatanodeStateMachine {
         .addPort(containerPort)
         .addPort(ratisPort)
         .addPort(restPort)
+        .addPort(streamPort)
         .build();
   }
 }

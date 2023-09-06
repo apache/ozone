@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -291,12 +292,6 @@ public class SimpleMockNodeManager implements NodeManager {
                                          LayoutVersionProto layoutReport) {
   }
 
-  @Override
-  public void processNodeCommandQueueReport(DatanodeDetails datanodeDetails,
-      CommandQueueReportProto commandReport,
-      Map<SCMCommandProto.Type, Integer> commandsToBeSent) {
-  }
-
   /**
    * Get the number of commands of the given type queued on the datanode at the
    * last heartbeat. If the Datanode has not reported information for the given
@@ -322,6 +317,30 @@ public class SimpleMockNodeManager implements NodeManager {
     return 0;
   }
 
+  /**
+   * Get the total number of pending commands of the given type on the given
+   * datanode. This includes both the number of commands queued in SCM which
+   * will be sent to the datanode on the next heartbeat, and the number of
+   * commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The command Type To query.
+   * @return The number of commands of the given type pending on the datanode.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public int getTotalDatanodeCommandCount(DatanodeDetails datanodeDetails,
+      SCMCommandProto.Type cmdType) throws NodeNotFoundException {
+    return 0;
+  }
+
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
+  }
+
   @Override
   public List<SCMCommand> getCommandQueue(UUID dnID) {
     return null;
@@ -344,6 +363,11 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int totalHealthyVolumeCount() {
     return 0;
   }
 
@@ -373,6 +397,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
+    return null;
+  }
+
+  @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
   }
@@ -394,7 +423,8 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo) {
+      LayoutVersionProto layoutInfo,
+      CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
 

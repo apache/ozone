@@ -144,9 +144,18 @@ public final class SCMHAUtils {
     return scmRatisDirectory;
   }
 
+  public static String getRatisStorageDir(final ConfigurationSource conf) {
+    String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+    if (Strings.isNullOrEmpty(storageDir)) {
+      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+      storageDir = (new File(metaDirPath, "scm-ha")).getPath();
+    }
+    return storageDir;
+  }
+
   public static String getSCMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir =
-            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+            conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
 
     // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
     if (Strings.isNullOrEmpty(snapshotDir)) {

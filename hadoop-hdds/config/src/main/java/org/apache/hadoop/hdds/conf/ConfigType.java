@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.TimeDurationUtil.getTimeDurationHelper;
+
 /**
  * Possible type of injected configuration.
  * <p>
@@ -24,13 +26,76 @@ package org.apache.hadoop.hdds.conf;
  * the configuration field.
  */
 public enum ConfigType {
-  AUTO,
-  STRING,
-  BOOLEAN,
-  INT,
-  LONG,
-  TIME,
-  SIZE,
-  CLASS,
-  DOUBLE
+  AUTO {
+    @Override
+    Object parse(String value, Config config, Class<?> type, String key) {
+      throw new UnsupportedOperationException();
+    }
+
+  },
+  STRING {
+    @Override
+    String parse(String value, Config config, Class<?> type, String key) {
+      return value;
+    }
+
+  },
+  BOOLEAN {
+    @Override
+    Boolean parse(String value, Config config, Class<?> type, String key) {
+      return Boolean.parseBoolean(value);
+    }
+
+  },
+  INT {
+    @Override
+    Integer parse(String value, Config config, Class<?> type, String key) {
+      return Integer.parseInt(value);
+    }
+
+  },
+  LONG {
+    @Override
+    Long parse(String value, Config config, Class<?> type, String key) {
+      return Long.parseLong(value);
+    }
+
+  },
+  TIME {
+    @Override
+    Long parse(String value, Config config, Class<?> type, String key) {
+      return getTimeDurationHelper(key, value, config.timeUnit());
+    }
+
+  },
+  SIZE {
+    @Override
+    Object parse(String value, Config config, Class<?> type, String key) {
+      StorageSize measure = StorageSize.parse(value);
+      long val = Math.round(measure.getUnit().toBytes(measure.getValue()));
+      if (type == int.class) {
+        return (int) val;
+      }
+      return val;
+    }
+
+  },
+  CLASS {
+    @Override
+    Class<?> parse(String value, Config config, Class<?> type, String key)
+        throws ClassNotFoundException {
+      return Class.forName(value);
+    }
+
+  },
+  DOUBLE {
+    @Override
+    Double parse(String value, Config config, Class<?> type, String key) {
+      return Double.parseDouble(value);
+    }
+
+  };
+
+  abstract Object parse(String value, Config config, Class<?> type, String key)
+      throws Exception;
 }

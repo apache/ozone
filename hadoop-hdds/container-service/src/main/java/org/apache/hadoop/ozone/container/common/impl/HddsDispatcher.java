@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -57,19 +55,26 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
-
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -200,7 +205,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     boolean isWriteStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
-            == DispatcherContext.WriteChunkStage.WRITE_DATA);
+            == DispatcherContext.WriteChunkStage.WRITE_DATA)
+            || (cmdType == Type.StreamInit);
     boolean isWriteCommitStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -332,11 +338,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // state here.
 
       Result result = responseProto.getResult();
-      if (cmdType == Type.CreateContainer
-          && result == Result.SUCCESS && dispatcherContext != null) {
-        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
-        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
-      }
       if (!HddsUtils.isReadOnly(msg) && !canIgnoreException(result)) {
         // If the container is open/closing and the container operation
         // has failed, it should be first marked unhealthy and the initiate the
@@ -360,7 +361,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                 || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
-          handler.markContainerUnhealthy(container);
+          // TODO HDDS-7096 + HDDS-8781: Use on demand scanning for the open
+          //  container instead.
+          handler.markContainerUnhealthy(container,
+              ScanResult.unhealthy(ScanResult.FailureType.WRITE_FAILURE,
+                  new File(container.getContainerData().getContainerPath()),
+                  new StorageContainerException(result)));
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
@@ -373,11 +379,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             container.getContainerData().getState() == State.UNHEALTHY);
         sendCloseContainerActionIfNeeded(container);
       }
-
+      if (cmdType == Type.CreateContainer
+          && result == Result.SUCCESS && dispatcherContext != null) {
+        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
+        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+      }
       if (result == Result.SUCCESS) {
         updateBCSID(container, dispatcherContext, cmdType);
         audit(action, eventType, params, AuditEventStatus.SUCCESS, null);
       } else {
+        //TODO HDDS-7096:
+        // This is a too general place for on demand scanning.
+        // Create a specific exception that signals for on demand scanning
+        // and move this general scan to where it is more appropriate.
+        // Add integration tests to test the full functionality.
+        OnDemandContainerDataScanner.scanContainer(container);
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -531,7 +547,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    */
   private void sendCloseContainerActionIfNeeded(Container container) {
     // We have to find a more efficient way to close a container.
-    boolean isSpaceFull = isContainerFull(container);
+    boolean isSpaceFull = isContainerFull(container) || isVolumeFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
       ContainerData containerData = container.getContainerData();
@@ -559,10 +575,27 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  private boolean isVolumeFull(Container container) {
+    boolean isOpen = Optional.ofNullable(container)
+        .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
+        .orElse(Boolean.FALSE);
+    if (isOpen) {
+      HddsVolume volume = container.getContainerData().getVolume();
+      long volumeCapacity = volume.getCapacity();
+      long volumeFreeSpaceToSpare =
+          VolumeUsage.getMinVolumeFreeSpace(conf, volumeCapacity);
+      long volumeFree = volume.getAvailable();
+      long volumeCommitted = volume.getCommittedBytes();
+      long volumeAvailable = volumeFree - volumeCommitted;
+      return (volumeAvailable <= volumeFreeSpaceToSpare);
+    }
+    return false;
+  }
+
   private boolean isContainerUnhealthy(Container container) {
     return Optional.ofNullable(container).map(
-        cont -> (cont.getContainerState() ==
-            ContainerDataProto.State.UNHEALTHY))
+            cont -> (cont.getContainerState() ==
+                ContainerDataProto.State.UNHEALTHY))
         .orElse(Boolean.FALSE);
   }
 
@@ -694,4 +727,21 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     default: return false;
     }
   }
+
+  @Override
+  public StateMachine.DataChannel getStreamDataChannel(
+          ContainerCommandRequestProto msg)
+          throws StorageContainerException {
+    long containerID = msg.getContainerID();
+    Container container = getContainer(containerID);
+    if (container != null) {
+      Handler handler = getHandler(getContainerType(container));
+      return handler.getStreamDataChannel(container, msg);
+    } else {
+      throw new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    }
+  }
+
 }

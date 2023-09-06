@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
+
 /**
  * Mixin class to handle ObjectID and UpdateID.
  */
@@ -52,7 +54,7 @@ public class WithObjectID extends WithMetadata {
   }
 
   /**
-   * Set the Object ID. If this value is already set then this function throws.
+   * Set the Object ID.
    * There is a reason why we cannot use the final here. The object
    * ({@link OmVolumeArgs}/ {@link OmBucketInfo}/ {@link OmKeyInfo}) is
    * deserialized from the protobuf in many places in code. We need to set
@@ -61,7 +63,7 @@ public class WithObjectID extends WithMetadata {
    * @param obId - long
    */
   public void setObjectID(long obId) {
-    if (this.objectID != 0) {
+    if (this.objectID != 0 && obId != OBJECT_ID_RECLAIM_BLOCKS) {
       throw new UnsupportedOperationException("Attempt to modify object ID " +
           "which is not zero. Current Object ID is " + this.objectID);
     }

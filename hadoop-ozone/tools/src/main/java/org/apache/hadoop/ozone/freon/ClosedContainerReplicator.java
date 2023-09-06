@@ -31,16 +31,18 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-import org.jetbrains.annotations.NotNull;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -77,6 +79,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
 
   private ReplicationSupervisor supervisor;
 
+  private ContainerReplicator replicator;
+
   private Timer timer;
 
   private List<ReplicationTask> replicationTasks;
@@ -93,14 +97,14 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
       checkDestinationDirectory(dir);
     }
 
-    //logic same as the download+import on the destination datanode
-    initializeReplicationSupervisor(conf);
-
     final ContainerOperationClient containerOperationClient =
         new ContainerOperationClient(conf);
 
     final List<ContainerInfo> containerInfos =
         containerOperationClient.listContainer(0L, 1_000_000);
+
+    //logic same as the download+import on the destination datanode
+    initializeReplicationSupervisor(conf, containerInfos.size() * 2);
 
     replicationTasks = new ArrayList<>();
 
@@ -123,8 +127,9 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         //if datanode is specified, replicate only container if it has a
         //replica.
         if (datanode.isEmpty() || datanodeUUIDs.contains(datanode)) {
-          replicationTasks.add(new ReplicationTask(container.getContainerID(),
-              datanodesWithContainer));
+          replicationTasks.add(new ReplicationTask(
+              ReplicateContainerCommand.fromSources(container.getContainerID(),
+                  datanodesWithContainer), replicator));
         }
       }
 
@@ -161,9 +166,8 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
             + " (used as destination) should be empty");
   }
 
-  @NotNull
-  private void initializeReplicationSupervisor(ConfigurationSource conf)
-      throws IOException {
+  private void initializeReplicationSupervisor(
+      ConfigurationSource conf, int queueSize) throws IOException {
     String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.isEmpty()) {
@@ -197,13 +201,20 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     ContainerController controller =
         new ContainerController(containerSet, handlers);
 
-    ContainerReplicator replicator =
-        new DownloadAndImportReplicator(containerSet,
-            controller,
-            new SimpleContainerDownloader(conf, null),
-            new TarContainerPacker());
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
+        controller, null);
+    replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
+        new SimpleContainerDownloader(conf, null));
 
-    supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
+    DatanodeConfiguration datanodeConfig =
+        conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setCommandQueueLimit(queueSize);
+    ReplicationServer.ReplicationConfig replicationConfig
+        = conf.getObject(ReplicationServer.ReplicationConfig.class);
+    supervisor = ReplicationSupervisor.newBuilder()
+        .datanodeConfig(datanodeConfig)
+        .replicationConfig(replicationConfig)
+        .build();
   }
 
   private void replicateContainer(long counter) throws Exception {

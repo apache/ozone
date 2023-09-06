@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -73,13 +74,16 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerCountBySize;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
@@ -89,10 +93,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,6 +121,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -132,7 +140,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private MetricsProxyEndpoint metricsProxyEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
-  private TableCountTask tableCountTask;
+  private ContainerSizeCountTask containerSizeCountTask;
+  private OmTableInsightTask omTableInsightTask;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
@@ -143,6 +152,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
+  private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -151,6 +161,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -225,24 +237,31 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
             .build();
 
+    reconScm = (ReconStorageContainerManagerFacade)
+        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     Configuration sqlConfiguration =
         reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
-        fileCountBySizeDao, utilizationSchemaDefinition);
+        fileCountBySizeDao,
+        containerCountBySizeDao,
+        utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
-    tableCountTask = new TableCountTask(
+    omTableInsightTask = new OmTableInsightTask(
         globalStatsDao, sqlConfiguration, reconOMMetadataManager);
-    reconScm = (ReconStorageContainerManagerFacade)
-        reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(reconScm, globalStatsDao);
+        new ClusterStateEndpoint(reconScm, globalStatsDao,
+            containerHealthSchemaManager);
+    containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
     metricsProxyEndpoint =
@@ -250,6 +269,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     dslContext = getDslContext();
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
@@ -361,9 +381,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     } catch (Exception ex) {
       Assertions.fail(ex.getMessage());
     }
-
     // Write Data to OM
-
     // A sample volume (sampleVol) and a bucket (bucketOne) is already created
     // in AbstractOMMetadataManagerTest.
     // Create a new volume and bucket and then write keys to the bucket.
@@ -388,12 +406,29 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // key = key_one
     writeDataToOm(reconOMMetadataManager, "key_one");
-
     // key = key_two
     writeDataToOm(reconOMMetadataManager, "key_two");
-
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
+
+    // Populate the deletedKeys table in OM DB
+    List<String> deletedKeysList1 = Arrays.asList("key1");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList1, "Bucket1", "Volume1");
+    List<String> deletedKeysList2 = Arrays.asList("key2", "key2");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList2, "Bucket2", "Volume2");
+    List<String> deletedKeysList3 = Arrays.asList("key3", "key3", "key3");
+    writeDeletedKeysToOm(reconOMMetadataManager,
+        deletedKeysList3, "Bucket3", "Volume3");
+
+    // Populate the deletedDirectories table in OM DB
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket1", "Volume1", "dir1",
+        3L, 2L, 1L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket2", "Volume2", "dir2",
+        6L, 5L, 4L);
+    writeDeletedDirToOm(reconOMMetadataManager, "Bucket3", "Volume3", "dir3",
+        9L, 8L, 7L);
 
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
@@ -589,6 +624,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(0, clusterStateResponse.getKeys());
     Assertions.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assertions.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
+    Assertions.assertEquals(0, clusterStateResponse.getMissingContainers());
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = clusterStateEndpoint.getClusterState();
@@ -599,13 +635,19 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // check volume, bucket and key count after running table count task
     Pair<String, Boolean> result =
-        tableCountTask.reprocess(reconOMMetadataManager);
+        omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();
     Assertions.assertEquals(2, clusterStateResponse.getVolumes());
     Assertions.assertEquals(2, clusterStateResponse.getBuckets());
     Assertions.assertEquals(3, clusterStateResponse.getKeys());
+    // Since a single RepeatedOmKeyInfo can contain multiple deleted keys with
+    // the same name, the total count of pending deletion keys is determined by
+    // summing the count of the keyInfoList. Each keyInfoList comprises
+    // OmKeyInfo objects that represent the deleted keys.
+    Assertions.assertEquals(6, clusterStateResponse.getKeysPendingDeletion());
+    Assertions.assertEquals(3, clusterStateResponse.getDeletedDirs());
   }
 
   @Test
@@ -629,22 +671,44 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     given(omKeyInfo3.getDataSize()).willReturn(1000L);
 
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
-    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableLegacy = mock(TypedTable.class);
+    TypedTable<String, OmKeyInfo> keyTableFso = mock(TypedTable.class);
 
-    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+    TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValue = mock(
+    TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
+        TypedTable.TypedKeyValue.class);
+    TypedTable.TypedKeyValue mockKeyValueFso = mock(
         TypedTable.TypedKeyValue.class);
 
-    when(keyTable.iterator()).thenReturn(mockKeyIter);
-    when(omMetadataManager.getKeyTable(getBucketLayout())).thenReturn(keyTable);
-    when(mockKeyIter.hasNext())
+    when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
+    when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);
+
+    when(omMetadataManager.getKeyTable(BucketLayout.LEGACY)).thenReturn(
+        keyTableLegacy);
+    when(omMetadataManager.getKeyTable(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED)).thenReturn(keyTableFso);
+
+    when(mockKeyIterLegacy.hasNext())
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(true)
         .thenReturn(false);
-    when(mockKeyIter.next()).thenReturn(mockKeyValue);
-    when(mockKeyValue.getValue())
+    when(mockKeyIterFso.hasNext())
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(false);
+    when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
+    when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
+
+    when(mockKeyValueLegacy.getValue())
+        .thenReturn(omKeyInfo1)
+        .thenReturn(omKeyInfo2)
+        .thenReturn(omKeyInfo3);
+    when(mockKeyValueFso.getValue())
         .thenReturn(omKeyInfo1)
         .thenReturn(omKeyInfo2)
         .thenReturn(omKeyInfo3);
@@ -660,13 +724,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(3, resultSet.size());
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
         o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
-        o.getCount() == 1L));
+        o.getCount() == 2L));
 
     // Test for "volume" query param
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);
@@ -703,6 +767,53 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
+  }
+
+  @Test
+  public void testGetContainerCounts() throws Exception {
+    // Mock container info objects with different sizes
+    ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
+    given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
+    given(omContainerInfo1.getUsedBytes()).willReturn(1500000000L); // 1.5GB
+
+    ContainerInfo omContainerInfo2 = mock(ContainerInfo.class);
+    given(omContainerInfo2.containerID()).willReturn(new ContainerID(2));
+    given(omContainerInfo2.getUsedBytes()).willReturn(2500000000L); // 2.5GB
+
+    // Create a list of container info objects
+    List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo1);
+    containers.add(omContainerInfo2);
+
+    // Process the list of containers through the container size count task
+    containerSizeCountTask.process(containers);
+
+    // Test fetching all container counts
+    Response response = utilizationEndpoint.getContainerCounts(0L);
+    List<ContainerCountBySize> resultSet =
+        (List<ContainerCountBySize>) response.getEntity();
+
+    assertEquals(2, resultSet.size());
+    // The UpperBound Stored for 1.5GB in the table is 2147483648L
+    assertTrue(resultSet.stream().anyMatch(o -> o.getContainerSize() ==
+        2147483648L && o.getCount() == 1L));
+    // The UpperBound Stored for 2.5GB in the table is 4294967296L
+    assertTrue(resultSet.stream().anyMatch(o -> o.getContainerSize() ==
+        4294967296L && o.getCount() == 1L));
+
+    // Test fetching a specific container size (1.5GB)
+    response = utilizationEndpoint.getContainerCounts(1500000000L);
+    resultSet = (List<ContainerCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    // The UpperBound Stored for 1.5GB is 2147483648L (2GB)
+    assertEquals(2147483648L, resultSet.get(0).getContainerSize());
+    assertEquals(1, resultSet.get(0).getCount());
+
+    // Test fetching non-existent container size
+    response = utilizationEndpoint.getContainerCounts(8192L);
+    resultSet = (List<ContainerCountBySize>) response.getEntity();
+    assertTrue(resultSet.isEmpty());
+
   }
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)

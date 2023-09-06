@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -470,19 +470,29 @@ public final class ContainerTestHelper {
    * Returns a close container request.
    * @param pipeline - pipeline
    * @param containerID - ID of the container.
+   * @param token - container token
    * @return ContainerCommandRequestProto.
    */
   public static ContainerCommandRequestProto getCloseContainer(
-      Pipeline pipeline, long containerID) throws IOException {
-    return ContainerCommandRequestProto.newBuilder()
+      Pipeline pipeline, long containerID, Token<?> token) throws IOException {
+    Builder builder = ContainerCommandRequestProto.newBuilder()
         .setCmdType(ContainerProtos.Type.CloseContainer)
         .setContainerID(containerID)
         .setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-        .build();
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+
+    if (token != null) {
+      builder.setEncodedToken(token.encodeToUrlString());
+    }
+
+    return builder.build();
   }
 
+  public static ContainerCommandRequestProto getCloseContainer(
+      Pipeline pipeline, long containerID) throws IOException {
+    return getCloseContainer(pipeline, containerID, null);
+  }
   /**
    * Returns a simple request without traceId.
    * @param pipeline - pipeline
@@ -532,18 +542,27 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID) {
-    // Add 2ms delay so that localID based on UtcTime
-    // won't collide.
-    sleep(2);
-    return new BlockID(containerID, HddsUtils.getTime());
+    return new BlockID(containerID, UniqueId.next());
   }
 
   public static long getTestContainerID() {
-    return HddsUtils.getTime();
+    return UniqueId.next();
   }
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
+  }
+
+  public static byte[] generateData(int length, boolean random) {
+    final byte[] data = new byte[length];
+    if (random) {
+      ThreadLocalRandom.current().nextBytes(data);
+    } else {
+      for (int i = 0; i < length; i++) {
+        data[i] = (byte) i;
+      }
+    }
+    return data;
   }
 
   /**

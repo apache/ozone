@@ -20,10 +20,10 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.4.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-interface-storage</artifactId>
-  <version>1.3.0-SNAPSHOT</version>
+  <version>1.4.0-SNAPSHOT</version>
   <description>Apache Ozone Storage Interface</description>
   <name>Apache Ozone Storage Interface</name>
   <packaging>jar</packaging>

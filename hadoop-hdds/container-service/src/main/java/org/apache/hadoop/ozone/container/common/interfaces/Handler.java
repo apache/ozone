@@ -37,6 +37,9 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.ratis.statemachine.StateMachine;
+
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Dispatcher sends ContainerCommandRequests to Handler. Each Container Type
@@ -80,6 +83,10 @@ public abstract class Handler {
           containerType + "doesn't exist.");
     }
   }
+
+  public abstract StateMachine.DataChannel getStreamDataChannel(
+          Container container, ContainerCommandRequestProto msg)
+          throws StorageContainerException;
 
   /**
    * Returns the Id of this datanode.
@@ -146,18 +153,22 @@ public abstract class Handler {
    * Marks the container Unhealthy. Moves the container to UNHEALTHY state.
    *
    * @param container container to update
+   * @param reason The reason the container was marked unhealthy
    * @throws IOException in case of exception
    */
-  public abstract void markContainerUnhealthy(Container container)
+  public abstract void markContainerUnhealthy(Container container,
+                                              ScanResult reason)
       throws IOException;
 
   /**
    * Moves the Container to QUASI_CLOSED state.
    *
    * @param container container to be quasi closed
+   * @param reason The reason the container was quasi closed, for logging
+   *               purposes.
    * @throws IOException
    */
-  public abstract void quasiCloseContainer(Container container)
+  public abstract void quasiCloseContainer(Container container, String reason)
       throws IOException;
 
   /**
@@ -189,6 +200,17 @@ public abstract class Handler {
    * @throws IOException
    */
   public abstract void deleteBlock(Container container, BlockData blockData)
+      throws IOException;
+
+  /**
+   * Deletes the possible onDisk but unreferenced blocks/chunks with localID
+   * in the container.
+   *
+   * @param container container whose block/chunk is to be deleted
+   * @param localID   localId of the block/chunk
+   * @throws IOException
+   */
+  public abstract void deleteUnreferenced(Container container, long localID)
       throws IOException;
 
   public void setClusterID(String clusterID) {

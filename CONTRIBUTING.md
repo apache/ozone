@@ -30,6 +30,7 @@ If you have any questions, please don't hesitate to contact
 
  * **email**: use dev@ozone.apache.org.
  * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
+ * **GitHub Discussions**: You can also interact with the community using [GitHub Discussions](https://github.com/apache/ozone/discussions). 
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
 ## Building from source
@@ -111,6 +112,14 @@ Basic code conventions followed by Ozone:
  * no `@author` tags, authorship is indicated by Git history
 
 These are checked by tools like Checkstyle and RAT.
+
+For IntelliJ users, it is recommended to import and select the Code Style scheme located at:
+
+```
+./hadoop-ozone/dev-support/intellij/ozone-style.xml
+```
+
+See https://www.jetbrains.com/help/idea/configuring-code-style.html#import-code-style for detailed instructions.
 
 ### Check your contribution
 

@@ -19,17 +19,18 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.util.CacheMetrics;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +50,6 @@ public class ScmClient {
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
-  private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
@@ -104,15 +104,6 @@ public class ScmClient {
     return this.containerClient;
   }
 
-  public void setUpdateServiceGrpcClient(
-      SCMUpdateServiceGrpcClient updateClient) {
-    this.updateServiceGrpcClient = updateClient;
-  }
-
-  public SCMUpdateServiceGrpcClient getUpdateServiceGrpcClient() {
-    return updateServiceGrpcClient;
-  }
-
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
                                                   boolean forceRefresh)
       throws IOException {
@@ -123,6 +114,18 @@ public class ScmClient {
       return containerLocationCache.getAll(containerIds);
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
+    } catch (InvalidCacheLoadException e) {
+      // this is thrown when a container is not found from SCM.
+      // In this case, return  available, instead of propagating the
+      // exception to client code.
+      Map<Long, Pipeline> result = new HashMap<>();
+      for (Long containerId : containerIds) {
+        Pipeline p = containerLocationCache.getIfPresent(containerId);
+        if (p != null) {
+          result.put(containerId, p);
+        }
+      }
+      return result;
     }
   }
 

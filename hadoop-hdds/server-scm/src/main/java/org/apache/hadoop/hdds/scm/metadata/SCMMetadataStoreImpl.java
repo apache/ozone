@@ -102,7 +102,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private DBStore store;
   private final OzoneConfiguration configuration;
 
-  private SCMMetadataStoreMetrics metrics;
   private Map<String, Table<?, ?>> tableMap = new ConcurrentHashMap<>();
 
   /**
@@ -192,14 +191,12 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       metaTable = META.getTable(store);
 
-      checkAndPopulateTable(moveTable, META.getName());
+      checkAndPopulateTable(metaTable, META.getName());
 
       statefulServiceConfigTable = STATEFUL_SERVICE_CONFIG.getTable(store);
 
       checkAndPopulateTable(statefulServiceConfigTable,
           STATEFUL_SERVICE_CONFIG.getName());
-
-      metrics = SCMMetadataStoreMetrics.create(this);
     }
   }
 
@@ -208,10 +205,6 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
     if (store != null) {
       store.close();
       store = null;
-    }
-    if (metrics != null) {
-      metrics.unRegister();
-      metrics = null;
     }
   }
 
@@ -334,9 +327,5 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   Map<String, Table<?, ?>> getTableMap() {
     return tableMap;
-  }
-
-  SCMMetadataStoreMetrics getMetrics() {
-    return metrics;
   }
 }

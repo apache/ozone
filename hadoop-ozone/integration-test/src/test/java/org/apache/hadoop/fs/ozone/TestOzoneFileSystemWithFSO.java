@@ -20,12 +20,14 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -48,7 +50,10 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -80,12 +85,6 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   @Override
   public void cleanup() {
     super.cleanup();
-    try {
-      deleteRootDir();
-    } catch (IOException e) {
-      LOG.info("Failed to cleanup DB tables.", e);
-      fail("Failed to cleanup DB tables." + e.getMessage());
-    }
   }
 
   private static final Logger LOG =
@@ -348,6 +347,108 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
+  @Test
+  public void testRenameParentDirModificationTime() throws IOException {
+    Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
+    Path file1 = new Path(dir1, "file1");
+    Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
+    // mv "/dir1/file1" to "/dir2/file1"
+    Path renamedFile1 = new Path(dir2, "file1");
+    getFs().mkdirs(dir1);
+    getFs().create(file1, false).close();
+    getFs().mkdirs(dir2);
+
+    long dir1BeforeMTime = getFs().getFileStatus(dir1).getModificationTime();
+    long dir2BeforeMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long file1BeforeMTime = getFs().getFileStatus(file1).getModificationTime();
+    getFs().rename(file1, renamedFile1);
+    long dir1AfterMTime = getFs().getFileStatus(dir1).getModificationTime();
+    long dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long file1AfterMTime = getFs().getFileStatus(renamedFile1)
+        .getModificationTime();
+    // rename should change the parent directory of source and object files
+    // modification time but not change modification time of the renamed file
+    assertTrue(dir1BeforeMTime < dir1AfterMTime);
+    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertEquals(file1BeforeMTime, file1AfterMTime);
+
+    // mv "/dir1/subdir1/" to "/dir2/subdir1/"
+    Path subdir1 = new Path(dir1, "subdir1");
+    Path renamedSubdir1 = new Path(dir2, "subdir1");
+    getFs().mkdirs(subdir1);
+
+    dir1BeforeMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2BeforeMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1BeforeMTime = getFs().getFileStatus(subdir1)
+        .getModificationTime();
+    getFs().rename(subdir1, renamedSubdir1);
+    dir1AfterMTime = getFs().getFileStatus(dir1).getModificationTime();
+    dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
+    long subdir1AfterMTime = getFs().getFileStatus(renamedSubdir1)
+        .getModificationTime();
+    assertTrue(dir1BeforeMTime < dir1AfterMTime);
+    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertEquals(subdir1BeforeMTime, subdir1AfterMTime);
+  }
+
+  @Test
+  public void testRenameParentBucketModificationTime() throws IOException {
+    OMMetadataManager omMgr =
+        getCluster().getOzoneManager().getMetadataManager();
+
+    // mv /file1 -> /renamedFile1, the bucket mtime should be changed
+    Path file1 = new Path("/file1");
+    Path renamedFile1 = new Path("/renamedFile1");
+    getFs().create(file1, false).close();
+    renameAndAssert(omMgr, file1, renamedFile1, true);
+
+    // mv /dir1/subFile2 -> /dir2/renamedSubFile2,
+    // the bucket mtime should not be changed
+    Path dir1 = new Path(getFs().getUri().toString(), "/dir1");
+    Path subFile2 = new Path(dir1, "subFile2");
+    Path dir2 = new Path(getFs().getUri().toString(), "/dir2");
+    Path renamedSubFile2 = new Path(dir2, "renamedSubFile2");
+    getFs().mkdirs(dir1);
+    getFs().mkdirs(dir2);
+    getFs().create(subFile2, false).close();
+    renameAndAssert(omMgr, subFile2, renamedSubFile2, false);
+
+    // mv /dir3/subFile3 -> "/renamedFile3"  the bucket mtime should be changed
+    Path dir3 = new Path(getFs().getUri().toString(), "/dir3");
+    Path subFile3 = new Path(dir3, "subFile3");
+    Path renamedFile3 = new Path("/renamedFile3");
+    getFs().mkdirs(dir3);
+    getFs().create(subFile3, false).close();
+    renameAndAssert(omMgr, subFile3, renamedFile3, true);
+
+    // mv /file4 -> "/dir4/renamedFile4"  the bucket mtime should be changed
+    Path file4 = new Path("/file4");
+    Path dir4 = new Path(getFs().getUri().toString(), "/dir4");
+    Path renamedSubFile4 = new Path(dir4, "subFile3");
+    getFs().mkdirs(dir4);
+    getFs().create(file4, false).close();
+    renameAndAssert(omMgr, file4, renamedSubFile4, true);
+  }
+
+  private void renameAndAssert(OMMetadataManager omMgr,
+      Path from, Path to, boolean exceptChangeMtime) throws IOException {
+    OmBucketInfo omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketBeforeMTime = omBucketInfo.getModificationTime();
+    long fileBeforeMTime = getFs().getFileStatus(from).getModificationTime();
+    getFs().rename(from, to);
+    omBucketInfo = omMgr.getBucketTable()
+        .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
+    long bucketAfterMTime = omBucketInfo.getModificationTime();
+    long fileAfterMTime = getFs().getFileStatus(to).getModificationTime();
+    if (exceptChangeMtime) {
+      assertTrue(bucketBeforeMTime < bucketAfterMTime);
+    } else {
+      assertEquals(bucketBeforeMTime, bucketAfterMTime);
+    }
+    assertEquals(fileBeforeMTime, fileAfterMTime);
+  }
+
   @Override
   @Test
   @Ignore("TODO:HDDS-2939")
@@ -463,6 +564,29 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         return false;
       }
     }, 1000, 120000);
+  }
+
+  /**
+   * Verify recoverLease() and isFileClosed() APIs.
+   * @throws Exception
+   */
+  @Test
+  public void testLeaseRecoverable() throws Exception {
+    // Create a file
+    Path parent = new Path("/d1/d2/");
+    Path source = new Path(parent, "file1");
+
+    LeaseRecoverable fs = (LeaseRecoverable)getFs();
+    FSDataOutputStream stream = getFs().create(source);
+    // file not visible yet
+    assertThrows(OMException.class, () -> fs.isFileClosed(source));
+    stream.write(1);
+    stream.hsync();
+    // file is visible and open
+    assertFalse(fs.isFileClosed(source));
+    assertTrue(fs.recoverLease(source));
+    // file is closed after lease recovery
+    assertTrue(fs.isFileClosed(source));
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,

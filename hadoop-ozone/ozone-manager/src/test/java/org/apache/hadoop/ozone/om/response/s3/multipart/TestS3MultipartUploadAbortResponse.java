@@ -100,7 +100,8 @@ public class TestS3MultipartUploadAbortResponse
   protected S3InitiateMultipartUploadResponse
         getS3InitiateMultipartUploadResponse(
       String volumeName, String bucketName, String keyName,
-      String multipartUploadID, long volumeId, long bucketId) {
+      String multipartUploadID, long volumeId, long bucketId)
+      throws IOException {
     return createS3InitiateMPUResponse(volumeName, bucketName, keyName,
         multipartUploadID);
   }
@@ -167,10 +168,14 @@ public class TestS3MultipartUploadAbortResponse
         omMetadataManager.getDeletedTable()) == 2);
 
     String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo()
+                .getObjectID(), multipartKey);
 
     String part2DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(2).getPartName();
+        omMetadataManager.getOzoneDeletePathKey(
+            omMultipartKeyInfo.getPartKeyInfo(2).getPartKeyInfo()
+                .getObjectID(), multipartKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

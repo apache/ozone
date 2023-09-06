@@ -40,8 +40,11 @@ public class DBCheckpointMetrics {
   // Metrics to track checkpoint statistics from last run.
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
   private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
+  private @Metric MutableGaugeLong lastCheckpointStreamingNumSSTExcluded;
+  // NOTE: numCheckpoints includes numIncrementalCheckpoints
   private @Metric MutableCounterLong numCheckpoints;
   private @Metric MutableCounterLong numCheckpointFails;
+  private @Metric MutableCounterLong numIncrementalCheckpoints;
 
   public DBCheckpointMetrics() {
   }
@@ -53,6 +56,11 @@ public class DBCheckpointMetrics {
         new DBCheckpointMetrics());
   }
 
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
   @VisibleForTesting
   public void setLastCheckpointCreationTimeTaken(long val) {
     this.lastCheckpointCreationTimeTaken.set(val);
@@ -61,6 +69,10 @@ public class DBCheckpointMetrics {
   @VisibleForTesting
   public void setLastCheckpointStreamingTimeTaken(long val) {
     this.lastCheckpointStreamingTimeTaken.set(val);
+  }
+
+  public void setLastCheckpointStreamingNumSSTExcluded(long val) {
+    this.lastCheckpointStreamingNumSSTExcluded.set(val);
   }
 
   @VisibleForTesting
@@ -74,6 +86,11 @@ public class DBCheckpointMetrics {
   }
 
   @VisibleForTesting
+  public void incNumIncrementalCheckpoint() {
+    numIncrementalCheckpoints.incr();
+  }
+
+  @VisibleForTesting
   public long getLastCheckpointCreationTimeTaken() {
     return lastCheckpointCreationTimeTaken.value();
   }
@@ -84,6 +101,11 @@ public class DBCheckpointMetrics {
   }
 
   @VisibleForTesting
+  public long getNumIncrementalCheckpoints() {
+    return numIncrementalCheckpoints.value();
+  }
+
+  @VisibleForTesting
   public long getNumCheckpointFails() {
     return numCheckpointFails.value();
   }
@@ -91,5 +113,9 @@ public class DBCheckpointMetrics {
   @VisibleForTesting
   public long getLastCheckpointStreamingTimeTaken() {
     return lastCheckpointStreamingTimeTaken.value();
+  }
+
+  public long getLastCheckpointStreamingNumSSTExcluded() {
+    return lastCheckpointStreamingNumSSTExcluded.value();
   }
 }

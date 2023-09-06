@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,7 +56,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
@@ -127,6 +127,7 @@ public class TestSCMSafeModeManager {
     // Currently, only considered containers which are not in open state.
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
@@ -160,6 +161,7 @@ public class TestSCMSafeModeManager {
     // container list
     for (ContainerInfo container : containers) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, null, queue,
@@ -254,7 +256,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -281,7 +283,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -307,7 +309,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
       scmSafeModeManager = new SCMSafeModeManager(
           conf, containers, null, pipelineManager, queue, serviceManager,
           scmContext);
@@ -340,7 +342,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
@@ -501,12 +503,19 @@ public class TestSCMSafeModeManager {
     // Add 100 containers to the list of containers in SCM
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
     // Assign CLOSED state to first 25 containers and OPEN state to rest
-    // of the containers
+    // of the containers. Set container key count = 10 in each container.
     for (ContainerInfo container : containers.subList(0, 25)) {
       container.setState(HddsProtos.LifeCycleState.CLOSED);
+      container.setNumberOfKeys(10);
     }
     for (ContainerInfo container : containers.subList(25, 100)) {
       container.setState(HddsProtos.LifeCycleState.OPEN);
+      container.setNumberOfKeys(10);
+    }
+
+    // Set the last 5 closed containers to be empty
+    for (ContainerInfo container : containers.subList(20, 25)) {
+      container.setNumberOfKeys(0);
     }
 
     scmSafeModeManager = new SCMSafeModeManager(
@@ -515,14 +524,15 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     // When 10 CLOSED containers are reported by DNs, the computed container
-    // threshold should be 10/25 as there are only 25 CLOSED containers.
+    // threshold should be 10/20 as there are only 20 CLOSED NON-EMPTY
+    // containers.
     // Containers in OPEN state should not contribute towards list of
     // containers while calculating container threshold in SCMSafeNodeManager
-    testContainerThreshold(containers.subList(0, 10), 0.4);
+    testContainerThreshold(containers.subList(0, 10), 0.5);
     assertTrue(scmSafeModeManager.getInSafeMode());
 
-    // When remaining 15 OPEN containers are reported by DNs, the container
-    // threshold should be (10+15)/25.
+    // When remaining 10 CLOSED NON-EMPTY containers are reported by DNs,
+    // the container threshold should be (10+10)/20.
     testContainerThreshold(containers.subList(10, 25), 1.0);
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
@@ -592,7 +602,7 @@ public class TestSCMSafeModeManager {
               queue,
               scmContext,
               serviceManager,
-              new MonotonicClock(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC));
 
       PipelineProvider<RatisReplicationConfig> mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -657,7 +667,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -665,8 +675,6 @@ public class TestSCMSafeModeManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
-    SafeModeEventHandler smHandler = new SafeModeEventHandler();
-    queue.addHandler(SCMEvents.SAFE_MODE_STATUS, smHandler);
     scmSafeModeManager = new SCMSafeModeManager(
         config, containers, null, pipelineManager, queue, serviceManager,
         scmContext);
@@ -682,7 +690,6 @@ public class TestSCMSafeModeManager {
       assertFalse(scmSafeModeManager.getPreCheckComplete());
     }
     queue.processAll(5000);
-    assertEquals(0, smHandler.getInvokedCount());
 
     // Register last DataNode and check that the SafeModeEvent gets fired, but
     // SafeMode is still enabled with preCheck completed.
@@ -690,9 +697,8 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     queue.processAll(5000);
 
-    assertEquals(1, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertTrue(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertTrue(scmSafeModeManager.getInSafeMode());
 
     /* There is a race condition where the background pipeline creation
      * task creates the pipeline before the following create call.
@@ -716,9 +722,8 @@ public class TestSCMSafeModeManager {
     firePipelineEvent(pipelineManager, pipeline);
 
     queue.processAll(5000);
-    assertEquals(2, smHandler.getInvokedCount());
-    assertTrue(smHandler.getPreCheckComplete());
-    assertFalse(smHandler.getIsInSafeMode());
+    assertTrue(scmSafeModeManager.getPreCheckComplete());
+    assertFalse(scmSafeModeManager.getInSafeMode());
   }
 
   private static class SafeModeEventHandler

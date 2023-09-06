@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -164,7 +163,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
           new CacheKey<>(tenantId),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       // Decrement volume refCount
       if (decVolumeRefCount) {
@@ -183,7 +182,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
         omMetadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(dbVolumeKey),
-            new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+            CacheValue.get(transactionLogIndex, omVolumeArgs));
 
         // TODO: Set response dbVolumeKey?
       }

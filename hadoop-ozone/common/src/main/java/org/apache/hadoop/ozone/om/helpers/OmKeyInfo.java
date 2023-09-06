@@ -32,6 +32,11 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
@@ -48,8 +53,25 @@ import org.slf4j.LoggerFactory;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithParentObjectId {
+public final class OmKeyInfo extends WithParentObjectId
+    implements CopyObject<OmKeyInfo> {
   private static final Logger LOG = LoggerFactory.getLogger(OmKeyInfo.class);
+
+  private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
+  private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+
+  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+    return new DelegatedCodec<>(
+        Proto2Codec.get(KeyInfo.class),
+        OmKeyInfo::getFromProtobuf,
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION));
+  }
+
+  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
+    LOG.info("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  }
+
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -60,7 +82,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   private long modificationTime;
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
-  private FileChecksum fileChecksum;
+  private final FileChecksum fileChecksum;
   /**
    * Support OFS use-case to identify if the key is a file or a directory.
    */
@@ -188,6 +210,10 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public boolean isFile() {
     return isFile;
+  }
+
+  public boolean isHsync() {
+    return metadata.containsKey(OzoneConsts.HSYNC_CLIENT_ID);
   }
 
   /**
@@ -397,6 +423,25 @@ public final class OmKeyInfo extends WithParentObjectId {
 
   public FileChecksum getFileChecksum() {
     return fileChecksum;
+  }
+
+  @Override
+  public String toString() {
+    return "OmKeyInfo{" +
+        "volumeName='" + volumeName + '\'' +
+        ", bucketName='" + bucketName + '\'' +
+        ", keyName='" + keyName + '\'' +
+        ", dataSize=" + dataSize +
+        ", keyLocationVersions=" + keyLocationVersions +
+        ", creationTime=" + creationTime +
+        ", modificationTime=" + modificationTime +
+        ", replicationConfig=" + replicationConfig +
+        ", encInfo=" + (encInfo == null ? "null" : "<REDACTED>") +
+        ", fileChecksum=" + fileChecksum +
+        ", isFile=" + isFile +
+        ", fileName='" + fileName + '\'' +
+        ", acls=" + acls +
+        '}';
   }
 
   /**
@@ -748,6 +793,7 @@ public final class OmKeyInfo extends WithParentObjectId {
   /**
    * Return a new copy of the object.
    */
+  @Override
   public OmKeyInfo copyObject() {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
@@ -761,7 +807,8 @@ public final class OmKeyInfo extends WithParentObjectId {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentObjectID(parentObjectID)
-        .setFileName(fileName);
+        .setFileName(fileName)
+        .setFile(isFile);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(

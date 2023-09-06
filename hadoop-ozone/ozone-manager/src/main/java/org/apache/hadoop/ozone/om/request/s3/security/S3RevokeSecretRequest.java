@@ -18,13 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
-import com.google.common.base.Optional;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -43,8 +38,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
-
 /**
  * Handles RevokeS3Secret request.
  */
@@ -62,7 +55,8 @@ public class S3RevokeSecretRequest extends OMClientRequest {
     final RevokeS3SecretRequest s3RevokeSecretRequest =
         getOmRequest().getRevokeS3SecretRequest();
     final String accessId = s3RevokeSecretRequest.getKerberosID();
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final UserGroupInformation ugi =
+        S3SecretRequestHelper.getOrCreateUgi(accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
@@ -91,41 +85,35 @@ public class S3RevokeSecretRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    boolean acquiredLock = false;
     IOException exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     final RevokeS3SecretRequest revokeS3SecretRequest =
         getOmRequest().getRevokeS3SecretRequest();
     String kerberosID = revokeS3SecretRequest.getKerberosID();
     try {
-      acquiredLock =
-         omMetadataManager.getLock().acquireWriteLock(S3_SECRET_LOCK,
-             kerberosID);
-
-      // Remove if entry exists in table
-      if (omMetadataManager.getS3SecretTable().isExist(kerberosID)) {
-        // Invalid entry in table cache immediately
-        omMetadataManager.getS3SecretTable().addCacheEntry(
-            new CacheKey<>(kerberosID),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
-        omClientResponse = new S3RevokeSecretResponse(kerberosID,
-                omResponse.setStatus(Status.OK).build());
-      } else {
-        omClientResponse = new S3RevokeSecretResponse(null,
-                omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
-      }
+      omClientResponse = ozoneManager.getS3SecretManager()
+          .doUnderLock(kerberosID, s3SecretManager -> {
+            // Remove if entry exists in table
+            if (s3SecretManager.hasS3Secret(kerberosID)) {
+              // Invalid entry in table cache immediately
+              s3SecretManager.invalidateCacheEntry(kerberosID);
+              return new S3RevokeSecretResponse(kerberosID,
+                  s3SecretManager,
+                  omResponse.setStatus(Status.OK).build());
+            } else {
+              return new S3RevokeSecretResponse(null,
+                  s3SecretManager,
+                  omResponse.setStatus(Status.S3_SECRET_NOT_FOUND).build());
+            }
+          });
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new S3RevokeSecretResponse(null,
+          ozoneManager.getS3SecretManager(),
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
-      if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK,
-            kerberosID);
-      }
     }
 
     Map<String, String> auditMap = new HashMap<>();

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -29,6 +28,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
@@ -54,8 +54,6 @@ public class TestRatisPipelineCreateAndDestroy {
   private PipelineManager pipelineManager;
 
   public void init(int numDatanodes) throws Exception {
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -75,6 +73,7 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Flaky("HDDS-7886")
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -96,6 +95,7 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Flaky("HDDS-7886")
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);

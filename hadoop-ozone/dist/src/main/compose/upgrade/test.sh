@@ -17,9 +17,6 @@
 
 #suite:compat
 
-# Version that will be run using the local build.
-: "${OZONE_CURRENT_VERSION:=1.3.0}"
-export OZONE_CURRENT_VERSION
 
 TEST_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 source "$TEST_DIR/testlib.sh"
@@ -35,8 +32,13 @@ RESULT_DIR="$ALL_RESULT_DIR" create_results_dir
 
 # Upgrade tests to be run. In CI we want to run just one set, but for a release
 # we might advise the release manager to run the full matrix.
-#run_test non-rolling-upgrade 1.1.0 1.3.0
-run_test non-rolling-upgrade 1.2.1 1.3.0
+
+# This is the version of Ozone that should use the runner image to run the
+# code that was built. Other versions will pull images from docker hub.
+export OZONE_CURRENT_VERSION=1.4.0
+run_test ha non-rolling-upgrade 1.3.0 "$OZONE_CURRENT_VERSION"
+# run_test ha non-rolling-upgrade 1.2.1 "$OZONE_CURRENT_VERSION"
+# run_test om-ha non-rolling-upgrade 1.1.0 "$OZONE_CURRENT_VERSION"
 
 generate_report "upgrade" "$ALL_RESULT_DIR"
 

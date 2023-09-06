@@ -87,7 +87,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   }
 
   public boolean isFileSystemOptimizedBucket(String path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path,
+        OzoneConfiguration.of(getOzoneConfig()));
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
     ObjectStore objectStore = ozoneClient.getObjectStore();
@@ -111,7 +112,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   }
 
   public boolean isObjectStoreBucket(String path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path,
+        OzoneConfiguration.of(getOzoneConfig()));
 
     boolean enableFileSystemPaths = getOzoneConfig()
         .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -147,7 +149,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
    * @throws IOException
    */
   public boolean bucketIsPresentInThePath(String path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsPath = new OFSPath(path,
+        OzoneConfiguration.of(getOzoneConfig()));
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
     ObjectStore objectStore = ozoneClient.getObjectStore();

@@ -31,7 +31,6 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.SecretKeyProto;
@@ -49,13 +48,16 @@ public class OzoneSecretKey implements Writable {
   private PrivateKey privateKey;
   private PublicKey publicKey;
   private SecurityConfig securityConfig;
+  private String certSerialId;
 
-  public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair) {
+  public OzoneSecretKey(int keyId, long expiryDate, KeyPair keyPair,
+      String certificateSerialId) {
     Preconditions.checkNotNull(keyId);
     this.keyId = keyId;
     this.expiryDate = expiryDate;
     this.privateKey = keyPair.getPrivate();
     this.publicKey = keyPair.getPublic();
+    this.certSerialId = certificateSerialId;
   }
 
   /*
@@ -87,6 +89,10 @@ public class OzoneSecretKey implements Writable {
 
   public PublicKey getPublicKey() {
     return publicKey;
+  }
+
+  public String getCertSerialId() {
+    return certSerialId;
   }
 
   public byte[] getEncodedPrivateKey() {

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -61,6 +62,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   @Override
+  public ReentrantReadWriteLock getTableLock(String tableName) {
+    return super.getTableLock(tableName);
+  }
+
+  @Override
   public void start(OzoneConfiguration configuration) throws IOException {
     LOG.info("Starting ReconOMMetadataManagerImpl");
     File reconDbDir =
@@ -86,15 +92,14 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
           .setName(dbFile.getName())
           .setPath(dbFile.toPath().getParent());
       addOMTablesAndCodecs(dbStoreBuilder);
-      DBStore newStore = dbStoreBuilder.build();
-      setStore(newStore);
+      setStore(dbStoreBuilder.build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables();
+      initializeOmTables(true);
       omTablesInitialized = true;
     }
   }
@@ -126,7 +131,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (null == rocksDBStore) {
       return 0;
     } else {
-      return rocksDBStore.getDb().getLatestSequenceNumber();
+      try {
+        return rocksDBStore.getDb().getLatestSequenceNumber();
+      } catch (IOException e) {
+        return 0;
+      }
     }
   }
 

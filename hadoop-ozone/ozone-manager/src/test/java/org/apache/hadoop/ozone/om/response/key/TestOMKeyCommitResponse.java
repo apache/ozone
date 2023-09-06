@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.jetbrains.annotations.NotNull;
@@ -58,7 +62,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete);
+            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -89,7 +93,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     String ozoneKey = getOzoneKey();
 
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, null);
+            omKeyInfo, omResponse, openKey, ozoneKey, null, false);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
@@ -116,14 +120,18 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   public void testAddToDBBatchOnOverwrite() throws Exception {
     OmKeyInfo omKeyInfo = getOmKeyInfo();
     keysToDelete =
-            OmUtils.prepareKeyForDelete(omKeyInfo, null, 100, false);
+            OmUtils.prepareKeyForDelete(omKeyInfo, 100, false);
     Assert.assertNotNull(keysToDelete);
     testAddToDBBatch();
 
-    RepeatedOmKeyInfo keysInDeleteTable =
-            omMetadataManager.getDeletedTable().get(getOzoneKey());
-    Assert.assertNotNull(keysInDeleteTable);
-    Assert.assertEquals(1, keysInDeleteTable.getOmKeyInfoList().size());
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName,
+        omBucketInfo.getBucketName(), keyName);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(
+        null, 100, deletedKey);
+    Assert.assertTrue(rangeKVs.size() > 0);
+    Assert.assertEquals(1,
+        rangeKVs.get(0).getValue().getOmKeyInfoList().size());
 
   }
 
@@ -143,9 +151,16 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @NotNull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey, RepeatedOmKeyInfo deleteKeys) throws IOException {
+          String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+          throws IOException {
     Assert.assertNotNull(omBucketInfo);
+    Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
+    if (null != deleteKeys) {
+      deleteKeys.getOmKeyInfoList().stream().forEach(e -> deleteKeyMap.put(
+          omMetadataManager.getOzoneDeletePathKey(e.getObjectID(), ozoneKey),
+          new RepeatedOmKeyInfo(e)));
+    }
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-            omBucketInfo, deleteKeys);
+            omBucketInfo, deleteKeyMap, isHSync);
   }
 }

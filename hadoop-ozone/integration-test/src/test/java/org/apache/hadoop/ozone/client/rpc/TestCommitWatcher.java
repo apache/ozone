@@ -29,8 +29,9 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.scm.storage.CommitWatcher;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -56,12 +58,16 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -161,6 +167,7 @@ public class TestCommitWatcher {
    */
   @After
   public void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -170,172 +177,170 @@ public class TestCommitWatcher {
   public void testReleaseBuffers() throws Exception {
     int capacity = 2;
     BufferPool bufferPool = new BufferPool(chunkSize, capacity);
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
-    ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-    Pipeline pipeline = container.getPipeline();
-    long containerId = container.getContainerInfo().getContainerID();
-    XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
-    Assert.assertEquals(1, xceiverClient.getRefcount());
-    Assert.assertTrue(xceiverClient instanceof XceiverClientRatis);
-    XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
-    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
-    List<XceiverClientReply> replies = new ArrayList<>();
-    long length = 0;
-    List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
-        futures = new ArrayList<>();
-    for (int i = 0; i < capacity; i++) {
-      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-          ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize);
-      // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
-      byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
-      ratisClient.sendCommandAsync(writeChunkRequest);
-      ContainerProtos.ContainerCommandRequestProto putBlockRequest =
-          ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
-      XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
-      final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
-      length += byteBuffer.position();
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          reply.getResponse().thenApply(v -> {
-            watcher.updateCommitInfoMap(reply.getLogIndex(), bufferList);
-            return v;
-          });
-      futures.add(future);
-      watcher.getFutureMap().put(length, future);
-      replies.add(reply);
-    }
+    try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
+      ContainerWithPipeline container = storageContainerLocationClient
+          .allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+      Pipeline pipeline = container.getPipeline();
+      long containerId = container.getContainerInfo().getContainerID();
+      try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
+        assertEquals(1, xceiverClient.getRefcount());
+        assertTrue(xceiverClient instanceof XceiverClientRatis);
+        XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
+        CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
+        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
+        List<XceiverClientReply> replies = new ArrayList<>();
+        long length = 0;
+        List<CompletableFuture<ContainerCommandResponseProto>>
+            futures = new ArrayList<>();
+        for (int i = 0; i < capacity; i++) {
+          ContainerCommandRequestProto writeChunkRequest =
+              ContainerTestHelper
+                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+          // add the data to the buffer pool
+          final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
+          byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
+          ratisClient.sendCommandAsync(writeChunkRequest);
+          ContainerCommandRequestProto putBlockRequest =
+              ContainerTestHelper.getPutBlockRequest(pipeline,
+                  writeChunkRequest.getWriteChunk());
+          XceiverClientReply reply =
+              ratisClient.sendCommandAsync(putBlockRequest);
+          final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
+          length += byteBuffer.position();
+          CompletableFuture<ContainerCommandResponseProto> future =
+              reply.getResponse().thenApply(v -> {
+                watcher.updateCommitInfoMap(reply.getLogIndex(), bufferList);
+                return v;
+              });
+          futures.add(future);
+          watcher.getFutureMap().put(length, future);
+          replies.add(reply);
+        }
 
-    Assert.assertTrue(replies.size() == 2);
-    // wait on the 1st putBlock to complete
-    CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future1 =
-        futures.get(0);
-    CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future2 =
-        futures.get(1);
-    future1.get();
-    Assert.assertNotNull(watcher.getFutureMap().get((long) chunkSize));
-    Assert.assertTrue(
-        watcher.getFutureMap().get((long) chunkSize).equals(future1));
-    // wait on 2nd putBlock to complete
-    future2.get();
-    Assert.assertNotNull(watcher.getFutureMap().get((long) 2 * chunkSize));
-    Assert.assertTrue(
-            watcher.getFutureMap().get((long) 2 * chunkSize).equals(future2));
-    Assert.assertTrue(watcher.
-            getCommitIndex2flushedDataMap().size() == 2);
-    watcher.watchOnFirstIndex();
-    Assert.assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertEquals(2, replies.size());
+        // wait on the 1st putBlock to complete
+        CompletableFuture<ContainerCommandResponseProto> future1 =
+            futures.get(0);
+        CompletableFuture<ContainerCommandResponseProto> future2 =
+            futures.get(1);
+        future1.get();
+        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
+        // wait on 2nd putBlock to complete
+        future2.get();
+        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
+        assertEquals(2, watcher.
+            getCommitIndex2flushedDataMap().size());
+        watcher.watchOnFirstIndex();
+        assertFalse(watcher.getCommitIndex2flushedDataMap()
             .containsKey(replies.get(0).getLogIndex()));
-    Assert.assertFalse(watcher.getFutureMap().containsKey(chunkSize));
-    Assert.assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
-    watcher.watchOnLastIndex();
-    Assert.assertFalse(watcher.getCommitIndex2flushedDataMap()
-        .containsKey(replies.get(1).getLogIndex()));
-    Assert.assertFalse(watcher.getFutureMap().containsKey(2 * chunkSize));
-    Assert.assertTrue(watcher.getTotalAckDataLength() == 2 * chunkSize);
-    Assert.assertTrue(watcher.getFutureMap().isEmpty());
-    Assert.assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+        assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
+        assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
+        watcher.watchOnLastIndex();
+        assertFalse(watcher.getCommitIndex2flushedDataMap()
+            .containsKey(replies.get(1).getLogIndex()));
+        assertFalse(watcher.getFutureMap().containsKey((long) 2 * chunkSize));
+        assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
+        assertTrue(watcher.getFutureMap().isEmpty());
+        assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+      }
+    }
   }
 
   @Test
   public void testReleaseBuffersOnException() throws Exception {
     int capacity = 2;
     BufferPool bufferPool = new BufferPool(chunkSize, capacity);
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
-    ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-    Pipeline pipeline = container.getPipeline();
-    long containerId = container.getContainerInfo().getContainerID();
-    XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
-    Assert.assertEquals(1, xceiverClient.getRefcount());
-    Assert.assertTrue(xceiverClient instanceof XceiverClientRatis);
-    XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
-    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-    BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
-    List<XceiverClientReply> replies = new ArrayList<>();
-    long length = 0;
-    List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
-        futures = new ArrayList<>();
-    for (int i = 0; i < capacity; i++) {
-      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-          ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize);
-      // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
-      byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
-      ratisClient.sendCommandAsync(writeChunkRequest);
-      ContainerProtos.ContainerCommandRequestProto putBlockRequest =
-          ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
-      XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
-      final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
-      length += byteBuffer.position();
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
-          reply.getResponse().thenApply(v -> {
-            watcher.updateCommitInfoMap(reply.getLogIndex(), bufferList);
-            return v;
-          });
-      futures.add(future);
-      watcher.getFutureMap().put(length, future);
-      replies.add(reply);
-    }
+    try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
+      ContainerWithPipeline container = storageContainerLocationClient
+          .allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+      Pipeline pipeline = container.getPipeline();
+      long containerId = container.getContainerInfo().getContainerID();
+      try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
+        assertEquals(1, xceiverClient.getRefcount());
+        assertTrue(xceiverClient instanceof XceiverClientRatis);
+        XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
+        CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
+        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
+        List<XceiverClientReply> replies = new ArrayList<>();
+        long length = 0;
+        List<CompletableFuture<ContainerCommandResponseProto>>
+            futures = new ArrayList<>();
+        for (int i = 0; i < capacity; i++) {
+          ContainerCommandRequestProto writeChunkRequest =
+              ContainerTestHelper
+                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+          // add the data to the buffer pool
+          final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
+          byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
+          ratisClient.sendCommandAsync(writeChunkRequest);
+          ContainerCommandRequestProto putBlockRequest =
+              ContainerTestHelper.getPutBlockRequest(pipeline,
+                  writeChunkRequest.getWriteChunk());
+          XceiverClientReply reply =
+              ratisClient.sendCommandAsync(putBlockRequest);
+          final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
+          length += byteBuffer.position();
+          CompletableFuture<ContainerCommandResponseProto> future =
+              reply.getResponse().thenApply(v -> {
+                watcher.updateCommitInfoMap(reply.getLogIndex(), bufferList);
+                return v;
+              });
+          futures.add(future);
+          watcher.getFutureMap().put(length, future);
+          replies.add(reply);
+        }
 
-    Assert.assertTrue(replies.size() == 2);
-    // wait on the 1st putBlock to complete
-    CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future1 =
-        futures.get(0);
-    CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future2 =
-        futures.get(1);
-    future1.get();
-    Assert.assertNotNull(watcher.getFutureMap().get((long) chunkSize));
-    Assert.assertTrue(
-        watcher.getFutureMap().get((long) chunkSize).equals(future1));
-    // wait on 2nd putBlock to complete
-    future2.get();
-    Assert.assertNotNull(watcher.getFutureMap().get((long) 2 * chunkSize));
-    Assert.assertTrue(
-        watcher.getFutureMap().get((long) 2 * chunkSize).equals(future2));
-    Assert.assertTrue(watcher.getCommitIndex2flushedDataMap().size() == 2);
-    watcher.watchOnFirstIndex();
-    Assert.assertFalse(watcher.getCommitIndex2flushedDataMap()
-        .containsKey(replies.get(0).getLogIndex()));
-    Assert.assertFalse(watcher.getFutureMap().containsKey(chunkSize));
-    Assert.assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
-    try {
-      // just watch for a higher index so as to ensure, it does an actual
-      // call to Ratis. Otherwise, it may just return in case the commitInfoMap
-      // is updated to the latest index in putBlock response.
-      watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
-      Assert.fail("Expected exception not thrown");
-    } catch (IOException ioe) {
-      // with retry count set to noRetry and a lower watch request
-      // timeout, watch request will eventually
-      // fail with TimeoutIOException from ratis client or the client
-      // can itself get AlreadyClosedException from the Ratis Server
-      // and the write may fail with RaftRetryFailureException
-      Throwable t = HddsClientUtils.checkForException(ioe);
-      Assert.assertTrue("Unexpected exception: " + t.getClass(),
-          t instanceof RaftRetryFailureException ||
-          t instanceof TimeoutIOException ||
-          t instanceof AlreadyClosedException ||
-          t instanceof NotReplicatedException);
-    }
-    if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
-        .getLogIndex()) {
-      Assert.assertTrue(watcher.getTotalAckDataLength() == chunkSize);
-      Assert.assertTrue(watcher.getCommitIndex2flushedDataMap().size() == 1);
-      Assert.assertTrue(watcher.getFutureMap().size() == 1);
-    } else {
-      Assert.assertTrue(watcher.getTotalAckDataLength() == 2 * chunkSize);
-      Assert.assertTrue(watcher.getFutureMap().isEmpty());
-      Assert.assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+        assertEquals(2, replies.size());
+        // wait on the 1st putBlock to complete
+        CompletableFuture<ContainerCommandResponseProto> future1 =
+            futures.get(0);
+        CompletableFuture<ContainerCommandResponseProto> future2 =
+            futures.get(1);
+        future1.get();
+        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
+        // wait on 2nd putBlock to complete
+        future2.get();
+        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
+        assertEquals(2, watcher.getCommitIndex2flushedDataMap().size());
+        watcher.watchOnFirstIndex();
+        assertFalse(watcher.getCommitIndex2flushedDataMap()
+            .containsKey(replies.get(0).getLogIndex()));
+        assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
+        assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
+        cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
+        cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+        try {
+          // just watch for a higher index so as to ensure, it does an actual
+          // call to Ratis. Otherwise, it may just return in case the
+          // commitInfoMap is updated to the latest index in putBlock response.
+          watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
+          fail("Expected exception not thrown");
+        } catch (IOException ioe) {
+          // with retry count set to noRetry and a lower watch request
+          // timeout, watch request will eventually
+          // fail with TimeoutIOException from ratis client or the client
+          // can itself get AlreadyClosedException from the Ratis Server
+          // and the write may fail with RaftRetryFailureException
+          Throwable t = HddsClientUtils.checkForException(ioe);
+          assertTrue("Unexpected exception: " + t.getClass(),
+              t instanceof RaftRetryFailureException ||
+                  t instanceof TimeoutIOException ||
+                  t instanceof AlreadyClosedException ||
+                  t instanceof NotReplicatedException);
+        }
+        if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
+            .getLogIndex()) {
+          assertEquals(chunkSize, watcher.getTotalAckDataLength());
+          assertEquals(1, watcher.getCommitIndex2flushedDataMap().size());
+          assertEquals(1, watcher.getFutureMap().size());
+        } else {
+          assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
+          assertTrue(watcher.getFutureMap().isEmpty());
+          assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+        }
+      }
     }
   }
 }

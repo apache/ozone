@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -38,12 +39,10 @@ import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.apache.hadoop.util.ShutdownHookManager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import static org.apache.hadoop.util.RunJar.SHUTDOWN_HOOK_PRIORITY;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +83,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final String datanodeUuid;
   private String clusterID;
 
-  private Runnable shutdownHook;
   private final StorageVolumeChecker volumeChecker;
   private Runnable failedVolumeListener;
   private StateContext context;
@@ -165,10 +163,11 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     for (String locationString : rawLocations) {
+      StorageVolume volume = null;
       try {
         StorageLocation location = StorageLocation.parse(locationString);
 
-        StorageVolume volume = volumeFactory.createVolume(
+        volume = volumeFactory.createVolume(
             location.getUri().getPath(), location.getStorageType());
 
         LOG.info("Added Volume : {} to VolumeSet",
@@ -182,8 +181,11 @@ public class MutableVolumeSet implements VolumeSet {
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
       } catch (IOException e) {
-        StorageVolume volume =
-            volumeFactory.createFailedVolume(locationString);
+        if (volume != null) {
+          volume.shutdown();
+        }
+
+        volume = volumeFactory.createFailedVolume(locationString);
         failedVolumeMap.put(locationString, volume);
         LOG.error("Failed to parse the storage location: " + locationString, e);
       }
@@ -194,15 +196,6 @@ public class MutableVolumeSet implements VolumeSet {
     if (volumeMap.size() == 0) {
       throw new DiskOutOfSpaceException("No storage locations configured");
     }
-
-    checkAllVolumes();
-
-    // Ensure volume threads are stopped and scm df is saved during shutdown.
-    shutdownHook = () -> {
-      saveVolumeSetUsed();
-    };
-    ShutdownHookManager.get().addShutdownHook(shutdownHook,
-        SHUTDOWN_HOOK_PRIORITY);
   }
 
   /**
@@ -255,15 +248,7 @@ public class MutableVolumeSet implements VolumeSet {
 
       // check failed volume tolerated
       if (!hasEnoughVolumes()) {
-        // on startup, we could not try to stop uninitialized services
-        if (shutdownHook == null) {
-          throw new IOException("Don't have enough good volumes on startup,"
-              + " bad volumes detected: " + failedVolumes.size()
-              + " max tolerated: " + maxVolumeFailuresTolerated);
-        }
-        if (context != null) {
-          context.getParent().handleFatalVolumeFailures();
-        }
+        context.getParent().handleFatalVolumeFailures();
       }
     } finally {
       this.writeUnlock();
@@ -415,27 +400,17 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   /**
-   * This method, call shutdown on each volume to shutdown volume usage
-   * thread and write scmUsed on each volume.
-   */
-
-  private synchronized void saveVolumeSetUsed() {
-    for (StorageVolume hddsVolume : volumeMap.values()) {
-      try {
-        hddsVolume.shutdown();
-      } catch (Exception ex) {
-        LOG.error("Failed to shutdown volume : " + hddsVolume.getStorageDir(),
-            ex);
-      }
-    }
-    volumeMap.clear();
-  }
-
-  /**
    * Shutdown the volumeset.
    */
   public void shutdown() {
-    saveVolumeSetUsed();
+    for (StorageVolume volume : volumeMap.values()) {
+      try {
+        volume.shutdown();
+      } catch (Exception ex) {
+        LOG.error("Failed to shutdown volume : " + volume.getStorageDir(), ex);
+      }
+    }
+    volumeMap.clear();
   }
 
   @Override
@@ -485,28 +460,32 @@ public class MutableVolumeSet implements VolumeSet {
       StorageVolume volume;
       for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
         volume = entry.getValue();
-        VolumeInfo volumeInfo = volume.getVolumeInfo();
-        long scmUsed;
-        long remaining;
-        long capacity;
-        failed = false;
-        try {
-          scmUsed = volumeInfo.getScmUsed();
-          remaining = volumeInfo.getAvailable();
-          capacity = volumeInfo.getCapacity();
-        } catch (UncheckedIOException ex) {
-          LOG.warn("Failed to get scmUsed and remaining for container " +
-              "storage location {}", volumeInfo.getRootDir(), ex);
-          // reset scmUsed and remaining if df/du failed.
-          scmUsed = 0;
-          remaining = 0;
-          capacity = 0;
-          failed = true;
+        Optional<VolumeInfo> volumeInfo = volume.getVolumeInfo();
+        long scmUsed = 0;
+        long remaining = 0;
+        long capacity = 0;
+        String rootDir = "";
+        failed = true;
+        if (volumeInfo.isPresent()) {
+          try {
+            rootDir = volumeInfo.get().getRootDir();
+            scmUsed = volumeInfo.get().getScmUsed();
+            remaining = volumeInfo.get().getAvailable();
+            capacity = volumeInfo.get().getCapacity();
+            failed = false;
+          } catch (UncheckedIOException ex) {
+            LOG.warn("Failed to get scmUsed and remaining for container " +
+                    "storage location {}", volumeInfo.get().getRootDir(), ex);
+            // reset scmUsed and remaining if df/du failed.
+            scmUsed = 0;
+            remaining = 0;
+            capacity = 0;
+          }
         }
 
         StorageLocationReport.Builder builder =
             StorageLocationReport.newBuilder();
-        builder.setStorageLocation(volumeInfo.getRootDir())
+        builder.setStorageLocation(rootDir)
             .setId(volume.getStorageID())
             .setFailed(failed)
             .setCapacity(capacity)

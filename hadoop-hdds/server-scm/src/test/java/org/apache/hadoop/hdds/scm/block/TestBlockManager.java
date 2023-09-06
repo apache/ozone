@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
@@ -70,8 +71,8 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.ozone.test.GenericTestUtils;
@@ -143,7 +144,7 @@ public class TestBlockManager {
             eventQueue,
             scmContext,
             serviceManager,
-            new MonotonicClock(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -156,8 +157,8 @@ public class TestBlockManager {
             sequenceIdGen,
             pipelineManager,
             scmMetadataStore.getContainerTable(),
-            new ContainerReplicaPendingOps(conf,
-                new MonotonicClock(ZoneId.systemDefault())));
+            new ContainerReplicaPendingOps(
+                Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), containerManager,
         pipelineManager, eventQueue, serviceManager, scmContext) {
@@ -174,7 +175,9 @@ public class TestBlockManager {
     configurator.setMetadataStore(scmMetadataStore);
     configurator.setSCMHAManager(scmHAManager);
     configurator.setScmContext(scmContext);
+    configurator.setLeaseManager(new LeaseManager<>("test-leaseManager", 0));
     scm = HddsTestUtils.getScm(conf, configurator);
+    configurator.getLeaseManager().start();
 
     // Initialize these fields so that the tests can pass.
     mapping = scm.getContainerManager();
@@ -182,7 +185,8 @@ public class TestBlockManager {
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
-        new CloseContainerEventHandler(pipelineManager, mapping, scmContext);
+        new CloseContainerEventHandler(pipelineManager, mapping, scmContext,
+            configurator.getLeaseManager(), 0);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
@@ -257,7 +261,7 @@ public class TestBlockManager {
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
                   new ExcludeList()));
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -307,7 +311,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -368,7 +372,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -436,7 +440,7 @@ public class TestBlockManager {
           blockList.add(block);
           allocatedBlockMap.put(containerId, blockList);
           future.complete(block);
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
           future.completeExceptionally(e);
         }
         return future;
@@ -515,7 +519,7 @@ public class TestBlockManager {
                 new ExcludeList());
         return !block.getPipeline().getId()
             .equals(allocatedBlock.getPipeline().getId());
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
       }
       return false;
     }, 100, 1000);
@@ -560,7 +564,7 @@ public class TestBlockManager {
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
                 new ExcludeList());
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
           numContainerPerOwnerInPipeline);
@@ -585,7 +589,7 @@ public class TestBlockManager {
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
                 new ExcludeList());
-      } catch (IOException | TimeoutException e) {
+      } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
           numContainerPerOwnerInPipeline);
@@ -595,7 +599,7 @@ public class TestBlockManager {
   @Test
   @Timeout(100)
   public void testBlockAllocationWithNoAvailablePipelines()
-      throws IOException, TimeoutException {
+      throws IOException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       pipelineManager.closePipeline(pipeline, false);
     }
@@ -618,7 +622,7 @@ public class TestBlockManager {
             (CreatePipelineCommand) command.getCommand();
         try {
           pipelineManager.openPipeline(createCommand.getPipelineID());
-        } catch (IOException | TimeoutException e) {
+        } catch (IOException e) {
         }
       }
     }

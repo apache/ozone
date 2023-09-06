@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -43,6 +45,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
@@ -64,6 +67,7 @@ public class TestListKeysWithFSO {
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneBucket legacyOzoneBucket2;
   private static OzoneBucket fsoOzoneBucket2;
+  private static OzoneClient client;
 
   @Rule
   public Timeout timeout = new Timeout(1200000);
@@ -88,13 +92,13 @@ public class TestListKeysWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.LEGACY);
+        .createVolumeAndBucket(client, BucketLayout.LEGACY);
     String volumeName = legacyOzoneBucket.getVolumeName();
 
-    OzoneClient client = cluster.getClient();
     OzoneVolume ozoneVolume = client.getObjectStore().getVolume(volumeName);
 
     // create buckets
@@ -125,6 +129,7 @@ public class TestListKeysWithFSO {
 
   @AfterClass
   public static void teardownClass() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -258,6 +263,11 @@ public class TestListKeysWithFSO {
     expectedKeys =
         getExpectedKeyList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
     checkKeyList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
+
+    // case-10: keyPrefix corresponds an exist file
+    expectedKeys =
+        getExpectedKeyList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
+    checkKeyList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -490,10 +500,14 @@ public class TestListKeysWithFSO {
 
     Iterator<? extends OzoneKey> ozoneKeyIterator =
         fsoBucket.listKeys(keyPrefix, startKey);
+    ReplicationConfig expectedReplication =
+        Optional.ofNullable(fsoBucket.getReplicationConfig())
+            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
+      Assert.assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
       keyLists.add(ozoneKey.getName());
     }
     LinkedList outputKeysList = new LinkedList(keyLists);

@@ -19,6 +19,8 @@
  */
 package org.apache.hadoop.ozone.s3.commontypes;
 
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -29,15 +31,22 @@ import javax.xml.bind.annotation.adapters.XmlAdapter;
 public class TestObjectKeyNameAdapter {
   @Test
   public void testEncodeResult() throws Exception {
-    Assert.assertEquals("abc/",
-        getAdapter().marshal("abc/"));
-    Assert.assertEquals("a+b+c/",
-        getAdapter().marshal("a b c/"));
-    Assert.assertEquals("a%2Bb%2Bc/",
-        getAdapter().marshal("a+b+c/"));
+    Assert.assertEquals("abc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("abc/", ENCODING_TYPE)));
+    Assert.assertEquals("a+b+c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a b c/", ENCODING_TYPE)));
+    Assert.assertEquals("a%2Bb%2Bc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a+b+c/", ENCODING_TYPE)));
+
+    Assert.assertEquals("abc/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("abc/", null)));
+    Assert.assertEquals("a b c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a b c/", null)));
+    Assert.assertEquals("a+b+c/", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("a+b+c/", null)));
   }
 
-  private XmlAdapter<String, String> getAdapter() {
+  private XmlAdapter<String, EncodingTypeObject> getAdapter() {
     return (new ObjectKeyNameAdapter());
   }
 }

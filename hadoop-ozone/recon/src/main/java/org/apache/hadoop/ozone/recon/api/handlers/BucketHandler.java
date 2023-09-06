@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.ozone.recon.api.handlers;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -97,6 +94,9 @@ public abstract class BucketHandler {
   public abstract OmKeyInfo getKeyInfo(String[] names)
       throws IOException;
 
+  public abstract OmDirectoryInfo getDirInfo(String[] names)
+      throws IOException;
+
   /**
    * Fixing the existing path and appending the next level entity to it.
    * @param path
@@ -113,27 +113,6 @@ public abstract class BucketHandler {
       subpath = subpath + OM_KEY_PREFIX + nextLevel;
     }
     return subpath;
-  }
-
-  public long getKeySizeWithReplication(OmKeyInfo keyInfo) {
-    OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocations =
-        locationGroup.getBlocksLatestVersionOnly();
-    long du = 0L;
-    // a key could be too large to fit in one single container
-    for (OmKeyLocationInfo location: keyLocations) {
-      BlockID block = location.getBlockID();
-      ContainerID containerId = new ContainerID(block.getContainerID());
-      try {
-        int replicationFactor =
-            containerManager.getContainerReplicas(containerId).size();
-        long blockSize = location.getLength() * replicationFactor;
-        du += blockSize;
-      } catch (ContainerNotFoundException cnfe) {
-        LOG.warn("Cannot find container {}", block.getContainerID(), cnfe);
-      }
-    }
-    return du;
   }
 
   /**
@@ -197,6 +176,12 @@ public abstract class BucketHandler {
           .equals(BucketLayout.LEGACY)) {
         return new LegacyBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.OBJECT_STORE)) {
+        // TODO: HDDS-7810 Write a handler for object store bucket
+        // We can use LegacyBucketHandler for OBS bucket for now.
+        return new LegacyBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
       } else {
         LOG.error("Unsupported bucket layout: " +
             bucketInfo.getBucketLayout());
@@ -212,8 +197,12 @@ public abstract class BucketHandler {
       String volumeName, String bucketName) throws IOException {
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo bucketInfo = omMetadataManager
-        .getBucketTable().getSkipCache(bucketKey);
+    Table<String, OmBucketInfo> bucketTable =
+        omMetadataManager.getBucketTable();
+    OmBucketInfo bucketInfo = null;
+    if (null != bucketTable) {
+      bucketInfo = bucketTable.getSkipCache(bucketKey);
+    }
 
     return getBucketHandler(reconNamespaceSummaryManager,
         omMetadataManager, reconSCM, bucketInfo);
