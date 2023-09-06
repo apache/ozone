@@ -1616,6 +1616,20 @@ public class TestOzoneFileSystem {
     Assert.assertEquals(6, res.size());
   }
 
+  @Test
+  public void testDeleteRootWithTrash() throws IOException {
+    // Try to delete root
+    Path root = new Path(OZONE_URI_DELIMITER);
+    Assert.assertThrows(IOException.class, () -> trash.moveToTrash(root));
+    // Also try with TrashPolicyDefault
+    OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
+    conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
+        TrashPolicy.class);
+    Trash trashPolicyDefault = new Trash(conf2);
+    Assert.assertThrows(IOException.class,
+        () -> trashPolicyDefault.moveToTrash(root));
+  }
+
   /**
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
