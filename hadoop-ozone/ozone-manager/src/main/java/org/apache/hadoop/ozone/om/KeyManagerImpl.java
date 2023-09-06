@@ -1389,11 +1389,14 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  public static boolean isKeyDeleted(String key, Table keyTable) {
+  public static boolean isKeyDeleted(String key, Table keyTable)
+      throws IOException {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
-    return omKeyInfoCacheValue != null
-        && omKeyInfoCacheValue.getCacheValue() == null;
+    if (null == omKeyInfoCacheValue) {
+      return null == keyTable.getSkipCache(key);
+    }
+    return omKeyInfoCacheValue.getCacheValue() == null;
   }
 
   /**
@@ -1427,7 +1430,9 @@ public class KeyManagerImpl implements KeyManager {
         OzoneFileStatus fileStatus = new OzoneFileStatus(
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
         cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
-      } else if (cacheOmKeyInfo == null) {
+      } else if (cacheOmKeyInfo == null
+          && cacheKey.startsWith(startCacheKey)
+          && cacheKey.compareTo(startCacheKey) >= 0) {
         cacheKeyMap.putIfAbsent(cacheKey, null);
       }
     }
