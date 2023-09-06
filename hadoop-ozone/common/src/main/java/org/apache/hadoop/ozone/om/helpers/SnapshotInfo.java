@@ -123,8 +123,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    */
   private long dbTxSequenceNumber;
   private boolean deepClean;
-
   private boolean sstFiltered;
+  private long referencedSize;
+  private long referencedReplicatedSize;
+  private long exclusiveSize;
+  private long exclusiveReplicatedSize;
 
   /**
    * Private constructor, constructed via builder.
@@ -142,6 +145,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    * @param checkpointDir - Snapshot checkpoint directory.
    * @param dbTxSequenceNumber - RDB latest transaction sequence number.
    * @param deepCleaned - To be deep cleaned status for snapshot.
+   * @param referencedSize - Snapshot referenced size.
+   * @param referencedReplicatedSize - Snapshot referenced size w/ replication.
+   * @param exclusiveSize - Snapshot exclusive size.
+   * @param exclusiveReplicatedSize - Snapshot exclusive size w/ replication.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapshotInfo(UUID snapshotId,
@@ -157,7 +164,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
                        String checkpointDir,
                        long dbTxSequenceNumber,
                        boolean deepCleaned,
-                       boolean sstFiltered) {
+                       boolean sstFiltered,
+                       long referencedSize,
+                       long referencedReplicatedSize,
+                       long exclusiveSize,
+                       long exclusiveReplicatedSize) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -172,6 +183,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.dbTxSequenceNumber = dbTxSequenceNumber;
     this.deepClean = deepCleaned;
     this.sstFiltered = sstFiltered;
+    this.referencedSize = referencedSize;
+    this.referencedReplicatedSize = referencedReplicatedSize;
+    this.exclusiveSize = exclusiveSize;
+    this.exclusiveReplicatedSize = exclusiveReplicatedSize;
   }
 
   public void setName(String name) {
@@ -289,7 +304,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
         .setDeepClean(deepClean)
-        .setSstFiltered(sstFiltered);
+        .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize)
+        .setReferencedReplicatedSize(referencedReplicatedSize)
+        .setExclusiveSize(exclusiveSize)
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize);
   }
 
   /**
@@ -309,8 +328,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private String checkpointDir;
     private long dbTxSequenceNumber;
     private boolean deepClean;
-
     private boolean sstFiltered;
+    private long referencedSize;
+    private long referencedReplicatedSize;
+    private long exclusiveSize;
+    private long exclusiveReplicatedSize;
 
     public Builder() {
       // default values
@@ -387,6 +409,26 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
+    public Builder setReferencedSize(long referencedSize) {
+      this.referencedSize = referencedSize;
+      return this;
+    }
+
+    public Builder setReferencedReplicatedSize(long referencedReplicatedSize) {
+      this.referencedReplicatedSize = referencedReplicatedSize;
+      return this;
+    }
+
+    public Builder setExclusiveSize(long exclusiveSize) {
+      this.exclusiveSize = exclusiveSize;
+      return this;
+    }
+
+    public Builder setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
+      this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+      return this;
+    }
+
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -403,7 +445,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
           checkpointDir,
           dbTxSequenceNumber,
           deepClean,
-          sstFiltered
+          sstFiltered,
+          referencedSize,
+          referencedReplicatedSize,
+          exclusiveSize,
+          exclusiveReplicatedSize
       );
     }
   }
@@ -414,14 +460,18 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   public OzoneManagerProtocolProtos.SnapshotInfo getProtobuf() {
     OzoneManagerProtocolProtos.SnapshotInfo.Builder sib =
         OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
-        .setSnapshotID(toProtobuf(snapshotId))
-        .setName(name)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setSnapshotStatus(snapshotStatus.toProto())
-        .setCreationTime(creationTime)
-        .setDeletionTime(deletionTime)
-        .setSstFiltered(sstFiltered);
+            .setSnapshotID(toProtobuf(snapshotId))
+            .setName(name)
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotStatus(snapshotStatus.toProto())
+            .setCreationTime(creationTime)
+            .setDeletionTime(deletionTime)
+            .setSstFiltered(sstFiltered)
+            .setReferencedSize(referencedSize)
+            .setReferencedReplicatedSize(referencedReplicatedSize)
+            .setExclusiveSize(exclusiveSize)
+            .setExclusiveReplicatedSize(exclusiveReplicatedSize);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -474,6 +524,26 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       osib.setSstFiltered(snapshotInfoProto.getSstFiltered());
     }
 
+    if (snapshotInfoProto.hasReferencedSize()) {
+      osib.setReferencedSize(
+          snapshotInfoProto.getReferencedSize());
+    }
+
+    if (snapshotInfoProto.hasReferencedReplicatedSize()) {
+      osib.setReferencedReplicatedSize(
+          snapshotInfoProto.getReferencedReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveSize()) {
+      osib.setExclusiveSize(
+          snapshotInfoProto.getExclusiveSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
+      osib.setExclusiveReplicatedSize(
+          snapshotInfoProto.getExclusiveReplicatedSize());
+    }
+
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
         .setCheckpointDir(snapshotInfoProto.getCheckpointDir())
         .setDbTxSequenceNumber(snapshotInfoProto.getDbTxSequenceNumber());
@@ -524,6 +594,38 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       String snapshotName) {
     return OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
         + OM_KEY_PREFIX + snapshotName;
+  }
+
+  public void setReferencedSize(long referencedSize) {
+    this.referencedSize = referencedSize;
+  }
+
+  public long getReferencedSize() {
+    return referencedSize;
+  }
+
+  public void setReferencedReplicatedSize(long referencedReplicatedSize) {
+    this.referencedReplicatedSize = referencedReplicatedSize;
+  }
+
+  public long getReferencedReplicatedSize() {
+    return referencedReplicatedSize;
+  }
+
+  public void setExclusiveSize(long exclusiveSize) {
+    this.exclusiveSize = exclusiveSize;
+  }
+
+  public long getExclusiveSize() {
+    return exclusiveSize;
+  }
+
+  public void setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
+    this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+  }
+
+  public long getExclusiveReplicatedSize() {
+    return exclusiveReplicatedSize;
   }
 
   /**
@@ -586,7 +688,13 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         Objects.equals(
             globalPreviousSnapshotId, that.globalPreviousSnapshotId) &&
         snapshotPath.equals(that.snapshotPath) &&
-        checkpointDir.equals(that.checkpointDir);
+        checkpointDir.equals(that.checkpointDir) &&
+        deepClean == that.deepClean &&
+        sstFiltered == that.sstFiltered &&
+        referencedSize == that.referencedSize &&
+        referencedReplicatedSize == that.referencedReplicatedSize &&
+        exclusiveSize == that.exclusiveSize &&
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize;
   }
 
   @Override
@@ -594,7 +702,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return Objects.hash(snapshotId, name, volumeName, bucketName,
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
-        globalPreviousSnapshotId, snapshotPath, checkpointDir);
+        globalPreviousSnapshotId, snapshotPath, checkpointDir,
+        deepClean, sstFiltered,
+        referencedSize, referencedReplicatedSize,
+        exclusiveSize, exclusiveReplicatedSize);
   }
 
   /**
@@ -617,6 +728,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean)
         .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize)
+        .setReferencedReplicatedSize(referencedReplicatedSize)
+        .setExclusiveSize(exclusiveSize)
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
         .build();
   }
 }

@@ -290,6 +290,17 @@ public final class CodecBuffer implements AutoCloseable {
   }
 
   /**
+   * Similar to {@link ByteBuffer#put(byte)}.
+   *
+   * @return this object.
+   */
+  public CodecBuffer put(byte val) {
+    assertRefCnt(1);
+    buf.writeByte(val);
+    return this;
+  }
+
+  /**
    * Similar to {@link ByteBuffer#put(byte[])}.
    *
    * @return this object.
