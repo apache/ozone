@@ -520,7 +520,7 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;
 
   public static final String OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX =
-      "ozone.om.lock.stripes.";
+      "ozone.om.lock.stripes.count.";
 
   public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
 
