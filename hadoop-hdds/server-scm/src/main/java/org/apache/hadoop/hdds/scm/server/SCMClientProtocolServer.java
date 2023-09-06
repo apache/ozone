@@ -863,7 +863,6 @@ public class SCMClientProtocolServer implements
 
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     List<DeletedBlocksTransactionInfo> result;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("count", String.valueOf(count));

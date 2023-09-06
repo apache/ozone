@@ -56,7 +56,7 @@ Verify Bucket ACL
 
 Can follow link with read access
     Execute             kdestroy
-    Run Keyword         Kinit test user             testuser          testuser.keytab
+    Run Keyword         Kinit test user             testuser2         testuser2.keytab
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link
                         Should Contain              ${result}         key-in-readable-bucket
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link2
