@@ -68,7 +68,7 @@ public class AuthorizationFilter implements ContainerRequestFilter {
       IOException {
     // Skip authentication if the uri is hitting S3Secret generation or
     // revocation endpoint.
-    if (context.getUriInfo().getPath().startsWith("secret")) {
+    if (context.getUriInfo().getRequestUri().getPath().startsWith("/secret")) {
       return;
     }
 

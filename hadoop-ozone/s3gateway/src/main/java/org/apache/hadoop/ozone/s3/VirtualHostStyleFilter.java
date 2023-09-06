@@ -65,7 +65,8 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       IOException {
     // Skip this filter if the uri is hitting S3Secret generation or
     // revocation endpoint.
-    if (requestContext.getUriInfo().getPath().startsWith("secret")) {
+    if (requestContext.getUriInfo().getRequestUri().getPath()
+        .startsWith("/secret")) {
       return;
     }
 
