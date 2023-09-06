@@ -1616,34 +1616,6 @@ public class TestOzoneFileSystem {
   }
 
   /**
-   * Check that files are moved to trash.
-   * since fs.rename(src,dst,options) is enabled.
-   */
-  @Test
-  public void testRenameToTrashEnabled() throws Exception {
-    // Create a file
-    String testKeyName = "testKey1";
-    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
-    try (FSDataOutputStream stream = fs.create(path)) {
-      stream.write(1);
-    }
-
-    // Construct paths
-    String username = UserGroupInformation.getCurrentUser().getShortUserName();
-    Path userTrash = new Path(TRASH_ROOT, username);
-
-    Assert.assertFalse(o3fs.exists(userTrash));
-    // Call moveToTrash. We can't call protected fs.rename() directly
-    trash.moveToTrash(path);
-    // We can safely assert only trash directory here.
-    // Asserting Current or checkpoint directory is not feasible here in this
-    // test due to independent TrashEmptier thread running in cluster and
-    // possible flakiness is hard to avoid unless we test this test case
-    // in separate mini cluster with closer accuracy of TrashEmptier.
-    Assert.assertTrue(o3fs.exists(userTrash));
-  }
-
-  /**
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
    */
@@ -1664,6 +1636,7 @@ public class TestOzoneFileSystem {
     Path userTrash = new Path(TRASH_ROOT, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
     Path trashPath = new Path(userTrashCurrent, testKeyName);
+    Assert.assertFalse(o3fs.exists(userTrash));
 
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
@@ -1671,6 +1644,7 @@ public class TestOzoneFileSystem {
     // test case which needs to be tested with separate mini cluster having
     // emptier thread started with close match of timings of relevant
     // assertion statements and corresponding trash and checkpoint interval.
+    Assert.assertTrue(o3fs.exists(userTrash));
     Assert.assertTrue(o3fs.exists(userTrashCurrent));
 
     // Wait until the TrashEmptier purges the key
