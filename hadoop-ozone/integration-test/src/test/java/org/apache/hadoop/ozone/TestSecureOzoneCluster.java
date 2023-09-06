@@ -105,7 +105,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 
@@ -723,9 +722,12 @@ public final class TestSecureOzoneCluster {
       S3SecretValue attempt1 = omClient.getS3Secret(username);
 
       // A second getS3Secret on the same username should throw exception
-      LambdaTestUtils.intercept(OMException.class,
-          "already exists",
-          () -> omClient.getS3Secret(username));
+      try {
+        omClient.getS3Secret(username);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+            omEx.getResult());
+      }
 
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
@@ -752,9 +754,13 @@ public final class TestSecureOzoneCluster {
       S3SecretValue attempt4 = omClient.setS3Secret(username, secretKeySet);
       assertEquals(secretKeySet, attempt4.getAwsSecret());
 
-      LambdaTestUtils.intercept(OMException.class,
-          "already exists",
-          () -> omClient.getS3Secret(username));
+      // A second getS3Secret on the same username should throw exception
+      try {
+        omClient.getS3Secret(username);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+            omEx.getResult());
+      }
 
       // Clean up
       omClient.revokeS3Secret(username);
