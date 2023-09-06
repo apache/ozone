@@ -45,7 +45,8 @@ public class OzoneManagersCommandHandler implements Callable<Void> {
   public Void call() throws Exception {
     ConfigurationSource configSource =
             OzoneConfiguration.of(tool.getConf());
-    Collection<InetSocketAddress> omAddresses = getOmHAAddressesById(configSource)
+    Collection<InetSocketAddress> omAddresses =
+            getOmHAAddressesById(configSource)
             .values().stream().flatMap(Collection::stream).collect(toList());
     for (InetSocketAddress addr : omAddresses) {
       tool.printOut(addr.getHostName());
