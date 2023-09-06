@@ -98,16 +98,16 @@ public class TestOmUtils {
     conf.set("ozone.om.address.ozone1.node2", "1.1.1.2");
     conf.set("ozone.om.address.ozone1.node3", "1.1.1.3");
     Map<String, List<InetSocketAddress>> addresses =
-            OmUtils.getOmHAAddressesById(conf);
+        OmUtils.getOmHAAddressesById(conf);
     assertFalse(addresses.isEmpty());
     List<InetSocketAddress> rpcAddrs = addresses.get("ozone1");
     assertFalse(rpcAddrs.isEmpty());
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
     assertTrue(rpcAddrs.stream().anyMatch(
-            a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
+        a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
   }
 
   @Test
