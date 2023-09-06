@@ -1389,11 +1389,14 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  public static boolean isKeyDeleted(String key, Table keyTable) {
+  public static boolean isKeyDeleted(String key, Table keyTable)
+      throws IOException {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
-    return omKeyInfoCacheValue != null
-        && omKeyInfoCacheValue.getCacheValue() == null;
+    if (null == omKeyInfoCacheValue) {
+      return null == keyTable.getSkipCache(key);
+    }
+    return omKeyInfoCacheValue.getCacheValue() == null;
   }
 
   /**
@@ -1426,7 +1429,11 @@ public class KeyManagerImpl implements KeyManager {
         }
         OzoneFileStatus fileStatus = new OzoneFileStatus(
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
-        cacheKeyMap.put(cacheKey, fileStatus);
+        cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
+      } else if (cacheOmKeyInfo == null
+          && cacheKey.startsWith(startCacheKey)
+          && cacheKey.compareTo(startCacheKey) >= 0) {
+        cacheKeyMap.putIfAbsent(cacheKey, null);
       }
     }
   }
@@ -1542,6 +1549,9 @@ public class KeyManagerImpl implements KeyManager {
     for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
       // No need to check if a key is deleted or not here, this is handled
       // when adding entries to cacheKeyMap from DB.
+      if (fileStatus == null) {
+        continue;
+      }
       fileStatusList.add(fileStatus);
       countEntries++;
       if (countEntries >= numEntries) {
@@ -1612,7 +1622,7 @@ public class KeyManagerImpl implements KeyManager {
           if (recursive) {
             // for recursive list all the entries
 
-            if (!isKeyDeleted(entryInDb, keyTable)) {
+            if (!cacheKeyMap.containsKey(entryInDb)) {
               cacheKeyMap.putIfAbsent(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
@@ -1626,23 +1636,23 @@ public class KeyManagerImpl implements KeyManager {
                 .getImmediateChild(entryKeyName, keyName);
             boolean isFile = OzoneFSUtils.isFile(immediateChild);
             if (isFile) {
-              if (!isKeyDeleted(entryInDb, keyTable)) {
-                cacheKeyMap.put(entryInDb,
+              if (!cacheKeyMap.containsKey(entryInDb)) {
+                cacheKeyMap.putIfAbsent(entryInDb,
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                 countEntries++;
               }
             } else {
               // if entry is a directory
-              if (!isKeyDeleted(entryInDb, keyTable)) {
+              if (!cacheKeyMap.containsKey(entryInDb)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo, immediateChild);
-                  cacheKeyMap.put(entryInDb,
+                  cacheKeyMap.putIfAbsent(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
                 } else {
                   // If entryKeyName matches dir name, we have the info
-                  cacheKeyMap.put(entryInDb,
+                  cacheKeyMap.putIfAbsent(entryInDb,
                       new OzoneFileStatus(omKeyInfo, 0, true));
                 }
                 countEntries++;
