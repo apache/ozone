@@ -50,7 +50,7 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
 
   /**
    * Handles a closed EC container with unhealthy replicas. Note that if we
-   * reach here, there is no over, under, or mis replication. This handler
+   * reach here, there is no over or under replication. This handler
    * will just send commands to delete the unhealthy replicas.
    *
    * <p>
