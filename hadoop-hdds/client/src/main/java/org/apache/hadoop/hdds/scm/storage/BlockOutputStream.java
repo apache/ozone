@@ -81,7 +81,8 @@ public class BlockOutputStream extends OutputStream {
       "Unexpected Storage Container Exception: ";
 
   private final BlockID blockID;
-  private final AtomicReference<ChunkInfo> previousChunkInfo = new AtomicReference<>();
+  private final AtomicReference<ChunkInfo> previousChunkInfo
+      = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
   private XceiverClientFactory xceiverClientFactory;
@@ -477,10 +478,8 @@ public class BlockOutputStream extends OutputStream {
           Preconditions.checkState(blockID.getContainerBlockID()
               .equals(responseBlockID.getContainerBlockID()));
           // updates the bcsId of the block
-          Preconditions.checkState(getBlockID().getContainerBlockID()
-              .equals(responseBlockID.getContainerBlockID()));
-
-          blockID.setBlockCommitSequenceId(responseBlockID.getBlockCommitSequenceId());
+          blockID.setBlockCommitSequenceId(
+              responseBlockID.getBlockCommitSequenceId());
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " flushLength "
@@ -709,15 +708,16 @@ public class BlockOutputStream extends OutputStream {
     }
 
     final ChunkInfo previous = previousChunkInfo.getAndSet(chunkInfo);
-      final long expectedOffset = previous == null? 0
-          : chunkInfo.getChunkName().equals(previous.getChunkName()) ?
-          previous.getOffset() : previous.getOffset() + previous.getLen();
-      if (chunkInfo.getOffset() != expectedOffset) {
-        throw new IOException("Unexpected offset: "
-            + chunkInfo.getOffset() + "(actual) != "
-            + expectedOffset + "(expected), "
-            + blockID + ", chunkInfo = " + chunkInfo + ", previous = " + previous);
-      }
+    final long expectedOffset = previous == null ? 0
+        : chunkInfo.getChunkName().equals(previous.getChunkName()) ?
+        previous.getOffset() : previous.getOffset() + previous.getLen();
+    if (chunkInfo.getOffset() != expectedOffset) {
+      throw new IOException("Unexpected offset: "
+          + chunkInfo.getOffset() + "(actual) != "
+          + expectedOffset + "(expected), "
+          + blockID + ", chunkInfo = " + chunkInfo
+          + ", previous = " + previous);
+    }
 
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
