@@ -41,7 +41,7 @@ execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link o
 
 execute_robot_test s3g basic/links.robot
 
-## Exclude virtual-host.robot
+## Exclude virtual-host tests. This is tested separately as it requires additional config.
 exclude="--exclude virtual-host"
 for bucket in encrypted link; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3

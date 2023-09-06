@@ -86,8 +86,7 @@ Setup secure v4 headers
                         Execute                    aws configure set aws_access_key_id ${accessKey}
                         Execute                    aws configure set aws_secret_access_key ${secret}
                         Execute                    aws configure set region us-west-1
-                        Return From Keyword If     '${OZONE_S3_ADDRESS_STYLE}' != 'virtual'
-                        Execute                    aws configure set default.s3.addressing_style virtual
+                        Execute                    aws configure set default.s3.addressing_style ${OZONE_S3_ADDRESS_STYLE}
 
 
 Setup dummy credentials for S3
