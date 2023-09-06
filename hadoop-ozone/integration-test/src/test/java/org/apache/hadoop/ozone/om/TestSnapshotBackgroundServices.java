@@ -39,13 +39,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -204,7 +204,7 @@ public class TestSnapshotBackgroundServices {
   @DisplayName("testSnapshotAndKeyDeletionBackgroundServices")
   @SuppressWarnings("methodlength")
   public void testSnapshotAndKeyDeletionBackgroundServices()
-      throws IOException, InterruptedException, TimeoutException {
+      throws Exception {
     OzoneManager leaderOM = getLeaderOM();
     OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
 
@@ -226,7 +226,7 @@ public class TestSnapshotBackgroundServices {
     SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
         SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
 
-      /*
+    /*
       Check whether newly created key data is reclaimed
       create key a
       create snapshot b
@@ -256,13 +256,8 @@ public class TestSnapshotBackgroundServices {
     // delete key a
     ozoneBucket.deleteKey(keyNameA);
 
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return Objects.isNull(omKeyInfoTable.get(keyA));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 10000);
+    LambdaTestUtils.await(10000, 1000,
+        () -> !isKeyInTable(keyA, omKeyInfoTable));
 
     // create snapshot c
     SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM,
@@ -279,22 +274,8 @@ public class TestSnapshotBackgroundServices {
     }
 
     // assert that key a is in snapshot c's deleted table
-    GenericTestUtils.waitFor(() -> {
-      try (TableIterator<String, ? extends Table.KeyValue<String,
-          RepeatedOmKeyInfo>> iterator =
-               snapC.getMetadataManager().getDeletedTable().iterator()) {
-        while (iterator.hasNext()) {
-          if (iterator.next().getKey().contains(keyA)) {
-            return true;
-          }
-        }
-
-        return false;
-      } catch (IOException e) {
-        Assertions.fail();
-        return false;
-      }
-    }, 1000, 10000);
+    LambdaTestUtils.await(10000, 1000,
+        () -> isKeyInTable(keyA, snapC.getMetadataManager().getDeletedTable()));
 
     // create snapshot d
     SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
@@ -304,15 +285,9 @@ public class TestSnapshotBackgroundServices {
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, snapshotInfoC.getName());
 
-    GenericTestUtils.waitFor(() -> {
-      Table<String, SnapshotInfo> snapshotInfoTable =
-          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
-      try {
-        return null == snapshotInfoTable.get(snapshotInfoC.getTableKey());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 30000);
+    LambdaTestUtils.await(30000, 1000, () ->
+        !isKeyInTable(snapshotInfoC.getTableKey(),
+            newLeaderOM.getMetadataManager().getSnapshotInfoTable()));
 
     // get snapshot d
     OmSnapshot snapD;
@@ -325,39 +300,33 @@ public class TestSnapshotBackgroundServices {
     }
 
     // wait until key a appears in deleted table of snapshot d
-    GenericTestUtils.waitFor(() -> {
-      try (TableIterator<String, ? extends Table.KeyValue<String,
-          RepeatedOmKeyInfo>> iterator =
-               snapD.getMetadataManager().getDeletedTable().iterator()) {
-        while (iterator.hasNext()) {
-          Table.KeyValue<String, RepeatedOmKeyInfo> next = iterator.next();
-          if (next.getKey().contains(keyA)) {
-            return true;
-          }
-        }
-
-        return false;
-      } catch (IOException e) {
-        Assertions.fail();
-        return false;
-      }
-    }, 1000, 10000);
+    LambdaTestUtils.await(10000, 1000,
+        () -> isKeyInTable(keyA, snapD.getMetadataManager().getDeletedTable()));
 
     // Confirm entry for deleted snapshot removed from info table
     client.getObjectStore()
         .deleteSnapshot(volumeName, bucketName, newSnapshot.getName());
-    GenericTestUtils.waitFor(() -> {
-      Table<String, SnapshotInfo> snapshotInfoTable =
-          newLeaderOM.getMetadataManager().getSnapshotInfoTable();
-      try {
-        return null == snapshotInfoTable.get(newSnapshot.getTableKey());
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 10000);
+    LambdaTestUtils.await(10000, 1000,
+        () -> isKeyInTable(newSnapshot.getTableKey(),
+            newLeaderOM.getMetadataManager().getSnapshotInfoTable()));
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
         newLeaderOM);
+  }
+
+  private static <V> boolean isKeyInTable(String key, Table<String, V> table) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, V>> iterator
+             = table.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, V> next = iterator.next();
+        if (next.getKey().contains(key)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   private void startInactiveFollower(OzoneManager leaderOM,
@@ -566,9 +535,10 @@ public class TestSnapshotBackgroundServices {
         diff.getDiffList());
   }
 
-  private static void checkIfCompactionBackupFilesWerePruned(File sstBackupDir,
-      int numberOfSstFiles)
-      throws TimeoutException, InterruptedException {
+  private static void checkIfCompactionBackupFilesWerePruned(
+      File sstBackupDir,
+      int numberOfSstFiles
+  ) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       int newNumberOfSstFiles = Objects.requireNonNull(
           sstBackupDir.listFiles()).length;
