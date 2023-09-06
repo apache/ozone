@@ -484,7 +484,7 @@ public class TestReplicationSupervisor {
   }
 
   /**
-   * Test replicate schema V2 replica to V3 enabled datanode
+   * Test replicate schema V2 replica to V3 enabled datanode.
    */
   @Test
   public void testV2ToV3Replication() throws Exception {
@@ -499,7 +499,7 @@ public class TestReplicationSupervisor {
   }
 
   /**
-   * Test replicate schema V3 replica to V3 disabled datanode
+   * Test replicate schema V3 replica to V3 disabled datanode.
    */
   @Test
   public void testV3ToV2Replication() throws Exception {
@@ -588,7 +588,7 @@ public class TestReplicationSupervisor {
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeId.toString(), containerSet,
-            volumeSet, metrics, c -> {});
+            volumeSet, metrics, c -> { });
     keyValueHandler.setClusterID(scmId);
     ContainerController controller = new ContainerController(containerSet,
         singletonMap(ContainerProtos.ContainerType.KeyValueContainer,
