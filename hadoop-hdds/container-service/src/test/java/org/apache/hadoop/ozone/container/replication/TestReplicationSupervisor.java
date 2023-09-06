@@ -557,7 +557,9 @@ public class TestReplicationSupervisor {
     //export container
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     File file1 = new File(dir1 + "/" + containerId);
-    file1.createNewFile();
+    if (!file1.createNewFile()) {
+      fail("Failed to create file " + file1.getAbsolutePath());
+    }
     try (FileOutputStream fos = new FileOutputStream(file1)) {
       container.exportContainerData(fos, packer);
     }
