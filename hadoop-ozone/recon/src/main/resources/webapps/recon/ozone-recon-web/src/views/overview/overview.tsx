@@ -125,8 +125,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     const { requests, controller } = AxiosAllGetHelper([
       '/api/v1/clusterState',
       '/api/v1/task/status',
-      '/api/v1/keys/open?limit=0',
-      '/api/v1/keys/deletePending?limit=1'
+      '/api/v1/keys/open/summary',
+      '/api/v1/keys/deletePending/summary'
     ], cancelOverviewSignal);
     cancelOverviewSignal = controller;
 

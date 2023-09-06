@@ -987,7 +987,7 @@ public class TestOmSnapshot {
         key1);
     Assert.assertEquals(diff.getDiffList(), Arrays.asList(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReport.DiffType.MODIFY, key1)));
+            SnapshotDiffReport.DiffType.RENAME, key1, key1)));
   }
 
   /**

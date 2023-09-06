@@ -427,12 +427,12 @@ public final class OzoneConsts {
    * contains illegal characters when creating/renaming key.
    *
    * Avoid the following characters in a key name:
-   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
-   * and Non-printable ASCII characters (128–255 decimal characters).
-   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   * "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", Quotation
+   * marks and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
    */
   public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
-          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+          Pattern.compile("^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff]+$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
 

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -573,6 +574,7 @@ public interface OzoneManagerProtocol
    * @return S3SecretValue
    * @throws IOException
    */
+  @Nonnull
   default S3SecretValue getS3Secret(String kerberosID) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
@@ -1037,12 +1039,12 @@ public interface OzoneManagerProtocol
    * to benchmark RPC communication performance.
    * @param payloadReq payload in request.
    * @param payloadSizeResp payload size of response.
+   * @param writeToRatis write to Ratis log if flag is set to true.
    * @throws IOException if there is error in the RPC communication.
    * @return EchoRPCResponse.
    */
-  EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                             int payloadSizeResp)
-          throws IOException;
+  EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+                             boolean writeToRatis) throws IOException;
 
 
   /**
