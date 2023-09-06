@@ -75,6 +75,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   private final List<Integer> pendingDelete;
   private final int remainingMaintenanceRedundancy;
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
+  private final Map<Integer, Integer> unHealthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
   private final Set<DatanodeDetails> unhealthyReplicaDNs;
@@ -127,6 +128,9 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       3 is not considered over replicated because its second copy is unhealthy.
       */
       if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        int val = unHealthyIndexes
+            .getOrDefault(replica.getReplicaIndex(), 0);
+        unHealthyIndexes.put(replica.getReplicaIndex(), val + 1);
         continue;
       }
       HddsProtos.NodeOperationalState state =
@@ -304,13 +308,28 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isUnrecoverable() {
+    Set<Integer> distinct = healthyReplicas();
+    return distinct.size() < repConfig.getData();
+  }
+
+  /**
+   * Return true if there are insufficient replicas to recover this container
+   * when unhealthy replicas are included.
+   * @return True if the container is missing, false otherwise.
+   */
+  public boolean isMissing() {
+    Set<Integer> distinct = healthyReplicas();
+    distinct.addAll(unHealthyIndexes.keySet());
+    return distinct.size() < repConfig.getData();
+  }
+
+  private Set<Integer> healthyReplicas() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());
     distinct.addAll(maintenanceIndexes.keySet());
-    return distinct.size() < repConfig.getData();
+    return distinct;
   }
-
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will

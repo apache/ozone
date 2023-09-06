@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -187,6 +188,17 @@ public class TestOMSnapshotCreateRequest {
         bucketName, snapshotName1);
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     String key = getTableKey(volumeName, bucketName, snapshotName1);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    // Add a 1000-byte key to the bucket
+    OmKeyInfo key1 = addKey("key-testValidateAndUpdateCache", 12345L);
+    addKeyToTable(key1);
+
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
+    long bucketDataSize = key1.getDataSize();
+    long bucketUsedBytes = omBucketInfo.getUsedBytes();
+    assertEquals(key1.getReplicatedSize(), bucketUsedBytes);
 
     // Value in cache should be null as of now.
     assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
@@ -204,17 +216,24 @@ public class TestOMSnapshotCreateRequest {
     assertEquals(OK, omResponse.getStatus());
 
     // verify table data with response data.
-    SnapshotInfo snapshotInfoFromProto = getFromProtobuf(omClientResponse
-        .getOMResponse()
-        .getCreateSnapshotResponse()
-        .getSnapshotInfo()
-    );
+    OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoProto =
+        omClientResponse
+            .getOMResponse()
+            .getCreateSnapshotResponse()
+            .getSnapshotInfo();
 
-    // Get value form cache
+    assertEquals(bucketDataSize, snapshotInfoProto.getReferencedSize());
+    assertEquals(bucketUsedBytes,
+        snapshotInfoProto.getReferencedReplicatedSize());
+
+    SnapshotInfo snapshotInfoFromProto = getFromProtobuf(snapshotInfoProto);
+
+    // Get value from cache
     SnapshotInfo snapshotInfoInCache =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfoInCache);
     assertEquals(snapshotInfoFromProto, snapshotInfoInCache);
+
     assertEquals(0, omMetrics.getNumSnapshotCreateFails());
     assertEquals(1, omMetrics.getNumSnapshotActive());
     assertEquals(1, omMetrics.getNumSnapshotCreates());
@@ -370,12 +389,12 @@ public class TestOMSnapshotCreateRequest {
 
   private OmKeyInfo addKey(String keyName, long objectId) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
         objectId);
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {
-    OMRequestTestUtils.addKeyToTable(false, false, keyInfo, 0, 0L,
+    OMRequestTestUtils.addKeyToTable(false, true, keyInfo, 0, 0L,
         omMetadataManager);
     return omMetadataManager.getOzoneKey(keyInfo.getVolumeName(),
         keyInfo.getBucketName(), keyInfo.getKeyName());

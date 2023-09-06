@@ -128,6 +128,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
       "o3fs://bucket.volume.omServiceId/key";
 
+  private static final int PATH_DEPTH_TO_BUCKET = 0;
+
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     super.initialize(name, conf);
@@ -934,8 +936,9 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public Path createSnapshot(Path path, String snapshotName)
           throws IOException {
-    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
-    return new Path(path,
+    String snapshot = getAdapter()
+        .createSnapshot(pathToKey(path), snapshotName);
+    return new Path(OzoneFSUtils.trimPathToDepth(path, PATH_DEPTH_TO_BUCKET),
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
   }
 

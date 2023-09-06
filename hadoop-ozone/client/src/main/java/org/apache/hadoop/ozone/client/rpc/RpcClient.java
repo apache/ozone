@@ -167,6 +167,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
@@ -818,6 +819,7 @@ public class RpcClient implements ClientProtocol {
    * @throws IOException
    */
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
@@ -1738,8 +1740,11 @@ public class RpcClient implements ClientProtocol {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, uploadID);
-    Preconditions.checkArgument(partNumber > 0 && partNumber <= 10000, "Part " +
-        "number should be greater than zero and less than or equal to 10000");
+    if (partNumber <= 0 || partNumber > MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD) {
+      throw new OMException("Part number must be an integer between 1 and "
+          + MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD + ", inclusive",
+          OMException.ResultCodes.INVALID_PART);
+    }
     Preconditions.checkArgument(size >= 0, "size should be greater than or " +
         "equal to zero");
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()

@@ -368,7 +368,10 @@ public final class OMConfigKeys {
 
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";
-  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+  // default is 6000 taking account of 32MB buffer size, and assuming
+  // 4KB size (considering acls, key/file name, and other meata)  * 6000
+  // resulting 24MB
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
