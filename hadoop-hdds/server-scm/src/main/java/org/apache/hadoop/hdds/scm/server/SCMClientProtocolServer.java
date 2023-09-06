@@ -300,8 +300,6 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
-
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -321,7 +319,6 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
       long containerId, int clientVersion) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
 
     Set<ContainerReplica> replicas = getScm().getContainerManager()
@@ -362,7 +359,6 @@ public class SCMClientProtocolServer implements
         throw ex;
       }
     }
-
 
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -449,7 +445,6 @@ public class SCMClientProtocolServer implements
   public List<ContainerInfo> listContainer(long startContainerID,
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationFactor factor) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -517,7 +512,6 @@ public class SCMClientProtocolServer implements
       int count, HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig repConfig) throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerID));
@@ -724,7 +718,6 @@ public class SCMClientProtocolServer implements
   @Override
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getPipelineManager().getPipeline(
         PipelineID.getFromProtobuf(pipelineID));
   }
@@ -1225,14 +1218,12 @@ public class SCMClientProtocolServer implements
 
   @Override
   public long getContainerCount() throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers().size();
   }
 
   @Override
   public long getContainerCount(HddsProtos.LifeCycleState state)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers(state).size();
   }
 
@@ -1240,7 +1231,6 @@ public class SCMClientProtocolServer implements
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
     return scm.getContainerManager().getContainers(
         ContainerID.valueOf(startContainerID), count, state);
   }
