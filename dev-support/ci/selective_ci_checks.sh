@@ -82,7 +82,7 @@ function get_changed_files() {
 }
 
 function set_outputs_run_everything_and_exit() {
-    BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
+    BASIC_CHECKS="author bats checkstyle docs findbugs native rat"
     compile_needed=true
     compose_tests_needed=true
     dependency_check_needed=true
@@ -260,18 +260,7 @@ function get_count_integration_files() {
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
-    )
-    # Ozone's unit test naming convention: Test*.java
-    # The following makes this filter ignore all tests except those in
-    # integration-test and fault-injection-test.
-    # Directories starting with `i` under hadoop-ozone need to be listed
-    # explicitly, other subdirectories are captured by the second item.
-    local ignore_array=(
-        "^hadoop-hdds/.*/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/[a-eghj-z].*/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/insight/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/interface-client/src/test/java/.*/Test.*.java"
-        "^hadoop-ozone/interface-storage/src/test/java/.*/Test.*.java"
+        "src/test/resources"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
@@ -453,29 +442,6 @@ function check_needs_native() {
     start_end::group_end
 }
 
-function check_needs_unit_test() {
-    start_end::group_start "Check if unit test is needed"
-    local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
-        "^hadoop-ozone/dev-support/checks/unit.sh"
-        "^hadoop-ozone/dev-support/checks/junit.sh"
-        "src/test/java"
-        "src/test/resources"
-    )
-    local ignore_array=(
-        "^hadoop-ozone/dist"
-        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
-        "^hadoop-ozone/integration-test"
-    )
-    filter_changed_files true
-
-    if [[ ${match_count} != "0" ]]; then
-        add_basic_check unit
-    fi
-
-    start_end::group_end
-}
-
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
 function get_count_misc_files() {
@@ -497,6 +463,7 @@ function get_count_misc_files() {
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/acceptance.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
+        "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/dev-support/checks/kubernetes.sh"
     )
     filter_changed_files true
@@ -529,7 +496,6 @@ function calculate_test_types_to_run() {
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
-        add_basic_check unit
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
@@ -612,6 +578,5 @@ check_needs_dependency
 check_needs_docs
 check_needs_findbugs
 check_needs_native
-check_needs_unit_test
 calculate_test_types_to_run
 set_outputs

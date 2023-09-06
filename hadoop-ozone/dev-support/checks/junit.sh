@@ -41,7 +41,7 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
 fi
 
-if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
+if [[ ${ITERATIONS} -gt 1 ]]; then
   mvn ${MAVEN_OPTIONS} -DskipTests clean install
 fi
 
