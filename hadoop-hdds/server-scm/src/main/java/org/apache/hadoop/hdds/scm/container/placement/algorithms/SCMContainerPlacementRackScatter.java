@@ -391,18 +391,15 @@ public final class SCMContainerPlacementRackScatter
     for (Node node : excludedNodes) {
       Node rack = networkTopology.getAncestor(node, RACK_LEVEL);
       if (rack != null && !usedRacksCntMap.containsKey(rack)) {
-        // Rack for an excluded node and no used nodes on this rack.
+        // Dead nodes are removed from the topology, so the node may have a null
+        // rack, hence the not null check.
+        // Anything that reaches here is the rack for an excluded node and no
+        // used nodes on are on the rack.
         excludedNodeRacks.add(rack);
       }
     }
     Set<Node> exc = new HashSet<>(excludedNodes);
     for (Node rack : excludedNodeRacks) {
-      // Dead nodes are removed from the topology, so the node may have a null
-      // rack, or the topology may not know about it, depending on the timing
-      // of when it got removed / excluded.
-      if (rack == null) {
-        continue;
-      }
       // If a node is removed from the cluster (eg goes dead), but the client
       // already added it to the exclude list, then the rack may not be in the
       // topology any longer. See test
