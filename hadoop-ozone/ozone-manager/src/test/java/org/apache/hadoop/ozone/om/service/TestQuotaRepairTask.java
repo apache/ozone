@@ -32,6 +32,8 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+
 /**
  * Test class for quota repair.
  */
@@ -67,6 +69,10 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
       OMRequestTestUtils.addFileToKeyTable(false, false,
           fileName, omKeyInfo, -1, 50 + i, omMetadataManager);
     }
+
+    // Intentionally zero out buckets' used bytes first
+    zeroOutBucketUsedBytes(volumeName, bucketName, 1L);
+    zeroOutBucketUsedBytes(volumeName, fsoBucketName, 2L);
 
     // all count is 0 as above is adding directly to key / file table
     // and directory table
@@ -132,5 +138,17 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
         .get(omMetadataManager.getVolumeKey(volumeName));
     Assert.assertTrue(volArgsVerify.getQuotaInBytes() == -1);
     Assert.assertTrue(volArgsVerify.getQuotaInNamespace() == -1);
+  }
+
+  private void zeroOutBucketUsedBytes(String volumeName, String bucketName,
+                                      long trxnLogIndex)
+      throws IOException {
+    String dbKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(dbKey);
+    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    omMetadataManager.getBucketTable()
+        .addCacheEntry(new CacheKey<>(dbKey),
+            CacheValue.get(trxnLogIndex, bucketInfo));
+    omMetadataManager.getBucketTable().put(dbKey, bucketInfo);
   }
 }

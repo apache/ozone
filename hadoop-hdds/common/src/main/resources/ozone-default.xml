@@ -1798,6 +1798,22 @@
   </property>
 
   <property>
+    <name>ozone.s3g.secret.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The boolean which enables the Ozone S3Gateway Secret endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.type</name>
+    <value>kerberos</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
     <tag>OZONE, OM</tag>
@@ -3357,7 +3373,7 @@
   </property>
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
-    <value>10000</value>
+    <value>6000</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.

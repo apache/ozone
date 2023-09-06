@@ -189,7 +189,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  Column Family        |        VALUE                                    |
    * |-------------------------------------------------------------------------|
-   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
    * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
    * |                       |  1. /volumeId/bucketId/parentId/dirName         |
@@ -728,6 +728,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
+    // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
+    //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);
@@ -1355,7 +1357,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue< String, SnapshotInfo> snapshotinfo;
+      KeyValue<String, SnapshotInfo> snapshotinfo;
       snapshotIter.seek(previous);
       while (snapshotIter.hasNext() && count < maxListResult) {
         snapshotinfo = snapshotIter.next();
