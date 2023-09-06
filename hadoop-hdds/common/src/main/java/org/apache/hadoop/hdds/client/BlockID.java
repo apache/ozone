@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * BlockID of Ozone (containerID + localID + blockCommitSequenceId).
@@ -30,14 +29,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class BlockID {
 
   private final ContainerBlockID containerBlockID;
-  private final AtomicLong blockCommitSequenceId;
+  private long blockCommitSequenceId;
 
   public BlockID(long containerID, long localID) {
     this(containerID, localID, 0);
   }
 
   private BlockID(long containerID, long localID, long bcsID) {
-    this(new ContainerBlockID(containerID, localID), bcsID);
+    containerBlockID = new ContainerBlockID(containerID, localID);
+    blockCommitSequenceId = bcsID;
   }
 
   public BlockID(ContainerBlockID containerBlockID) {
@@ -46,7 +46,7 @@ public class BlockID {
 
   private BlockID(ContainerBlockID containerBlockID, long bcsId) {
     this.containerBlockID = containerBlockID;
-    this.blockCommitSequenceId = new AtomicLong(bcsId);
+    blockCommitSequenceId = bcsId;
   }
 
   public long getContainerID() {
@@ -58,11 +58,11 @@ public class BlockID {
   }
 
   public long getBlockCommitSequenceId() {
-    return blockCommitSequenceId.get();
+    return blockCommitSequenceId;
   }
 
   public void setBlockCommitSequenceId(long blockCommitSequenceId) {
-    this.blockCommitSequenceId.set(blockCommitSequenceId);
+    this.blockCommitSequenceId = blockCommitSequenceId;
   }
 
   public ContainerBlockID getContainerBlockID() {
@@ -78,7 +78,7 @@ public class BlockID {
 
   public void appendTo(StringBuilder sb) {
     containerBlockID.appendTo(sb);
-    sb.append(" bcsId: ").append(getBlockCommitSequenceId());
+    sb.append(" bcsId: ").append(blockCommitSequenceId);
   }
 
   @JsonIgnore
@@ -86,7 +86,7 @@ public class BlockID {
     return ContainerProtos.DatanodeBlockID.newBuilder().
         setContainerID(containerBlockID.getContainerID())
         .setLocalID(containerBlockID.getLocalID())
-        .setBlockCommitSequenceId(getBlockCommitSequenceId()).build();
+        .setBlockCommitSequenceId(blockCommitSequenceId).build();
   }
 
   @JsonIgnore
@@ -100,7 +100,7 @@ public class BlockID {
   public HddsProtos.BlockID getProtobuf() {
     return HddsProtos.BlockID.newBuilder()
         .setContainerBlockID(containerBlockID.getProtobuf())
-        .setBlockCommitSequenceId(getBlockCommitSequenceId()).build();
+        .setBlockCommitSequenceId(blockCommitSequenceId).build();
   }
 
   @JsonIgnore
@@ -120,13 +120,13 @@ public class BlockID {
     }
     BlockID blockID = (BlockID) o;
     return containerBlockID.equals(blockID.getContainerBlockID())
-        && getBlockCommitSequenceId() == blockID.getBlockCommitSequenceId();
+        && blockCommitSequenceId == blockID.getBlockCommitSequenceId();
   }
 
   @Override
   public int hashCode() {
     return Objects
         .hash(containerBlockID.getContainerID(), containerBlockID.getLocalID(),
-            getBlockCommitSequenceId());
+            blockCommitSequenceId);
   }
 }

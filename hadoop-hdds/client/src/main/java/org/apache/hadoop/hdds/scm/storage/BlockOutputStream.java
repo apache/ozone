@@ -80,7 +80,7 @@ public class BlockOutputStream extends OutputStream {
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
 
-  private final BlockID blockID;
+  private AtomicReference<BlockID> blockID;
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
 
@@ -145,7 +145,7 @@ public class BlockOutputStream extends OutputStream {
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
-    this.blockID = blockID;
+    this.blockID = new AtomicReference<>(blockID);
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -194,7 +194,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   public BlockID getBlockID() {
-    return blockID;
+    return blockID.get();
   }
 
   public long getTotalAckDataLength() {
@@ -475,11 +475,10 @@ public class BlockOutputStream extends OutputStream {
         if (getIoException() == null && !force) {
           BlockID responseBlockID = BlockID.getFromProtobuf(
               e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.getContainerBlockID()
+          Preconditions.checkState(blockID.get().getContainerBlockID()
               .equals(responseBlockID.getContainerBlockID()));
           // updates the bcsId of the block
-          blockID.setBlockCommitSequenceId(
-              responseBlockID.getBlockCommitSequenceId());
+          blockID.set(responseBlockID);
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " flushLength "
@@ -696,7 +695,7 @@ public class BlockOutputStream extends OutputStream {
         bufferPool.byteStringConversion());
     ChecksumData checksumData = checksum.computeChecksum(chunk);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.getLocalID() + "_chunk_" + ++chunkIndex)
+        .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())
@@ -721,7 +720,7 @@ public class BlockOutputStream extends OutputStream {
 
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID, data, token, replicationIndex);
+          blockID.get(), data, token, replicationIndex);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>

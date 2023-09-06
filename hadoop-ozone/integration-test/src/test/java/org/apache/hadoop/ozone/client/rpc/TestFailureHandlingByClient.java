@@ -70,6 +70,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -534,9 +535,10 @@ public class TestFailureHandlingByClient {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
     // Make sure a new block is written
-    Assert.assertNotEquals(
-        keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
-            .getBlockID(), blockId);
+    final BlockID latest = keyInfo.getLatestVersionLocations()
+        .getBlocksLatestVersionOnly().get(0).getBlockID();
+    Assertions.assertNotEquals(latest, blockId);
+
     Assert.assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
