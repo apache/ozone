@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
@@ -241,13 +242,18 @@ public class ObjectEndpoint extends EndpointBase {
             "Connection", "close").build();
       }
 
-      if (length == 0 &&
-          ozoneConfiguration
-              .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-                  OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
-          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      boolean canCreateDirectory = ozoneConfiguration
+          .getBoolean(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
+              OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT) &&
+          bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED;
+
+      String amzDecodedLength =
+          headers.getHeaderString(S3Consts.DECODED_CONTENT_LENGTH_HEADER);
+      boolean hasAmzDecodedLengthZero = amzDecodedLength != null &&
+          Long.parseLong(amzDecodedLength) == 0;
+      if (canCreateDirectory &&
+          (length == 0 || hasAmzDecodedLengthZero)) {
         s3GAction = S3GAction.CREATE_DIRECTORY;
-        // create directory
         getClientProtocol()
             .createDirectory(volume.getName(), bucketName, keyPath);
         return Response.ok().status(HttpStatus.SC_OK).build();
