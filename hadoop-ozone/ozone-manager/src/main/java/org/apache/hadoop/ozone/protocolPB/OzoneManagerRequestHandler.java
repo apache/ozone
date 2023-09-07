@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashSet;

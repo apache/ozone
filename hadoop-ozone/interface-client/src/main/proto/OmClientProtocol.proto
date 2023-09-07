@@ -505,7 +505,7 @@ enum Status {
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
     
-    NVALID_PATH = 91;
+    INVALID_PATH = 91;
 }
 
 /**
