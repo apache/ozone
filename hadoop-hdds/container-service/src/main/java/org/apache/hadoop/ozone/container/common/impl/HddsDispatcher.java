@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -231,7 +232,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     try {
       if (DispatcherContext.op(dispatcherContext).validateToken()) {
-        validateToken(msg);
+        TracingUtil.executeInNewSpan("validateToken",
+            () -> validateToken(msg));
       }
     } catch (IOException ioe) {
       final String s = ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED

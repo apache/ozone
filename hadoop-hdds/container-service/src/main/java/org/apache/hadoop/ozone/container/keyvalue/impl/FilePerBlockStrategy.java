@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -114,6 +115,13 @@ public class FilePerBlockStrategy implements ChunkManager {
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
+    TracingUtil.executeInNewSpan("FilePerBlockStrategy.writeChunk",
+        () -> writeChunkInSpan(container, blockID, info, data, dispatcherContext));
+  }
+
+  private void writeChunkInSpan(Container container, BlockID blockID, ChunkInfo info,
+      ChunkBuffer data, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
 
     checkLayoutVersion(container);
 
@@ -171,6 +179,13 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public ChunkBuffer readChunk(Container container, BlockID blockID,
+      ChunkInfo info, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
+    return TracingUtil.executeInNewSpan("FilePerBlockStrategy.readChunk",
+        () -> readChunkInSpan(container, blockID, info, dispatcherContext));
+  }
+
+  private ChunkBuffer readChunkInSpan(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
