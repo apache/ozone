@@ -1468,7 +1468,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
     final WithObjectID toObject = toSnapshotTable.get(toObjectName);
     if ((fromObject instanceof OmKeyInfo) && (toObject instanceof OmKeyInfo)) {
-      return !SnapshotDeletingService.isBlockLocationInfoSame(
+      return !((OmKeyInfo) fromObject).isKeyInfoSame((OmKeyInfo) toObject,
+          false, false, false, false)
+          || !SnapshotDeletingService.isBlockLocationInfoSame(
           (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
     } else if ((fromObject instanceof OmDirectoryInfo)
         && (toObject instanceof OmDirectoryInfo)) {
