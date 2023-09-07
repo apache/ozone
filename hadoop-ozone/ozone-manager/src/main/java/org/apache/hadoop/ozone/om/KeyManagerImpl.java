@@ -1389,14 +1389,11 @@ public class KeyManagerImpl implements KeyManager {
     refreshPipeline(Arrays.asList(key));
   }
 
-  public static boolean isKeyDeleted(String key, Table keyTable)
-      throws IOException {
+  public static boolean isKeyDeleted(String key, Table keyTable) {
     CacheValue<OmKeyInfo> omKeyInfoCacheValue
         = keyTable.getCacheValue(new CacheKey(key));
-    if (null == omKeyInfoCacheValue) {
-      return null == keyTable.getSkipCache(key);
-    }
-    return omKeyInfoCacheValue.getCacheValue() == null;
+    return omKeyInfoCacheValue != null
+        && omKeyInfoCacheValue.getCacheValue() == null;
   }
 
   /**
