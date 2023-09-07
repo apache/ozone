@@ -325,13 +325,32 @@ public final class OMRequestTestUtils {
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
+
+      // Simulate bucket quota (usage) update done in OMKeyCommitRequest
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+          bucketKey);
+      // omBucketInfo can be null if some mocked tests doesn't use the table
+      if (omBucketInfo != null) {
+        omBucketInfo.incrUsedBytes(omKeyInfo.getReplicatedSize());
+      }
+
       if (addToCache) {
         omMetadataManager.getKeyTable(getDefaultBucketLayout())
             .addCacheEntry(new CacheKey<>(ozoneKey),
                 CacheValue.get(trxnLogIndex, omKeyInfo));
+        if (omBucketInfo != null) {
+          omMetadataManager.getBucketTable()
+              .addCacheEntry(new CacheKey<>(bucketKey),
+                  CacheValue.get(trxnLogIndex + 1, omBucketInfo));
+        }
       }
       omMetadataManager.getKeyTable(getDefaultBucketLayout())
           .put(ozoneKey, omKeyInfo);
+
+      if (omBucketInfo != null) {
+        omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+      }
     }
   }
 

@@ -20,31 +20,74 @@ package org.apache.hadoop.ozone.s3secret;
 
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.POST;
+import javax.annotation.Nullable;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
- * Revoke secret endpoint.
+ * Endpoint to manage S3 secret.
  */
-@Path("/secret/revoke")
+@Path("/secret")
 @S3SecretEnabled
-public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
-
+public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   private static final Logger LOG =
-          LoggerFactory.getLogger(S3SecretRevokeEndpoint.class);
+      LoggerFactory.getLogger(S3SecretManagementEndpoint.class);
 
+  @PUT
+  public Response generate() throws IOException {
+    return generateInternal(null);
+  }
 
-  @POST
+  @PUT
+  @Path("/{username}")
+  public Response generate(@PathParam("username") String username)
+      throws IOException {
+    return generateInternal(username);
+  }
+
+  private Response generateInternal(@Nullable String username)
+      throws IOException {
+    S3SecretResponse s3SecretResponse = new S3SecretResponse();
+    S3SecretValue s3SecretValue = generateS3Secret(username);
+    s3SecretResponse.setAwsSecret(s3SecretValue.getAwsSecret());
+    s3SecretResponse.setAwsAccessKey(s3SecretValue.getAwsAccessKey());
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        S3GAction.GENERATE_SECRET, getAuditParameters()));
+    return Response.ok(s3SecretResponse).build();
+  }
+
+  private S3SecretValue generateS3Secret(@Nullable String username)
+      throws IOException {
+    String actualUsername = username == null ? userNameFromRequest() : username;
+    return getClient().getObjectStore().getS3Secret(actualUsername);
+  }
+
+  @DELETE
   public Response revoke() throws IOException {
+    return revokeInternal(null);
+  }
+
+  @DELETE
+  @Path("/{username}")
+  public Response revoke(@PathParam("username") String username)
+      throws IOException {
+    return revokeInternal(username);
+  }
+
+  private Response revokeInternal(@Nullable String username)
+      throws IOException {
     try {
-      revokeSecret();
+      revokeSecret(username);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           S3GAction.REVOKE_SECRET, getAuditParameters()));
       return Response.ok().build();
@@ -62,8 +105,8 @@ public class S3SecretRevokeEndpoint extends S3SecretEndpointBase {
     }
   }
 
-  private void revokeSecret() throws IOException {
-    getClient().getObjectStore().revokeS3Secret(userNameFromRequest());
+  private void revokeSecret(@Nullable String username) throws IOException {
+    String actualUsername = username == null ? userNameFromRequest() : username;
+    getClient().getObjectStore().revokeS3Secret(actualUsername);
   }
-
 }

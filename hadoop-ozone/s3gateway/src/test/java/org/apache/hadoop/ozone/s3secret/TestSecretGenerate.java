@@ -35,10 +35,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -47,9 +48,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 public class TestSecretGenerate {
   private static final String USER_NAME = "test";
+  private static final String OTHER_USER_NAME = "test2";
   private static final String USER_SECRET = "test_secret";
 
-  private S3SecretGenerateEndpoint endpoint;
+  private S3SecretManagementEndpoint endpoint;
 
   @Mock
   private ClientProtocol proxy;
@@ -62,31 +64,43 @@ public class TestSecretGenerate {
   @Mock
   private Principal principal;
 
+  private static S3SecretValue getS3SecretValue(InvocationOnMock invocation) {
+    Object[] args = invocation.getArguments();
+    return new S3SecretValue((String) args[0], USER_SECRET);
+  }
+
   @BeforeEach
   void setUp() throws IOException {
-    S3SecretValue value = new S3SecretValue(USER_NAME, USER_SECRET);
-    when(proxy.getS3Secret(eq(USER_NAME))).thenReturn(value);
+    when(proxy.getS3Secret(any())).then(TestSecretGenerate::getS3SecretValue);
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClient client = new OzoneClientStub(new ObjectStoreStub(conf, proxy));
-
-    when(principal.getName()).thenReturn(USER_NAME);
-    when(securityContext.getUserPrincipal()).thenReturn(principal);
-    when(context.getSecurityContext()).thenReturn(securityContext);
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretGenerateEndpoint();
+    endpoint = new S3SecretManagementEndpoint();
     endpoint.setClient(client);
     endpoint.setContext(context);
   }
 
   @Test
   void testSecretGenerate() throws IOException {
+    when(principal.getName()).thenReturn(USER_NAME);
+    when(securityContext.getUserPrincipal()).thenReturn(principal);
+    when(context.getSecurityContext()).thenReturn(securityContext);
+
     S3SecretResponse response =
             (S3SecretResponse) endpoint.generate().getEntity();
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(USER_NAME, response.getAwsAccessKey());
+  }
+
+  @Test
+  void testSecretGenerateWithUsername() throws IOException {
+    S3SecretResponse response =
+            (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
+    assertEquals(USER_SECRET, response.getAwsSecret());
+    assertEquals(OTHER_USER_NAME, response.getAwsAccessKey());
   }
 }
