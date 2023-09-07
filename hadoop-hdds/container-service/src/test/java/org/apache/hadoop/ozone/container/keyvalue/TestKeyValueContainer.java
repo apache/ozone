@@ -977,20 +977,15 @@ public class TestKeyValueContainer {
   private void testMixedSchemaImport(String dir,
       boolean schemaV3Enabled) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String scmId = UUID.randomUUID().toString();
-    UUID datanodeId = UUID.randomUUID();
     final String dir1 = dir + (schemaV3Enabled ? "/v3" : "/v2");
 
     // create HddsVolume
-    VolumeChoosingPolicy volumeChoosingPolicy =
-        mock(RoundRobinVolumeChoosingPolicy.class);
     HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
     StorageVolumeUtil.checkVolume(hddsVolume1, scmId, scmId, conf, null, null);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume1);
-    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
     // create container
     long containerId = 1;
