@@ -880,7 +880,8 @@ public class TestLegacyReplicationManager {
       Assertions.assertTrue(repSources.containsAll(
           Arrays.asList(closedReplica1.getDatanodeDetails(),
               closedReplica2.getDatanodeDetails())));
-      Assertions.assertFalse(repSources.contains(quasiReplica.getDatanodeDetails()));
+      Assertions.assertFalse(
+          repSources.contains(quasiReplica.getDatanodeDetails()));
     }
 
     /**
