@@ -392,9 +392,12 @@ public abstract class SCMCommonPlacementPolicy implements
    * should have
    *
    * @param numReplicas - The desired replica counts
+   * @param excludedRackCount - The number of racks excluded due to containing
+   *                          only excluded nodes. The total racks on the
+   *                          cluster will be reduced by this number.
    * @return The number of racks containers should span to meet the policy
    */
-  protected int getRequiredRackCount(int numReplicas) {
+  protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     return 1;
   }
 
@@ -432,7 +435,7 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
-    int requiredRacks = getRequiredRackCount(replicas);
+    int requiredRacks = getRequiredRackCount(replicas, 0);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -520,7 +523,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups =
-            getRequiredRackCount(totalNumberOfReplicas);
+            getRequiredRackCount(totalNumberOfReplicas, 0);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
     List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
             .values().stream()
