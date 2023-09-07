@@ -218,7 +218,7 @@ public class OzoneListStatusHelper {
         // Since putIfAbsent doesn't work as expected in case of null value,
         // so had to explicitly check using containsKey
         if (!map.containsKey(entry.key)) {
-          map.putIfAbsent(entry.key, status);
+          map.put(entry.key, status);
         }
       }
     }

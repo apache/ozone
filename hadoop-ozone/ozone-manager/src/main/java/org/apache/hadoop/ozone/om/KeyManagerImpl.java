@@ -1429,8 +1429,9 @@ public class KeyManagerImpl implements KeyManager {
         cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
       } else if (cacheOmKeyInfo == null
           && cacheKey.startsWith(startCacheKey)
-          && cacheKey.compareTo(startCacheKey) >= 0) {
-        cacheKeyMap.putIfAbsent(cacheKey, null);
+          && cacheKey.compareTo(startCacheKey) >= 0
+          && !cacheKeyMap.containsKey(cacheKey)) {
+        cacheKeyMap.put(cacheKey, null);
       }
     }
   }
@@ -1624,7 +1625,7 @@ public class KeyManagerImpl implements KeyManager {
             // Since putIfAbsent doesn't work as expected in case of null value,
             // so had to explicitly check using containsKey
             if (!cacheKeyMap.containsKey(entryInDb)) {
-              cacheKeyMap.putIfAbsent(entryInDb, new OzoneFileStatus(omKeyInfo,
+              cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
               countEntries++;
             }
@@ -1640,7 +1641,7 @@ public class KeyManagerImpl implements KeyManager {
               // Since putIfAbsent doesn't work as expected in case of null
               // value, so had to explicitly check using containsKey
               if (!cacheKeyMap.containsKey(entryInDb)) {
-                cacheKeyMap.putIfAbsent(entryInDb,
+                cacheKeyMap.put(entryInDb,
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                 countEntries++;
               }
@@ -1652,7 +1653,7 @@ public class KeyManagerImpl implements KeyManager {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
                       omKeyInfo, immediateChild);
-                  cacheKeyMap.putIfAbsent(entryInDb,
+                  cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(fakeDirEntry,
                           scmBlockSize, true));
                 } else {
