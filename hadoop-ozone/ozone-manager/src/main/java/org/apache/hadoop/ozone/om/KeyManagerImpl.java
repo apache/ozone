@@ -1230,7 +1230,8 @@ public class KeyManagerImpl implements KeyManager {
         return createDirectoryKey(cacheValue.getCacheValue(), dirKey);
       }
       // deletedKeys may contain deleted entry while iterating cache iterator
-      // To avoid flush of cache while iterating table iterator.
+      // To avoid race condition of flush of cache while iterating
+      // table iterator.
       if (!exists) {
         deletedKeys.add(cacheKey);
       }
