@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -113,9 +114,21 @@ public class RatisUnderReplicationHandler
       return 0;
     }
 
-    // find targets to send replicas to
-    List<DatanodeDetails> targetDatanodes =
-        getTargets(replicaCount, pendingOps);
+    List<DatanodeDetails> targetDatanodes;
+    try {
+      // find targets to send replicas to
+      targetDatanodes = getTargets(replicaCount, pendingOps);
+    } catch (SCMException e) {
+      SCMException.ResultCodes code = e.getResult();
+      if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
+        throw e;
+      }
+      LOG.warn("Cannot replicate container {} because no suitable targets " +
+          "were found.", containerInfo);
+      removeUnhealthyReplicaIfPossible(containerInfo, replicas, pendingOps);
+      // Throw the original exception so the request gets re-queued to try again
+      throw e;
+    }
 
     int commandsSent = sendReplicationCommands(
         containerInfo, sourceDatanodes, targetDatanodes);
@@ -135,6 +148,73 @@ public class RatisUnderReplicationHandler
           replicaCount.additionalReplicaNeeded(), targetDatanodes.size());
     }
     return commandsSent;
+  }
+
+  private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
+      throws NotLeaderException {
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        // There is at least one pending delete which will free up a node.
+        // Therefore we do nothing until that delete completes or times out.
+        LOG.debug("Container {} has pending deletes which will free nodes",
+            pendingOps);
+        return;
+      }
+    }
+
+    if (replicas.size() <= 2) {
+      // We never remove replicas if it will leave us with less than 2 replicas
+      LOG.debug("There are only {} replicas for container {} so no more will " +
+          "be deleted", replicas.size(), containerInfo);
+      return;
+    }
+
+    // If there are no healthy containers, we do nothing as this should be
+    // handled elsewhere.
+    boolean hasHealthy = false;
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == State.CLOSED) {
+        hasHealthy = true;
+        break;
+      }
+    }
+    if (!hasHealthy) {
+      LOG.debug("Container {} has no CLOSED containers, it will be handled " +
+          "elsewhere", containerInfo);
+      return;
+    }
+
+    // Replicas that are candidates to delete are, in preference:
+    //   * Quasi-Closed with oldest sequence less than the container seq
+    //   * Any Unhealthy replica
+    ContainerReplica deleteCandidate = null;
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == State.QUASI_CLOSED
+          && r.getSequenceId() < containerInfo.getSequenceId()) {
+        if ((deleteCandidate == null
+            || r.getSequenceId() < deleteCandidate.getSequenceId())) {
+          deleteCandidate = r;
+        }
+      }
+    }
+
+    if (deleteCandidate == null) {
+      for (ContainerReplica r : replicas) {
+        if (r.getState() == State.UNHEALTHY) {
+          deleteCandidate = r;
+          break;
+        }
+      }
+    }
+    if (deleteCandidate != null) {
+      replicationManager.sendDeleteCommand(containerInfo,
+          deleteCandidate.getReplicaIndex(),
+          deleteCandidate.getDatanodeDetails(), true);
+    } else {
+      LOG.info("Unable to find a replica to remove for container {} with " +
+          "replicas {}", containerInfo, replicas);
+    }
   }
 
   /**
