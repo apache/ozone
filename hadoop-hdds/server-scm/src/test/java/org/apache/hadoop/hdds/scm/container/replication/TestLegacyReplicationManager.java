@@ -923,7 +923,7 @@ public class TestLegacyReplicationManager {
       Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
       ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
 
-      // Only the quasi closed replica should have been used as a source.
+      // Only the quasi closed replicas should have been used as a sources.
       List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
       Assertions.assertEquals(2, repSources.size());
       Assertions.assertTrue(repSources.containsAll(
