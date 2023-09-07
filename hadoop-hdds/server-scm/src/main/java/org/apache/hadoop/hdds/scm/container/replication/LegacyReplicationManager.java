@@ -1138,8 +1138,12 @@ public class LegacyReplicationManager {
           container.containerID());
     }
 
+    State matchingReplicaState = State.CLOSED;
+    if (container.getState() == LifeCycleState.QUASI_CLOSED) {
+      matchingReplicaState = State.QUASI_CLOSED;
+    }
     List<ContainerReplica> replicationSources = getReplicationSources(container,
-        replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
+        replicaSet.getReplicas(), matchingReplicaState);
     // This method will handle topology even if replicasNeeded <= 0.
     replicateAnyWithTopology(container, replicationSources,
         placementStatus, replicasNeeded);

@@ -836,14 +836,14 @@ public class TestLegacyReplicationManager {
     }
 
     /**
-     * 1 closed replica
-     * 2 quasi-closed replicas
+     * 2 closed replica
+     * 1 quasi-closed replicas
      * SCM state is closed.
      * Expectation: The replicate container command should only contain the
-     * closed replica as a source.
+     * closed replicas as sources.
      */
     @Test
-    public void testOnlyMatchingReplicasChosen()
+    public void testOnlyMatchingClosedReplicasChosen()
         throws IOException {
       final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
       final ContainerID id = container.containerID();
@@ -861,12 +861,9 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(id, closedReplica1);
       containerStateManager.updateContainerReplica(id, closedReplica2);
 
-      final int currentReplicateCommandCount = datanodeCommandHandler
-          .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
-      // Two of the replicas are in OPEN state
       replicationManager.processAll();
       eventQueue.processAll(1000);
-      Assertions.assertEquals(currentReplicateCommandCount + 1,
+      Assertions.assertEquals(1,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.replicateContainerCommand));
 
@@ -884,6 +881,55 @@ public class TestLegacyReplicationManager {
           Arrays.asList(closedReplica1.getDatanodeDetails(),
               closedReplica2.getDatanodeDetails())));
       Assertions.assertFalse(repSources.contains(quasiReplica.getDatanodeDetails()));
+    }
+
+    /**
+     * 2 quasi-closed replicas
+     * 1 unhealthy replica
+     * SCM state is quasi-closed.
+     * Expectation: The replicate container command should only contain the
+     * quasi-closed replicas as sources.
+     */
+    @Test
+    public void testOnlyMatchingQuasiClosedReplicasChosen()
+        throws IOException {
+      final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica quasiReplica1 = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica quasiReplica2 = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      final ContainerReplica unhealthyReplica = getReplicas(
+          id, UNHEALTHY, 1000L, datanodeDetails.getUuid(), datanodeDetails);
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, quasiReplica1);
+      containerStateManager.updateContainerReplica(id, quasiReplica2);
+      containerStateManager.updateContainerReplica(id, unhealthyReplica);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Optional<CommandForDatanode> cmdOptional =
+          datanodeCommandHandler.getReceivedCommands().stream().findFirst();
+      Assertions.assertTrue(cmdOptional.isPresent());
+      SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
+      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
+
+      // Only the quasi closed replica should have been used as a source.
+      List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
+      Assertions.assertEquals(2, repSources.size());
+      Assertions.assertTrue(repSources.containsAll(
+          Arrays.asList(quasiReplica1.getDatanodeDetails(),
+              quasiReplica2.getDatanodeDetails())));
+      Assertions.assertFalse(
+          repSources.contains(unhealthyReplica.getDatanodeDetails()));
     }
 
     /**
