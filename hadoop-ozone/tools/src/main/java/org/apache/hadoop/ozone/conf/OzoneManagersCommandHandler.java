@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 import static java.util.stream.Collectors.toList;
@@ -45,11 +46,17 @@ public class OzoneManagersCommandHandler implements Callable<Void> {
   public Void call() throws Exception {
     ConfigurationSource configSource =
             OzoneConfiguration.of(tool.getConf());
-    Collection<InetSocketAddress> omAddresses =
-            getOmHAAddressesById(configSource)
-            .values().stream().flatMap(Collection::stream).collect(toList());
-    for (InetSocketAddress addr : omAddresses) {
-      tool.printOut(addr.getHostName());
+    if (OmUtils.isServiceIdsDefined(
+            configSource)) {
+      Collection<InetSocketAddress> omAddresses =
+              getOmHAAddressesById(configSource)
+                      .values().stream().flatMap(Collection::stream)
+                      .collect(toList());
+      for (InetSocketAddress addr : omAddresses) {
+        tool.printOut(addr.getHostName());
+      }
+    } else {
+      tool.printOut(OmUtils.getOmAddress(configSource).getHostName());
     }
     return null;
   }
