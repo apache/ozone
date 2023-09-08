@@ -388,7 +388,7 @@ jobs:
     needs:
       - acceptance
       - basic
-      - integration
+      - unit_and_integration
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
