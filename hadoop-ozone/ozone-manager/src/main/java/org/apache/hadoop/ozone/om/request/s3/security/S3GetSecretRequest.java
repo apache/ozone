@@ -171,7 +171,6 @@ public class S3GetSecretRequest extends OMClientRequest {
               final OMMultiTenantManager multiTenantManager =
                   ozoneManager.getMultiTenantManager();
               if (multiTenantManager == null ||
-                  multiTenantManager.getTenantForAccessID(accessId) == null ||
                   !multiTenantManager.getTenantForAccessID(accessId)
                       .isPresent()) {
                 // Access Id is not assigned to any tenant and
