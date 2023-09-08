@@ -4135,7 +4135,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Pair<String, String> resolved;
     if (isAclEnabled) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
-              omClientRequest.createUGISafety(),
+              omClientRequest.createUGIForApi(),
               omClientRequest.getRemoteAddress(),
               omClientRequest.getHostName());
     } else {

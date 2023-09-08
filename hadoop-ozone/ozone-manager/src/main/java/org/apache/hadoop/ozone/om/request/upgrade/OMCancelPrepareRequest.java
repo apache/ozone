@@ -63,7 +63,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
-      UserGroupInformation ugi = createUGISafety();
+      UserGroupInformation ugi = createUGIForApi();
       if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
         throw new OMException("Access denied for user "
             + ugi + ". " +

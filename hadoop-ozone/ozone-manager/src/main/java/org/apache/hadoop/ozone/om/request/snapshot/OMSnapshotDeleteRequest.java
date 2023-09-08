@@ -83,7 +83,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     String bucketName = deleteSnapshotRequest.getBucketName();
 
     // Permission check
-    UserGroupInformation ugi = createUGISafety();
+    UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
     if (!ozoneManager.isAdmin(ugi) &&

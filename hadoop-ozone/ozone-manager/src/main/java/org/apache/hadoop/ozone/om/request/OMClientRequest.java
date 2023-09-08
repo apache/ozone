@@ -264,7 +264,7 @@ public abstract class OMClientRequest implements RequestAuditor {
           obj.getVolumeName(),
           obj.getBucketName(), contextBuilder.getAclRights(),
           obj.getResourceType());
-      UserGroupInformation currentUser = createUGISafety();
+      UserGroupInformation currentUser = createUGIForApi();
       contextBuilder.setClientUgi(currentUser);
       contextBuilder.setIp(getRemoteAddress());
       contextBuilder.setHost(getHostName());
@@ -318,7 +318,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String vol, String bucket, String key, String volOwner)
       throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGISafety(), getRemoteAddress(), getHostName(), true,
+        createUGIForApi(), getRemoteAddress(), getHostName(), true,
         volOwner);
   }
 
@@ -347,7 +347,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         ozoneManager.getOmMetadataReader()) {
       OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
           resType, storeType, aclType,
-          vol, bucket, key, volOwner, bucketOwner, createUGISafety(),
+          vol, bucket, key, volOwner, bucketOwner, createUGIForApi(),
           getRemoteAddress(), getHostName());
     }
   }
@@ -374,7 +374,14 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  public UserGroupInformation createUGISafety() throws OMException {
+  /**
+   * Crete a UGI from request and wrap the AuthenticationException
+   * to OMException in case of empty credentials
+   * @return UserGroupInformation
+   * @throws OMException exception about an empty user credential
+   *                      (unauthorized request)
+   */
+  public UserGroupInformation createUGIForApi() throws OMException {
     UserGroupInformation ugi;
     try {
       ugi = createUGI();
