@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 /**
  * Test cases for {@link SimpleStriped}.
  */
-public class SimpleStripedTest {
+public class TestSimpleStriped {
   @Test
   void testReadWriteLocks() {
     testReadWriteLocks(true);
