@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -217,9 +218,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
+      boolean isPreviousCommitHsync = false;
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+      if (null != keyToDelete) {
+        final String clientIdString
+            = String.valueOf(commitKeyRequest.getClientID());
+        isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
+            .map(WithMetadata::getMetadata)
+            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+            .filter(id -> id.equals(clientIdString))
+            .isPresent();
+      }
 
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
@@ -248,7 +259,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace needn't check and
       // increase.
-      if (keyToDelete != null && isHSync) {
+      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
