@@ -98,7 +98,7 @@ public class AccessHeatMapEndpoint {
     List<FeatureProvider.Feature> allDisabledFeatures =
         FeatureProvider.getAllDisabledFeatures();
     for (FeatureProvider.Feature feature : allDisabledFeatures) {
-      if (feature.getFeatureName().equals("HeatMap")) {
+      if ("HeatMap".equals(feature.getFeatureName())) {
         heatMapFeature = feature;
         break;
       }
