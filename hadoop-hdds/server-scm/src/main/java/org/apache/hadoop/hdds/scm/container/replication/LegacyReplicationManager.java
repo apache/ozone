@@ -1178,7 +1178,7 @@ public class LegacyReplicationManager {
     }
 
     List<ContainerReplica> replicas = replicaCount.getReplicas();
-    if (replicas.size() < 4) {
+    if (replicas.size() < 3) {
       LOG.debug("Container {} has only {} replicas. Will not delete an " +
           "unhealthy replica for this container.", container, replicas.size());
       return;
@@ -1200,7 +1200,6 @@ public class LegacyReplicationManager {
     }
 
     List<ContainerReplica> deleteCandidates = new ArrayList<>();
-    long containerSeq = container.getSequenceId();
     // collect unhealthy replicas on in-service, healthy nodes
     for (ContainerReplica replica : replicas) {
       try {
@@ -1217,8 +1216,7 @@ public class LegacyReplicationManager {
 
       if (replica.getState() == State.QUASI_CLOSED) {
         deleteCandidates.add(replica);
-      }
-      if (replica.getState() == State.UNHEALTHY) {
+      } else if (replica.getState() == State.UNHEALTHY) {
         deleteCandidates.add(replica);
       }
     }
@@ -2311,7 +2309,7 @@ public class LegacyReplicationManager {
     // Sort containers with lowest BCSID first. These will be the first ones
     // deleted.
     deleteCandidates.sort(
-        Comparator.comparingLong(ContainerReplica::getSequenceId).reversed());
+        Comparator.comparingLong(ContainerReplica::getSequenceId));
     deleteExcess(container, deleteCandidates, excess);
   }
 
