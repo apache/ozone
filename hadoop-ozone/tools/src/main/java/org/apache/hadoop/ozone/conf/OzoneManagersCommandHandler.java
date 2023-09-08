@@ -45,13 +45,13 @@ public class OzoneManagersCommandHandler implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     ConfigurationSource configSource =
-            OzoneConfiguration.of(tool.getConf());
+        OzoneConfiguration.of(tool.getConf());
     if (OmUtils.isServiceIdsDefined(
-            configSource)) {
+        configSource)) {
       Collection<InetSocketAddress> omAddresses =
-              getOmHAAddressesById(configSource)
-                      .values().stream().flatMap(Collection::stream)
-                      .collect(toList());
+          getOmHAAddressesById(configSource)
+              .values().stream().flatMap(Collection::stream)
+              .collect(toList());
       for (InetSocketAddress addr : omAddresses) {
         tool.printOut(addr.getHostName());
       }
