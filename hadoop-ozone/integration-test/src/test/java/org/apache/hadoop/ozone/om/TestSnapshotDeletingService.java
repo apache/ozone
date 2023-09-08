@@ -49,10 +49,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -188,6 +191,30 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(deletedTable, 0);
 
     verifySnapshotChain(delSnapInfo, null);
+
+    // verify the cache of purged snapshot
+    // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
+    SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
+    Method getDbMapMethod = snapshotCache.getClass()
+        .getDeclaredMethod("getDbMap");
+    getDbMapMethod.setAccessible(true);
+    ConcurrentHashMap<String,
+        ReferenceCounted<IOmMetadataReader, SnapshotCache>> dbMap =
+        (ConcurrentHashMap<String,
+            ReferenceCounted<IOmMetadataReader,
+                SnapshotCache>>) getDbMapMethod.invoke(snapshotCache);
+
+    assertEquals(2, dbMap.size());
+
+    Method getPendingEvictionListMethod =
+        snapshotCache.getClass().getDeclaredMethod("getPendingEvictionList");
+    getPendingEvictionListMethod.setAccessible(true);
+    Set<ReferenceCounted<
+        IOmMetadataReader, SnapshotCache>> pendingEvictionList =
+        (Set<ReferenceCounted<IOmMetadataReader, SnapshotCache>>)
+            getPendingEvictionListMethod.invoke(snapshotCache);
+
+    assertEquals(2, pendingEvictionList.size());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
