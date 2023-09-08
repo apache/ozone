@@ -341,8 +341,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         try {
           adapterImpl.rename(this.bucket, keyPath, newPath);
         } catch (OMException ome) {
-          LOG.error("rename key failed: {}. source:{}, destin:{}",
-              ome.getMessage(), keyPath, newPath);
+          LOG.error("Key rename failed for source key: {} to " +
+              "destination key: {}.", keyPath, newPath, ome);
           if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
               OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
               OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
