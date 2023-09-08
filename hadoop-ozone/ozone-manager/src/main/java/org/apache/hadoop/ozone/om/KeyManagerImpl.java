@@ -1427,10 +1427,7 @@ public class KeyManagerImpl implements KeyManager {
         OzoneFileStatus fileStatus = new OzoneFileStatus(
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
         cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
-      } else if (cacheOmKeyInfo == null
-          && cacheKey.startsWith(startCacheKey)
-          && cacheKey.compareTo(startCacheKey) >= 0
-          && !cacheKeyMap.containsKey(cacheKey)) {
+      } else if (cacheOmKeyInfo == null && !cacheKeyMap.containsKey(cacheKey)) {
         cacheKeyMap.put(cacheKey, null);
       }
     }
@@ -1658,7 +1655,7 @@ public class KeyManagerImpl implements KeyManager {
                           scmBlockSize, true));
                 } else {
                   // If entryKeyName matches dir name, we have the info
-                  cacheKeyMap.putIfAbsent(entryInDb,
+                  cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(omKeyInfo, 0, true));
                 }
                 countEntries++;
