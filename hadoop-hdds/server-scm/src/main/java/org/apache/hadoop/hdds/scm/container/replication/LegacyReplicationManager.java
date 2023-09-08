@@ -1140,6 +1140,10 @@ public class LegacyReplicationManager {
 
     State matchingReplicaState = State.CLOSED;
     if (container.getState() == LifeCycleState.QUASI_CLOSED) {
+      // If we are replicating quasi closed replicas, they should have the
+      // same origin node ID and therefore the same BCSID. If they have
+      // different origin node IDs, then we have 2/3 containers and it should
+      // have been closed before replicating.
       matchingReplicaState = State.QUASI_CLOSED;
     }
     List<ContainerReplica> replicationSources = getReplicationSources(container,
