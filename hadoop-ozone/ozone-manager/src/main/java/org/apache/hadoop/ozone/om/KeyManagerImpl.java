@@ -1427,6 +1427,10 @@ public class KeyManagerImpl implements KeyManager {
         OzoneFileStatus fileStatus = new OzoneFileStatus(
             cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
         cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
+        // This else block has been added to capture deleted entries in cache.
+        // Adding deleted entries in cacheKeyMap as there is a possible race
+        // condition where table cache iterator is flushed already when
+        // using in the caller of this method.
       } else if (cacheOmKeyInfo == null && !cacheKeyMap.containsKey(cacheKey)) {
         cacheKeyMap.put(cacheKey, null);
       }
@@ -1619,8 +1623,6 @@ public class KeyManagerImpl implements KeyManager {
           String entryKeyName = omKeyInfo.getKeyName();
           if (recursive) {
             // for recursive list all the entries
-            // Since putIfAbsent doesn't work as expected in case of null value,
-            // so had to explicitly check using containsKey
             if (!cacheKeyMap.containsKey(entryInDb)) {
               cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
                   scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
@@ -1635,8 +1637,6 @@ public class KeyManagerImpl implements KeyManager {
                 .getImmediateChild(entryKeyName, keyName);
             boolean isFile = OzoneFSUtils.isFile(immediateChild);
             if (isFile) {
-              // Since putIfAbsent doesn't work as expected in case of null
-              // value, so had to explicitly check using containsKey
               if (!cacheKeyMap.containsKey(entryInDb)) {
                 cacheKeyMap.put(entryInDb,
                     new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
@@ -1644,8 +1644,6 @@ public class KeyManagerImpl implements KeyManager {
               }
             } else {
               // if entry is a directory
-              // Since putIfAbsent doesn't work as expected in case of null
-              // value, so had to explicitly check using containsKey
               if (!cacheKeyMap.containsKey(entryInDb)) {
                 if (!entryKeyName.equals(immediateChild)) {
                   OmKeyInfo fakeDirEntry = createDirectoryKey(
