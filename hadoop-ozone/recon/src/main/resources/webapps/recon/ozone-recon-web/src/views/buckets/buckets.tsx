@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import {Icon, Table, Tag} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';

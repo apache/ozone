@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-import React, {useState} from 'react';
-import axios from 'axios';
+import React from 'react';
 import {Table} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
