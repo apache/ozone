@@ -19,6 +19,8 @@
 package org.apache.ozone.rocksdb.util;
 
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -88,17 +90,33 @@ public class ManagedSstFileReader {
     return estimatedTotalKeys;
   }
 
-  public Stream<String> getKeyStream() throws RocksDBException {
+  public Stream<String> getKeyStream(String lowerBound,
+      String upperBound) throws RocksDBException {
     // TODO: [SNAPSHOT] Check if default Options and ReadOptions is enough.
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           private ManagedOptions options;
           private ReadOptions readOptions;
 
+          private ManagedSlice lowerBoundSLice;
+
+          private ManagedSlice upperBoundSlice;
+
           @Override
           protected void init() {
             this.options = new ManagedOptions();
             this.readOptions = new ManagedReadOptions();
+            if (Objects.nonNull(lowerBound)) {
+              this.lowerBoundSLice = new ManagedSlice(
+                  StringUtils.string2Bytes(lowerBound));
+              readOptions.setIterateLowerBound(lowerBoundSLice);
+            }
+
+            if (Objects.nonNull(upperBound)) {
+              this.upperBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(upperBound));
+              readOptions.setIterateUpperBound(upperBoundSlice);
+            }
           }
 
           @Override
@@ -118,28 +136,40 @@ public class ManagedSstFileReader {
             super.close();
             options.close();
             readOptions.close();
+            IOUtils.closeQuietly(lowerBoundSLice, upperBoundSlice);
           }
         };
     return getStreamFromIterator(itr);
   }
 
   public Stream<String> getKeyStreamWithTombstone(
-      ManagedSSTDumpTool sstDumpTool) throws RocksDBException {
+      ManagedSSTDumpTool sstDumpTool, String lowerBound,
+      String upperBound) throws RocksDBException {
     final MultipleSstFileIterator<String> itr =
         new MultipleSstFileIterator<String>(sstFiles) {
           //TODO: [SNAPSHOT] Check if default Options is enough.
           private ManagedOptions options;
+          private ManagedSlice lowerBoundSlice;
+          private ManagedSlice upperBoundSlice;
 
           @Override
           protected void init() {
             this.options = new ManagedOptions();
+            if (Objects.nonNull(lowerBound)) {
+              this.lowerBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(lowerBound));
+            }
+            if (Objects.nonNull(upperBound)) {
+              this.upperBoundSlice = new ManagedSlice(
+                  StringUtils.string2Bytes(upperBound));
+            }
           }
 
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
               throws NativeLibraryNotLoadedException, IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
-                options) {
+                options, lowerBoundSlice, upperBoundSlice) {
               @Override
               protected String getTransformedValue(Optional<KeyValue> value) {
                 return value.map(v -> StringUtils.bytes2String(v.getKey()))
@@ -152,6 +182,7 @@ public class ManagedSstFileReader {
           public void close() throws UncheckedIOException {
             super.close();
             options.close();
+            IOUtils.closeQuietly(lowerBoundSlice, upperBoundSlice);
           }
         };
     return getStreamFromIterator(itr);

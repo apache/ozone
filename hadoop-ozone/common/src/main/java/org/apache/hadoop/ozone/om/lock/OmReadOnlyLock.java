@@ -17,46 +17,23 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
+
 /**
  * Read only "lock" for snapshots
- * Uses no lock.  Always returns true when aquiring
+ * Uses no lock.  Always returns true when acquiring
  * read lock and false for write locks
  */
 public class OmReadOnlyLock implements IOzoneManagerLock {
-  @Override
-  public boolean acquireLock(OzoneManagerLock.Resource resource,
-                             String... resources) {
-    return false;
-  }
 
   @Override
-  public boolean acquireReadLock(OzoneManagerLock.Resource resource,
-                                 String... resources) {
+  public boolean acquireReadLock(Resource resource, String... resources) {
     return true;
   }
 
   @Override
-  public boolean acquireReadHashedLock(OzoneManagerLock.Resource resource,
-                                 String resourceName) {
-    return true;
-  }
-
-  @Override
-  public boolean acquireWriteLock(OzoneManagerLock.Resource resource,
-                                  String... resources) {
+  public boolean acquireWriteLock(Resource resource, String... resources) {
     return false;
-  }
-
-  @Override
-  public boolean acquireWriteHashedLock(OzoneManagerLock.Resource resource,
-                                        String resourceName) {
-    return false;
-  }
-
-  @Override
-  public String generateResourceName(OzoneManagerLock.Resource resource,
-                                     String... resources) {
-    return "";
   }
 
   @Override
@@ -70,88 +47,29 @@ public class OmReadOnlyLock implements IOzoneManagerLock {
   }
 
   @Override
-  public void releaseWriteLock(OzoneManagerLock.Resource resource,
-                               String... resources) {
+  public void releaseWriteLock(Resource resource, String... resources) {
   // Intentionally empty
   }
 
   @Override
-  public void releaseWriteHashedLock(OzoneManagerLock.Resource resource,
-                               String resourceName) {
+  public void releaseReadLock(Resource resource, String... resources) {
   // Intentionally empty
   }
 
   @Override
-  public void releaseReadLock(OzoneManagerLock.Resource resource,
-                              String... resources) {
-  // Intentionally empty
-  }
-
-  @Override
-  public void releaseReadHashedLock(OzoneManagerLock.Resource resource,
-                               String resourceName) {
-  // Intentionally empty
-  }
-
-  @Override
-  public void releaseLock(OzoneManagerLock.Resource resource,
-                          String... resources) {
-  // Intentionally empty
-  }
-
-  @Override
-  public int getReadHoldCount(String resourceName) {
+  public int getReadHoldCount(Resource resource, String... resources) {
     return 0;
   }
 
   @Override
-  public String getReadLockWaitingTimeMsStat() {
-    return "";
-  }
-
-  @Override
-  public long getLongestReadLockWaitingTimeMs() {
+  public int getWriteHoldCount(Resource resource, String... resources) {
     return 0;
   }
 
   @Override
-  public String getReadLockHeldTimeMsStat() {
-    return "";
-  }
-
-  @Override
-  public long getLongestReadLockHeldTimeMs() {
-    return 0;
-  }
-
-  @Override
-  public int getWriteHoldCount(String resourceName) {
-    return 0;
-  }
-
-  @Override
-  public boolean isWriteLockedByCurrentThread(String resourceName) {
+  public boolean isWriteLockedByCurrentThread(Resource resource,
+      String... resources) {
     return false;
-  }
-
-  @Override
-  public String getWriteLockWaitingTimeMsStat() {
-    return "";
-  }
-
-  @Override
-  public long getLongestWriteLockWaitingTimeMs() {
-    return 0;
-  }
-
-  @Override
-  public String getWriteLockHeldTimeMsStat() {
-    return "";
-  }
-
-  @Override
-  public long getLongestWriteLockHeldTimeMs() {
-    return 0;
   }
 
   @Override

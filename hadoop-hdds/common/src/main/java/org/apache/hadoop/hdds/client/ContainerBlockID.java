@@ -25,8 +25,8 @@ import java.util.Objects;
  * BlockID returned by SCM during allocation of block (containerID + localID).
  */
 public class ContainerBlockID {
-  private long containerID;
-  private long localID;
+  private final long containerID;
+  private final long localID;
 
   public ContainerBlockID(long containerID, long localID) {
     this.containerID = containerID;

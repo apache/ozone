@@ -212,6 +212,10 @@ public class OzoneBucketStub extends OzoneBucket {
             byte[] bytes1 = new byte[buffer.remaining()];
             buffer.get(bytes1);
             keyContents.put(key, bytes1);
+
+            Map<String, String> objectMetadata = keyMetadata == null ?
+                new HashMap<>() : keyMetadata;
+
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
@@ -219,7 +223,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 size,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
-                new ArrayList<>(), rConfig, metadata, null,
+                new ArrayList<>(), rConfig, objectMetadata, null,
                 null, false
             ));
           }

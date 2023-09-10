@@ -35,7 +35,7 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
 OZONE-SITE.XML_hdds.container.token.enabled=true
 OZONE-SITE.XML_hdds.grpc.tls.enabled=true
-OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 
@@ -47,7 +47,8 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser,recon"
+OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.s3.administrators="testuser,recon,om"
 OZONE-SITE.XML_ozone.recon.administrators="testuser2"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 

@@ -227,6 +227,10 @@ public class RootCARotationManager extends StatefulService {
     return RootCARotationManager.class.getSimpleName();
   }
 
+  public SecurityConfig getSecurityConfig() {
+    return secConf;
+  }
+
   /**
    * Schedule monitor task.
    */

@@ -15,19 +15,30 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.hashcodegenerator;
+package org.apache.hadoop.ozone.common;
+
+import org.apache.commons.lang3.RandomUtils;
 
 /**
- * Interface for hash code generation implementations.
+ * Utility class for payload operations.
  */
-public interface OMHashCodeGenerator {
+public final class PayloadUtils {
 
-  /**
-   * Returns the hash code of the resourceName passed.
-   *
-   * @param resourceName
-   * @return hash code of resourceName
-   */
-  long getHashCode(String resourceName);
+  private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;
+  private static final int MAX_SIZE_KB = 2097151;
 
+  private PayloadUtils() {
+  }
+
+  public static byte[] generatePayloadBytes(int payloadSize) {
+
+    byte[] payloadBytes = new byte[0];
+    int payloadRespSize =
+        Math.min(payloadSize * RPC_PAYLOAD_MULTIPLICATION_FACTOR, MAX_SIZE_KB);
+    if (payloadRespSize > 0) {
+      payloadBytes = RandomUtils.nextBytes(payloadRespSize);
+    }
+
+    return payloadBytes;
+  }
 }

@@ -744,7 +744,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public Path getTrashRoot(Path path) {
     final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    return new Path(pathToTrash, getUsername());
+    return this.makeQualified(new Path(pathToTrash, getUsername()));
   }
 
   /**
