@@ -191,11 +191,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 8
-      - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
-      - name: Summary of failures
-        run: cat target/${{ matrix.check }}/summary.txt
-        if: ${{ !cancelled() }}
+
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: ${{ !cancelled() }}
@@ -209,6 +205,23 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
+  basic-test:
+    needs:
+      - build-info
+      - build
+    runs-on: ubuntu-20.04
+    timeout-minutes: 90
+    if: needs.build-info.outputs.needs-basic-unit == 'true'
+    strategy:
+      matrix:
+        check: ${{ fromJson(needs.build-info.outputs.basic-unit) }}
+      fail-fast: false
+    steps:
+      - name: Execute tests
+        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+      - name: Summary of failures
+        run: cat target/${{ matrix.check }}/summary.txt
+        if: ${{ !cancelled() }}
   dependency:
     needs:
       - build-info
@@ -318,7 +331,7 @@ jobs:
           name: kubernetes
           path: target/kubernetes
         continue-on-error: true
-  unit_and_integration:
+  integration:
     needs:
       - build-info
       - build
@@ -337,7 +350,6 @@ jobs:
           - scm
           - shell
           - flaky
-        check: ${{ fromJson(needs.build-info.outputs.basic-unit) }}
       fail-fast: false
     steps:
       - name: Checkout project
@@ -356,9 +368,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 8
-      - name: Execute basic unit tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
-        if: matrix.profile != 'flaky'
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         if: matrix.profile != 'flaky'
@@ -388,7 +397,7 @@ jobs:
     needs:
       - acceptance
       - basic
-      - unit_and_integration
+      - integration
     steps:
       - name: Checkout project
         uses: actions/checkout@v3

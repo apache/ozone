@@ -340,7 +340,7 @@ load bats-assert/load.bash
   run dev-support/ci/selective_ci_checks.sh ac8aee7f8
 
   assert_output -p 'basic-checks=[]'
-  assert_output -p 'basic-checks=[]'
+  assert_output -p 'basic-unit=[]'
   assert_output -p needs-build=false
   assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
