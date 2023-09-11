@@ -72,5 +72,5 @@ Decommission SCM Primordial Node
                             LOG                     SCM Instance Count after SCM Decommission: ${node_count_post}
                             Should be Equal         ${node_count_expect}                        ${node_count_post}
     Execute                 ozone sh key get /${VOLUME}/${BUCKET}/${TESTFILE} /tmp/getdecomfile
-    ${md5sum_new} =         Execute     md5sum /tmp/getdecomfile | awk '{print $1}'
+    ${md5sum_new} =         Execute                 md5sum /tmp/getdecomfile | awk '{print $1}'
                             Should be Equal         ${md5sum}                      ${md5sum_new}
