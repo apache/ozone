@@ -23,8 +23,7 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ozone.RootedOzoneFileSystem;
-import org.apache.hadoop.fs.ozone.OzoneFileSystem;
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -74,14 +73,9 @@ public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
     URI uri = URI.create(this.path);
     FileSystem fs = FileSystem.get(uri, configuration);
 
-    switch (fs.getScheme()) {
-    case "ofs":
-      ((RootedOzoneFileSystem) fs).recoverLease(new Path(uri));
-      break;
-    case "o3fs":
-      ((OzoneFileSystem) fs).recoverLease(new Path(uri));
-      break;
-    default:
+    if (fs instanceof LeaseRecoverable) {
+      ((LeaseRecoverable) fs).recoverLease(new Path(uri));
+    } else {
       throw new IllegalArgumentException("Unsupported file system: "
           + fs.getScheme());
     }
