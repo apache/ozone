@@ -1567,7 +1567,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                   prevKeyTableDBKey = getOzonePathKey(volumeId,
                       bucketInfo.getObjectID(),
                       info.getParentObjectID(),
-                      info.getKeyName());
+                      info.getFileName());
                 } else if (prevKeyTableDBKey == null) {
                   prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
                       info.getBucketName(),
