@@ -357,14 +357,12 @@ public class TestRatisUnderReplicationHandler {
 
     // This quasi closed is newer than the other one below, so it should not
     // be removed.
-    replicas.add(createContainerReplica(container.containerID(), 0,
-        IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1));
-    // Unhealthy should not be removed when there are quasi closed replicas
     replicas.add(createContainerReplica(
-        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY));
-    ContainerReplica shouldDelete = createContainerReplica(
         container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
-        sequenceID - 2);
+        sequenceID - 2));
+    // Unhealthy should be removed over the quasi-closed ones.
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
     replicas.add(shouldDelete);
 
     Assert.assertThrows(IOException.class,

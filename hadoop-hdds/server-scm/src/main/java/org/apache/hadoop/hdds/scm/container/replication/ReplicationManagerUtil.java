@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -30,8 +31,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.compareState;
 
 /**
  * Utility class for ReplicationManager.
@@ -202,7 +209,8 @@ public final class ReplicationManagerUtil {
    */
   public static ContainerReplica selectUnhealthyReplicaForDelete(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas,
-      List<ContainerReplicaOp> pendingOps) {
+      List<ContainerReplicaOp> pendingOps,
+      Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
 
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
@@ -221,44 +229,71 @@ public final class ReplicationManagerUtil {
       return null;
     }
 
-    // If there are no healthy containers, we do nothing as this should be
-    // handled elsewhere.
-    boolean hasHealthy = false;
-    for (ContainerReplica r : replicas) {
-      if (r.getState() == ContainerReplicaProto.State.CLOSED) {
-        hasHealthy = true;
+    boolean foundMatchingReplica = false;
+    for (ContainerReplica replica : replicas) {
+      if (compareState(containerInfo.getState(), replica.getState())) {
+        foundMatchingReplica = true;
         break;
       }
     }
-    if (!hasHealthy) {
-      LOG.debug("Container {} has no CLOSED containers, it will be handled " +
-          "elsewhere", containerInfo);
+    if (!foundMatchingReplica) {
+      LOG.debug("No matching replica found for container {} with replicas " +
+              "{}. No unhealthy replicas can be safely delete.",
+          containerInfo, replicas);
       return null;
     }
 
-    // Replicas that are candidates to delete are, in preference:
-    //   * Quasi-Closed with oldest sequence less than the container seq
-    //   * Any Unhealthy replica
-    ContainerReplica deleteCandidate = null;
+    List<ContainerReplica> deleteCandidates = new ArrayList<>();
     for (ContainerReplica r : replicas) {
-      if (r.getState() == ContainerReplicaProto.State.QUASI_CLOSED
-          && r.getSequenceId() < containerInfo.getSequenceId()) {
-        if ((deleteCandidate == null
-            || r.getSequenceId() < deleteCandidate.getSequenceId())) {
-          deleteCandidate = r;
-        }
+      NodeStatus nodeStatus = nodeStatusFn.apply(r.getDatanodeDetails());
+      if (nodeStatus == null || !nodeStatus.isHealthy()
+          || !nodeStatus.isInService()) {
+        continue;
+      }
+      // If the container is closed, then quasi-closed and unhealthy replicas
+      // will get added to this list. If the container is quasi-closed, then
+      // only unhealthy replicas will get added here.
+      if (!compareState(containerInfo.getState(), r.getState())) {
+        deleteCandidates.add(r);
+      }
+    }
+    deleteCandidates.sort(
+        Comparator.comparingLong(ContainerReplica::getSequenceId));
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
+      return deleteCandidates.size() > 0 ? deleteCandidates.get(0) : null;
+    }
+
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      List<ContainerReplica> nonUniqueOrigins =
+          findNonUniqueDeleteCandidates(replicas, deleteCandidates);
+      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins.get(0) : null;
+    }
+    return null;
+  }
+
+  private static List<ContainerReplica> findNonUniqueDeleteCandidates(
+      Set<ContainerReplica> allReplicas,
+      List<ContainerReplica> deleteCandidates) {
+    // Gather the origin node IDs of replicas which are not candidates for
+    // deletion.
+    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
+        .filter(r -> !deleteCandidates.contains(r))
+        .map(ContainerReplica::getOriginDatanodeId)
+        .collect(Collectors.toSet());
+
+    List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
+    for (ContainerReplica replica : deleteCandidates) {
+      if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
+        nonUniqueDeleteCandidates.add(replica);
+      } else {
+        // Spare this replica with this new origin node ID from deletion.
+        // delete candidates seen later in the loop with this same origin
+        // node ID can be deleted.
+        existingOriginNodeIDs.add(replica.getOriginDatanodeId());
       }
     }
 
-    if (deleteCandidate == null) {
-      for (ContainerReplica r : replicas) {
-        if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-          deleteCandidate = r;
-          break;
-        }
-      }
-    }
-    return deleteCandidate;
+    return nonUniqueDeleteCandidates;
   }
 
 }

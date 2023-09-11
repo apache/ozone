@@ -154,7 +154,14 @@ public class RatisUnderReplicationHandler
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
     ContainerReplica deleteCandidate = ReplicationManagerUtil
-        .selectUnhealthyReplicaForDelete(containerInfo, replicas, pendingOps);
+        .selectUnhealthyReplicaForDelete(containerInfo, replicas, pendingOps,
+            (dnd) -> {
+              try {
+                return replicationManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                return null;
+              }
+            });
 
     if (deleteCandidate != null) {
       replicationManager.sendDeleteCommand(containerInfo,
