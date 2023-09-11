@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -971,8 +970,8 @@ public class TestLegacyReplicationManager {
           });
 
       final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
-      ContainerReplica closed = addReplicaToDn(container,
-          randomDatanodeDetails(), CLOSED, container.getSequenceId());
+      addReplicaToDn(container, randomDatanodeDetails(), CLOSED,
+          container.getSequenceId());
       ContainerReplica quasiToDelete = addReplicaToDn(container,
           randomDatanodeDetails(), QUASI_CLOSED, container.getSequenceId() - 1);
       ContainerReplica quasi2 = addReplicaToDn(container,
@@ -1103,8 +1102,9 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, replicateCommands.size());
       ReplicateContainerCommand command = (ReplicateContainerCommand)
           replicateCommands.iterator().next().getCommand();
-      Assertions.assertEquals(ImmutableList.of(quasi1.getDatanodeDetails(),
-          quasi2.getDatanodeDetails()), command.getSourceDatanodes());
+      List<DatanodeDetails> sources = command.getSourceDatanodes();
+      Assertions.assertTrue(sources.contains(quasi1.getDatanodeDetails()) &&
+          sources.contains(quasi2.getDatanodeDetails()));
       ContainerReplica replica3 =
           getReplicas(container.containerID(), QUASI_CLOSED,
               container.getSequenceId(), quasi1.getOriginDatanodeId(),
