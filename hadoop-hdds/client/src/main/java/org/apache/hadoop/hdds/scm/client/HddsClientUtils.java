@@ -132,9 +132,8 @@ public final class HddsClientUtils {
     // ozone allows namespace to follow other volume/bucket naming convention,
     // for example, here supports '_',
     // which is a valid character in POSIX-compliant system, like HDFS.
-    return (c == '.' || c == '-' ||
-        Character.isLowerCase(c) || Character.isDigit(c)) ||
-        (c == '_' && !isStrictS3);
+    return (OzoneConsts.SUPPORTED_CHARACTER_CHECK_REGEX
+        .matcher(Character.toString(c)).matches()) || (c == '_' && !isStrictS3);
   }
 
   private static void doCharacterChecks(char currChar, char prev,
