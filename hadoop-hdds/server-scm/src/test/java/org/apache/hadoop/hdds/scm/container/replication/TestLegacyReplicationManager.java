@@ -1033,6 +1033,10 @@ public class TestLegacyReplicationManager {
       assertOverReplicatedCount(0);
     }
 
+    /**
+     * Test for when a quasi_closed container's under replication cannot be
+     * solved because there are UNHEALTHY replicas occupying datanodes.
+     */
     @Test
     public void testUnderRepQuasiClosedContainerBlockedByUnhealthyReplicas()
         throws IOException, TimeoutException {
@@ -1075,7 +1079,7 @@ public class TestLegacyReplicationManager {
           randomDatanodeDetails(), UNHEALTHY, container.getSequenceId());
 
       // First RM iteration.
-      // this container is under replicated by 2 replicas.
+      // this container is under replicated by 1 replica.
       // delete command should be sent for unhealthy to unblock under rep
       // handling.
       assertDeleteScheduled(1);
@@ -1093,13 +1097,27 @@ public class TestLegacyReplicationManager {
       assertUnderReplicatedCount(1);
 
       // Process the replicate command and report the replica back to SCM.
-      Assertions.assertEquals(1,
-          datanodeCommandHandler.getReceivedCommands().size());
+      List<CommandForDatanode> replicateCommands =
+          datanodeCommandHandler.getReceivedCommands().stream()
+              .filter(command -> command.getCommand().getType()
+                  .equals(SCMCommandProto.Type.replicateContainerCommand))
+              .collect(Collectors.toList());
+      Assertions.assertEquals(1, replicateCommands.size());
       ReplicateContainerCommand command = (ReplicateContainerCommand)
-          datanodeCommandHandler.getReceivedCommands().iterator().next()
-              .getCommand();
+          replicateCommands.iterator().next().getCommand();
       Assertions.assertEquals(ImmutableList.of(quasi1.getDatanodeDetails(),
           quasi2.getDatanodeDetails()), command.getSourceDatanodes());
+      ContainerReplica replica3 =
+          getReplicas(container.containerID(), QUASI_CLOSED,
+              container.getSequenceId(), quasi1.getOriginDatanodeId(),
+              MockDatanodeDetails.randomDatanodeDetails());
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica3);
+
+      // Third RM iteration
+      assertReplicaScheduled(0);
+      assertUnderReplicatedCount(0);
+      assertOverReplicatedCount(0);
     }
 
     /**

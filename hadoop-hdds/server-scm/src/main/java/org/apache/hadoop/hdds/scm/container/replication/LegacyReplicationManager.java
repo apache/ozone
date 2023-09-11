@@ -1143,7 +1143,7 @@ public class LegacyReplicationManager {
     // This method will handle topology even if replicasNeeded <= 0.
     try {
       replicateAnyWithTopology(container, replicationSources,
-          placementStatus, replicasNeeded);
+          placementStatus, replicasNeeded, replicaSet.getReplicas());
     } catch (SCMException e) {
       if (e.getResult()
           .equals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) &&
@@ -1406,7 +1406,8 @@ public class LegacyReplicationManager {
           container.getReplicationConfig().getRequiredNodes());
       try {
         replicateAnyWithTopology(container, replicationSources,
-            placementStatus, replicas.size() - replicationSources.size());
+            placementStatus, replicas.size() - replicationSources.size(),
+            replicas);
       } catch (SCMException e) {
         LOG.warn("Could not fix container {} with replicas {}.", container,
             replicas, e);
@@ -2184,7 +2185,7 @@ public class LegacyReplicationManager {
       try {
         replicateAnyWithTopology(container,
             getReplicationSources(container, replicas), placementStatus,
-            additionalReplicasNeeded);
+            additionalReplicasNeeded, replicas);
       } catch (SCMException e) {
         LOG.warn("Could not fix container {} with replicas {}.", container,
             replicas, e);
@@ -2325,13 +2326,14 @@ public class LegacyReplicationManager {
    * topology requirements.
    */
   private void replicateAnyWithTopology(ContainerInfo container,
-      List<ContainerReplica> replicas,
-      ContainerPlacementStatus placementStatus, int additionalReplicasNeeded)
+      List<ContainerReplica> sourceReplicas,
+      ContainerPlacementStatus placementStatus, int additionalReplicasNeeded,
+      List<ContainerReplica> allReplicas)
       throws SCMException {
     try {
       final ContainerID id = container.containerID();
 
-      final List<DatanodeDetails> sourceDNs = replicas.stream()
+      final List<DatanodeDetails> sourceDNs = sourceReplicas.stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
       final List<DatanodeDetails> replicationInFlight
@@ -2357,8 +2359,7 @@ public class LegacyReplicationManager {
           return;
         }
 
-        final List<DatanodeDetails> excludeList = replicas.stream()
-                .filter(r -> !r.getDatanodeDetails().isDecommissioned())
+        final List<DatanodeDetails> excludeList = allReplicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         excludeList.addAll(replicationInFlight);
