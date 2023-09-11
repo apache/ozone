@@ -1200,6 +1200,7 @@ public class LegacyReplicationManager {
     }
 
     List<ContainerReplica> deleteCandidates = new ArrayList<>();
+    long containerSeq = container.getSequenceId();
     // collect unhealthy replicas on in-service, healthy nodes
     for (ContainerReplica replica : replicas) {
       try {
@@ -1214,8 +1215,13 @@ public class LegacyReplicationManager {
         continue;
       }
 
-      if (replica.getState() == State.QUASI_CLOSED) {
-        deleteCandidates.add(replica);
+      if (containerState != LifeCycleState.QUASI_CLOSED &&
+          replica.getState() == State.QUASI_CLOSED) {
+        // a quasi_closed replica is a candidate only if its seq id is less
+        // than the container's
+        if (replica.getSequenceId() < containerSeq) {
+          deleteCandidates.add(replica);
+        }
       } else if (replica.getState() == State.UNHEALTHY) {
         deleteCandidates.add(replica);
       }
@@ -1226,7 +1232,7 @@ public class LegacyReplicationManager {
       return;
     }
 
-    // if the container is quasi_closed, delete a replica only if it's seq id
+    // if the container is quasi_closed, delete a replica only if its seq id
     // is less, and it doesn't have a unique origin node
     if (containerState == LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueDeleteCandidates =
@@ -2400,10 +2406,6 @@ public class LegacyReplicationManager {
           container.getContainerID(), ex);
     }
   }
-//
-//  private void removeUnhealthyDatanodeIfNeeded() {
-//    if (getInflightDel())
-//  }
 
   private void closeEmptyContainer(ContainerInfo containerInfo) {
     /*
