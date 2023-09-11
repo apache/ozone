@@ -39,7 +39,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * So, we have to use reflection to forcibly support fair order policy with
  * {@link Striped}. When the above issue is resolved, we can remove this util.
  */
-public final class SimpleStriped<L> {
+public final class SimpleStriped {
 
   private SimpleStriped() {
   }
