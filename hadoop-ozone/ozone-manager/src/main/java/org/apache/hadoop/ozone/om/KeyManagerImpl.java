@@ -442,21 +442,21 @@ public class KeyManagerImpl implements KeyManager {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .build();
-    OzoneFileStatus fileStatus = null;
+
     try {
-      fileStatus = getOzoneFileStatus(keyArgs, null);
+      OzoneFileStatus fileStatus = getOzoneFileStatus(keyArgs, null);
+      LOG.info("tej key omkeyinfo; " + keyName + " status:" + fileStatus);
+      if (fileStatus.isDirectory()) {
+        keyName = OzoneFSUtils.addTrailingSlashIfNeeded(
+            fileStatus.getKeyInfo().getKeyName());
+      }
+      LOG.info("tej key omkeyinfo; " + keyName);
     } catch (OMException oe) {
       if (oe.getResult().equals(FILE_NOT_FOUND)) {
         throw new OMException("Key:" + keyName + " not found", KEY_NOT_FOUND);
       }
     }
 
-    LOG.info("tej key omkeyinfo; "+ keyName +" status:" + fileStatus);
-    if (fileStatus.isDirectory()) {
-      keyName = OzoneFSUtils.addTrailingSlashIfNeeded(
-          fileStatus.getKeyInfo().getKeyName());
-    }
-    LOG.info("tej key omkeyinfo; " + keyName);
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
     BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
