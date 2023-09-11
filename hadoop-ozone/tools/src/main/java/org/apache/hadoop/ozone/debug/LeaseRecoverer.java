@@ -73,14 +73,20 @@ public class LeaseRecoverer implements Callable<Void>, SubcommandWithParent {
     OzoneConfiguration configuration = new OzoneConfiguration();
     URI uri = URI.create(this.path);
     FileSystem fs = FileSystem.get(uri, configuration);
-    if (fs instanceof RootedOzoneFileSystem) {
+
+    switch (fs.getScheme()) {
+    case "ofs":
       ((RootedOzoneFileSystem) fs).recoverLease(new Path(uri));
-    } else if (fs instanceof OzoneFileSystem) {
+      break;
+    case "o3fs":
       ((OzoneFileSystem) fs).recoverLease(new Path(uri));
-    } else {
+      break;
+    default:
       throw new IllegalArgumentException("Unsupported file system: "
           + fs.getScheme());
     }
+
+    System.out.println("Lease recovery SUCCEEDED on " + uri);
 
     return null;
   }
