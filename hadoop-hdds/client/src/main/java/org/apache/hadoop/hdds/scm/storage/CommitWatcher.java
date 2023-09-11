@@ -66,8 +66,8 @@ public class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   @Override
   void releaseBuffers(long index) {
     for (ChunkBuffer buffer : remove(index)) {
-      bufferPool.releaseBuffer(buffer);
       totalAckDataLength += buffer.position();
+      bufferPool.releaseBuffer(buffer);
     }
     // When putBlock is called, a future is added.
     // When putBlock reply, the future is removed below.

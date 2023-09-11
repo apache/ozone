@@ -42,8 +42,8 @@ public class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
   @Override
   void releaseBuffers(long index) {
     for (StreamBuffer buffer : remove(index)) {
-      bufferList.remove(buffer);
       totalAckDataLength += buffer.position();
+      bufferList.remove(buffer);
     }
   }
 
