@@ -284,7 +284,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns),
       showPanel: false
     }));
-    const { request, controller } = AxiosGetHelper('/api/v1/om/volumes', cancelSignal,
+    const { request, controller } = AxiosGetHelper('/api/v1/volumes', cancelSignal,
         "", { limit: this.state.selectedLimit.value});
     cancelSignal = controller;
     request.then(response => {

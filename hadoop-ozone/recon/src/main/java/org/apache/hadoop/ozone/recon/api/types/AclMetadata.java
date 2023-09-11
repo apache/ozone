@@ -18,11 +18,13 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneAcl;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Metadata object represents one Ozone ACL.
@@ -114,5 +116,21 @@ public final class AclMetadata {
       return new AclMetadata(this);
     }
 
+  }
+
+  public static AclMetadata toAclMetadata(OzoneAcl ozoneAcl) {
+    if (ozoneAcl == null) {
+      return null;
+    }
+
+    AclMetadata.Builder builder = AclMetadata.newBuilder();
+
+    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
+        .withName(ozoneAcl.getName())
+        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
+        .withAclList(ozoneAcl.getAclList().stream().map(Enum::toString)
+            .map(String::toUpperCase)
+            .collect(Collectors.toList()))
+        .build();
   }
 }

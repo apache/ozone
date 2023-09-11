@@ -390,7 +390,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       showPanel: false
     }));
 
-    const { request, controller} = AxiosGetHelper('/api/v1/om/buckets', cancelSignal,
+    const { request, controller} = AxiosGetHelper('/api/v1/buckets', cancelSignal,
         "", { limit: this.state.selectedLimit.value});
     cancelSignal = controller;
     request.then(response => {

@@ -15,21 +15,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.recon.api;
 
+
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
-import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
-import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
@@ -47,29 +41,24 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_STARTKEY;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 
 /**
- * Endpoint to fetch details about volume.
+ * Endpoint to fetch details about volumes.
  */
-@Path("/om")
+@Path("/volumes")
 @Produces(MediaType.APPLICATION_JSON)
 @AdminOnly
-public class OMEndpoint {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMEndpoint.class);
+public class VolumeEndpoint {
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  public OMEndpoint(ReconOMMetadataManager omMetadataManager) {
+  public VolumeEndpoint(ReconOMMetadataManager omMetadataManager) {
     this.omMetadataManager = omMetadataManager;
   }
 
   @GET
-  @Path("/volumes")
   public Response getVolumes(
       @DefaultValue(DEFAULT_FETCH_COUNT)
       @QueryParam(RECON_QUERY_LIMIT) int limit,
@@ -85,24 +74,6 @@ public class OMEndpoint {
     return Response.ok(volumesResponse).build();
   }
 
-  @GET
-  @Path("/buckets")
-  public Response getBuckets(
-      @QueryParam(RECON_QUERY_VOLUME) String volume,
-      @DefaultValue(DEFAULT_FETCH_COUNT)
-      @QueryParam(RECON_QUERY_LIMIT) int limit,
-      @DefaultValue(StringUtils.EMPTY)
-      @QueryParam(RECON_QUERY_STARTKEY) String startKey
-  ) throws IOException {
-    List<OmBucketInfo> buckets = omMetadataManager.listBucketsUnderVolume(
-        volume, startKey, limit);
-    List<BucketMetadata> bucketMetadata = buckets
-        .stream().map(this::toBucketMetadata).collect(Collectors.toList());
-    BucketsResponse bucketsResponse =
-        new BucketsResponse(buckets.size(), bucketMetadata);
-    return Response.ok(bucketsResponse).build();
-  }
-
   private VolumeMetadata toVolumeMetadata(OmVolumeArgs omVolumeArgs) {
     if (omVolumeArgs == null) {
       return null;
@@ -113,7 +84,7 @@ public class OMEndpoint {
     List<AclMetadata> acls = new ArrayList<>();
     if (omVolumeArgs.getAcls() != null) {
       acls = omVolumeArgs.getAcls().stream()
-          .map(this::toAclMetadata).collect(Collectors.toList());
+          .map(AclMetadata::toAclMetadata).collect(Collectors.toList());
     }
 
     return builder.withVolume(omVolumeArgs.getVolume())
@@ -128,60 +99,4 @@ public class OMEndpoint {
         .withAcls(acls)
         .build();
   }
-
-  private AclMetadata toAclMetadata(OzoneAcl ozoneAcl) {
-    if (ozoneAcl == null) {
-      return null;
-    }
-
-    AclMetadata.Builder builder = AclMetadata.newBuilder();
-
-    return builder.withType(ozoneAcl.getType().toString().toUpperCase())
-        .withName(ozoneAcl.getName())
-        .withScope(ozoneAcl.getAclScope().toString().toUpperCase())
-        .withAclList(ozoneAcl.getAclList().stream().map(Enum::toString)
-            .map(String::toUpperCase)
-            .collect(Collectors.toList()))
-        .build();
-  }
-
-  private BucketMetadata toBucketMetadata(OmBucketInfo omBucketInfo) {
-    if (omBucketInfo == null) {
-      return null;
-    }
-
-    BucketMetadata.Builder builder = BucketMetadata.newBuilder();
-
-    List<AclMetadata> acls = new ArrayList<>();
-    if (omBucketInfo.getAcls() != null) {
-      acls = omBucketInfo.getAcls().stream()
-          .map(this::toAclMetadata).collect(Collectors.toList());
-    }
-
-    builder.withVolumeName(omBucketInfo.getVolumeName())
-        .withBucketName(omBucketInfo.getBucketName())
-        .withAcls(acls)
-        .withVersionEnabled(omBucketInfo.getIsVersionEnabled())
-        .withStorageType(omBucketInfo.getStorageType().toString().toUpperCase())
-        .withCreationTime(omBucketInfo.getCreationTime())
-        .withModificationTime(omBucketInfo.getModificationTime())
-        .withUsedBytes(omBucketInfo.getUsedBytes())
-        .withUsedNamespace(omBucketInfo.getUsedNamespace())
-        .withQuotaInBytes(omBucketInfo.getQuotaInBytes())
-        .withQuotaInNamespace(omBucketInfo.getQuotaInNamespace())
-        .withBucketLayout(
-            omBucketInfo.getBucketLayout().toString().toUpperCase())
-        .withOwner(omBucketInfo.getOwner());
-
-    if (omBucketInfo.getSourceVolume() != null) {
-      builder.withSourceVolume(omBucketInfo.getSourceVolume());
-    }
-
-    if (omBucketInfo.getSourceBucket() != null) {
-      builder.withSourceBucket(omBucketInfo.getSourceBucket());
-    }
-
-    return builder.build();
-  }
-
 }

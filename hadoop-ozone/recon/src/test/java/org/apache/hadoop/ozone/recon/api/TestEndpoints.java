@@ -149,7 +149,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ClusterStateEndpoint clusterStateEndpoint;
   private UtilizationEndpoint utilizationEndpoint;
   private MetricsProxyEndpoint metricsProxyEndpoint;
-  private OMEndpoint omEndpoint;
+  private VolumeEndpoint volumeEndpoint;
+  private BucketEndpoint bucketEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
   private ContainerSizeCountTask containerSizeCountTask;
@@ -242,7 +243,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .withContainerDB()
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
-            .addBinding(OMEndpoint.class)
+            .addBinding(VolumeEndpoint.class)
+            .addBinding(BucketEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(UtilizationEndpoint.class)
@@ -254,7 +256,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
-    omEndpoint = reconTestInjector.getInstance(OMEndpoint.class);
+    volumeEndpoint = reconTestInjector.getInstance(VolumeEndpoint.class);
+    bucketEndpoint = reconTestInjector.getInstance(BucketEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
@@ -928,7 +931,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testGetVolumes() throws Exception {
-    Response response = omEndpoint.getVolumes(10, "");
+    Response response = volumeEndpoint.getVolumes(10, "");
     Assertions.assertEquals(200, response.getStatus());
     VolumesResponse volumesResponse =
         (VolumesResponse) response.getEntity();
@@ -947,7 +950,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   @Test
   public void testGetVolumesWithPrevKeyAndLimit() throws IOException {
     // Test limit
-    Response responseWithLimit = omEndpoint.getVolumes(1, null);
+    Response responseWithLimit = volumeEndpoint.getVolumes(1, null);
     Assertions.assertEquals(200, responseWithLimit.getStatus());
     VolumesResponse volumesResponseWithLimit =
         (VolumesResponse) responseWithLimit.getEntity();
@@ -955,7 +958,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assertions.assertEquals(1, volumesResponseWithLimit.getVolumes().size());
 
     // Test prevKey
-    Response responseWithPrevKey = omEndpoint.getVolumes(1, "sampleVol");
+    Response responseWithPrevKey = volumeEndpoint.getVolumes(1, "sampleVol");
     Assertions.assertEquals(200, responseWithPrevKey.getStatus());
     VolumesResponse volumesResponseWithPrevKey =
         (VolumesResponse) responseWithPrevKey.getEntity();
@@ -1025,7 +1028,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   @Test
   public void testGetBuckets() throws Exception {
     // Normal bucket under a volume
-    Response response = omEndpoint.getBuckets("sampleVol2", 10, null);
+    Response response = bucketEndpoint.getBuckets("sampleVol2", 10, null);
     Assertions.assertEquals(200, response.getStatus());
     BucketsResponse bucketUnderVolumeResponse =
         (BucketsResponse) response.getEntity();
@@ -1042,7 +1045,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     });
 
     // Listing all buckets
-    Response response3 = omEndpoint.getBuckets(null, 10, null);
+    Response response3 = bucketEndpoint.getBuckets(null, 10, null);
     Assertions.assertEquals(200, response3.getStatus());
     BucketsResponse allBucketsResponse =
         (BucketsResponse) response3.getEntity();
@@ -1058,7 +1061,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   public void testGetBucketsWithPrevKeyAndLimit() throws IOException {
     // Case 1: Volume is not specified (prevKey is ignored)
     // Test limit
-    Response responseLimitWithoutVolume = omEndpoint.getBuckets(null, 1, null);
+    Response responseLimitWithoutVolume = bucketEndpoint.getBuckets(null,
+        1, null);
     Assertions.assertEquals(200, responseLimitWithoutVolume.getStatus());
 
     BucketsResponse bucketsResponseLimitWithoutVolume =
@@ -1069,7 +1073,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         bucketsResponseLimitWithoutVolume.getBuckets().size());
 
     // Test prevKey (it should be ignored)
-    Response responsePrevKeyWithoutVolume = omEndpoint.getBuckets(
+    Response responsePrevKeyWithoutVolume = bucketEndpoint.getBuckets(
         null, 3, "bucketOne");
 
     Assertions.assertEquals(200,
@@ -1090,7 +1094,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // Case 2: Volume is specified (prevKey is not ignored)
     // Test limit
-    Response responseLimitWithVolume = omEndpoint.getBuckets(
+    Response responseLimitWithVolume = bucketEndpoint.getBuckets(
         "sampleVol2", 1, null);
 
     Assertions.assertEquals(200, responseLimitWithVolume.getStatus());
@@ -1103,7 +1107,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         bucketResponseLimitWithVolume.getBuckets().size());
 
     // Case 3: Test prevKey (it should not be ignored)
-    Response responsePrevKeyWithVolume = omEndpoint.getBuckets(
+    Response responsePrevKeyWithVolume = bucketEndpoint.getBuckets(
         "sampleVol2", 1, "bucketOne");
 
     Assertions.assertEquals(200, responsePrevKeyWithVolume.getStatus());
@@ -1122,7 +1126,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .stream().findFirst().get().getBucketName());
 
     // Case 4: Test volume does not exist
-    Response responseVolumeNotExist = omEndpoint.getBuckets(
+    Response responseVolumeNotExist = bucketEndpoint.getBuckets(
         "sampleVol3", 100, "bucketOne");
 
     Assertions.assertEquals(200, responseVolumeNotExist.getStatus());
