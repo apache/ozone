@@ -153,60 +153,9 @@ public class RatisUnderReplicationHandler
   private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        // There is at least one pending delete which will free up a node.
-        // Therefore we do nothing until that delete completes or times out.
-        LOG.debug("Container {} has pending deletes which will free nodes",
-            pendingOps);
-        return;
-      }
-    }
+    ContainerReplica deleteCandidate = ReplicationManagerUtil
+        .selectUnhealthyReplicaForDelete(containerInfo, replicas, pendingOps);
 
-    if (replicas.size() <= 2) {
-      // We never remove replicas if it will leave us with less than 2 replicas
-      LOG.debug("There are only {} replicas for container {} so no more will " +
-          "be deleted", replicas.size(), containerInfo);
-      return;
-    }
-
-    // If there are no healthy containers, we do nothing as this should be
-    // handled elsewhere.
-    boolean hasHealthy = false;
-    for (ContainerReplica r : replicas) {
-      if (r.getState() == State.CLOSED) {
-        hasHealthy = true;
-        break;
-      }
-    }
-    if (!hasHealthy) {
-      LOG.debug("Container {} has no CLOSED containers, it will be handled " +
-          "elsewhere", containerInfo);
-      return;
-    }
-
-    // Replicas that are candidates to delete are, in preference:
-    //   * Quasi-Closed with oldest sequence less than the container seq
-    //   * Any Unhealthy replica
-    ContainerReplica deleteCandidate = null;
-    for (ContainerReplica r : replicas) {
-      if (r.getState() == State.QUASI_CLOSED
-          && r.getSequenceId() < containerInfo.getSequenceId()) {
-        if ((deleteCandidate == null
-            || r.getSequenceId() < deleteCandidate.getSequenceId())) {
-          deleteCandidate = r;
-        }
-      }
-    }
-
-    if (deleteCandidate == null) {
-      for (ContainerReplica r : replicas) {
-        if (r.getState() == State.UNHEALTHY) {
-          deleteCandidate = r;
-          break;
-        }
-      }
-    }
     if (deleteCandidate != null) {
       replicationManager.sendDeleteCommand(containerInfo,
           deleteCandidate.getReplicaIndex(),

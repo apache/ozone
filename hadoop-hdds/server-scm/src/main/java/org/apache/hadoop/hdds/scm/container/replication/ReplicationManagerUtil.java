@@ -188,4 +188,77 @@ public final class ReplicationManagerUtil {
     }
   }
 
+  /**
+   * This is intended to be call when a container is under replicated, but there
+   * are no spare nodes to create new replicas on, due to having too many
+   * unhealthy replicas or quasi-closed replicas which cannot be closed due to
+   * having a lagging sequence ID. The logic here will select a replica to
+   * delete, or return null if there are none which can be safely deleted.
+   * @param containerInfo The container to select a replica to delete from
+   * @param replicas The list of replicas for the container
+   * @param pendingOps The list of pending replica operations for the container
+   * @return A replica to delete, or null if there are none which can be safely
+   *         deleted.
+   */
+  public static ContainerReplica selectUnhealthyReplicaForDelete(
+      ContainerInfo containerInfo, Set<ContainerReplica> replicas,
+      List<ContainerReplicaOp> pendingOps) {
+
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        // There is at least one pending delete which will free up a node.
+        // Therefore we do nothing until that delete completes or times out.
+        LOG.debug("Container {} has pending deletes which will free nodes",
+            pendingOps);
+        return null;
+      }
+    }
+
+    if (replicas.size() <= 2) {
+      // We never remove replicas if it will leave us with less than 2 replicas
+      LOG.debug("There are only {} replicas for container {} so no more will " +
+          "be deleted", replicas.size(), containerInfo);
+      return null;
+    }
+
+    // If there are no healthy containers, we do nothing as this should be
+    // handled elsewhere.
+    boolean hasHealthy = false;
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == ContainerReplicaProto.State.CLOSED) {
+        hasHealthy = true;
+        break;
+      }
+    }
+    if (!hasHealthy) {
+      LOG.debug("Container {} has no CLOSED containers, it will be handled " +
+          "elsewhere", containerInfo);
+      return null;
+    }
+
+    // Replicas that are candidates to delete are, in preference:
+    //   * Quasi-Closed with oldest sequence less than the container seq
+    //   * Any Unhealthy replica
+    ContainerReplica deleteCandidate = null;
+    for (ContainerReplica r : replicas) {
+      if (r.getState() == ContainerReplicaProto.State.QUASI_CLOSED
+          && r.getSequenceId() < containerInfo.getSequenceId()) {
+        if ((deleteCandidate == null
+            || r.getSequenceId() < deleteCandidate.getSequenceId())) {
+          deleteCandidate = r;
+        }
+      }
+    }
+
+    if (deleteCandidate == null) {
+      for (ContainerReplica r : replicas) {
+        if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+          deleteCandidate = r;
+          break;
+        }
+      }
+    }
+    return deleteCandidate;
+  }
+
 }
