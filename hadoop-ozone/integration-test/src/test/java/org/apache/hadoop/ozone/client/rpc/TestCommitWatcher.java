@@ -230,19 +230,19 @@ public class TestCommitWatcher {
         future2.get();
         assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.
-            getCommitIndex2flushedDataMap().size());
+            getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(0).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
         assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
         watcher.watchOnLastIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(1).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) 2 * chunkSize));
         assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
         assertTrue(watcher.getFutureMap().isEmpty());
-        assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+        assertTrue(watcher.getCommitIndexMap().isEmpty());
       }
     }
   }
@@ -303,9 +303,9 @@ public class TestCommitWatcher {
         // wait on 2nd putBlock to complete
         future2.get();
         assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
-        assertEquals(2, watcher.getCommitIndex2flushedDataMap().size());
+        assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndex2flushedDataMap()
+        assertFalse(watcher.getCommitIndexMap()
             .containsKey(replies.get(0).getLogIndex()));
         assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
         assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
@@ -333,12 +333,12 @@ public class TestCommitWatcher {
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
-          assertEquals(1, watcher.getCommitIndex2flushedDataMap().size());
+          assertEquals(1, watcher.getCommitIndexMap().size());
           assertEquals(1, watcher.getFutureMap().size());
         } else {
           assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
           assertTrue(watcher.getFutureMap().isEmpty());
-          assertTrue(watcher.getCommitIndex2flushedDataMap().isEmpty());
+          assertTrue(watcher.getCommitIndexMap().isEmpty());
         }
       }
     }
