@@ -21,10 +21,20 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
+${VOLUME}           decom-volume
+${BUCKET}           decom-bucket
+${TESTFILE}         testfiledecomm
 
-** Keywords ***
+*** Keywords ***
+Create volume bucket and put key
+    Execute                 ozone sh volume create /${VOLUME}
+    Execute                 ozone sh bucket create /${VOLUME}/${BUCKET}
+    Create File             /tmp/${TESTFILE}
+    Execute                 echo "This is a decommissioning test" > /tmp/${TESTFILE}
+    ${md5sum} =             Execute     md5sum /tmp/${TESTFILE} | awk '{print $1}'
+    Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} /tmp/${TESTFILE}
+    [Return]                ${md5sum}
 
-*** Test Cases ***
 Transfer Leader to non-primordial node Follower
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
                             LOG                     ${result}
@@ -35,9 +45,13 @@ Transfer Leader to non-primordial node Follower
 
     ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -n ${follower_scmId}
                             LOG                     ${result}
-                            Should Contain          ${result}                Transfer leadership successfully
+    [Return]                ${result}
 
+*** Test Cases ***
 Decommission SCM Primordial Node
+    ${md5sum} =             Create volume bucket and put key
+    ${transfer_result} =    Transfer Leader to non-primordial node Follower
+                            Should Contain          ${transfer_result}       Transfer leadership successfully
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
     ${nodes_in_quorum} =    Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
     ${node_count} =         Get Line Count          ${nodes_in_quorum}
@@ -57,4 +71,6 @@ Decommission SCM Primordial Node
     ${node_count_post} =    Convert to String       ${node_count}
                             LOG                     SCM Instance Count after SCM Decommission: ${node_count_post}
                             Should be Equal         ${node_count_expect}                        ${node_count_post}
-
+    Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} /tmp/getdecomfile
+    ${md5sum_new} =         Execute     md5sum /tmp/getdecomfile | awk '{print $1}'
+                            Should be Equal         ${md5sum}                      ${md5sum_new}
