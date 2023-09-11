@@ -567,7 +567,7 @@ function set_outputs() {
         initialization::ga_output needs-basic-checks "true"
     fi
     if [[ -n "${UNIT_TESTS}" ]]; then
-            initialization::ga_output needs-basic-unit "true"
+        initialization::ga_output needs-basic-unit "true"
     fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"

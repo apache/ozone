@@ -27,6 +27,7 @@ jobs:
     outputs:
       basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
       needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
+      basic-unit: ${{ steps.selective-checks.outputs.basic-unit }}
       needs-basic-unit: ${{ steps.selective-checks.outputs.needs-basic-unit }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
