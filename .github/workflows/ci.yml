@@ -193,7 +193,9 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 8
-
+      - name: Summary of failures
+        run: cat target/${{ matrix.check }}/summary.txt
+        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: ${{ !cancelled() }}
@@ -207,10 +209,10 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/ozone/hdds*
           rm -rf ~/.m2/repository/org/apache/ozone/ozone*
         if: always()
-  basic-test:
+  unit:
     needs:
       - build-info
-      - build
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     if: needs.build-info.outputs.needs-basic-unit == 'true'
@@ -273,7 +275,7 @@ jobs:
     needs:
       - build-info
       - build
-      - basic-test
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-compose-tests == 'true'
@@ -323,7 +325,7 @@ jobs:
     needs:
       - build-info
       - build
-      - basic-test
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
@@ -355,7 +357,7 @@ jobs:
     needs:
       - build-info
       - build
-      - basic-test
+      - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 150
     if: needs.build-info.outputs.needs-integration-tests == 'true'
@@ -416,8 +418,8 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'apache/ozone' && github.event_name != 'pull_request'
     needs:
+      - unit
       - acceptance
-      - basic
       - integration
     steps:
       - name: Checkout project
