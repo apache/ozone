@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -1515,7 +1516,7 @@ public class TestOzoneFileSystem {
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = new Path(TRASH_ROOT, username);
+    Path expectedOutPath1 = o3fs.makeQualified(new Path(TRASH_ROOT, username));
     Assert.assertEquals(expectedOutPath1, outPath1);
   }
 
@@ -1613,6 +1614,20 @@ public class TestOzoneFileSystem {
     // allUsers = true should return all user trash
     res = o3fs.getTrashRoots(true);
     Assert.assertEquals(6, res.size());
+  }
+
+  @Test
+  public void testDeleteRootWithTrash() throws IOException {
+    // Try to delete root
+    Path root = new Path(OZONE_URI_DELIMITER);
+    Assert.assertThrows(IOException.class, () -> trash.moveToTrash(root));
+    // Also try with TrashPolicyDefault
+    OzoneConfiguration conf2 = new OzoneConfiguration(cluster.getConf());
+    conf2.setClass("fs.trash.classname", TrashPolicyDefault.class,
+        TrashPolicy.class);
+    Trash trashPolicyDefault = new Trash(conf2);
+    Assert.assertThrows(IOException.class,
+        () -> trashPolicyDefault.moveToTrash(root));
   }
 
   /**

@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.util.ClosableIterator;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -1129,11 +1130,19 @@ public class SnapshotDiffManager implements AutoCloseable {
         fsTable.getName().equals(DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
-
+    String sstFileReaderLowerBound = tablePrefix;
+    String sstFileReaderUpperBound = null;
+    if (Strings.isNotEmpty(tablePrefix)) {
+      char[] upperBoundCharArray = tablePrefix.toCharArray();
+      upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
+      sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
+    }
     try (Stream<String> keysToCheck =
              nativeRocksToolsLoaded && sstDumpTool.isPresent()
-                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get())
-                 : sstFileReader.getKeyStream()) {
+                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get(),
+                 sstFileReaderLowerBound, sstFileReaderUpperBound)
+                 : sstFileReader.getKeyStream(sstFileReaderLowerBound,
+                 sstFileReaderUpperBound)) {
       keysToCheck.forEach(key -> {
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);

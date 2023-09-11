@@ -591,9 +591,10 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
-  protected int getRequiredRackCount(int numReplicas) {
+  protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     int racks = networkTopology != null
         ? networkTopology.getNumOfNodes(networkTopology.getMaxLevel() - 1)
+            - excludedRackCount
         : 1;
     return Math.min(REQUIRED_RACKS, racks);
   }
