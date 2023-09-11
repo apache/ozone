@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -48,6 +49,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -74,6 +76,7 @@ public class TestLeaseRecovery {
     final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(5)
@@ -120,6 +123,7 @@ public class TestLeaseRecovery {
     ThreadLocalRandom.current().nextBytes(data);
     stream.write(data);
     stream.hsync();
+    assertFalse(fs.isFileClosed(file));
 
     int count = 0;
     while (count++ < 15 && !fs.recoverLease(file)) {
@@ -127,6 +131,7 @@ public class TestLeaseRecovery {
     }
     // The lease should have been recovered.
     assertTrue("File should be closed", fs.recoverLease(file));
+    assertTrue(fs.isFileClosed(file));
     // open it again, make sure the data is correct
     byte[] readData = new byte[1 << 20];
     try (FSDataInputStream fdis = fs.open(file)) {

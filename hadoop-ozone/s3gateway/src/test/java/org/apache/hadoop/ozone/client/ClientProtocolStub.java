@@ -19,6 +19,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import javax.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
 
@@ -60,6 +62,8 @@ import java.util.Map;
  * ClientProtocol implementation with in-memory state.
  */
 public class ClientProtocolStub implements ClientProtocol {
+  private static final String STUB_KERBEROS_ID = "stub_kerberos_id";
+  private static final String STUB_SECRET = "stub_secret";
   private final ObjectStoreStub objectStoreStub;
 
   public ClientProtocolStub(ObjectStoreStub objectStoreStub) {
@@ -365,8 +369,9 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return null;
+    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override
@@ -630,7 +635,10 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
-
+  public String printCompactionLogDag(String fileNamePrefix,
+                                      String graphType) throws IOException {
+    return null;
+  }
 
   @Override
   public SnapshotDiffResponse snapshotDiff(String volumeName,
@@ -639,8 +647,25 @@ public class ClientProtocolStub implements ClientProtocol {
                                            String toSnapshot,
                                            String token,
                                            int pageSize,
-                                           boolean forceFullDiff)
+                                           boolean forceFullDiff,
+                                           boolean disableNativeDiff)
       throws IOException {
+    return null;
+  }
+
+  @Override
+  public CancelSnapshotDiffResponse cancelSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName, String bucketName,
+      String jobStatus, boolean listAll) {
     return null;
   }
 

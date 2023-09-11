@@ -1013,6 +1013,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.container.lock.stripes</name>
+    <value>512</value>
+    <tag>OZONE, SCM, PERFORMANCE, MANAGEMENT</tag>
+    <description>
+      The number of stripes created for the container state manager lock.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.address</name>
     <value/>
     <tag>OZONE, MANAGEMENT</tag>
@@ -1780,6 +1788,32 @@
   </property>
 
   <property>
+    <name>ozone.s3g.list-keys.shallow.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>If this is true, there will be efficiency optimization effects
+      when calling s3g list interface with delimiter '/' parameter, especially
+      when there are a large number of keys.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.secret.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The boolean which enables the Ozone S3Gateway Secret endpoint.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.secret.http.auth.type</name>
+    <value>kerberos</value>
+    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
     <tag>OZONE, OM</tag>
@@ -2011,6 +2045,14 @@
       OM.
       If undefined, OM snapshot dir will fallback to ozone.metadata.dirs.
       This fallback approach is not recommended for production environments.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
+    <value>100000000</value>
+    <tag>OZONE, OM, RATIS</tag>
+    <description>
+      Max size of SST files in OM Ratis Snapshot tarball.
     </description>
   </property>
   <property>
@@ -2250,6 +2292,40 @@
     <description>Time of day to start the rotation. Default 02:00 AM to avoid impacting
       daily workload. The supported format is 'hh:mm:ss', representing hour, minute,
       and second.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.ack.timeout</name>
+    <value>PT15M</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Max time that SCM leader will wait for the rotation preparation acks before it believes the rotation
+      is failed. Default is 15 minutes.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.ca.rotation.enabled</name>
+    <value>false</value>
+    <tag>OZONE, HDDS, SECURITY</tag>
+    <description>Whether auto root CA and sub CA certificate rotation is enabled or not. Default is disabled.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.rootca.certificate.polling.interval</name>
+    <value>PT2h</value>
+    <description>Interval to use for polling in certificate clients for a new
+      root ca certificate. Every time the specified time duration elapses,
+      the clients send a request to the SCMs to see if a new root ca
+      certificate was generated. Once there is a change, the system
+      automatically adds the new root ca to the clients'
+      trust stores and requests a new certificate to be signed.
+    </description>
+  </property>
+  <property>
+    <name>hdds.x509.expired.certificate.check.interval</name>
+    <value>P1D</value>
+    <description>Interval to use for removing expired certificates. A background
+      task to remove expired certificates from the scm metadata store is
+      scheduled to run at the rate this configuration option specifies.
     </description>
   </property>
   <property>
@@ -3297,7 +3373,7 @@
   </property>
   <property>
     <name>ozone.path.deleting.limit.per.task</name>
-    <value>10000</value>
+    <value>6000</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>A maximum number of paths(dirs/files) to be deleted by
       directory deleting service per time interval.
@@ -3324,6 +3400,15 @@
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.checkpoint.dir.creation.poll.timeout</name>
+    <value>20s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Max poll timeout for snapshot dir exists check performed before loading a snapshot in cache.
+      Unit defaults to millisecond if a unit is not specified.
     </description>
   </property>
   <property>
@@ -3913,11 +3998,33 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.db.max.open.files</name>
+    <value>100</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Max number of open files for each snapshot db present in the snapshot cache.
+      Essentially sets `max_open_files` config for RocksDB instances opened for Ozone snapshots.
+      This will limit the total number of files opened by a snapshot db thereby limiting the total number of
+      open file handles by snapshot dbs.
+      Max total number of open handles = (snapshot cache size * max open files)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.force.full.diff</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
     <description>
       Flag to always perform full snapshot diff (can be slow) without using the optimised compaction DAG.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.snapshot.diff.disable.native.libs</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Flag to perform snapshot diff without using native libs(can be slow).
     </description>
   </property>
 
@@ -3970,7 +4077,7 @@
 
   <property>
     <name>ozone.om.snapshot.diff.cleanup.service.run.internal</name>
-    <value>60m</value>
+    <value>1m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which snapshot diff clean up service will run.
@@ -4060,6 +4167,16 @@
       The algorithm that SCM uses to generate symmetric secret keys.
       A valid algorithm is the one supported by KeyGenerator, as described at
       https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#KeyGenerator.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.upgrade.quota.recalculate.enabled</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      quota recalculation trigger when upgrade to the layout version QUOTA.
+      while upgrade, re-calculation of quota used will block write operation
+      to existing buckets till this operation is completed.
     </description>
   </property>
 </configuration>

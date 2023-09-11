@@ -35,7 +35,7 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.block.token.enabled=true
 OZONE-SITE.XML_hdds.container.token.enabled=true
 OZONE-SITE.XML_hdds.grpc.tls.enabled=true
-OZONE-SITE.XML_ozone.replication=3
+OZONE-SITE.XML_ozone.server.default.replication=3
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 
@@ -47,8 +47,10 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser,recon"
+OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.s3.administrators="testuser,recon,om"
 OZONE-SITE.XML_ozone.recon.administrators="testuser2"
+OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
@@ -87,12 +89,14 @@ HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.
 
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
+OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.scm.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.s3g.http.auth.type=kerberos
+OZONE-SITE.XML_ozone.s3g.secret.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.httpfs.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.recon.http.auth.type=kerberos
 

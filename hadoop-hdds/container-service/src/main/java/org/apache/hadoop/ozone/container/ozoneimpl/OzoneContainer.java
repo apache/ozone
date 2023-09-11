@@ -28,12 +28,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -53,7 +54,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -141,7 +141,7 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.volumeChecker = getVolumeChecker(conf);
+    this.volumeChecker = new StorageVolumeChecker(conf, new Timer());
 
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
         context, VolumeType.DATA_VOLUME, volumeChecker);
@@ -290,8 +290,6 @@ public class OzoneContainer {
     // system properties set. These can inspect and possibly repair
     // containers as we iterate them here.
     ContainerInspectorUtil.load();
-    //TODO: diskchecker should be run before this, to see how disks are.
-    // And also handle disk failure tolerance need to be added
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
       Thread thread = new Thread(new ContainerReader(volumeSet,
@@ -329,8 +327,16 @@ public class OzoneContainer {
       return;
     }
     initOnDemandContainerScanner(c);
-    initMetadataScanner(c);
-    initContainerScanner(c);
+
+    // This config is for testing the scanners in isolation.
+    if (c.isMetadataScanEnabled()) {
+      initMetadataScanner(c);
+    }
+
+    // This config is for testing the scanners in isolation.
+    if (c.isDataScanEnabled()) {
+      initContainerScanner(c);
+    }
   }
 
   private void initContainerScanner(ContainerScannerConfiguration c) {
@@ -406,6 +412,18 @@ public class OzoneContainer {
       }
       LOG.info("Ignore. OzoneContainer already started.");
       return;
+    }
+
+    // Start background volume checks, which will begin after the configured
+    // delay.
+    volumeChecker.start();
+    // Do an immediate check of all volumes to ensure datanode health before
+    // proceeding.
+    volumeSet.checkAllVolumes();
+    metaVolumeSet.checkAllVolumes();
+    // DB volume set may be null if dedicated DB volumes are not used.
+    if (dbVolumeSet != null) {
+      dbVolumeSet.checkAllVolumes();
     }
 
     LOG.info("Attempting to start container services.");
@@ -528,11 +546,6 @@ public class OzoneContainer {
 
   public MutableVolumeSet getDbVolumeSet() {
     return dbVolumeSet;
-  }
-
-  @VisibleForTesting
-  StorageVolumeChecker getVolumeChecker(ConfigurationSource conf) {
-    return new StorageVolumeChecker(conf, new Timer());
   }
 
   public ContainerMetrics getMetrics() {

@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -125,6 +126,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       "ofs://om-service-id/path/to/key  OR " +
       "ofs://om-host.example.com/path/to/key  OR " +
       "ofs://om-host.example.com:5678/path/to/key";
+
+  private static final int PATH_DEPTH_TO_BUCKET = 2;
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -508,9 +511,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public Path createSnapshot(Path path, String snapshotName)
           throws IOException {
-    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
-    return new Path(path,
+    String snapshot = getAdapter()
+        .createSnapshot(pathToKey(path), snapshotName);
+    return new Path(OzoneFSUtils.trimPathToDepth(path, PATH_DEPTH_TO_BUCKET),
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
+  }
+
+  @Override
+  public void deleteSnapshot(Path path, String snapshotName)
+      throws IOException {
+    adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
   private class DeleteIterator extends OzoneListingIterator {
@@ -954,7 +964,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path,
         OzoneConfiguration.of(getConfSource()));
-    return ofsPath.getTrashRoot();
+    return this.makeQualified(ofsPath.getTrashRoot());
   }
 
   /**
@@ -1537,18 +1547,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return adapter.getSnapshotDiffReport(snapshotDir, fromSnapshot, toSnapshot);
   }
 
-
-  /**
-   * Start the lease recovery of a file.
-   *
-   * @param f a file
-   * @return true if the file is already closed
-   * @throws IOException if an error occurs
-   */
-  public boolean recoverLease(final Path f) throws IOException {
-    return adapterImpl.recoverLease(f);
-  }
-
   @Override
   public void setTimes(Path f, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
@@ -1563,4 +1561,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     adapter.setTimes(key, mtime, atime);
   }
 
+  protected boolean setSafeModeUtil(SafeModeAction action,
+      boolean isChecked)
+      throws IOException {
+    if (action == SafeModeAction.GET) {
+      statistics.incrementReadOps(1);
+    } else {
+      statistics.incrementWriteOps(1);
+    }
+    LOG.trace("setSafeMode() action:{}", action);
+    return getAdapter().setSafeMode(action, isChecked);
+  }
 }

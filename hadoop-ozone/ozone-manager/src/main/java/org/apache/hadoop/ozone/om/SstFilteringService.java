@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om;
 
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -31,33 +32,27 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.hadoop.ozone.OzoneConsts.FILTERED_SNAPSHOTS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
 
 /**
  * When snapshots are taken, an entire snapshot of the
@@ -86,13 +81,19 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicLong snapshotFilteredCount;
 
-  private BooleanTriFunction<String, String, String, Boolean> filterFunction =
-      (first, last, prefix) -> {
-        String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
-        String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
-        return RocksDiffUtils
-            .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
-      };
+  private AtomicBoolean running;
+
+  // Note: This filter only works till snapshots are readable only.
+  // In the future, if snapshots are changed to writable as well,
+  // this will need to be revisited.
+  static final BooleanTriFunction<String, String, String, Boolean>
+      FILTER_FUNCTION =
+          (first, last, prefix) -> {
+            String firstBucketKey = RocksDiffUtils.constructBucketKey(first);
+            String lastBucketKey = RocksDiffUtils.constructBucketKey(last);
+            return RocksDiffUtils
+                .isKeyWithPrefixPresent(prefix, firstBucketKey, lastBucketKey);
+          };
 
   public SstFilteringService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) {
@@ -103,77 +104,134 @@ public class SstFilteringService extends BackgroundService
         .getLong(SNAPSHOT_SST_DELETING_LIMIT_PER_TASK,
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
+    running = new AtomicBoolean(false);
   }
 
   private final BootstrapStateHandler.Lock lock =
       new BootstrapStateHandler.Lock();
 
+  @Override
+  public void start() {
+    running.set(true);
+    super.start();
+  }
+
+  @VisibleForTesting
+  public void pause() {
+    running.set(false);
+  }
+
+  @VisibleForTesting
+  public void resume() {
+    running.set(true);
+  }
+
+
   private class SstFilteringTask implements BackgroundTask {
+
+
+    /**
+     * Marks the SSTFiltered flag corresponding to the snapshot.
+     * @param volume Volume name of the snapshot
+     * @param bucket Bucket name of the snapshot
+     * @param snapshotName Snapshot name
+     * @throws IOException
+     */
+    private void markSSTFilteredFlagForSnapshot(String volume, String bucket,
+        String snapshotName) throws IOException {
+      boolean acquiredSnapshotLock = ozoneManager.getMetadataManager().getLock()
+              .acquireWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+      if (acquiredSnapshotLock) {
+        Table<String, SnapshotInfo> snapshotInfoTable =
+            ozoneManager.getMetadataManager().getSnapshotInfoTable();
+        try {
+          // mark the snapshot as filtered by writing to the file
+          String snapshotTableKey = SnapshotInfo.getTableKey(volume, bucket,
+              snapshotName);
+          SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
+
+          snapshotInfo.setSstFiltered(true);
+          snapshotInfoTable.put(snapshotTableKey, snapshotInfo);
+        } finally {
+          ozoneManager.getMetadataManager().getLock()
+              .releaseWriteLock(SNAPSHOT_LOCK, volume, bucket, snapshotName);
+        }
+      }
+    }
 
     @Override
     public BackgroundTaskResult call() throws Exception {
 
+      Optional<SnapshotCache> snapshotCache = Optional.ofNullable(ozoneManager)
+          .map(OzoneManager::getOmSnapshotManager)
+          .map(OmSnapshotManager::getSnapshotCache);
+      if (!snapshotCache.isPresent()) {
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
+      }
       Table<String, SnapshotInfo> snapshotInfoTable =
           ozoneManager.getMetadataManager().getSnapshotInfoTable();
-      try (
-          TableIterator<String, ? extends Table.KeyValue
+
+
+      try (TableIterator<String, ? extends Table.KeyValue
               <String, SnapshotInfo>> iterator = snapshotInfoTable
               .iterator()) {
         iterator.seekToFirst();
 
         long snapshotLimit = snapshotLimitPerTask;
 
-        while (iterator.hasNext() && snapshotLimit > 0) {
-          Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-          String snapShotTableKey = keyValue.getKey();
-          SnapshotInfo snapshotInfo = keyValue.getValue();
-          UUID snapshotId = snapshotInfo.getSnapshotId();
+        while (iterator.hasNext() && snapshotLimit > 0 && running.get()) {
+          try {
+            Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
+            String snapShotTableKey = keyValue.getKey();
+            SnapshotInfo snapshotInfo = keyValue.getValue();
 
-          File omMetadataDir =
-              OMStorage.getOmDbDir(ozoneManager.getConfiguration());
-          String snapshotDir = omMetadataDir + OM_KEY_PREFIX + OM_SNAPSHOT_DIR;
-          Path filePath =
-              Paths.get(snapshotDir + OM_KEY_PREFIX + FILTERED_SNAPSHOTS);
-
-          // If entry for the snapshotID is present in this file,
-          // it has already undergone filtering.
-          if (Files.exists(filePath)) {
-            List<String> processedSnapshotIds = Files.readAllLines(filePath);
-            if (snapshotId != null &&
-                processedSnapshotIds.contains(snapshotId.toString())) {
+            if (snapshotInfo.isSstFiltered()) {
               continue;
             }
-          }
 
-          LOG.debug("Processing snapshot {} to filter relevant SST Files",
-              snapShotTableKey);
+            LOG.debug("Processing snapshot {} to filter relevant SST Files",
+                snapShotTableKey);
 
-          List<Pair<String, String>> prefixPairs =
-              constructPrefixPairs(snapshotInfo);
+            List<Pair<String, String>> prefixPairs = constructPrefixPairs(
+                snapshotInfo);
 
-          String dbName = OM_DB_NAME + snapshotInfo.getCheckpointDirName();
-
-          String snapshotCheckpointDir = omMetadataDir + OM_KEY_PREFIX +
-              OM_SNAPSHOT_CHECKPOINT_DIR;
-          try (RDBStore rdbStore = (RDBStore) OmMetadataManagerImpl
-              .loadDB(ozoneManager.getConfiguration(),
-                      new File(snapshotCheckpointDir),
-                      dbName, true, Optional.of(Boolean.TRUE), false, false)) {
-            RocksDatabase db = rdbStore.getDb();
-            try (BootstrapStateHandler.Lock lock =
-                getBootstrapStateLock().lock()) {
-              db.deleteFilesNotMatchingPrefix(prefixPairs, filterFunction);
+            try (
+                ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                    snapshotMetadataReader = snapshotCache.get().get(
+                        snapshotInfo.getTableKey())) {
+              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+              RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
+                  .getStore();
+              RocksDatabase db = rdbStore.getDb();
+              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
+                  .lock()) {
+                db.deleteFilesNotMatchingPrefix(prefixPairs, FILTER_FUNCTION);
+              }
+            } catch (OMException ome) {
+              // FILE_NOT_FOUND is obtained when the snapshot is deleted
+              // In this case, get the snapshotInfo from the db, check if
+              // it is deleted and if deleted mark it as sstFiltered.
+              if (ome.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+                SnapshotInfo snapshotInfoToCheck =
+                    ozoneManager.getMetadataManager().getSnapshotInfoTable()
+                        .get(snapShotTableKey);
+                if (snapshotInfoToCheck.getSnapshotStatus() ==
+                    SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+                  LOG.info("Snapshot with name: '{}', id: '{}' has been " +
+                          "deleted.", snapshotInfo.getName(), snapshotInfo
+                      .getSnapshotId());
+                }
+              }
             }
+            markSSTFilteredFlagForSnapshot(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName(), snapshotInfo.getName());
+            snapshotLimit--;
+            snapshotFilteredCount.getAndIncrement();
+          } catch (RocksDBException | IOException e) {
+            LOG.error("Exception encountered while filtering a snapshot", e);
           }
-
-          // mark the snapshot as filtered by writing to the file
-          String content = snapshotInfo.getSnapshotId() + "\n";
-          Files.write(filePath, content.getBytes(StandardCharsets.UTF_8),
-              StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-          snapshotLimit--;
-          snapshotFilteredCount.getAndIncrement();
         }
-      } catch (RocksDBException | IOException e) {
+      } catch (IOException e) {
         LOG.error("Error during Snapshot sst filtering ", e);
       }
 
@@ -198,10 +256,12 @@ public class SstFilteringService extends BackgroundService
           ozoneManager.getMetadataManager().getBucketId(volumeName, bucketName);
 
       String filterPrefix =
-          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName;
+          OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName
+              + OM_KEY_PREFIX;
 
       String filterPrefixFSO =
-          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId;
+          OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId
+              + OM_KEY_PREFIX;
 
       List<Pair<String, String>> prefixPairs = new ArrayList<>();
       prefixPairs
@@ -229,5 +289,11 @@ public class SstFilteringService extends BackgroundService
   @Override
   public BootstrapStateHandler.Lock getBootstrapStateLock() {
     return lock;
+  }
+
+  @Override
+  public void shutdown() {
+    running.set(false);
+    super.shutdown();
   }
 }

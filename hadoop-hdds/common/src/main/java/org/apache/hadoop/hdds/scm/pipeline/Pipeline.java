@@ -468,7 +468,7 @@ public final class Pipeline {
     return new EqualsBuilder()
         .append(id, that.id)
         .append(replicationConfig, that.replicationConfig)
-        .append(getNodes(), that.getNodes())
+        .append(nodeStatus.keySet(), that.nodeStatus.keySet())
         .isEquals();
   }
 

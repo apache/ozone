@@ -25,8 +25,8 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -80,6 +80,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
+import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
@@ -319,9 +320,11 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case EchoRPC:
+      return new OMEchoRPCWriteRequest(omRequest);
     default:
-      throw new IllegalStateException("Unrecognized write command " +
-          "type request" + cmdType);
+      throw new OMException("Unrecognized write command type request "
+          + cmdType, OMException.ResultCodes.INVALID_REQUEST);
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
@@ -478,11 +481,11 @@ public final class OzoneManagerRatisUtils {
   }
 
   public static GrpcTlsConfig createServerTlsConfig(SecurityConfig conf,
-      CertificateClient caClient, boolean mutualTls) throws IOException {
+      CertificateClient caClient) throws IOException {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       KeyStoresFactory serverKeyFactory = caClient.getServerKeyStoresFactory();
       return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
-          serverKeyFactory.getTrustManagers()[0], mutualTls);
+          serverKeyFactory.getTrustManagers()[0], true);
     }
 
     return null;

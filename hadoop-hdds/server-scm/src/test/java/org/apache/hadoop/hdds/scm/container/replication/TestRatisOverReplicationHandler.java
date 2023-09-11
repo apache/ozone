@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -50,6 +51,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
@@ -277,6 +279,34 @@ public class TestRatisOverReplicationHandler {
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
+  }
+  @Test
+  public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
+      throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+
+    // Add another CLOSED replica
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, ContainerReplicaProto.State.CLOSED, sequenceID));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
   }
 
   @Test

@@ -1,1 +1,0 @@
-../common/hadoop-2.7.sh

@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e
+set -e -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -72,38 +72,14 @@ find_tests(){
 
 ## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
-  # version-dependent
-  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
+  local cmd="ozone admin safemode wait -t 240"
+  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+    wait_for_port kdc 88 60
+    cmd="kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $cmd"
+  fi
 
-  #Reset the timer
-  SECONDS=0
-
-  #Don't give it up until 240 seconds
-  while [[ $SECONDS -lt 240 ]]; do
-
-     #This line checks the safemode status in scm
-     local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
-     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose exec -T ${SCM} bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
-     else
-         status=$(docker-compose exec -T ${SCM} bash -c "$command")
-     fi
-
-     echo "SECONDS: $SECONDS"
-
-     echo $status
-     if [[ "$status" ]]; then
-       if [[ ${status} == "SCM is out of safe mode." ]]; then
-         #Safemode exits. Let's return from the function.
-         echo "Safe mode is off"
-         return
-       fi
-     fi
-
-     sleep 2
-   done
-   echo "WARNING! Safemode is still on. Please check the docker-compose files"
-   return 1
+  wait_for_port ${SCM} 9860 120
+  execute_commands_in_container ${SCM} "$cmd"
 }
 
 ## @description wait until OM leader is elected (or 120 seconds)
@@ -120,9 +96,9 @@ wait_for_om_leader() {
   while [[ $SECONDS -lt 120 ]]; do
     local command="ozone admin om getserviceroles --service-id '${OM_SERVICE_ID}'"
     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "kinit -k scm/scm@EXAMPLE.COM -t /etc/security/keytabs/scm.keytab && $command" | grep LEADER || true)
     else
-      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER)
+      status=$(docker-compose exec -T ${SCM} bash -c "$command" | grep LEADER || true)
     fi
     if [[ -n "${status}" ]]; then
       echo "Found OM leader for service ${OM_SERVICE_ID}: $status"
@@ -158,13 +134,12 @@ start_docker_env(){
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
   docker-compose --ansi never down
-  if ! { docker-compose --ansi never up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit \
-      && wait_for_om_leader ; }; then
-    [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME"
-    stop_docker_env
-    return 1
-  fi
+
+  trap stop_docker_env EXIT HUP INT TERM
+
+  docker-compose --ansi never up -d --scale datanode="${datanode_count}"
+  wait_for_safemode_exit
+  wait_for_om_leader
 }
 
 ## @description  Execute robot tests in a specific container.
@@ -179,20 +154,23 @@ execute_robot_test(){
   unset 'ARGUMENTS[${#ARGUMENTS[@]}-1]' #Remove the last element, remainings are the custom parameters
   TEST_NAME=$(basename "$TEST")
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
-  set +e
-  [[ -n "$OUTPUT_NAME" ]] || OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
+
+  local output_name=$(get_output_name)
 
   # find unique filename
   declare -i i=0
-  OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
+  OUTPUT_FILE="robot-${output_name}1.xml"
   while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let i++
-    OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
+    let ++i
+    OUTPUT_FILE="robot-${output_name}${i}.xml"
   done
 
   SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
+
+  set +e
+
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
@@ -209,17 +187,11 @@ execute_robot_test(){
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
-  copy_daemon_logs
-
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
     create_stack_dumps
   fi
 
   set -e
-
-  if [[ ${rc} -gt 0 ]]; then
-    stop_docker_env
-  fi
 
   return ${rc}
 }
@@ -244,7 +216,7 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
   done
 }
 
@@ -263,27 +235,51 @@ copy_daemon_logs() {
 ## @param        container name
 ## @param        specific command to execute
 execute_command_in_container(){
-  set -e
   # shellcheck disable=SC2068
   docker-compose exec -T "$@"
-  set +e
+}
+
+## @description  Execute specific commands in docker container
+## @param        container name
+## @param        specific commands to execute
+execute_commands_in_container(){
+  local container=$1
+  shift 1
+  local command=$@
+
+  # shellcheck disable=SC2068
+  docker-compose exec -T $container /bin/bash -c "$command"
 }
 
 ## @description Stop a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
-  set -e
   docker-compose --ansi never stop $@
-  set +e
 }
 
 
 ## @description Start a list of named containers
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
-  set -e
   docker-compose --ansi never start $@
-  set +e
+}
+
+create_containers() {
+  docker-compose --ansi never up -d $@
+}
+
+get_output_name() {
+  if [[ -n "${OUTPUT_NAME}" ]]; then
+    echo "${OUTPUT_NAME}-"
+  fi
+}
+
+save_container_logs() {
+  local output_name=$(get_output_name)
+  local c
+  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
+    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
+  done
 }
 
 
@@ -300,13 +296,9 @@ wait_for_port(){
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "Port $port is available on $host"
-         return;
+     if docker-compose exec -T ${SCM} /bin/bash -c "nc -z $host $port"; then
+       echo "Port $port is available on $host"
+       return
      fi
      echo "Port $port is not available on $host yet"
      sleep 1
@@ -322,22 +314,19 @@ wait_for_port(){
 wait_for_execute_command(){
   local container=$1
   local timeout=$2
-  local command=$3
+  shift 2
+  local command=$@
 
   #Reset the timer
   SECONDS=0
 
   while [[ $SECONDS -lt $timeout ]]; do
-     set +e
-     docker-compose exec -T $container bash -c '$command'
-     status=$?
-     set -e
-     if [ $status -eq 0 ] ; then
-         echo "$command succeed"
-         return;
+     if docker-compose exec -T $container /bin/bash -c "$command"; then
+        echo "$command succeed"
+        return
      fi
-     echo "$command hasn't succeed yet"
-     sleep 1
+        echo "$command hasn't succeed yet"
+        sleep 1
    done
    echo "Timed out waiting on $command to be successful"
    return 1
@@ -345,7 +334,8 @@ wait_for_execute_command(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose --ansi never logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  copy_daemon_logs
+  save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
      docker-compose --ansi never down
   fi
@@ -398,8 +388,8 @@ copy_results() {
   fi
 
   if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml
-    rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
+    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
+      && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
   mkdir -p "${target_dir}"

@@ -126,7 +126,7 @@ public class TestCloseContainerCommandHandler {
     verify(writeChannel)
         .submitRequest(any(), eq(pipelineID.getProtobuf()));
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
   }
 
   @Test
@@ -141,7 +141,7 @@ public class TestCloseContainerCommandHandler {
     // Container in CLOSING state is moved to UNHEALTHY if pipeline does not
     // exist. Container should not exist in CLOSING state without a pipeline.
     verify(containerHandler)
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
   }
 
   @Test
@@ -192,7 +192,7 @@ public class TestCloseContainerCommandHandler {
     verify(writeChannel)
         .submitRequest(any(), any());
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
   }
@@ -210,7 +210,7 @@ public class TestCloseContainerCommandHandler {
     verify(containerHandler, never())
         .markContainerForClose(container);
     verify(containerHandler, never())
-        .quasiCloseContainer(container);
+        .quasiCloseContainer(eq(container), any());
     verify(containerHandler, never())
         .closeContainer(container);
     verify(writeChannel, never())

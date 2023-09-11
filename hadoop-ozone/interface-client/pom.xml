@@ -110,11 +110,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </plugin>
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
+        <version>${maven-antrun-plugin.version}</version>
         <executions>
           <execution>
             <phase>generate-sources</phase>
             <configuration>
-              <tasks>
+              <target>
                 <replace token="com.google.protobuf"
                          value="org.apache.hadoop.thirdparty.protobuf"
                          dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
@@ -145,7 +146,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                       tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto3"/>
                 <move file="target/generated-sources/protobuf/java/proto3"
                       tofile="target/generated-sources/protobuf/java/"/>
-              </tasks>
+              </target>
             </configuration>
             <goals>
               <goal>run</goal>

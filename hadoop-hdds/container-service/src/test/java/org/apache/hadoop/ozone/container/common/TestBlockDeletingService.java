@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -589,6 +589,10 @@ public class TestBlockDeletingService {
 
       long deleteSuccessCount =
           deletingServiceMetrics.getSuccessCount();
+      long totalBlockChosenCount =
+          deletingServiceMetrics.getTotalBlockChosenCount();
+      long totalContainerChosenCount =
+          deletingServiceMetrics.getTotalContainerChosenCount();
       Assert.assertEquals(0, transactionId);
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
@@ -613,6 +617,12 @@ public class TestBlockDeletingService {
       Assert.assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(1,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
       // The value of the getTotalPendingBlockCount Metrics is obtained
       // before the deletion is processing
       // So the Pending Block count will be 3
@@ -636,6 +646,12 @@ public class TestBlockDeletingService {
       Assert.assertEquals(3,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
+      Assert.assertEquals(3,
+          deletingServiceMetrics.getTotalBlockChosenCount()
+              - totalBlockChosenCount);
+      Assert.assertEquals(2,
+          deletingServiceMetrics.getTotalContainerChosenCount()
+              - totalContainerChosenCount);
 
       // check if blockData get deleted
       assertBlockDataTableRecordCount(0, meta, filter, data.getContainerID());
@@ -1059,12 +1075,13 @@ public class TestBlockDeletingService {
       DBHandle handle, KeyPrefixFilter filter, long containerID)
       throws IOException {
     long count = 0L;
-    BlockIterator<BlockData> iterator = handle.getStore().
-        getBlockIterator(containerID, filter);
-    iterator.seekToFirst();
-    while (iterator.hasNext()) {
-      iterator.nextBlock();
-      count += 1;
+    try (BlockIterator<BlockData> iterator = handle.getStore().
+        getBlockIterator(containerID, filter)) {
+      iterator.seekToFirst();
+      while (iterator.hasNext()) {
+        iterator.nextBlock();
+        count += 1;
+      }
     }
     Assert.assertEquals("Excepted: " + expectedCount
         + ", but actual: " + count + " in the blockData table of container: "

@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 /**
  * This interface defines an API for saving and reading configurations of a
@@ -42,7 +41,7 @@ public interface StatefulServiceStateManager {
    */
   @Replicate
   void saveConfiguration(String serviceName, ByteString bytes)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Reads the persisted configuration mapped to the specified serviceName.
@@ -52,6 +51,15 @@ public interface StatefulServiceStateManager {
    * @throws IOException on failure
    */
   ByteString readConfiguration(String serviceName) throws IOException;
+
+  /**
+   * Deletes the persisted configuration mapped to the specified serviceName.
+   * @param serviceName name of the {@link StatefulService}, obtained through
+   * {@link SCMService#getServiceName()}
+   * @throws IOException on failure
+   */
+  @Replicate
+  void deleteConfiguration(String serviceName) throws IOException;
 
   /**
    * Sets the updated reference to the table when reloading SCM state.

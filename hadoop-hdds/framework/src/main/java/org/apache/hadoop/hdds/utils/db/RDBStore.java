@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.RocksDBCheckpointDifferHolder;
 import org.rocksdb.RocksDBException;
@@ -101,8 +100,10 @@ public class RDBStore implements DBStore {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
             getSnapshotMetadataDir(),
-            DB_COMPACTION_SST_BACKUP_DIR, DB_COMPACTION_LOG_DIR,
-            dbLocation.toString(), configuration);
+            DB_COMPACTION_SST_BACKUP_DIR,
+            DB_COMPACTION_LOG_DIR,
+            dbLocation.toString(),
+            configuration);
         rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
       } else {
         rocksDBCheckpointDiffer = null;
@@ -218,7 +219,10 @@ public class RDBStore implements DBStore {
 
     RDBMetrics.unRegister();
     IOUtils.closeQuietly(checkPointManager);
-    IOUtils.closeQuietly(rocksDBCheckpointDiffer);
+    if (rocksDBCheckpointDiffer != null) {
+      RocksDBCheckpointDifferHolder
+          .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
+    }
     IOUtils.closeQuietly(db);
   }
 
@@ -347,13 +351,13 @@ public class RDBStore implements DBStore {
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
   }
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws SequenceNumberNotFoundException {
+      throws IOException {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
@@ -413,6 +417,7 @@ public class RDBStore implements DBStore {
         }
         logIterator.get().next();
       }
+      dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     } catch (SequenceNumberNotFoundException e) {
       LOG.warn("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will be thrown to the client",
@@ -433,7 +438,6 @@ public class RDBStore implements DBStore {
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
       }
     }
-    dbUpdatesWrapper.setLatestSequenceNumber(db.getLatestSequenceNumber());
     return dbUpdatesWrapper;
   }
 
@@ -442,7 +446,6 @@ public class RDBStore implements DBStore {
     return db.isClosed();
   }
 
-  @VisibleForTesting
   public RocksDatabase getDb() {
     return db;
   }

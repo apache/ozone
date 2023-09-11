@@ -160,6 +160,7 @@ public final class ReplicationTestUtil {
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
     builder.setOriginNodeId(originNodeId);
+    builder.setEmpty(keyCount == 0);
     return builder.build();
   }
 
@@ -193,6 +194,17 @@ public final class ReplicationTestUtil {
         .setContainerID(containerID)
         .setReplicationConfig(replicationConfig)
         .setState(containerState)
+        .build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long sequenceID) {
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setSequenceId(sequenceID)
         .build();
   }
 

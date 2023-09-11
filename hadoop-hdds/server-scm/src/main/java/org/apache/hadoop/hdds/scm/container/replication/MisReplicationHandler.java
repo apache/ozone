@@ -56,6 +56,7 @@ public abstract class MisReplicationHandler implements
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
   private final ReplicationManager replicationManager;
+  private final ReplicationManagerMetrics metrics;
 
   public MisReplicationHandler(
       final PlacementPolicy containerPlacement,
@@ -65,6 +66,7 @@ public abstract class MisReplicationHandler implements
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.replicationManager = replicationManager;
+    this.metrics = replicationManager.getMetrics();
   }
 
   protected ReplicationManager getReplicationManager() {
@@ -138,6 +140,8 @@ public abstract class MisReplicationHandler implements
               container.getContainerID());
       return 0;
     }
+
+    LOG.debug("Handling mis replicated container {}.", container);
     Set<ContainerReplica> sources = filterSources(replicas);
     Set<ContainerReplica> replicasToBeReplicated = containerPlacement
             .replicasToCopyToFixMisreplication(replicas.stream()
@@ -164,6 +168,11 @@ public abstract class MisReplicationHandler implements
 
     int found = targetDatanodes.size();
     if (found < requiredNodes) {
+      if (container.getReplicationType() == HddsProtos.ReplicationType.EC) {
+        metrics.incrEcPartialReplicationForMisReplicationTotal();
+      } else {
+        metrics.incrPartialReplicationForMisReplicationTotal();
+      }
       LOG.warn("Placement Policy {} found only {} nodes for Container: {}," +
           " number of required nodes: {}, usedNodes : {}",
           containerPlacement.getClass(), found,

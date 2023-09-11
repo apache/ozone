@@ -163,7 +163,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       msg = String.format("Pipeline creation failed due to no sufficient" +
               " healthy datanodes. Required %d. Found %d. Excluded %d.",
           nodesRequired, initialHealthyNodesCount, excludedNodesSize);
-      LOG.warn(msg);
+      LOG.debug(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
@@ -366,14 +366,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
             "pipeline allocation. healthyNodes size: %d, " +
             "excludeNodes size: %d", healthyNodes.size(),
             mutableExclude.size());
-        LOG.warn(msg);
+        LOG.debug(msg);
         throw new SCMException(msg,
             SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
       }
     }
 
     if (results.size() < nodesRequired) {
-      LOG.warn("Unable to find the required number of " +
+      LOG.debug("Unable to find the required number of " +
               "healthy nodes that  meet the criteria. Required nodes: {}, " +
               "Found nodes: {}", nodesRequired, results.size());
       throw new SCMException("Unable to find required number of nodes.",
@@ -413,13 +413,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         removePeers(anchor, healthyNodes);
         mutableExclude.add(anchor);
       } else {
-        LOG.warn("Unable to find healthy node for anchor(first) node.");
+        LOG.debug("Unable to find healthy node for anchor(first) node.");
         throw new SCMException("Unable to find anchor node.",
             SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("First node chosen: {}", anchor);
-      }
+      LOG.debug("First node chosen: {}", anchor);
     } else if (usedNodes.size() == 1) {
       // Only 1 usedNode, consider it as anchor node.
       anchor = usedNodes.get(0);
@@ -457,9 +455,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         results.add(nextNode);
         removePeers(nextNode, healthyNodes);
         mutableExclude.add(nextNode);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Second node chosen: {}", nextNode);
-        }
+        LOG.debug("Second node chosen: {}", nextNode);
       } else {
         LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
             "rack based on rack awareness. anchor: {}", anchor);
@@ -577,7 +573,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   @Override
-  protected int getRequiredRackCount(int numReplicas) {
+  protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     return REQUIRED_RACKS;
   }
 

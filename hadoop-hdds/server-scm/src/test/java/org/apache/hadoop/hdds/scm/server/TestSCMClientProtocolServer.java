@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
@@ -26,15 +25,20 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.Test;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 
-import java.io.File;
+import java.io.IOException;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -47,13 +51,12 @@ public class TestSCMClientProtocolServer {
   private StorageContainerLocationProtocolServerSideTranslatorPB service;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    config = new OzoneConfiguration();
-    File dir = GenericTestUtils.getRandomizedTestDir();
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
+  void setUp() throws Exception {
+    config = SCMTestUtils.getConf();
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
+    config.set(OZONE_READONLY_ADMINISTRATORS, "testUser");
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
@@ -91,5 +94,21 @@ public class TestSCMClientProtocolServer {
     assertTrue(resp.hasErrorMsg());
     assertTrue(resp.getErrorMsg()
         .equals(err));
+  }
+
+  @Test
+  public void testReadOnlyAdmins() throws IOException {
+    UserGroupInformation testUser = UserGroupInformation.
+        createUserForTesting("testUser", new String[] {"testGroup"});
+
+    try {
+      // read operator
+      server.getScm().checkAdminAccess(testUser, true);
+      // write operator
+      Assert.assertThrows(AccessControlException.class,
+          () -> server.getScm().checkAdminAccess(testUser, false));
+    } finally {
+      UserGroupInformation.reset();
+    }
   }
 }

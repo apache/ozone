@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -36,8 +35,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
@@ -49,11 +47,31 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotPurgeResponse.class);
   private final List<String> snapshotDbKeys;
+  private final Map<String, SnapshotInfo> updatedSnapInfos;
+  private final Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos;
 
-  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> snapshotDbKeys) {
+  public OMSnapshotPurgeResponse(
+      @Nonnull OMResponse omResponse,
+      @Nonnull List<String> snapshotDbKeys,
+      Map<String, SnapshotInfo> updatedSnapInfos,
+      Map<String, SnapshotInfo> updatedPreviousAndGlobalSnapInfos
+  ) {
     super(omResponse);
     this.snapshotDbKeys = snapshotDbKeys;
+    this.updatedSnapInfos = updatedSnapInfos;
+    this.updatedPreviousAndGlobalSnapInfos = updatedPreviousAndGlobalSnapInfos;
+  }
+
+  /**
+   * Constructor for failed request.
+   * It should not be used for successful request.
+   */
+  public OMSnapshotPurgeResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+    this.snapshotDbKeys = null;
+    this.updatedSnapInfos = null;
+    this.updatedPreviousAndGlobalSnapInfos = null;
   }
 
   @Override
@@ -62,6 +80,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
 
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
         omMetadataManager;
+    updateSnapInfo(metadataManager, batchOperation, updatedSnapInfos);
+    updateSnapInfo(metadataManager, batchOperation,
+        updatedPreviousAndGlobalSnapInfos);
     for (String dbKey: snapshotDbKeys) {
       SnapshotInfo snapshotInfo = omMetadataManager
           .getSnapshotInfoTable().get(dbKey);
@@ -72,7 +93,7 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       if (snapshotInfo == null) {
         continue;
       }
-      cleanupSnapshotChain(metadataManager, snapshotInfo, batchOperation);
+
       // Delete Snapshot checkpoint directory.
       deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation,
@@ -80,81 +101,14 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     }
   }
 
-  /**
-   * Cleans up the snapshot chain and updates next snapshot's
-   * previousPath and previousGlobal IDs.
-   */
-  private void cleanupSnapshotChain(OmMetadataManagerImpl metadataManager,
-                                    SnapshotInfo snapInfo,
-                                    BatchOperation batchOperation)
+  private void updateSnapInfo(OmMetadataManagerImpl metadataManager,
+                              BatchOperation batchOp,
+                              Map<String, SnapshotInfo> snapshotInfos)
       throws IOException {
-    SnapshotChainManager snapshotChainManager = metadataManager
-        .getSnapshotChainManager();
-    SnapshotInfo nextPathSnapInfo = null;
-    SnapshotInfo nextGlobalSnapInfo;
-
-    // If the snapshot is deleted in the previous run, then the in-memory
-    // SnapshotChainManager might throw NoSuchElementException as the snapshot
-    // is removed in-memory but OMDoubleBuffer has not flushed yet.
-    boolean hasNextPathSnapshot;
-    boolean hasNextGlobalSnapshot;
-    try {
-      hasNextPathSnapshot = snapshotChainManager.hasNextPathSnapshot(
-          snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
-      hasNextGlobalSnapshot = snapshotChainManager.hasNextGlobalSnapshot(
-          snapInfo.getSnapshotId());
-    } catch (NoSuchElementException ex) {
-      LOG.warn("The Snapshot {} could have been deleted in the previous run.",
-          snapInfo.getSnapshotId(), ex);
-      return;
+    for (Map.Entry<String, SnapshotInfo> entry : snapshotInfos.entrySet()) {
+      metadataManager.getSnapshotInfoTable().putWithBatch(batchOp,
+          entry.getKey(), entry.getValue());
     }
-
-    // Updates next path snapshot's previous snapshot ID
-    if (hasNextPathSnapshot) {
-      UUID nextPathSnapshotId = snapshotChainManager.nextPathSnapshot(
-          snapInfo.getSnapshotPath(), snapInfo.getSnapshotId());
-
-      String snapshotTableKey = snapshotChainManager
-          .getTableKey(nextPathSnapshotId);
-      nextPathSnapInfo = metadataManager.getSnapshotInfoTable()
-          .get(snapshotTableKey);
-      if (nextPathSnapInfo != null) {
-        nextPathSnapInfo.setPathPreviousSnapshotId(
-            snapInfo.getPathPreviousSnapshotId());
-        metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
-            nextPathSnapInfo.getTableKey(), nextPathSnapInfo);
-      }
-    }
-
-    // Updates next global snapshot's previous snapshot ID
-    if (hasNextGlobalSnapshot) {
-      UUID nextGlobalSnapshotId =
-          snapshotChainManager.nextGlobalSnapshot(snapInfo.getSnapshotId());
-
-      String snapshotTableKey = snapshotChainManager
-          .getTableKey(nextGlobalSnapshotId);
-      nextGlobalSnapInfo = metadataManager.getSnapshotInfoTable()
-          .get(snapshotTableKey);
-      // If both next global and path snapshot are same, it may overwrite
-      // nextPathSnapInfo.setPathPreviousSnapshotID(), adding this check
-      // will prevent it.
-      if (nextGlobalSnapInfo != null && nextPathSnapInfo != null &&
-          nextGlobalSnapInfo.getSnapshotId().equals(
-              nextPathSnapInfo.getSnapshotId())) {
-        nextPathSnapInfo.setGlobalPreviousSnapshotId(
-            snapInfo.getPathPreviousSnapshotId());
-        metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
-            nextPathSnapInfo.getTableKey(), nextPathSnapInfo);
-      } else if (nextGlobalSnapInfo != null) {
-        nextGlobalSnapInfo.setGlobalPreviousSnapshotId(
-            snapInfo.getPathPreviousSnapshotId());
-        metadataManager.getSnapshotInfoTable().putWithBatch(batchOperation,
-            nextGlobalSnapInfo.getTableKey(), nextGlobalSnapInfo);
-      }
-    }
-
-    // Removes current snapshot from the snapshot chain.
-    snapshotChainManager.deleteSnapshot(snapInfo);
   }
 
   /**

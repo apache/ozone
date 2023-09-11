@@ -78,7 +78,8 @@ public class ContainerSafeModeRule extends
 
       Optional.ofNullable(container.getState())
           .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-              state == HddsProtos.LifeCycleState.CLOSED))
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });
@@ -166,7 +167,8 @@ public class ContainerSafeModeRule extends
 
       Optional.ofNullable(container.getState())
           .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-              state == HddsProtos.LifeCycleState.CLOSED))
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });

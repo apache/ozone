@@ -39,6 +39,7 @@ import "hdds.proto";
 import "Security.proto";
 
 enum Type {
+  UnknownCommand = 0;
   CreateVolume = 11;
   SetVolumeProperty = 12;
   CheckVolumeAccess = 13;
@@ -136,6 +137,17 @@ enum Type {
   RecoverLease = 119;
   SetTimes = 120;
   RefetchSecretKey = 121;
+  ListSnapshotDiffJobs = 122;
+  CancelSnapshotDiff = 123;
+  SetSafeMode = 124;
+  PrintCompactionLogDag = 125;
+}
+
+enum SafeMode {
+    ENTER = 1;
+    LEAVE = 2;
+    FORCE_EXIT = 3;
+    GET = 4;
 }
 
 message OMRequest {
@@ -254,8 +266,12 @@ message OMRequest {
   optional SnapshotPurgeRequest             SnapshotPurgeRequest           = 118;
 
   optional RecoverLeaseRequest              RecoverLeaseRequest            = 119;
-  optional SetTimesRequest                   SetTimesRequest               = 120;
+  optional SetTimesRequest                  SetTimesRequest                = 120;
   optional RefetchSecretKeyRequest          RefetchSecretKeyRequest        = 121;
+  optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
+  optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
+  optional SetSafeModeRequest               SetSafeModeRequest             = 124;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
 }
 
 message OMResponse {
@@ -364,10 +380,14 @@ message OMResponse {
   optional SnapshotMoveDeletedKeysResponse   SnapshotMoveDeletedKeysResponse = 116;
 
   optional hdds.TransferLeadershipResponseProto   TransferOmLeadershipResponse  = 117;
-  optional SnapshotPurgeResponse              SnapshotPurgeResponse         = 118;
+  optional SnapshotPurgeResponse              SnapshotPurgeResponse        = 118;
   optional RecoverLeaseResponse              RecoverLeaseResponse          = 119;
-  optional SetTimesResponse                   SetTimesResponse             = 120;
+  optional SetTimesResponse                  SetTimesResponse              = 120;
   optional RefetchSecretKeyResponse          RefetchSecretKeyResponse      = 121;
+  optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
+  optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
+  optional SetSafeModeResponse               SetSafeModeResponse           = 124;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
 }
 
 enum Status {
@@ -798,7 +818,32 @@ message SnapshotInfo {
   optional string snapshotPath = 10;
   optional string checkpointDir = 11;
   optional int64 dbTxSequenceNumber = 12;
- }
+  optional bool deepClean = 13;
+  optional bool sstFiltered = 14;
+  // snapshot reference size before any key replication or EC
+  optional uint64 referencedSize = 15;
+  // snapshot reference size after replication
+  optional uint64 referencedReplicatedSize = 16;
+  // snapshot exclusive size before any key replication or EC
+  optional uint64 exclusiveSize = 17;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSize = 18;
+  // note: shared sizes can be calculated from: referenced - exclusive
+}
+
+message SnapshotDiffJobProto {
+  optional uint64 creationTime = 1;
+  optional string jobId = 2;
+  optional SnapshotDiffResponse.JobStatusProto status = 3;
+  optional string volume = 4;
+  optional string bucket = 5;
+  optional string fromSnapshot = 6;
+  optional string toSnapshot = 7;
+  optional bool forceFullDiff = 8;
+  optional uint64 totalDiffEntries = 9;
+  optional string message = 10;
+  optional bool disableNativeDiff = 11;
+}
 
 message OzoneObj {
   enum ObjectType {
@@ -1218,6 +1263,7 @@ message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
+    repeated SnapshotMoveKeyInfos keysToUpdate = 3;
 }
 
 message PurgeKeysResponse {
@@ -1563,6 +1609,7 @@ message PartInfo {
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
     optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3 [default = true];
 }
 
 /**
@@ -1691,6 +1738,7 @@ message CreateTenantRequest {
     optional string volumeName = 2;
     optional string userRoleName = 3;
     optional string adminRoleName = 4;
+    optional bool forceCreationWhenVolumeExists = 5;
 }
 
 message SetRangerServiceVersionRequest {
@@ -1721,6 +1769,21 @@ message SnapshotDiffRequest {
   optional string token = 5;
   optional uint32 pageSize = 6;
   optional bool forceFullDiff = 7;
+  optional bool disableNativeDiff = 8;
+}
+
+message CancelSnapshotDiffRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshot = 3;
+  optional string toSnapshot = 4;
+}
+
+message ListSnapshotDiffJobRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string jobStatus = 3;
+  optional bool listAll = 4;
 }
 
 message DeleteSnapshotRequest {
@@ -1728,6 +1791,11 @@ message DeleteSnapshotRequest {
   optional string bucketName = 2;
   optional string snapshotName = 3;
   optional uint64 deletionTime = 4;
+}
+
+message PrintCompactionLogDagRequest {
+  optional string fileNamePrefix = 1;
+  optional string graphType = 2;
 }
 
 message SnapshotMoveDeletedKeysRequest {
@@ -1745,6 +1813,7 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
+  repeated string updatedSnapshotDBKey = 2;
 }
 
 message DeleteTenantRequest {
@@ -1799,14 +1868,29 @@ message SnapshotDiffResponse {
     DONE = 3;
     REJECTED = 4;
     FAILED = 5;
+    CANCELLED = 6;
   }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
+  optional string reason = 4;
+}
+
+message CancelSnapshotDiffResponse {
+  optional string reason = 1;
+}
+
+message ListSnapshotDiffJobResponse {
+  repeated SnapshotDiffJobProto snapshotDiffJob = 1;
 }
 
 message DeleteSnapshotResponse {
 
+}
+
+message PrintCompactionLogDagResponse {
+  optional string message = 1;
 }
 
 message SnapshotMoveDeletedKeysResponse {
@@ -1902,6 +1986,14 @@ message SetTimesRequest {
 }
 
 message SetTimesResponse {
+}
+
+message SetSafeModeRequest {
+  required SafeMode safeMode    = 1;
+}
+
+message SetSafeModeResponse {
+  optional bool response = 1;
 }
 
 /**

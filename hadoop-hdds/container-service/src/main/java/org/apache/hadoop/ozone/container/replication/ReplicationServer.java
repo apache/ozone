@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -78,6 +78,8 @@ public class ReplicationServer {
 
     int replicationServerWorkers =
         replicationConfig.getReplicationMaxStreams();
+    LOG.info("Initializing replication server with thread count = {}",
+        replicationConfig.getReplicationMaxStreams());
     this.executor =
         new ThreadPoolExecutor(replicationServerWorkers,
             replicationServerWorkers,

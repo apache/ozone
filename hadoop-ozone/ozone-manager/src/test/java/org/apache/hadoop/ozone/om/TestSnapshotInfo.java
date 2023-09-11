@@ -51,7 +51,7 @@ public class TestSnapshotInfo {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_DB_DIRS,
         folder.getRoot().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl(conf, null);
   }
 
   private SnapshotInfo createSnapshotInfo() {
@@ -96,5 +96,18 @@ public class TestSnapshotInfo {
     Assert.assertTrue(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
     snapshotInfo.delete(EXPECTED_SNAPSHOT_KEY);
     Assert.assertFalse(snapshotInfo.isExist(EXPECTED_SNAPSHOT_KEY));
+  }
+
+  @Test
+  public void testSnapshotSSTFilteredFlag() throws Exception {
+    Table<String, SnapshotInfo> snapshotInfo =
+        omMetadataManager.getSnapshotInfoTable();
+    SnapshotInfo info  = createSnapshotInfo();
+    info.setSstFiltered(false);
+    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
+    Assert.assertFalse(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
+    info.setSstFiltered(true);
+    snapshotInfo.put(EXPECTED_SNAPSHOT_KEY, info);
+    Assert.assertTrue(snapshotInfo.get(EXPECTED_SNAPSHOT_KEY).isSstFiltered());
   }
 }

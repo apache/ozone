@@ -23,10 +23,11 @@ import axios from 'axios';
 import {IStorageReport} from 'types/datanode.types';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
-import {showDataFetchError} from 'utils/common';
+import {showDataFetchError,byteToSize} from 'utils/common';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import filesize from 'filesize';
 import './overview.less';
+import { AxiosAllGetHelper, AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({round: 1});
 
@@ -62,7 +63,16 @@ interface IOverviewState {
   openContainers: number;
   deletedContainers: number;
   keysPendingDeletion: number;
+  openSummarytotalUnrepSize: number,
+  openSummarytotalRepSize: number,
+  openSummarytotalOpenKeys: number,
+  deletePendingSummarytotalUnrepSize: number,
+  deletePendingSummarytotalRepSize: number,
+  deletePendingSummarytotalDeletedKeys: number,
 }
+
+let cancelOverviewSignal: AbortController;
+let cancelOMDBSyncSignal: AbortController;
 
 export class Overview extends React.Component<Record<string, object>, IOverviewState> {
   interval = 0;
@@ -90,7 +100,13 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       omStatus: '',
       openContainers: 0,
       deletedContainers: 0,
-      keysPendingDeletion: 0
+      keysPendingDeletion: 0,
+      openSummarytotalUnrepSize: 0,
+      openSummarytotalRepSize: 0,
+      openSummarytotalOpenKeys: 0,
+      deletePendingSummarytotalUnrepSize: 0,
+      deletePendingSummarytotalRepSize: 0,
+      deletePendingSummarytotalDeletedKeys: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -99,10 +115,22 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     this.setState({
       loading: true
     });
-    axios.all([
-      axios.get('/api/v1/clusterState'),
-      axios.get('/api/v1/task/status')
-    ]).then(axios.spread((clusterStateResponse, taskstatusResponse) => {
+
+    //cancel any previous pending requests
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ]);
+
+    const { requests, controller } = AxiosAllGetHelper([
+      '/api/v1/clusterState',
+      '/api/v1/task/status',
+      '/api/v1/keys/open/summary',
+      '/api/v1/keys/deletePending/summary'
+    ], cancelOverviewSignal);
+    cancelOverviewSignal = controller;
+
+    requests.then(axios.spread((clusterStateResponse, taskstatusResponse, openResponse, deletePendingResponse) => {
       
       const clusterState: IClusterStateResponse = clusterStateResponse.data;
       const taskStatus = taskstatusResponse.data;
@@ -125,7 +153,13 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         deletedContainers: clusterState.deletedContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
-        lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp
+        lastUpdatedOMDBFull: omDBFullObject && omDBFullObject.lastUpdatedTimestamp,
+        openSummarytotalUnrepSize: openResponse.data  && openResponse.data.totalUnreplicatedDataSize,
+        openSummarytotalRepSize: openResponse.data && openResponse.data.totalReplicatedDataSize,
+        openSummarytotalOpenKeys: openResponse.data && openResponse.data.totalOpenKeys,
+        deletePendingSummarytotalUnrepSize: deletePendingResponse.data && deletePendingResponse.data.totalUnreplicatedDataSize,
+        deletePendingSummarytotalRepSize: deletePendingResponse.data && deletePendingResponse.data.totalReplicatedDataSize,
+        deletePendingSummarytotalDeletedKeys: deletePendingResponse.data && deletePendingResponse.data.totalDeletedKeys
       });
     })).catch(error => {
       this.setState({
@@ -141,7 +175,14 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       loading: true
     });
 
-    axios.get('/api/v1/triggerdbsync/om').then( omstatusResponse => {    
+    const { request, controller } = AxiosGetHelper(
+      '/api/v1/triggerdbsync/om',
+      cancelOMDBSyncSignal,
+      "OM-DB Sync request cancelled because data was updated"
+    );
+    cancelOMDBSyncSignal = controller;
+
+    request.then( omstatusResponse => {    
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -162,17 +203,36 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelRequests([
+      cancelOMDBSyncSignal,
+      cancelOverviewSignal
+    ]);
   }
 
   render() {
-    const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers, keysPendingDeletion} = this.state;
+    const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
+      deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,keysPendingDeletion,
+      keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers } = this.state;
       
     const datanodesElement = (
       <span>
         <Icon type='check-circle' theme='filled' className='icon-success icon-small'/> {datanodes} <span className='ant-card-meta-description meta'>HEALTHY</span>
       </span>
     );
+    const openSummaryData = (
+        <div>
+          {openSummarytotalRepSize!== undefined ? byteToSize(openSummarytotalRepSize, 1): '0'}   <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+          {openSummarytotalUnrepSize!== undefined ? byteToSize(openSummarytotalUnrepSize, 1): '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+          {openSummarytotalOpenKeys !== undefined ? openSummarytotalOpenKeys: '0'}  <span className='ant-card-meta-description meta'>Total Open Keys</span>
+        </div>
+    );
+    const deletePendingSummaryData = (
+      <div>
+        {deletePendingSummarytotalRepSize!== undefined ? byteToSize(deletePendingSummarytotalRepSize, 1): '0'}  <span className='ant-card-meta-description meta'>Total Replicated Data Size</span><br />
+        {deletePendingSummarytotalUnrepSize!== undefined ? byteToSize(deletePendingSummarytotalUnrepSize,1): '0'}  <span className='ant-card-meta-description meta'>Total UnReplicated Data Size</span><br />
+        {deletePendingSummarytotalDeletedKeys !== undefined ? deletePendingSummarytotalDeletedKeys: '0'}  <span className='ant-card-meta-description meta'>Total Pending Delete Keys</span>
+      </div>
+  );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
     const duLink = '/DiskUsage';
@@ -240,6 +300,12 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Pending Key Deletions' data={keysPendingDeletion.toString()} icon='delete' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+            <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' />
+          </Col>
+          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+            <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' />
           </Col>
         </Row>
       </div>

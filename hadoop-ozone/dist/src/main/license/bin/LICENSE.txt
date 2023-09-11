@@ -314,6 +314,7 @@ Apache License 2.0
    commons-logging:commons-logging
    commons-net:commons-net
    commons-validator:commons-validator
+   commons-fileupload:commons-fileupload
    info.picocli:picocli
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
@@ -357,8 +358,6 @@ Apache License 2.0
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
-   net.minidev:accessors-smart
-   net.minidev:json-smart
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
@@ -469,6 +468,8 @@ EPL 2.0
 
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
+   org.jgrapht:jgrapht-core
+   org.jgrapht:jgrapht-ext
 
 
 CDDL + GPLv2 with classpath exception
@@ -495,7 +496,6 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
-   org.ow2.asm:asm
 
 
 BSD 2-Clause

@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -126,6 +127,8 @@ public class BasicOzoneFileSystem extends FileSystem {
       "o3fs://bucket.volume.om-host.example.com/key  OR " +
       "o3fs://bucket.volume.om-host.example.com:5678/key  OR " +
       "o3fs://bucket.volume.omServiceId/key";
+
+  private static final int PATH_DEPTH_TO_BUCKET = 0;
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -741,7 +744,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public Path getTrashRoot(Path path) {
     final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    return new Path(pathToTrash, getUsername());
+    return this.makeQualified(new Path(pathToTrash, getUsername()));
   }
 
   /**
@@ -933,9 +936,16 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public Path createSnapshot(Path path, String snapshotName)
           throws IOException {
-    String snapshot = adapter.createSnapshot(pathToKey(path), snapshotName);
-    return new Path(path,
+    String snapshot = getAdapter()
+        .createSnapshot(pathToKey(path), snapshotName);
+    return new Path(OzoneFSUtils.trimPathToDepth(path, PATH_DEPTH_TO_BUCKET),
         OM_SNAPSHOT_INDICATOR + OZONE_URI_DELIMITER + snapshot);
+  }
+
+  @Override
+  public void deleteSnapshot(Path path, String snapshotName)
+      throws IOException {
+    adapter.deleteSnapshot(pathToKey(path), snapshotName);
   }
 
   @Override
@@ -1259,5 +1269,17 @@ public class BasicOzoneFileSystem extends FileSystem {
       return fileStatus;
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
+  }
+
+  protected boolean setSafeModeUtil(SafeModeAction action,
+      boolean isChecked)
+      throws IOException {
+    if (action == SafeModeAction.GET) {
+      statistics.incrementReadOps(1);
+    } else {
+      statistics.incrementWriteOps(1);
+    }
+    LOG.trace("setSafeMode() action:{}", action);
+    return getAdapter().setSafeMode(action, isChecked);
   }
 }
