@@ -580,10 +580,22 @@ public class OMDBInsightEndpoint {
     if (nsSummary == null) {
       return 0L;
     }
+    // Check if the deleted dir size is already computed and set previously.
+    if (nsSummary.getIsSizeOfDeletedDirectoryComputed()) {
+      return nsSummary.getSizeOfFiles();
+    }
+
+    // Initialize the total size
     long totalSize = nsSummary.getSizeOfFiles();
+
+    // Compute the size recursively
     for (long childId : nsSummary.getChildDir()) {
       totalSize += fetchSizeForDeletedDirectory(childId);
     }
+    // Update the size in the NSSummary and set sizeOfFilesSet to true to avoid
+    // re-computation the next time.
+    nsSummary.setSizeOfFiles(totalSize);
+    nsSummary.setIsSizeOfDeletedDirectoryComputed();
     return totalSize;
   }
 
