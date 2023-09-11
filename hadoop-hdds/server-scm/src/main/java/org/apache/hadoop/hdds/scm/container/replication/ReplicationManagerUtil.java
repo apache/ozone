@@ -250,13 +250,19 @@ public final class ReplicationManagerUtil {
           || !nodeStatus.isInService()) {
         continue;
       }
-      // If the container is closed, then quasi-closed and unhealthy replicas
-      // will get added to this list. If the container is quasi-closed, then
-      // only unhealthy replicas will get added here.
-      if (!compareState(containerInfo.getState(), r.getState())) {
+
+      if (containerInfo.getState() != HddsProtos.LifeCycleState.QUASI_CLOSED &&
+          r.getState() == ContainerReplicaProto.State.QUASI_CLOSED) {
+        // a quasi_closed replica is a candidate only if its seq id is less
+        // than the container's
+        if (r.getSequenceId() < containerInfo.getSequenceId()) {
+          deleteCandidates.add(r);
+        }
+      } else if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
         deleteCandidates.add(r);
       }
     }
+
     deleteCandidates.sort(
         Comparator.comparingLong(ContainerReplica::getSequenceId));
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
