@@ -376,7 +376,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   /**
    * Crete a UGI from request and wrap the AuthenticationException
-   * to OMException in case of empty credentials
+   * to OMException in case of empty credentials.
    * @return UserGroupInformation
    * @throws OMException exception about an empty user credential
    *                      (unauthorized request)
