@@ -102,9 +102,18 @@ public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
     OzoneManagerProtocolProtos.CancelPrepareRequest cancelPrepareRequest =
         OzoneManagerProtocolProtos.CancelPrepareRequest.newBuilder().build();
 
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("0.0.0.0")
+            .build();
+
     return OMRequest.newBuilder()
         .setCancelPrepareRequest(cancelPrepareRequest)
         .setCmdType(OzoneManagerProtocolProtos.Type.CancelPrepare)
-        .setClientId(UUID.randomUUID().toString()).build();
+        .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
+        .build();
   }
 }
