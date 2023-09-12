@@ -42,10 +42,10 @@ The user needs to `kinit` first and once they have authenticated via kerberos
 ozone s3 getsecret
 ```
 
-* Or by sending request to /secret/generate S3 REST endpoint.
+* Or by sending request to /secret S3 REST endpoint.
 
 ```bash
-curl -X POST --negotiate -u : https://localhost:9879/secret/generate
+curl -X PUT --negotiate -u : https://localhost:9879/secret
 ```
 
 This command will talk to ozone, validate the user via Kerberos and generate

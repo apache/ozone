@@ -25,7 +25,7 @@ x-common-config:
 
 x-environment:
   &environment
-  OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-3}
+  OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-3}
   OZONE_UPGRADE_TO: ${OZONE_UPGRADE_TO:-0}
   OZONE_UPGRADE_FROM: ${OZONE_UPGRADE_FROM:-0}
 

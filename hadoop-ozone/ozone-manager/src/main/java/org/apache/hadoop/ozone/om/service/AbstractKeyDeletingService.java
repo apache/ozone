@@ -393,12 +393,14 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
-      String snapTableKey, long startTime) {
+      String snapTableKey, long startTime,
+      int remainingBufLimit) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
+    int consumedSize = 0;
     while (remainNum > 0 && subDirRecursiveCnt < allSubDirList.size()) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair
@@ -407,6 +409,12 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
             getOzoneManager().getKeyManager());
+        if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
+            request.getSerializedSize())) {
+          // ignore further add request
+          break;
+        }
+        consumedSize += request.getSerializedSize();
         purgePathRequestList.add(request);
         remainNum = remainNum - request.getDeletedSubFilesCount();
         remainNum = remainNum - request.getMarkDeletedSubDirsCount();
@@ -443,6 +451,11 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           Time.monotonicNow() - startTime, getRunCount());
     }
     return remainNum;
+  }
+
+  protected boolean isBufferLimitCrossed(
+      int maxLimit, int cLimit, int increment) {
+    return cLimit + increment >= maxLimit;
   }
 
   protected SnapshotInfo getPreviousActiveSnapshot(SnapshotInfo snapInfo,
@@ -489,7 +502,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           volumeId,
           bucketInfo.getObjectID(),
           deletedKeyInfo.getParentObjectID(),
-          deletedKeyInfo.getKeyName());
+          deletedKeyInfo.getFileName());
     } else {
       dbKey = ozoneManager.getMetadataManager().getOzoneKey(
           deletedKeyInfo.getVolumeName(),

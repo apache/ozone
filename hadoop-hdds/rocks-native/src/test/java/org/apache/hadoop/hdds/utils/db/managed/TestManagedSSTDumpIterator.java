@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -38,6 +40,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -192,28 +195,49 @@ class TestManagedSSTDumpIterator {
             new ArrayBlockingQueue<>(1),
             new ThreadPoolExecutor.CallerRunsPolicy());
     ManagedSSTDumpTool tool = new ManagedSSTDumpTool(executorService, 8192);
-    try (ManagedOptions options = new ManagedOptions(); ManagedSSTDumpIterator
-        <ManagedSSTDumpIterator.KeyValue> iterator =
-        new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
-            file.getAbsolutePath(), options) {
-          @Override
-          protected KeyValue getTransformedValue(
-              Optional<KeyValue> value) {
-            return value.orElse(null);
+    List<Optional<String>> testBounds = TestUtils.getTestingBounds(
+        keys.keySet().stream().collect(Collectors.toMap(Pair::getKey,
+            Pair::getValue, (v1, v2) -> v1, TreeMap::new)));
+    for (Optional<String> keyStart : testBounds) {
+      for (Optional<String> keyEnd : testBounds) {
+        Map<Pair<String, Integer>, String> expectedKeys = keys.entrySet()
+            .stream().filter(e -> keyStart.map(s -> e.getKey().getKey()
+                .compareTo(s) >= 0).orElse(true))
+            .filter(e -> keyEnd.map(s -> e.getKey().getKey().compareTo(s) < 0)
+                .orElse(true))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        Optional<ManagedSlice> lowerBound = keyStart
+            .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+        Optional<ManagedSlice> upperBound = keyEnd
+            .map(s -> new ManagedSlice(StringUtils.string2Bytes(s)));
+        try (ManagedOptions options = new ManagedOptions();
+             ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue> iterator =
+            new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(tool,
+                file.getAbsolutePath(), options, lowerBound.orElse(null),
+                upperBound.orElse(null)) {
+              @Override
+              protected KeyValue getTransformedValue(
+                  Optional<KeyValue> value) {
+                return value.orElse(null);
+              }
+            }
+        ) {
+          while (iterator.hasNext()) {
+            ManagedSSTDumpIterator.KeyValue r = iterator.next();
+            String key = new String(r.getKey(), StandardCharsets.UTF_8);
+            Pair<String, Integer> recordKey = Pair.of(key, r.getType());
+            Assertions.assertTrue(expectedKeys.containsKey(recordKey));
+            Assertions.assertEquals(Optional.ofNullable(expectedKeys
+                    .get(recordKey)).orElse(""),
+                new String(r.getValue(), StandardCharsets.UTF_8));
+            expectedKeys.remove(recordKey);
           }
+          Assertions.assertEquals(0, expectedKeys.size());
+        } finally {
+          lowerBound.ifPresent(ManagedSlice::close);
+          upperBound.ifPresent(ManagedSlice::close);
         }
-    ) {
-      while (iterator.hasNext()) {
-        ManagedSSTDumpIterator.KeyValue r = iterator.next();
-        Pair<String, Integer> recordKey = Pair.of(new String(r.getKey(),
-            StandardCharsets.UTF_8), r.getType());
-        Assertions.assertTrue(keys.containsKey(recordKey));
-        Assertions.assertEquals(
-            Optional.ofNullable(keys.get(recordKey)).orElse(""),
-            new String(r.getValue(), StandardCharsets.UTF_8));
-        keys.remove(recordKey);
       }
-      Assertions.assertEquals(0, keys.size());
     }
     executorService.shutdown();
   }
@@ -231,7 +255,7 @@ class TestManagedSSTDumpIterator {
     Future future = Mockito.mock(Future.class);
     Mockito.when(future.isDone()).thenReturn(false);
     Mockito.when(future.get()).thenReturn(0);
-    Mockito.when(tool.run(Matchers.any(String[].class),
+    Mockito.when(tool.run(Matchers.any(Map.class),
             Matchers.any(ManagedOptions.class)))
         .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
             byteArrayInputStream));

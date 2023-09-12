@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -189,7 +190,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  Column Family        |        VALUE                                    |
    * |-------------------------------------------------------------------------|
-   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
    * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
    * |                       |  1. /volumeId/bucketId/parentId/dirName         |
@@ -728,6 +729,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
+    // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
+    //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);
@@ -1355,7 +1358,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue< String, SnapshotInfo> snapshotinfo;
+      KeyValue<String, SnapshotInfo> snapshotinfo;
       snapshotIter.seek(previous);
       while (snapshotIter.hasNext() && count < maxListResult) {
         snapshotinfo = snapshotIter.next();
@@ -1565,7 +1568,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                   prevKeyTableDBKey = getOzonePathKey(volumeId,
                       bucketInfo.getObjectID(),
                       info.getParentObjectID(),
-                      info.getKeyName());
+                      info.getFileName());
                 } else if (prevKeyTableDBKey == null) {
                   prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
                       info.getBucketName(),
@@ -1684,6 +1687,44 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return rcOmSnapshot.orElse(null);
   }
 
+  /**
+   * Decide whether the open key is a multipart upload related key.
+   * @param openKeyInfo open key related to multipart upload
+   * @param openDbKey db key of open key related to multipart upload, which
+   *                  might have different format depending on the bucket
+   *                  layout
+   * @return true open key is a multipart upload related key.
+   *         false otherwise.
+   */
+  private boolean isOpenMultipartKey(OmKeyInfo openKeyInfo, String openDbKey)
+      throws IOException {
+    if (OMMultipartUploadUtils.isMultipartKeySet(openKeyInfo)) {
+      return true;
+    }
+
+    String multipartUploadId =
+        OMMultipartUploadUtils.getUploadIdFromDbKey(openDbKey);
+
+    if (StringUtils.isEmpty(multipartUploadId)) {
+      return false;
+    }
+
+    String multipartInfoDbKey = getMultipartKey(openKeyInfo.getVolumeName(),
+        openKeyInfo.getBucketName(), openKeyInfo.getKeyName(),
+        multipartUploadId);
+
+    // In addition to checking isMultipartKey flag in the open key info,
+    // multipartInfoTable needs to be checked to handle multipart upload
+    // open keys that already set isMultipartKey = false prior to HDDS-9017.
+    // These open keys should not be deleted since doing so will result in
+    // orphan MPUs (i.e. multipart upload exists in multipartInfoTable, but
+    // does not exist in the openKeyTable/openFileTable). These orphan MPUs
+    // will not be able to be aborted / completed by the user
+    // since the MPU abort and complete requests require the open MPU keys
+    // to exist in the open key/file table.
+    return getMultipartInfoTable().isExist(multipartInfoDbKey);
+  }
+
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
@@ -1708,6 +1749,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
         final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
+
+        if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
+          continue;
+        }
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
           final String clientIdString
