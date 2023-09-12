@@ -1315,6 +1315,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (securityEnabled && testUgi == null) {
+      // Checking certificate duration validity by using
+      // validateCertificateValidityConfig() in SecurityConfig constructor.
+      new SecurityConfig(conf);
       loginOMUser(conf);
     }
   }
@@ -1332,9 +1335,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AuthenticationException {
     OMHANodeDetails omhaNodeDetails = OMHANodeDetails.loadOMHAConfig(conf);
     String nodeId = omhaNodeDetails.getLocalNodeDetails().getNodeId();
-    // Checking certificate duration validity by using
-    // validateCertificateValidityConfig() in SecurityConfig constructor.
-    new SecurityConfig(conf);
     loginOMUserIfSecurityEnabled(conf);
     OMStorage omStorage = new OMStorage(conf);
     StorageState state = omStorage.getState();
