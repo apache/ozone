@@ -51,10 +51,4 @@ public class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
   public long getTotalAckDataLength() {
     return totalAckDataLength;
   }
-
-  @Override
-  public void cleanup() {
-    super.cleanup();
-    bufferList.clear();
-  }
 }

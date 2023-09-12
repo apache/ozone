@@ -130,13 +130,13 @@ abstract class AbstractCommitWatcher<BUFFER> {
     }
 
     try {
-      XceiverClientReply reply = client.watchForCommit(commitIndex);
+      final XceiverClientReply reply = client.watchForCommit(commitIndex);
       f.complete(reply);
       final CompletableFuture<XceiverClientReply> removed
           = replies.remove(commitIndex);
       Preconditions.checkState(removed == f);
 
-      final long index = reply != null ?  reply.getLogIndex() : 0;
+      final long index = reply != null ? reply.getLogIndex() : 0;
       adjustBuffers(index);
       return reply;
     } catch (InterruptedException e) {
@@ -170,7 +170,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
   IOException getIOExceptionForWatchForCommit(long commitIndex, Exception e) {
     LOG.warn("watchForCommit failed for index {}", commitIndex, e);
     IOException ioException = new IOException(
-        "Unexpected Storage Container Exception: " + e.toString(), e);
+        "Unexpected Storage Container Exception: " + e, e);
     releaseBuffersOnException();
     return ioException;
   }
