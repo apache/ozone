@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
  * support for OBS buckets. Check that the NSSummary
  * for the OBS bucket is null.
  */
+@SuppressFBWarnings
 public final class TestNSSummaryTask {
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
