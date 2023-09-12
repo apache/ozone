@@ -54,7 +54,7 @@ SnapshotDiff CLI/API is asynchronous. The first time the API is invoked, OM star
 
 * List SnapshotDiff Jobs: List all snapshotDiff jobs of a given bucket 
 ```shell
-ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <value>
+ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <bucket>
 ```
 
 ## Architecture
