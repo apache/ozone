@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -57,6 +58,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
@@ -73,7 +75,7 @@ public class TestRatisUnderReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
-      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      RatisReplicationConfig.getInstance(THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
@@ -114,6 +116,8 @@ public class TestRatisUnderReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
         replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
+        commandsSent);
+    ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
         commandsSent);
   }
 
@@ -224,6 +228,7 @@ public class TestRatisUnderReplicationHandler {
     Assert.assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(0, commandsSent.size());
     Assert.assertEquals(0, metrics.getPartialReplicationTotal());
   }
 
@@ -245,6 +250,129 @@ public class TestRatisUnderReplicationHandler {
     // fine one node rather than two.
     Assert.assertEquals(1, commandsSent.size());
     Assert.assertEquals(1, metrics.getPartialReplicationTotal());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyRemoveNone() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // No commands send, as there are only 2 replicas available.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyNoneHealthy() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    // All replicas UNHEALTHY so we do nothing.
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // No commands send, as no CLOSED replicas available.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyRemoveUnhealthy() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+        .Type.deleteContainerCommand, cmd.getValue().getType());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyPendingDelete() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    List<ContainerReplicaOp> pending = Collections.singletonList(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        shouldDelete.getDatanodeDetails(), 0));
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            pending, getUnderReplicatedHealthResult(), 2));
+    // No commands sent as we have a pending delete.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundRemoveQuasiClosedWithLowestSeq() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    long sequenceID = 10;
+    container = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(THREE),
+        1, HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    // This quasi closed is newer than the other one below, so it should not
+    // be removed.
+    replicas.add(createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+        sequenceID - 2));
+    // Unhealthy should be removed over the quasi-closed ones.
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+        .Type.deleteContainerCommand, cmd.getValue().getType());
   }
 
   @Test

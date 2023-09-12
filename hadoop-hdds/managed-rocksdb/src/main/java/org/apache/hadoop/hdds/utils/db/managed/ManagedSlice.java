@@ -30,6 +30,11 @@ public class ManagedSlice extends Slice {
   }
 
   @Override
+  public synchronized long getNativeHandle() {
+    return super.getNativeHandle();
+  }
+
+  @Override
   protected void finalize() throws Throwable {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (this.isOwningHandle()) {

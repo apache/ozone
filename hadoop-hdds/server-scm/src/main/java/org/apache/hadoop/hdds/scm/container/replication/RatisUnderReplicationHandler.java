@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -113,9 +114,21 @@ public class RatisUnderReplicationHandler
       return 0;
     }
 
-    // find targets to send replicas to
-    List<DatanodeDetails> targetDatanodes =
-        getTargets(replicaCount, pendingOps);
+    List<DatanodeDetails> targetDatanodes;
+    try {
+      // find targets to send replicas to
+      targetDatanodes = getTargets(replicaCount, pendingOps);
+    } catch (SCMException e) {
+      SCMException.ResultCodes code = e.getResult();
+      if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
+        throw e;
+      }
+      LOG.warn("Cannot replicate container {} because no suitable targets " +
+          "were found.", containerInfo);
+      removeUnhealthyReplicaIfPossible(containerInfo, replicas, pendingOps);
+      // Throw the original exception so the request gets re-queued to try again
+      throw e;
+    }
 
     int commandsSent = sendReplicationCommands(
         containerInfo, sourceDatanodes, targetDatanodes);
@@ -135,6 +148,29 @@ public class RatisUnderReplicationHandler
           replicaCount.additionalReplicaNeeded(), targetDatanodes.size());
     }
     return commandsSent;
+  }
+
+  private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
+      throws NotLeaderException {
+    ContainerReplica deleteCandidate = ReplicationManagerUtil
+        .selectUnhealthyReplicaForDelete(containerInfo, replicas, pendingOps,
+            (dnd) -> {
+              try {
+                return replicationManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                return null;
+              }
+            });
+
+    if (deleteCandidate != null) {
+      replicationManager.sendDeleteCommand(containerInfo,
+          deleteCandidate.getReplicaIndex(),
+          deleteCandidate.getDatanodeDetails(), true);
+    } else {
+      LOG.info("Unable to find a replica to remove for container {} with " +
+          "replicas {}", containerInfo, replicas);
+    }
   }
 
   /**

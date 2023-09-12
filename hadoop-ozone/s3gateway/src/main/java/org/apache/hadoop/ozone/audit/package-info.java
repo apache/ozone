@@ -16,8 +16,7 @@
  */
 
 /**
- * This package in hdds-common contains the parts of Ozone's audit framework
- * that are shared between clients and servers.  See also package of the same
- * name in hdds-server-framework for details.
+ * This package defines S3GAction - an implementation of AuditAction
+ * for various actions that will be audited in S3 Gateway.
  */
 package org.apache.hadoop.ozone.audit;
