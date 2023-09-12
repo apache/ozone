@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
+Documentation       Test Ozone SCM Decommissioning
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
@@ -64,7 +64,8 @@ Transfer Leader to non-primordial node Follower
 *** Test Cases ***
 Decommission SCM Primordial Node
     ${primordial_scm_id} =  Get Primordial SCM ID
-    ${decomm_output} =      Execute                 ozone admin scm decommission --nodeid=${primordial_scm_id}
+                            LOG                     Primordial scm id : ${primordial_scm_id}
+    ${decomm_output} =      Execute And Ignore Error   ozone admin scm decommission --nodeid=${primordial_scm_id}
                             LOG                     ${decomm_output}
                             Should Contain          ${decomm_output}               Cannot remove current leader
     ${md5sum} =             Create volume bucket and put key
