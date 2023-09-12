@@ -1170,80 +1170,26 @@ public class LegacyReplicationManager {
         "replicas {} to unblock under replication handling.", container,
         replicaCount.getReplicas());
 
-    int pendingDeletes = getInflightDel(container.containerID());
-    if (pendingDeletes > 0) {
-      LOG.debug("Container {} has {} pending deletes. Will not delete an " +
-          "unhealthy replica for this container.", container, pendingDeletes);
-      return;
-    }
+    Set<ContainerReplica> replicas = new HashSet<>(replicaCount.getReplicas());
+    ContainerReplica replica = ReplicationManagerUtil
+        .selectUnhealthyReplicaForDelete(container, replicas,
+            getInflightDel(container.containerID()),
+            (dnd) -> {
+              try {
+                return nodeManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                return null;
+              }
+            });
 
-    List<ContainerReplica> replicas = replicaCount.getReplicas();
-    if (replicas.size() < 3) {
-      LOG.debug("Container {} has only {} replicas. Will not delete an " +
-          "unhealthy replica for this container.", container, replicas.size());
-      return;
-    }
-
-    LifeCycleState containerState = container.getState();
-    boolean foundMatchingReplica = false;
-    for (ContainerReplica replica : replicas) {
-      if (compareState(containerState, replica.getState())) {
-        foundMatchingReplica = true;
-        break;
-      }
-    }
-    if (!foundMatchingReplica) {
-      LOG.debug("No matching replica found for container {} with replicas " +
-              "{}. Will not delete any unhealthy replica for this container.",
+    if (replica == null) {
+      LOG.info(
+          "Could not find any unhealthy replica to delete when unblocking " +
+              "under replication handling for container {} with replicas {}.",
           container, replicas);
-      return;
+    } else {
+      sendDeleteCommand(container, replica.getDatanodeDetails(), false);
     }
-
-    List<ContainerReplica> deleteCandidates = new ArrayList<>();
-    long containerSeq = container.getSequenceId();
-    // collect unhealthy replicas on in-service, healthy nodes
-    for (ContainerReplica replica : replicas) {
-      try {
-        NodeStatus nodeStatus =
-            nodeManager.getNodeStatus(replica.getDatanodeDetails());
-        if (!nodeStatus.isHealthy() || !nodeStatus.isInService()) {
-          continue;
-        }
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Skipping replica {} when trying to unblock under " +
-            "replication handling.", replica, e);
-        continue;
-      }
-
-      if (containerState != LifeCycleState.QUASI_CLOSED &&
-          replica.getState() == State.QUASI_CLOSED) {
-        // a quasi_closed replica is a candidate only if its seq id is less
-        // than the container's
-        if (replica.getSequenceId() < containerSeq) {
-          deleteCandidates.add(replica);
-        }
-      } else if (replica.getState() == State.UNHEALTHY) {
-        deleteCandidates.add(replica);
-      }
-    }
-
-    if (containerState == LifeCycleState.CLOSED) {
-      deleteExcessLowestBcsIDs(container, deleteCandidates, 1);
-      return;
-    }
-
-    // if the container is quasi_closed, delete a replica only if its seq id
-    // is less, and it doesn't have a unique origin node
-    if (containerState == LifeCycleState.QUASI_CLOSED) {
-      List<ContainerReplica> nonUniqueDeleteCandidates =
-          findNonUniqueDeleteCandidates(replicas, deleteCandidates);
-      deleteExcessLowestBcsIDs(container, nonUniqueDeleteCandidates, 1);
-      return;
-    }
-
-    LOG.info("Could not find any unhealthy replica to delete when unblocking " +
-        "under replication handling for container {} with replicas {}.",
-        container, replicas);
   }
 
   /**
@@ -2271,20 +2217,6 @@ public class LegacyReplicationManager {
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
 
-    List<ContainerReplica> nonUniqueDeleteCandidates =
-        findNonUniqueDeleteCandidates(allReplicas, deleteCandidates);
-    if (LOG.isDebugEnabled() && nonUniqueDeleteCandidates.size() < excess) {
-      LOG.debug("Unable to delete {} excess replicas of container {}. Only {}" +
-          " replicas can be deleted to preserve unique origin node IDs for " +
-          "this unclosed container.", excess, container.getContainerID(),
-          nonUniqueDeleteCandidates.size());
-    }
-    deleteExcess(container, nonUniqueDeleteCandidates, excess);
-  }
-
-  private List<ContainerReplica> findNonUniqueDeleteCandidates(
-      List<ContainerReplica> allReplicas,
-      List<ContainerReplica> deleteCandidates) {
     // Gather the origin node IDs of replicas which are not candidates for
     // deletion.
     Set<UUID> existingOriginNodeIDs = allReplicas.stream()
@@ -2293,7 +2225,7 @@ public class LegacyReplicationManager {
         .collect(Collectors.toSet());
 
     List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
-    for (ContainerReplica replica : deleteCandidates) {
+    for (ContainerReplica replica: deleteCandidates) {
       if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
         nonUniqueDeleteCandidates.add(replica);
       } else {
@@ -2304,7 +2236,13 @@ public class LegacyReplicationManager {
       }
     }
 
-    return nonUniqueDeleteCandidates;
+    if (LOG.isDebugEnabled() && nonUniqueDeleteCandidates.size() < excess) {
+      LOG.debug("Unable to delete {} excess replicas of container {}. Only {}" +
+          " replicas can be deleted to preserve unique origin node IDs for " +
+          "this unclosed container.", excess, container.getContainerID(),
+          nonUniqueDeleteCandidates.size());
+    }
+    deleteExcess(container, nonUniqueDeleteCandidates, excess);
   }
 
   /**
