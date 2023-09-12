@@ -40,7 +40,6 @@ interface IHeatmapConfigurationProps {
   data: ITreeResponse[];
   onClick: Function;
   colorScheme: string[];
-  childEntityType: string;
 }
 
 export default class HeatMapConfiguration extends React.Component<IHeatmapConfigurationProps> {
@@ -127,9 +126,9 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
     `;}
     if (params.datum.label !== "") {
       tooltipContent += `<br/>
-          ${this.props.childEntityType.charAt(0).toUpperCase() + this.props.childEntityType.slice(1)} Name:
-          ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
-        `;
+        Entity Name:
+        ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
+      `;
     }
     tooltipContent += '</span>';
     return tooltipContent;

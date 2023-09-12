@@ -392,7 +392,7 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
                       </div>
                     </div>
                     <div id="heatmap-chart-container">
-                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent} childEntityType={this.state.entityType}></HeatMapConfiguration>
+                      <HeatMapConfiguration data={treeResponse} colorScheme={colourScheme["amber_alert"]} onClick={this.updateTreemapParent}></HeatMapConfiguration>
                     </div>
                   </div>
                   :
