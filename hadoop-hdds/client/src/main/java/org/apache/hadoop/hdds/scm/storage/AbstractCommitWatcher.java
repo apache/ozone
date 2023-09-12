@@ -136,7 +136,8 @@ abstract class AbstractCommitWatcher<BUFFER> {
           = replies.remove(commitIndex);
       Preconditions.checkState(removed == f);
 
-      adjustBuffers(reply.getLogIndex());
+      final long index = reply != null ?  reply.getLogIndex() : 0;
+      adjustBuffers(index);
       return reply;
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
