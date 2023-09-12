@@ -559,15 +559,15 @@ public final class TestNSSummaryTaskWithLegacy {
 
   /**
    * Populate OMDB with the following configs.
-   * vol
-   * /     \
-   * bucket1   bucket2
-   * /    \      /    \
-   * file1  dir1  file2  file4
-   * /   \
-   * dir2   dir3
-   * /
-   * file3
+   *              vol
+   *            /     \
+   *        bucket1   bucket2
+   *        /    \      /    \
+   *     file1  dir1  file2  file4
+   *            /   \
+   *         dir2   dir3
+   *          /
+   *        file3
    *
    * @throws IOException
    */
