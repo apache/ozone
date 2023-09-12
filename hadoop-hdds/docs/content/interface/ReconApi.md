@@ -845,7 +845,7 @@ Returns all the volumes in the cluster.
 
 **Returns**
 
-Returns all the volumes in the cluster if volume is not specified or it is an empty string. 
+Returns all the buckets in the cluster if volume is not specified or it is an empty string. 
 If `volume` is specified, it returns only the buckets under `volume`.
 
 ```json
