@@ -71,13 +71,13 @@ class ColumnSearch extends React.PureComponent {
     ),
     onFilter: (value: string, record: any) => {
       if (record[dataIndex] !== undefined || record[dataIndex] !== null) {
-          return typeof (record[dataIndex]) === typeof {}
-            ? Boolean (record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())))
-            : record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
-        }
-        else {
-          return;
-        }
+         return typeof (record[dataIndex]) === typeof {}
+           ? Boolean (record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())))
+           : record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
+       }
+       else {
+         return;
+       }
     },
     onFilterDropdownVisibleChange: (visible: boolean) => {
       if (visible) {
