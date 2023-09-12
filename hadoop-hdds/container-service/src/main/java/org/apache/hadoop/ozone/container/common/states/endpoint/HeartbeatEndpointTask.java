@@ -452,7 +452,7 @@ public class HeartbeatEndpointTask
         LOG.debug("Received SCM notification to register."
             + " Interrupt HEARTBEAT and transit to REGISTER state.");
       }
-      rpcEndpoint.setState(EndPointStates.REGISTER);
+      rpcEndpoint.setState(EndPointStates.GETVERSION);
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Illegal state {} found, expecting {}.",
