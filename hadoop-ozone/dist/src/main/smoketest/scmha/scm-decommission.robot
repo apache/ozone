@@ -35,10 +35,24 @@ Create volume bucket and put key
     Execute                 ozone sh key put /${VOLUME}/${BUCKET}/${TESTFILE} /tmp/${TESTFILE}
     [Return]                ${md5sum}
 
+Get Primordial SCM ID
+    ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
+    ${primordial_node} =    Get Lines Containing String                     ${result}           scm1
+    ${primordial_split} =   Split String            ${primordial_node}      :
+    ${primordial_scmId} =   Strip String            ${primordial_split[3]}
+    [Return]                ${primordial_scmId}
+
+Get SCM Node count
+    ${result} =              Execute                 ozone admin scm roles --service-id=scmservice
+    ${nodes_in_quorum} =     Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
+    ${node_count} =          Get Line Count          ${nodes_in_quorum}
+    [Return]                 ${node_count}
+
+
 Transfer Leader to non-primordial node Follower
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
                             LOG                     ${result}
-    ${follower_nodes} =     Get Lines Matching Pattern                      ${result}           scm[23].org:9894:FOLLOWER*
+    ${follower_nodes} =     Get Lines Matching Pattern                      ${result}           scm[123].org:9894:FOLLOWER*
     ${follower_node} =      Get Line                ${follower_nodes}        0
     ${follower_split} =     Split String            ${follower_node}         :
     ${follower_scmId} =     Strip String            ${follower_split[3]}
@@ -49,28 +63,25 @@ Transfer Leader to non-primordial node Follower
 
 *** Test Cases ***
 Decommission SCM Primordial Node
+    ${primordial_scm_id} =  Get Primordial SCM ID
+    ${decomm_output} =      Execute                 ozone admin scm decommission --nodeid=${primordial_scm_id}
+                            LOG                     ${decomm_output}
+                            Should Contain          ${decomm_output}               Cannot remove current leader
     ${md5sum} =             Create volume bucket and put key
     ${transfer_result} =    Transfer Leader to non-primordial node Follower
                             Should Contain          ${transfer_result}       Transfer leadership successfully
-    ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
-    ${nodes_in_quorum} =    Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
-    ${node_count} =         Get Line Count          ${nodes_in_quorum}
+    ${node_count} =         Get SCM Node count
     ${node_count_pre} =     Convert to String       ${node_count}
     ${n} =                  Evaluate                ${node_count}-1
     ${node_count_expect} =  Convert to String       ${n}
                             LOG                     SCM Instance Count before SCM Decommission: ${node_count_pre}
-    ${primordial_node} =    Get Lines Containing String                     ${result}           scm1
-    ${primordial_split} =   Split String            ${primordial_node}      :
-    ${primordial_scmId} =   Strip String            ${primordial_split[3]}
-    ${decommission_res} =   Execute                 ozone admin scm decommission --nodeid=${primordial_scmId}
+    ${decommission_res} =   Execute                 ozone admin scm decommission --nodeid=${primordial_scm_id}
                             LOG                     ${decommission_res}
                             Should Contain          ${decommission_res}                         Decommissioned
-    ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
-    ${nodes_in_quorum} =    Get Lines Matching Pattern                      ${result}           scm[1234].org:9894:*
-    ${node_count} =         Get Line Count          ${nodes_in_quorum}
+    ${node_count} =         Get SCM Node count
     ${node_count_post} =    Convert to String       ${node_count}
                             LOG                     SCM Instance Count after SCM Decommission: ${node_count_post}
-                            Should be Equal         ${node_count_expect}                        ${node_count_post}
+                            Should be Equal         ${node_count_expect}                       ${node_count_post}
     Execute                 ozone sh key get /${VOLUME}/${BUCKET}/${TESTFILE} /tmp/getdecomfile
     ${md5sum_new} =         Execute                 md5sum /tmp/getdecomfile | awk '{print $1}'
                             Should be Equal         ${md5sum}                      ${md5sum_new}
