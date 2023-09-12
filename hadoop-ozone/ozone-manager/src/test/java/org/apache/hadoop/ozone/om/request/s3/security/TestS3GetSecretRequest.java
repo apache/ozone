@@ -67,6 +67,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -161,6 +163,13 @@ public class TestS3GetSecretRequest {
     TenantOp cacheOp = mock(TenantOp.class);
     when(omMultiTenantManager.getAuthorizerOp()).thenReturn(authorizerOp);
     when(omMultiTenantManager.getCacheOp()).thenReturn(cacheOp);
+
+    when(omMultiTenantManager.getTenantForAccessID(USER_CAROL))
+        .thenReturn(Optional.absent());
+    when(omMultiTenantManager.getTenantForAccessID(USER_ALICE))
+        .thenReturn(Optional.absent());
+    when(omMultiTenantManager.getTenantForAccessID(ACCESS_ID_BOB))
+        .thenReturn(Optional.of(ACCESS_ID_BOB));
   }
 
   @After
@@ -215,7 +224,7 @@ public class TestS3GetSecretRequest {
     // This effectively makes alice an S3 admin.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
-    processSuccessSecretRequest(ACCESS_ID_BOB, 1, true);
+    processSuccessSecretRequest(USER_CAROL, 1, true);
   }
 
   @Test
@@ -244,9 +253,9 @@ public class TestS3GetSecretRequest {
     // This effectively makes alice a regular user.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(false);
 
-    // Get secret of "bob@EXAMPLE.COM" (as another regular user).
+    // Get secret of "carol@EXAMPLE.COM" (as another regular user).
     // Run preExecute, expect USER_MISMATCH
-    processFailedSecretRequest(ACCESS_ID_BOB);
+    processFailedSecretRequest(USER_CAROL);
   }
 
   @Test
@@ -414,8 +423,8 @@ public class TestS3GetSecretRequest {
     final S3GetSecretResponse s3GetSecretResponse =
         (S3GetSecretResponse) omClientResponse;
 
-    // Check response - fails as secret already exists
-    Assert.assertFalse(s3GetSecretResponse.getOMResponse().getSuccess());
+    // Check response
+    Assert.assertTrue(s3GetSecretResponse.getOMResponse().getSuccess());
     /*
        getS3SecretValue() should be null in this case because
        the entry is already inserted to DB in the previous request.
