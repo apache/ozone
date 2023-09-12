@@ -29,7 +29,7 @@ import io.opentracing.Scope;
 import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.hadoop.ozone.client.io.PureWrapperOutputStream;
+import org.apache.hadoop.ozone.client.io.WrappedOutputStream;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -71,7 +71,7 @@ public class TracingFilter implements ContainerRequestFilter,
     // written the data to the destination
     OutputStream out = responseContext.getEntityStream();
     if (out != null) {
-      responseContext.setEntityStream(new PureWrapperOutputStream(out) {
+      responseContext.setEntityStream(new WrappedOutputStream(out) {
         @Override
         public void close() throws IOException {
           super.close();

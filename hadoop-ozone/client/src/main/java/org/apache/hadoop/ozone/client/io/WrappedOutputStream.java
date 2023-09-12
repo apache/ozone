@@ -23,11 +23,11 @@ import java.io.OutputStream;
 /**
  * Pure wrapper of OutputStream.
  */
-public class PureWrapperOutputStream extends OutputStream {
+public class WrappedOutputStream extends OutputStream {
 
   private final OutputStream out;
 
-  public PureWrapperOutputStream(OutputStream out) {
+  public WrappedOutputStream(OutputStream out) {
     this.out = out;
   }
 
@@ -49,9 +49,5 @@ public class PureWrapperOutputStream extends OutputStream {
 
   public void close() throws IOException {
     out.close();
-  }
-
-  public OutputStream getOutputStream() {
-    return out;
   }
 }
