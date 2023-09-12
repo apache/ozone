@@ -201,25 +201,20 @@ public final class ReplicationManagerUtil {
    * unhealthy replicas or quasi-closed replicas which cannot be closed due to
    * having a lagging sequence ID. The logic here will select a replica to
    * delete, or return null if there are none which can be safely deleted.
+   *
    * @param containerInfo The container to select a replica to delete from
    * @param replicas The list of replicas for the container
-   * @param pendingOps The list of pending replica operations for the container
+   * @param pendingDeletes number pending deletes for this container
    * @return A replica to delete, or null if there are none which can be safely
    *         deleted.
    */
   public static ContainerReplica selectUnhealthyReplicaForDelete(
       ContainerInfo containerInfo, Set<ContainerReplica> replicas,
-      List<ContainerReplicaOp> pendingOps,
-      Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
-
-    for (ContainerReplicaOp op : pendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        // There is at least one pending delete which will free up a node.
-        // Therefore we do nothing until that delete completes or times out.
-        LOG.debug("Container {} has pending deletes which will free nodes",
-            pendingOps);
-        return null;
-      }
+      int pendingDeletes, Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
+    if (pendingDeletes > 0) {
+      LOG.debug("Container {} has {} pending deletes which will free nodes.",
+          containerInfo, pendingDeletes);
+      return null;
     }
 
     if (replicas.size() <= 2) {

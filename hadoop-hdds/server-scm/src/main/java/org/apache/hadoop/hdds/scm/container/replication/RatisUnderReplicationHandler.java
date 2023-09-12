@@ -153,8 +153,15 @@ public class RatisUnderReplicationHandler
   private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
+    int pendingDeletes = 0;
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+        pendingDeletes++;
+      }
+    }
     ContainerReplica deleteCandidate = ReplicationManagerUtil
-        .selectUnhealthyReplicaForDelete(containerInfo, replicas, pendingOps,
+        .selectUnhealthyReplicaForDelete(containerInfo, replicas,
+            pendingDeletes,
             (dnd) -> {
               try {
                 return replicationManager.getNodeStatus(dnd);
