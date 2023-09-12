@@ -1458,6 +1458,19 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
+  /**
+   * Checks if the key has been modified b/w snapshots.
+   * @param fromKey Key info in source snapshot.
+   * @param toKey Key info in target snapshot.
+   * @return true if key is modified otherwise false.
+   */
+  private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
+    return !fromKey.isKeyInfoSame(toKey,
+        false, false, false, false)
+        || !SnapshotDeletingService.isBlockLocationInfoSame(
+        fromKey, toKey);
+  }
+
   private boolean isObjectModified(String fromObjectName, String toObjectName,
       final Table<String, ? extends WithObjectID> fromSnapshotTable,
       final Table<String, ? extends WithObjectID> toSnapshotTable)
@@ -1468,10 +1481,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
     final WithObjectID toObject = toSnapshotTable.get(toObjectName);
     if ((fromObject instanceof OmKeyInfo) && (toObject instanceof OmKeyInfo)) {
-      return !((OmKeyInfo) fromObject).isKeyInfoSame((OmKeyInfo) toObject,
-          false, false, false, false)
-          || !SnapshotDeletingService.isBlockLocationInfoSame(
-          (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
+      return isKeyModified((OmKeyInfo) fromObject, (OmKeyInfo) toObject);
     } else if ((fromObject instanceof OmDirectoryInfo)
         && (toObject instanceof OmDirectoryInfo)) {
       return !areAclsSame((OmDirectoryInfo) fromObject,
