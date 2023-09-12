@@ -436,7 +436,7 @@ public final class OzoneConsts {
 
   // Supported characters for resource names when isStrictS3 is set as false
   public static final Pattern SUPPORTED_CHARACTER_CHECK_REGEX  =
-      Pattern.compile("[a-z0-9.-]]");
+      Pattern.compile("[a-z0-9.-]");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX = "._COPYING_";
 
