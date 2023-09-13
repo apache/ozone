@@ -1797,34 +1797,44 @@ public class TestOmSnapshot {
     OzoneBucket bucket1 = volume1.getBucket(bucket);
     bucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
     volume1.setQuota(OzoneQuota.parseQuota("204800000", "1000"));
-    // Create Key1 and take snapshot
-    String key1 = "key-1-";
-    createFileKeyWithPrefix(bucket1, key1);
 
-    long volNameQuotaBefore = volume1.getUsedNamespace();
-    long buckNameQuotaBefore = bucket1.getUsedNamespace();
-    long buckSpaceQuotaBefore = bucket1.getUsedBytes();
+    long volUsedNamespaceInitial = volume1.getUsedNamespace();
+    long buckUsedNamspaceInitial = bucket1.getUsedNamespace();
+    long buckUsedBytesIntial = bucket1.getUsedBytes();
+
+    String key1 = "key-1-";
+    key1 = createFileKeyWithPrefix(bucket1, key1);
+
+    long volUsedNamespaceBefore = volume1.getUsedNamespace();
+    long buckUsedNamspaceBefore = bucket1.getUsedNamespace();
+    long buckUsedBytesBefore = bucket1.getUsedBytes();
 
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
 
-    long volNameQuotaAfter = volume1.getUsedNamespace();
-    long buckNameQuotaAfter = bucket1.getUsedNamespace();
-    long buckSpaceQuotaAfter = bucket1.getUsedBytes();
+    long volUsedNamespaceAfter = volume1.getUsedNamespace();
+    long buckUsedNamespaceAfter = bucket1.getUsedNamespace();
+    long buckUsedBytesAfter = bucket1.getUsedBytes();
 
-    assertEquals(volNameQuotaBefore, volNameQuotaAfter);
-    assertEquals(buckNameQuotaBefore, buckNameQuotaAfter);
-    assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaAfter);
+    assertEquals(volUsedNamespaceBefore, volUsedNamespaceAfter);
+    assertEquals(buckUsedNamspaceBefore, buckUsedNamespaceAfter);
+    assertEquals(buckUsedBytesBefore, buckUsedBytesAfter);
 
     store.deleteSnapshot(volume, bucket, snap1);
 
-    long volNameQuotaFinal = volume1.getUsedNamespace();
-    long buckNameQuotaFinal = bucket1.getUsedNamespace();
-    long buckSpaceQuotaFinal = bucket1.getUsedBytes();
+    long volUsedNamespaceFinal = volume1.getUsedNamespace();
+    long buckUsedNamespaceFinal = bucket1.getUsedNamespace();
+    long buckUsedBytesFinal = bucket1.getUsedBytes();
 
-    assertEquals(volNameQuotaBefore, volNameQuotaFinal);
-    assertEquals(buckNameQuotaBefore, buckNameQuotaFinal);
-    assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaFinal);
+    assertEquals(volUsedNamespaceBefore, volUsedNamespaceFinal);
+    assertEquals(buckUsedNamspaceBefore, buckUsedNamespaceFinal);
+    assertEquals(buckUsedBytesBefore, buckUsedBytesFinal);
+
+    bucket1.deleteKey(key1);
+
+    assertEquals(volUsedNamespaceInitial, volume1.getUsedNamespace());
+    assertEquals(buckUsedNamspaceInitial, bucket1.getUsedNamespace());
+    assertEquals(buckUsedBytesIntial, bucket1.getUsedBytes());
   }
 
   @NotNull
