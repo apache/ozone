@@ -56,12 +56,19 @@ public class CompactionFileInfo {
   }
 
   public HddsProtos.CompactionFileInfoProto getProtobuf() {
-    return HddsProtos.CompactionFileInfoProto.newBuilder()
-        .setFileName(fileName)
-        .setStartKey(startKey)
-        .setEndKey(endKey)
-        .setColumnFamily(columnFamily)
-        .build();
+    HddsProtos.CompactionFileInfoProto.Builder builder =
+        HddsProtos.CompactionFileInfoProto.newBuilder()
+            .setFileName(fileName);
+    if (startKey != null) {
+      builder = builder.setStartKey(startKey);
+    }
+    if (endKey != null) {
+      builder = builder.setStartKey(endKey);
+    }
+    if (columnFamily != null) {
+      builder = builder.setStartKey(columnFamily);
+    }
+    return builder.build();
   }
 
   public static CompactionFileInfo getFromProtobuf(
