@@ -132,12 +132,11 @@ public final class HddsClientUtils {
     // ozone allows namespace to follow other volume/bucket naming convention,
     // for example, here supports '_',
     // which is a valid character in POSIX-compliant system, like HDFS.
-    int code = c;
-    if (code >= 47 && code <= 57) { // 0 - 9
+    if (c >= '0' && c <= '9') {
       return true;
-    } else if (code >= 97 && code <= 122) {  // a-z
+    } else if (c >= 'a' && c <= 'z') {
       return true;
-    } else if (code == 45 || code == 46) { // "-" and "."
+    } else if (c == '-' || c == '.') {
       return true;
     } else if (c == '_' && !isStrictS3) {
       return true;
