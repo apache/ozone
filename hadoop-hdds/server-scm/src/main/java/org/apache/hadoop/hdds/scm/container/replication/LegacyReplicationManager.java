@@ -1188,7 +1188,7 @@ public class LegacyReplicationManager {
               "under replication handling for container {} with replicas {}.",
           container, replicas);
     } else {
-      sendDeleteCommand(container, replica.getDatanodeDetails(), false);
+      sendDeleteCommand(container, replica.getDatanodeDetails(), true);
     }
   }
 
