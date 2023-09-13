@@ -338,7 +338,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     boolean processKeyPath(List<String> keyPathList) throws IOException {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-        adapterImpl.rename(this.bucket, keyPath, newPath);
+        try {
+          adapterImpl.rename(this.bucket, keyPath, newPath);
+        } catch (OMException ome) {
+          LOG.error("Key rename failed for source key: {} to " +
+              "destination key: {}.", keyPath, newPath, ome);
+          if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+              OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+              OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+            return false;
+          } else {
+            throw ome;
+          }
+        }
       }
       return true;
     }
