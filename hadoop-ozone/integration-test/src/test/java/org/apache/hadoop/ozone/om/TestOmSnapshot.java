@@ -1818,6 +1818,18 @@ public class TestOmSnapshot {
     assertEquals(volSpaceQuotaBefore, volSpaceQuotaAfter);
     assertEquals(buckNameQuotaBefore, buckNameQuotaAfter);
     assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaAfter);
+
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    long volNameQuotaFinal = volume1.getQuotaInNamespace();
+    long volSpaceQuotaFinal = volume1.getQuotaInBytes();
+    long buckNameQuotaFinal = bucket1.getQuotaInNamespace();
+    long buckSpaceQuotaFinal = bucket1.getQuotaInBytes();
+
+    assertEquals(volNameQuotaBefore, volNameQuotaFinal);
+    assertEquals(volSpaceQuotaBefore, volSpaceQuotaFinal);
+    assertEquals(buckNameQuotaBefore, buckNameQuotaFinal);
+    assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaFinal);
   }
 
   @NotNull
