@@ -31,22 +31,27 @@ public class WrappedOutputStream extends OutputStream {
     this.out = out;
   }
 
+  @Override
   public void write(int b) throws IOException {
     out.write(b);
   }
 
+  @Override
   public void write(byte[] b) throws IOException {
-    write(b, 0, b.length);
+    out.write(b);
   }
 
+  @Override
   public void write(byte[] b, int off, int len) throws IOException {
     out.write(b, off, len);
   }
 
+  @Override
   public void flush() throws IOException {
     out.flush();
   }
 
+  @Override
   public void close() throws IOException {
     out.close();
   }
