@@ -122,8 +122,6 @@ public class BlockDeletingTask implements BackgroundTask {
         new ContainerBackgroundTaskResult();
     while (blocksToDelete > 0) {
       ContainerBackgroundTaskResult crr = handleDeleteTask();
-      blocksToDelete -= crr.getSize();
-      result.addAll(crr.getDeletedBlocks());
       if (blocksToDelete > 0 && crr.getSize() == 0) {
         LOG.warn("Block deletion failed, remaining Blocks to be deleted {}," +
                 " but no Block be deleted. Container" +
@@ -132,6 +130,8 @@ public class BlockDeletingTask implements BackgroundTask {
             containerData.getNumPendingDeletionBlocks());
         break;
       }
+      blocksToDelete -= crr.getSize();
+      result.addAll(crr.getDeletedBlocks());
     }
     return result;
   }
@@ -192,7 +192,6 @@ public class BlockDeletingTask implements BackgroundTask {
       if (toDeleteBlocks.isEmpty()) {
         LOG.debug("No under deletion block found in container : {}",
             containerData.getContainerID());
-        blocksToDelete = 0;
         return crr;
       }
 
@@ -347,7 +346,6 @@ public class BlockDeletingTask implements BackgroundTask {
         // actually no delete transactions for the container, so reset the
         // pending delete block count to the correct value of zero.
         containerData.resetPendingDeleteBlockCount(meta);
-        blocksToDelete = 0;
         return crr;
       }
 
@@ -363,8 +361,8 @@ public class BlockDeletingTask implements BackgroundTask {
       int deletedBlocksCount = deleteBlocksResult.getBlocksDeleted();
       long releasedBytes = deleteBlocksResult.getBytesReleased();
       List<DeletedBlocksTransaction> deletedBlocksTxs =
-          deleteBlocksResult.getDeletedBlockTransactions();
-      deleteBlocksResult.getDeletedBlockTransactions().forEach(
+          deleteBlocksResult.deletedBlocksTxs();
+      deleteBlocksResult.deletedBlocksTxs().forEach(
           tx -> crr.addAll(tx.getLocalIDList().stream()
               .map(String::valueOf).collect(Collectors.toList()))
       );
@@ -480,8 +478,8 @@ public class BlockDeletingTask implements BackgroundTask {
       if (deletedBlocksTxs.size() < delBlocks.size() &&
           execTime.compareTo(getBlockDeletingMaxLockHoldingTime()) > 0) {
         LOG.info("Max lock hold time ({} ms) reached after {} ms. " +
-                "Completed {} transactions, deleted {} blocks." +
-                "In container: {}." +
+                "Completed {} transactions, deleted {} blocks. " +
+                "In container: {}. " +
                 "Releasing lock and resuming deletion later.",
             getBlockDeletingMaxLockHoldingTime().toMillis(),
             execTime.toMillis(), deletedBlocksTxs.size(), blocksDeleted,
@@ -537,7 +535,7 @@ public class BlockDeletingTask implements BackgroundTask {
       return bytesReleased;
     }
 
-    public List<DeletedBlocksTransaction> getDeletedBlockTransactions() {
+    public List<DeletedBlocksTransaction> deletedBlocksTxs() {
       return delBlockTxs;
     }
   }
