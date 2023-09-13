@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -1784,6 +1785,39 @@ public class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.deleteSnapshot(nullstr, bucket, snap1));
+  }
+
+  @Test
+  public void testSnapshotQuotaHandling() throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    bucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
+    volume1.setQuota(OzoneQuota.parseQuota("204800000", "1000"));
+    // Create Key1 and take snapshot
+    String key1 = "key-1-";
+    createFileKeyWithPrefix(bucket1, key1);
+
+    long volNameQuotaBefore = volume1.getQuotaInNamespace();
+    long volSpaceQuotaBefore = volume1.getQuotaInBytes();
+    long buckNameQuotaBefore = bucket1.getQuotaInNamespace();
+    long buckSpaceQuotaBefore = bucket1.getQuotaInBytes();
+
+    String snap1 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap1);
+
+    long volNameQuotaAfter = volume1.getQuotaInNamespace();
+    long volSpaceQuotaAfter = volume1.getQuotaInBytes();
+    long buckNameQuotaAfter = bucket1.getQuotaInNamespace();
+    long buckSpaceQuotaAfter = bucket1.getQuotaInBytes();
+
+    assertEquals(volNameQuotaBefore, volNameQuotaAfter);
+    assertEquals(volSpaceQuotaBefore, volSpaceQuotaAfter);
+    assertEquals(buckNameQuotaBefore, buckNameQuotaAfter);
+    assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaAfter);
   }
 
   @NotNull
