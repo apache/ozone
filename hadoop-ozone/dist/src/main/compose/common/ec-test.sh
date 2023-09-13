@@ -15,16 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:EC
+start_docker_env 5
 
-COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export COMPOSE_DIR
+execute_robot_test scm -v BUCKET:erasure s3
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../common/ec-test.sh"
+prefix=${RANDOM}
+execute_robot_test scm -v PREFIX:${prefix} ec/basic.robot
+docker-compose up -d --no-recreate --scale datanode=4
+execute_robot_test scm -v PREFIX:${prefix} -N read-4-datanodes ec/read.robot
+docker-compose up -d --no-recreate --scale datanode=3
+execute_robot_test scm -v PREFIX:${prefix} -N read-3-datanodes ec/read.robot
+docker-compose up -d --no-recreate --scale datanode=5
+execute_robot_test scm -v container:1 -v count:5 -N EC-recovery replication/wait.robot
