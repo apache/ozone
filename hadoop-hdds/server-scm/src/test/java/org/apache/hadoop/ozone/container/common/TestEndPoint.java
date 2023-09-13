@@ -263,11 +263,13 @@ public class TestEndPoint {
   @Test
   public void testDnLayoutVersionFile() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
+    conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        true);
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
-          datanodeDetails, conf, getContext(randomDatanodeDetails()));
+          datanodeDetails, conf, getContext(datanodeDetails));
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
           conf, ozoneContainer);
