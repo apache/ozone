@@ -49,6 +49,7 @@ import org.rocksdb.TransactionLogIterator.BatchResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -154,6 +155,14 @@ public class RDBStore implements DBStore {
         // sequence number as current compaction log filename.
         rocksDBCheckpointDiffer.setCurrentCompactionLog(
             db.getLatestSequenceNumber());
+
+        ColumnFamily compactionLogTableTableCF =
+            db.getColumnFamily(COMPACTION_LOG_TABLE);
+        Preconditions.checkNotNull(compactionLogTableTableCF,
+            "CompactionLogTable column family handle should not be null");
+        rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
+            compactionLogTableTableCF.getHandle());
+        rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb().get());
         // Load all previous compaction logs
         rocksDBCheckpointDiffer.loadAllCompactionLogs();
       }

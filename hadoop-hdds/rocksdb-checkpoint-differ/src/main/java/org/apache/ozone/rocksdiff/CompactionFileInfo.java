@@ -23,16 +23,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 /**
  * Dao to keep SST file information in the compaction log.
  */
-public class FileInfo {
+public class CompactionFileInfo {
   private final String fileName;
   private final String startKey;
   private final String endKey;
   private final String columnFamily;
 
-  public FileInfo(String fileName,
-                  String startRange,
-                  String endRange,
-                  String columnFamily) {
+  public CompactionFileInfo(String fileName,
+                            String startRange,
+                            String endRange,
+                            String columnFamily) {
     this.fileName = fileName;
     this.startKey = startRange;
     this.endKey = endRange;
@@ -55,8 +55,8 @@ public class FileInfo {
     return columnFamily;
   }
 
-  public HddsProtos.FileInfoProto getProtobuf() {
-    return HddsProtos.FileInfoProto.newBuilder()
+  public HddsProtos.CompactionFileInfoProto getProtobuf() {
+    return HddsProtos.CompactionFileInfoProto.newBuilder()
         .setFileName(fileName)
         .setStartKey(startKey)
         .setEndKey(endKey)
@@ -64,8 +64,9 @@ public class FileInfo {
         .build();
   }
 
-  public static FileInfo getFromProtobuf(HddsProtos.FileInfoProto proto) {
-    return new FileInfo(proto.getFileName(), proto.getStartKey(),
+  public static CompactionFileInfo getFromProtobuf(
+      HddsProtos.CompactionFileInfoProto proto) {
+    return new CompactionFileInfo(proto.getFileName(), proto.getStartKey(),
         proto.getEndKey(), proto.getColumnFamily());
   }
 

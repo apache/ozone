@@ -176,10 +176,10 @@ public class SstFilteringService extends BackgroundService
             LOG.debug("Processing snapshot {} to filter relevant SST Files",
                 snapShotTableKey);
 
-            Map<String, String> prefixPairs = getColumnFamilyToPrefixMap(
-                ozoneManager.getMetadataManager(),
-                snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName());
+            Map<String, String> columnFamilyNameToPrefixMap =
+                getColumnFamilyToPrefixMap(ozoneManager.getMetadataManager(),
+                    snapshotInfo.getVolumeName(),
+                    snapshotInfo.getBucketName());
 
             try (
                 ReferenceCounted<IOmMetadataReader, SnapshotCache>
@@ -191,7 +191,7 @@ public class SstFilteringService extends BackgroundService
               RocksDatabase db = rdbStore.getDb();
               try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
                   .lock()) {
-                db.deleteFilesNotMatchingPrefix(prefixPairs);
+                db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
               }
             } catch (OMException ome) {
               // FILE_NOT_FOUND is obtained when the snapshot is deleted
