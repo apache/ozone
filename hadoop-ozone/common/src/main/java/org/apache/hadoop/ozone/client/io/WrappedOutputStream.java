@@ -36,7 +36,7 @@ public class WrappedOutputStream extends OutputStream {
   }
 
   public void write(byte[] b) throws IOException {
-    out.write(b);
+    write(b, 0, b.length);
   }
 
   public void write(byte[] b, int off, int len) throws IOException {
