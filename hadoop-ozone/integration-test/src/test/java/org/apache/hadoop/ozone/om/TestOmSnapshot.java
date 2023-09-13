@@ -1801,33 +1801,28 @@ public class TestOmSnapshot {
     String key1 = "key-1-";
     createFileKeyWithPrefix(bucket1, key1);
 
-    long volNameQuotaBefore = volume1.getQuotaInNamespace();
-    long volSpaceQuotaBefore = volume1.getQuotaInBytes();
-    long buckNameQuotaBefore = bucket1.getQuotaInNamespace();
-    long buckSpaceQuotaBefore = bucket1.getQuotaInBytes();
+    long volNameQuotaBefore = volume1.getUsedNamespace();
+    long buckNameQuotaBefore = bucket1.getUsedNamespace();
+    long buckSpaceQuotaBefore = bucket1.getUsedBytes();
 
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volume, bucket, snap1);
 
-    long volNameQuotaAfter = volume1.getQuotaInNamespace();
-    long volSpaceQuotaAfter = volume1.getQuotaInBytes();
-    long buckNameQuotaAfter = bucket1.getQuotaInNamespace();
-    long buckSpaceQuotaAfter = bucket1.getQuotaInBytes();
+    long volNameQuotaAfter = volume1.getUsedNamespace();
+    long buckNameQuotaAfter = bucket1.getUsedNamespace();
+    long buckSpaceQuotaAfter = bucket1.getUsedBytes();
 
     assertEquals(volNameQuotaBefore, volNameQuotaAfter);
-    assertEquals(volSpaceQuotaBefore, volSpaceQuotaAfter);
     assertEquals(buckNameQuotaBefore, buckNameQuotaAfter);
     assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaAfter);
 
     store.deleteSnapshot(volume, bucket, snap1);
 
-    long volNameQuotaFinal = volume1.getQuotaInNamespace();
-    long volSpaceQuotaFinal = volume1.getQuotaInBytes();
-    long buckNameQuotaFinal = bucket1.getQuotaInNamespace();
-    long buckSpaceQuotaFinal = bucket1.getQuotaInBytes();
+    long volNameQuotaFinal = volume1.getUsedNamespace();
+    long buckNameQuotaFinal = bucket1.getUsedNamespace();
+    long buckSpaceQuotaFinal = bucket1.getUsedBytes();
 
     assertEquals(volNameQuotaBefore, volNameQuotaFinal);
-    assertEquals(volSpaceQuotaBefore, volSpaceQuotaFinal);
     assertEquals(buckNameQuotaBefore, buckNameQuotaFinal);
     assertEquals(buckSpaceQuotaBefore, buckSpaceQuotaFinal);
   }
