@@ -64,6 +64,11 @@ public class DatanodeLayoutStorage extends Storage {
     return new Properties();
   }
 
+  @Override
+  public void setClusterId(String clusterId) throws IOException {
+    super.getStorageInfo().setClusterId(clusterId);
+  }
+
   /**
    * Older versions of the code did not write a VERSION file to disk for the
    * datanode. Therefore, When a datanode starts up and does not find a metadata

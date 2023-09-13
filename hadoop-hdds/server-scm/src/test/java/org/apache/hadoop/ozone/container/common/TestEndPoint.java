@@ -78,6 +78,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -251,6 +252,32 @@ public class TestEndPoint {
           ozoneContainer.getVolumeSet().getVolumesList().size());
       Assertions.assertEquals(1,
           ozoneContainer.getVolumeSet().getFailedVolumesList().size());
+    }
+  }
+
+  /**
+   * This test checks that dnlayout version file contains proper
+   * clusterID identifying the scm cluster the datanode is part of.
+   * Dnlayout version file set upon call to version endpoint.
+   */
+  @Test
+  public void testDnLayoutVersionFile() throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
+        serverAddress, 1000)) {
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      OzoneContainer ozoneContainer = new OzoneContainer(
+          datanodeDetails, conf, getContext(randomDatanodeDetails()));
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
+          conf, ozoneContainer);
+      versionTask.call();
+
+      // After the version call, the datanode layout file should
+      // have its clusterID field set to the clusterID of the scm
+      DatanodeLayoutStorage layoutStorage
+          = new DatanodeLayoutStorage(conf, "na_expect_storage_initialized");
+      assertEquals(scmServerImpl.getClusterId(), layoutStorage.getClusterID());
     }
   }
 
