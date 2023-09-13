@@ -83,6 +83,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
@@ -118,6 +119,7 @@ public final class OzoneManagerRatisServer {
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private final Read.Option readOption;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -143,7 +145,6 @@ public final class OzoneManagerRatisServer {
     this.omRatisAddress = addr;
     this.port = addr.getPort();
     this.ratisStorageDir = OzoneManagerRatisUtils.getOMRatisDirectory(conf);
-    RaftProperties serverProperties = newRaftProperties(conf);
 
     this.raftPeerId = localRaftPeerId;
     this.raftGroupId = RaftGroupId.valueOf(
@@ -164,6 +165,9 @@ public final class OzoneManagerRatisServer {
           raftGroupIdStr, raftPeersStr.toString().substring(2));
     }
     this.omStateMachine = getStateMachine(conf);
+
+    final RaftProperties serverProperties = newRaftProperties(conf);
+    this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
@@ -532,6 +536,10 @@ public final class OzoneManagerRatisServer {
     return server;
   }
 
+  public boolean isLinearizableRead() {
+    return readOption == Read.Option.LINEARIZABLE;
+  }
+
   /**
    * Initializes and returns OzoneManager StateMachine.
    */
@@ -593,6 +601,10 @@ public final class OzoneManagerRatisServer {
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
         conf.getBoolean(OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE,
             OMConfigKeys.OZONE_OM_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT));
+
+    RaftServerConfigKeys.Read.setOption(properties,
+        conf.getEnum(OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION,
+            OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION_DEFAULT));
 
     // Set RAFT segment size
     final long raftSegmentSize = (long) conf.getStorageSize(
