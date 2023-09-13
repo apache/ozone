@@ -55,8 +55,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 public class TestSecretRevoke {
   private static final String USER_NAME = "test";
+  private static final String OTHER_USER_NAME = "test2";
 
-  private S3SecretRevokeEndpoint endpoint;
+  private S3SecretManagementEndpoint endpoint;
 
   @Mock
   private ObjectStoreStub objectStore;
@@ -73,27 +74,38 @@ public class TestSecretRevoke {
   void setUp() {
     OzoneClient client = new OzoneClientStub(objectStore);
 
-    when(principal.getName()).thenReturn(USER_NAME);
-    when(securityContext.getUserPrincipal()).thenReturn(principal);
-    when(context.getSecurityContext()).thenReturn(securityContext);
-
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(context.getUriInfo()).thenReturn(uriInfo);
 
-    endpoint = new S3SecretRevokeEndpoint();
+    endpoint = new S3SecretManagementEndpoint();
     endpoint.setClient(client);
     endpoint.setContext(context);
   }
 
+  private void mockSecurityContext() {
+    when(principal.getName()).thenReturn(USER_NAME);
+    when(securityContext.getUserPrincipal()).thenReturn(principal);
+    when(context.getSecurityContext()).thenReturn(securityContext);
+  }
+
   @Test
   void testSecretRevoke() throws IOException {
+    mockSecurityContext();
     endpoint.revoke();
     verify(objectStore, times(1)).revokeS3Secret(eq(USER_NAME));
   }
 
   @Test
+  void testSecretRevokeWithUsername() throws IOException {
+    endpoint.revoke(OTHER_USER_NAME);
+    verify(objectStore, times(1))
+        .revokeS3Secret(eq(OTHER_USER_NAME));
+  }
+
+  @Test
   void testSecretSequentialRevokes() throws IOException {
+    mockSecurityContext();
     Response firstResponse = endpoint.revoke();
     assertEquals(OK.getStatusCode(), firstResponse.getStatus());
     doThrow(new OMException(S3_SECRET_NOT_FOUND))
@@ -104,6 +116,7 @@ public class TestSecretRevoke {
 
   @Test
   void testSecretRevokesHandlesException() throws IOException {
+    mockSecurityContext();
     doThrow(new OMException(ACCESS_DENIED))
         .when(objectStore).revokeS3Secret(any());
     Response response = endpoint.revoke();

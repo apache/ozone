@@ -50,8 +50,12 @@ ozone sh snapshot delete [-hV] <bucket> <snapshotName>
 ```shell
 ozone sh snapshot diff [-chV] [-p=<pageSize>] [-t=<continuation-token>] <bucket> <fromSnapshot> <toSnapshot>
 ```
-
 SnapshotDiff CLI/API is asynchronous. The first time the API is invoked, OM starts a background thread to calculate the SnapshotDiff, and returns "Retry" with suggested duration for the retry operation. Once the SnapshotDiff is computed, this API returns the diffs in multiple Pages. Within each Diff response, OM also returns a continuation token for the client to continue from the last batch of Diff results.  This API is safe to be called multiple times for a given snapshot source and destination pair. Internally each Ozone Manager computes Snapdiff only once and stores it for future invocations of the same Snapshot Diff API.
+
+* List SnapshotDiff Jobs: List all snapshotDiff jobs of a given bucket 
+```shell
+ozone sh snapshot listDiff [-ahV] [-s=<jobStatus>] <bucket>
+```
 
 ## Architecture
 
