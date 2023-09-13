@@ -28,6 +28,7 @@ import javax.ws.rs.ext.Provider;
 import io.opentracing.Scope;
 import io.opentracing.ScopeManager;
 import io.opentracing.Span;
+import io.opentracing.noop.NoopSpan;
 import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.ozone.client.io.WrappedOutputStream;
 
@@ -70,7 +71,7 @@ public class TracingFilter implements ContainerRequestFilter,
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
     OutputStream out = responseContext.getEntityStream();
-    if (out != null) {
+    if (out != null && !(span instanceof NoopSpan)) {
       responseContext.setEntityStream(new WrappedOutputStream(out) {
         @Override
         public void close() throws IOException {
