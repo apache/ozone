@@ -1955,7 +1955,8 @@ public class KeyManagerImpl implements KeyManager {
               args.isForceUpdateContainerCacheFromSCM()));
 
       if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
+        captureLatencyNs(metrics.getGetKeyInfoSortDatanodesLatencyNs(),
+            () -> sortDatanodes(clientAddress, value));
       }
     }
     return value;
