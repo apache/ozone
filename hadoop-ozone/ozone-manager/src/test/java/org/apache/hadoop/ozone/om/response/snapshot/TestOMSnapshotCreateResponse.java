@@ -128,10 +128,13 @@ public class TestOMSnapshotCreateResponse {
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Check contents of entry
-    Table.KeyValue<String, SnapshotInfo> keyValue =
-        omMetadataManager.getSnapshotInfoTable().iterator().next();
-    SnapshotInfo storedInfo = keyValue.getValue();
-    Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
+    SnapshotInfo storedInfo;
+    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+             it = omMetadataManager.getSnapshotInfoTable().iterator()) {
+      Table.KeyValue<String, SnapshotInfo> keyValue = it.next();
+      storedInfo = keyValue.getValue();
+      Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
+    }
     Assert.assertEquals(snapshotInfo, storedInfo);
 
     // Check deletedTable and deletedDirectoryTable clean up work as expected

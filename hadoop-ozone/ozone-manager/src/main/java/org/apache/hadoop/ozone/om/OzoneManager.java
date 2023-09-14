@@ -1315,6 +1315,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (securityEnabled && testUgi == null) {
+      // Checking certificate duration validity by using
+      // validateCertificateValidityConfig() in SecurityConfig constructor.
+      new SecurityConfig(conf);
       loginOMUser(conf);
     }
   }
@@ -4135,7 +4138,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Pair<String, String> resolved;
     if (isAclEnabled) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
-              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.createUGIForApi(),
+              omClientRequest.getRemoteAddress(),
               omClientRequest.getHostName());
     } else {
       resolved = resolveBucketLink(requested, new HashSet<>(),
@@ -4458,8 +4462,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                                    int payloadSizeResp) {
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+                                    boolean writeToRatis) {
     return null;
   }
 

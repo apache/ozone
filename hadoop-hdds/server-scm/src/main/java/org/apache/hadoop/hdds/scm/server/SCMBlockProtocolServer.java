@@ -70,6 +70,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,6 +179,7 @@ public class SCMBlockProtocolServer implements
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList
   ) throws IOException {
+    scm.checkAdminAccess(getRemoteUser(), false);
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
@@ -229,6 +232,7 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
+    scm.checkAdminAccess(getRemoteUser(), false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} blocks",
           keyBlocksInfoList.size());
@@ -305,6 +309,7 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public boolean addSCM(AddSCMRequest request) throws IOException {
+    scm.checkAdminAccess(getRemoteUser(), false);
     LOG.debug("Adding SCM {} addr {} cluster id {}",
         request.getScmId(), request.getRatisAddr(), request.getClusterId());
 
@@ -332,7 +337,7 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
-      String clientMachine) throws IOException {
+      String clientMachine) {
     boolean auditSuccess = true;
     try {
       NodeManager nodeManager = scm.getScmNodeManager();

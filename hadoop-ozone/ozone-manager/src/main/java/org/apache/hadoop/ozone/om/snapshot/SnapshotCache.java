@@ -95,6 +95,10 @@ public class SnapshotCache implements ReferenceCountedCallback {
     return dbMap.size();
   }
 
+  public int getPendingEvictionListSize() {
+    return pendingEvictionList.size();
+  }
+
   /**
    * Immediately invalidate an entry.
    * @param key DB snapshot table key

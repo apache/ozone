@@ -503,6 +503,9 @@ enum Status {
     CONTAINS_SNAPSHOT = 88;
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
+    UNAUTHORIZED = 91;
+
+    S3_SECRET_ALREADY_EXISTS = 92;
 }
 
 /**
@@ -820,7 +823,16 @@ message SnapshotInfo {
   optional int64 dbTxSequenceNumber = 12;
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
- }
+  // snapshot reference size before any key replication or EC
+  optional uint64 referencedSize = 15;
+  // snapshot reference size after replication
+  optional uint64 referencedReplicatedSize = 16;
+  // snapshot exclusive size before any key replication or EC
+  optional uint64 exclusiveSize = 17;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSize = 18;
+  // note: shared sizes can be calculated from: referenced - exclusive
+}
 
 message SnapshotDiffJobProto {
   optional uint64 creationTime = 1;
@@ -1600,6 +1612,7 @@ message PartInfo {
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
     optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3 [default = true];
 }
 
 /**

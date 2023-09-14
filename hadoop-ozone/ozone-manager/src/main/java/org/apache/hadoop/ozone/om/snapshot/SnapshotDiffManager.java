@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.util.ClosableIterator;
+import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -1129,11 +1130,19 @@ public class SnapshotDiffManager implements AutoCloseable {
         fsTable.getName().equals(DIRECTORY_TABLE);
     ManagedSstFileReader sstFileReader = new ManagedSstFileReader(deltaFiles);
     validateEstimatedKeyChangesAreInLimits(sstFileReader);
-
+    String sstFileReaderLowerBound = tablePrefix;
+    String sstFileReaderUpperBound = null;
+    if (Strings.isNotEmpty(tablePrefix)) {
+      char[] upperBoundCharArray = tablePrefix.toCharArray();
+      upperBoundCharArray[upperBoundCharArray.length - 1] += 1;
+      sstFileReaderUpperBound = String.valueOf(upperBoundCharArray);
+    }
     try (Stream<String> keysToCheck =
              nativeRocksToolsLoaded && sstDumpTool.isPresent()
-                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get())
-                 : sstFileReader.getKeyStream()) {
+                 ? sstFileReader.getKeyStreamWithTombstone(sstDumpTool.get(),
+                 sstFileReaderLowerBound, sstFileReaderUpperBound)
+                 : sstFileReader.getKeyStream(sstFileReaderLowerBound,
+                 sstFileReaderUpperBound)) {
       keysToCheck.forEach(key -> {
         try {
           final WithParentObjectId fromObjectId = fsTable.get(key);
@@ -1458,6 +1467,19 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
+  /**
+   * Checks if the key has been modified b/w snapshots.
+   * @param fromKey Key info in source snapshot.
+   * @param toKey Key info in target snapshot.
+   * @return true if key is modified otherwise false.
+   */
+  private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
+    return !fromKey.isKeyInfoSame(toKey,
+        false, false, false, false)
+        || !SnapshotDeletingService.isBlockLocationInfoSame(
+        fromKey, toKey);
+  }
+
   private boolean isObjectModified(String fromObjectName, String toObjectName,
       final Table<String, ? extends WithObjectID> fromSnapshotTable,
       final Table<String, ? extends WithObjectID> toSnapshotTable)
@@ -1468,8 +1490,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
     final WithObjectID toObject = toSnapshotTable.get(toObjectName);
     if ((fromObject instanceof OmKeyInfo) && (toObject instanceof OmKeyInfo)) {
-      return !SnapshotDeletingService.isBlockLocationInfoSame(
-          (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
+      return isKeyModified((OmKeyInfo) fromObject, (OmKeyInfo) toObject);
     } else if ((fromObject instanceof OmDirectoryInfo)
         && (toObject instanceof OmDirectoryInfo)) {
       return !areAclsSame((OmDirectoryInfo) fromObject,

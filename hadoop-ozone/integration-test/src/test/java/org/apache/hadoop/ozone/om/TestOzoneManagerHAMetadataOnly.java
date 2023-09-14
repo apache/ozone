@@ -441,13 +441,23 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(OMVolumeCreateRequest.getLogger());
+
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("0.0.0.0")
+            .build();
+
     OMRequest omRequest =
         OMRequest.newBuilder().setCreateVolumeRequest(
             CreateVolumeRequest.newBuilder().setVolumeInfo(
                 VolumeInfo.newBuilder().setOwnerName(userName)
                     .setAdminName(userName).setVolume(volumeName).build())
                 .build()).setClientId(UUID.randomUUID().toString())
-            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume).build();
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+            .setUserInfo(userInfo)
+            .build();
 
     RaftClientReply raftClientReply =
         raftServer.submitClientRequest(RaftClientRequest.newBuilder()

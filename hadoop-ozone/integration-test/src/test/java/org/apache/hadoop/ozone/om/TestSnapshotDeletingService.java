@@ -188,6 +188,12 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(deletedTable, 0);
 
     verifySnapshotChain(delSnapInfo, null);
+
+    // verify the cache of purged snapshot
+    // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
+    SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
+    assertEquals(2, snapshotCache.size());
+    assertEquals(2, snapshotCache.getPendingEvictionListSize());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")

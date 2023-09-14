@@ -1901,6 +1901,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void clearThreadLocalS3Auth() {
     this.threadLocalS3Auth.remove();
   }
+
+  @Override
+  public ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return this.threadLocalS3Auth;
+  }
+
   @Override
   public S3Auth getThreadLocalS3Auth() {
     return this.threadLocalS3Auth.get();
@@ -2309,13 +2315,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                                    int payloadSizeResp)
-          throws IOException {
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+                                    boolean writeToRatis) throws IOException {
     EchoRPCRequest echoRPCRequest =
             EchoRPCRequest.newBuilder()
                     .setPayloadReq(ByteString.copyFrom(payloadReq))
                     .setPayloadSizeResp(payloadSizeResp)
+                    .setReadOnly(!writeToRatis)
                     .build();
 
     OMRequest omRequest = createOMRequest(Type.EchoRPC)
