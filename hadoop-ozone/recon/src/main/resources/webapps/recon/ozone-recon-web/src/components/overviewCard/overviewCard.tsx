@@ -67,24 +67,24 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
   render() {
     const {linkToUrl, children} = this.props;
     if (linkToUrl) {
-      if (linkToUrl === '/Om'){
-      return (
-        <Link to={{
-          pathname: linkToUrl,
-          state: { activeTab: children._owner.stateNode.props ? this.setCurrentActiveTab (children._owner.stateNode.props.title).active : '1'}
-        }} >
-          {children}
-        </Link>
-        )
-      }
-      else{
+      if (linkToUrl === '/Om') {
         return (
-            <Link to={linkToUrl}>
-              {children}
-            </Link>
+          <Link to={{
+            pathname: linkToUrl,
+            state: { activeTab: children._owner.stateNode.props ? this.setCurrentActiveTab(children._owner.stateNode.props.title).active : '1' }
+          }} >
+            {children}
+          </Link>
         )
       }
+      else {
+        return (
+          <Link to={linkToUrl}>
+            {children}
+          </Link>
+        )
       }
+    }
 
     return children;
   }
