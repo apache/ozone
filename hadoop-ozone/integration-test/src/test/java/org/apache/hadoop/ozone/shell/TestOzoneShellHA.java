@@ -1045,7 +1045,7 @@ public class TestOzoneShellHA {
         .contains("Missing required parameter"));
     out.reset();
 
-    // Test set bucket quota to 0.
+    // Test set bucket quota to invalid values
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "0GB"};
     eException = assertThrows(ExecutionException.class,
