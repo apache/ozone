@@ -112,7 +112,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         switch (container.getContainerState()) {
         case OPEN:
         case CLOSING:
-          // If container is part of open pipeline, close it via write channel
+          // If the container is part of open pipeline, close it via
+          // write channel
           if (ozoneContainer.getWriteChannel()
               .isExist(closeCommand.getPipelineID())) {
             ContainerCommandRequestProto request =
@@ -122,8 +123,9 @@ public class CloseContainerCommandHandler implements CommandHandler {
             ozoneContainer.getWriteChannel()
                 .submitRequest(request, closeCommand.getPipelineID());
           } else if (closeCommand.getForce()) {
-            // Non-RATIS containers should have force close flag set, so they
-            // are moved to CLOSED immediately rather going to quasi-closed
+            // Non-RATIS containers should have the force close flag set, so
+            // they are moved to CLOSED immediately rather than going to
+            // quasi-closed
             controller.closeContainer(containerId);
           } else {
             controller.quasiCloseContainer(containerId,

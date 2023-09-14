@@ -141,7 +141,7 @@ public class DatanodeConfiguration {
       type = ConfigType.INT,
       defaultValue = "3",
       tags = {DATANODE},
-      description = "The maximum number of threads used to delete containers " +
+      description = "The maximum number of threads used to close containers " +
           "on a datanode"
   )
   private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
