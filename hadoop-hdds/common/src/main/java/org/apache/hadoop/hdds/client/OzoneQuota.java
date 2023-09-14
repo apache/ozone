@@ -218,12 +218,17 @@ public final class OzoneQuota {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
-    long nameSpaceQuota = Long.parseLong(quotaInNamespace);
-    if (nameSpaceQuota <= 0) {
-      throw new IllegalArgumentException(
-          "Invalid values for namespace quota: " + nameSpaceQuota);
+    try {
+      long nameSpaceQuota = Long.parseLong(quotaInNamespace);
+      if (nameSpaceQuota <= 0) {
+        throw new IllegalArgumentException(
+            "Invalid values for namespace quota: " + nameSpaceQuota);
+      }
+      return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid values for quota, to ensure" +
+          " that the Quota format is legal(supported values are positive long values).");
     }
-    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
   }
 
   /**
