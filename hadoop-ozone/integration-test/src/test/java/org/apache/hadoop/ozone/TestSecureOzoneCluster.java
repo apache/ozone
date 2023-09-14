@@ -42,7 +42,6 @@ import java.util.concurrent.Callable;
 
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -150,6 +149,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_EN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.bouncycastle.asn1.x500.RDN;
@@ -157,7 +158,7 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -168,12 +169,11 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -186,19 +186,16 @@ import static org.slf4j.event.Level.INFO;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@InterfaceAudience.Private
-public final class TestSecureOzoneCluster {
+@Timeout(80)
+final class TestSecureOzoneCluster {
 
   private static final String COMPONENT = "om";
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecureOzoneCluster.class);
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(80);
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private File tempDir;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -221,7 +218,7 @@ public final class TestSecureOzoneCluster {
   private int certGraceTime = 10 * 1000; // 10s
   private int delegationTokenMaxTime = 9 * 1000; // 9s
 
-  @Before
+  @BeforeEach
   public void init() {
     try {
       conf = new OzoneConfiguration();
@@ -244,7 +241,7 @@ public final class TestSecureOzoneCluster {
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();
-      final String path = folder.newFolder().toString();
+      final String path = tempDir.getAbsolutePath();
       omMetaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, omMetaDirPath.toString());
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
@@ -261,7 +258,7 @@ public final class TestSecureOzoneCluster {
       conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
           delegationTokenMaxTime);
 
-      workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+      workDir = new File(tempDir, "workdir");
       clusterId = UUID.randomUUID().toString();
       scmId = UUID.randomUUID().toString();
       omId = UUID.randomUUID().toString();
@@ -276,7 +273,7 @@ public final class TestSecureOzoneCluster {
     }
   }
 
-  @After
+  @AfterEach
   public void stop() {
     try {
       stopMiniKdc();
@@ -452,8 +449,7 @@ public final class TestSecureOzoneCluster {
   }
 
   private void initSCM() throws IOException {
-    final String path = folder.newFolder().toString();
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = new File(tempDir, "scm-meta").toPath();
     Files.createDirectories(scmPath);
     conf.set(OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -1096,7 +1092,7 @@ public final class TestSecureOzoneCluster {
    * Test the directory rollback failure case.
    */
   @Test
-  @Ignore("Run it locally since it will terminate the process.")
+  @Disabled("Run it locally since it will terminate the process.")
   public void testCertificateRotationUnRecoverableFailure() throws Exception {
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
@@ -1151,6 +1147,7 @@ public final class TestSecureOzoneCluster {
    * Tests delegation token renewal after a certificate renew.
    */
   @Test
+  @Flaky("HDDS-8622")
   public void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
     try {
       // Setup secure OM for start.
@@ -1230,7 +1227,7 @@ public final class TestSecureOzoneCluster {
    * Test functionality to get SCM signed certificate for OM.
    */
   @Test
-  @Ignore("HDDS-8764")
+  @Disabled("HDDS-8764")
   public void testOMGrpcServerCertificateRenew() throws Exception {
     initSCM();
     try {
