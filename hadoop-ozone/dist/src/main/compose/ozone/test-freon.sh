@@ -30,4 +30,3 @@ start_docker_env
 
 execute_robot_test scm freon
 
-execute_robot_test scm ozone-lib/freon.robot
