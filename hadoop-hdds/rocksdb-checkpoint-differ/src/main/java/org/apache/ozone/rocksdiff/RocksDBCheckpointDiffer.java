@@ -464,7 +464,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Set CompactionLogTable DB column family handle to be used in DB listener.
    * @param compactionLogTableCFHandle ColumnFamilyHandle
    */
-  public void setCompactionLogTableCFHandle(
+  public synchronized void setCompactionLogTableCFHandle(
       ColumnFamilyHandle compactionLogTableCFHandle) {
     Preconditions.checkNotNull(compactionLogTableCFHandle,
         "Column family handle should not be null");
@@ -475,7 +475,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Set activeRocksDB to access CompactionLogTable.
    * @param activeRocksDB RocksDB
    */
-  public void setActiveRocksDB(RocksDB activeRocksDB) {
+  public synchronized void setActiveRocksDB(RocksDB activeRocksDB) {
     Preconditions.checkNotNull(activeRocksDB, "RocksDB should not be null.");
     this.activeRocksDB = activeRocksDB;
   }
@@ -1269,7 +1269,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
 
     Pair<List<String>, List<byte[]>> fileNodeToKeyPair =
-        getOlderSnapshotFileNodes();
+        getOlderFileNodes();
     List<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
     List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
 
@@ -1289,7 +1289,11 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  private Pair<List<String>, List<byte[]>> getOlderSnapshotFileNodes() {
+  /**
+   * Returns the list of input files from the compaction entries which are
+   * older than the maximum allowed in the compaction DAG.
+   */
+  private synchronized Pair<List<String>, List<byte[]>> getOlderFileNodes() {
     long compactionLogPruneStartTime = System.currentTimeMillis();
     List<String> compactionNodes = new ArrayList<>();
     List<byte[]> keysToRemove = new ArrayList<>();

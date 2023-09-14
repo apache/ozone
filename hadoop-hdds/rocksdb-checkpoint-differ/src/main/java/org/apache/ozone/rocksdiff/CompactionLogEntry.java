@@ -21,6 +21,10 @@ package org.apache.ozone.rocksdiff;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.rocksdb.RocksDBException;
@@ -30,6 +34,7 @@ import org.rocksdb.SstFileReaderIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION_LENGTH;
@@ -37,7 +42,16 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENS
 /**
  * Compaction log entry Dao to write to the compaction log file.
  */
-public class CompactionLogEntry {
+public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
+  private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(CompactionLogEntryProto.class),
+      CompactionLogEntry::getFromProtobuf,
+      CompactionLogEntry::getProtobuf);
+
+  public static Codec<CompactionLogEntry> getCodec() {
+    return CODEC;
+  }
+
   private final long dbSequenceNumber;
   private final long compactionTime;
   private final List<CompactionFileInfo> inputFileInfoList;
@@ -203,5 +217,34 @@ public class CompactionLogEntry {
       }
       return response;
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof CompactionLogEntry)) {
+      return false;
+    }
+
+    CompactionLogEntry that = (CompactionLogEntry) o;
+    return dbSequenceNumber == that.dbSequenceNumber &&
+        compactionTime == that.compactionTime &&
+        Objects.equals(inputFileInfoList, that.inputFileInfoList) &&
+        Objects.equals(outputFileInfoList, that.outputFileInfoList) &&
+        Objects.equals(compactionReason, that.compactionReason);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(dbSequenceNumber, compactionTime, inputFileInfoList,
+        outputFileInfoList, compactionReason);
+  }
+
+  @Override
+  public CompactionLogEntry copyObject() {
+    return new CompactionLogEntry(dbSequenceNumber, compactionTime,
+        inputFileInfoList, outputFileInfoList, compactionReason);
   }
 }
