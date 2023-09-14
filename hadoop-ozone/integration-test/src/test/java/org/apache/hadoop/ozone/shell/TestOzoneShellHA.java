@@ -919,7 +919,7 @@ public class TestOzoneShellHA {
     ExecutionException eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs1));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
@@ -927,7 +927,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs2));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for namespace quota"));
+        .contains("Invalid value for namespace quota"));
     out.reset();
 
     // Test set bucket quota to 0.
@@ -936,7 +936,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs1));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -944,7 +944,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs2));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for namespace quota"));
+        .contains("Invalid value for namespace quota"));
     out.reset();
 
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
