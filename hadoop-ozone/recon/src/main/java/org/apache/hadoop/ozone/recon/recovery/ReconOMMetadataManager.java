@@ -52,8 +52,8 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
   boolean isOmTablesInitialized();
 
   /**
-   * Return a list of volumes owned by a given user; if user is null, returns
-   * all volumes.
+   * Return a list of volumes based on the specified start volume and maximum
+   * number of volumes returned.
    *
    * This method can be optimized by using username as a filter.
    *
