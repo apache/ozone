@@ -613,11 +613,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   private void addToCompactionLogTable(CompactionLogEntry compactionLogEntry) {
-    // This is temporary till tests are fixed.
-    if (compactionLogTableCFHandle == null) {
-      return;
-    }
-
     // Key in the transactionId-currentTime
     // Just trxId can't be used because multiple compaction might be
     // running, and it is possible no new entry was added to DB.
@@ -1184,8 +1179,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * @return CompactionNode
    */
   private CompactionNode addNodeToDAG(String file, String snapshotID,
-                                      long seqNum, String startRange,
-                                      String endRange, String columnFamily) {
+                                      long seqNum, String startKey,
+                                      String endKey, String columnFamily) {
     long numKeys = 0L;
     try {
       numKeys = getSSTFileSummary(file);
@@ -1195,7 +1190,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       LOG.info("Can't find SST '{}'", file);
     }
     CompactionNode fileNode = new CompactionNode(file, snapshotID, numKeys,
-        seqNum, startRange, endRange, columnFamily);
+        seqNum, startKey, endKey, columnFamily);
     forwardCompactionDAG.addNode(fileNode);
     backwardCompactionDAG.addNode(fileNode);
 
@@ -1595,9 +1590,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private boolean shouldSkipNode(CompactionNode node,
                                  Map<String, String> columnFamilyToPrefixMap) {
-    // This is for backward compatibility. Before the compaction log V1
-    // migration,startKey, endKey and columnFamily information is not persisted
-    // in compaction logs.
+    // This is for backward compatibility. Before the compaction log table
+    // migration, startKey, endKey and columnFamily information is not persisted
+    // in compaction log files.
     if (node.getStartKey() == null || node.getEndKey() == null ||
         node.getColumnFamily() == null) {
       LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +

@@ -114,11 +114,11 @@ public class CompactionLogEntry {
 
   @Override
   public String toString() {
-    return String.format("dbSequenceNumber: '%s', inputFileInfoList: '%s'," +
-            " outputFileInfoList: '%s',", dbSequenceNumber, inputFileInfoList,
-        outputFileInfoList);
+    return String.format("dbSequenceNumber: '%s', compactionTime: '%s', " +
+            "inputFileInfoList: '%s', outputFileInfoList: '%s', " +
+            "compactionReason: '%s'.", dbSequenceNumber, compactionTime,
+        inputFileInfoList, outputFileInfoList, compactionReason);
   }
-
 
   /**
    * Builder of CompactionLogEntry.
@@ -193,9 +193,8 @@ public class CompactionLogEntry {
           iterator.seekToLast();
           String endKey = StringUtils.bytes2String(iterator.key());
 
-          CompactionFileInfo
-              fileInfo = new CompactionFileInfo(fileName, startKey, endKey,
-              columnFamily);
+          CompactionFileInfo fileInfo =
+              new CompactionFileInfo(fileName, startKey, endKey, columnFamily);
           response.add(fileInfo);
         } catch (RocksDBException rocksDBException) {
           throw new RuntimeException("Failed to read SST file: " + sstFile,

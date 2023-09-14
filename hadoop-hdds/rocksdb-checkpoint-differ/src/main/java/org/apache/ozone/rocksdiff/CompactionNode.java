@@ -38,17 +38,19 @@ public class CompactionNode {
    * @param ssId snapshotId field. Added here for improved debuggability only
    * @param numKeys Number of keys in the SST
    * @param seqNum Snapshot generation (sequence number)
+   * @param startKey start key in the SST file.
+   * @param endKey end key in the SST file.
+   * @param columnFamily column family SST file belongs to.
    */
   public CompactionNode(String file, String ssId, long numKeys, long seqNum,
-                        String keyStartRange, String keyEndRange,
-                        String columnFamily) {
+                        String startKey, String endKey, String columnFamily) {
     this.fileName = file;
     this.snapshotId = ssId;
     this.totalNumberOfKeys = numKeys;
     this.snapshotGeneration = seqNum;
     this.cumulativeKeysReverseTraversal = 0L;
-    this.startKey = keyStartRange;
-    this.endKey = keyEndRange;
+    this.startKey = startKey;
+    this.endKey = endKey;
     this.columnFamily = columnFamily;
   }
 
