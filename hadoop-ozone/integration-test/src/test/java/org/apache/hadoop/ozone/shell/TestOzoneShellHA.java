@@ -659,7 +659,7 @@ public class TestOzoneShellHA {
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
-    try (FileSystem fs = FileSystem.get(clientConf)) {
+    try {
       int res;
       // Test orphan link bucket when source volume removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
@@ -675,17 +675,29 @@ public class TestOzoneShellHA {
               "/linkvol/linkbuck"};
       execute(ozoneShell, args);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/vol1"});
-      assertEquals(0, res);
+      args =
+          new String[] {"volume", "delete", "vol1", "-r", "--yes"};
+      execute(ozoneShell, args);
+      out.reset();
+      OMException omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("vol1"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
 
-      res = ToolRunner.run(shell, new String[]{"-ls", "-R",
+      res = ToolRunner.run(shell, new String[]{"-ls",
           hostPrefix + "/linkvol"});
       assertEquals(0, res);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/linkvol"});
-      assertEquals(0, res);
+      args = new String[] {"bucket", "delete", "linkvol"
+              + OZONE_URI_DELIMITER + "linkbuck"};
+      execute(ozoneShell, args);
+      out.reset();
+
+      args = new String[] {"volume", "delete", "linkvol"};
+      execute(ozoneShell, args);
+      out.reset();
+      omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("linkvol"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
 
       // Test orphan link bucket when only source bucket removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
@@ -704,9 +716,17 @@ public class TestOzoneShellHA {
           "-skipTrash", hostPrefix + "/vol1/bucket1"});
       assertEquals(0, res);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/linkvol"});
-      assertEquals(0, res);
+      args = new String[] {"bucket", "delete", "linkvol"
+              + OZONE_URI_DELIMITER + "linkbuck"};
+      execute(ozoneShell, args);
+      out.reset();
+
+      args = new String[] {"volume", "delete", "linkvol"};
+      execute(ozoneShell, args);
+      out.reset();
+      omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("linkvol"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
     } finally {
       shell.close();
     }
