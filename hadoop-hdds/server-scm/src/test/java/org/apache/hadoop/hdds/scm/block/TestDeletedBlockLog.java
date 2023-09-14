@@ -478,7 +478,11 @@ public class TestDeletedBlockLog {
 
     // The rest txn shall be: 41-50. 41-50. 41-50
     List<DeletedBlocksTransaction> blocks = getAllTransactions();
-    Assertions.assertEquals(30, blocks.size());
+    // First 30 txns aren't considered for deletion as they don't have required
+    // container replica's so getAllTransactions() won't be able to fetch them
+    // and rest 20 txns are already committed and removed so in total
+    // getAllTransactions() will fetch 0 txns.
+    Assertions.assertEquals(0, blocks.size());
   }
 
   @Test

@@ -400,35 +400,38 @@ public class DeletedBlockLogImpl
   public void close() throws IOException {
   }
 
-  private void getTransaction(
-      DeletedBlocksTransaction tx,
+  private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
-      Set<DatanodeDetails> dnList) {
-    try {
-      DeletedBlocksTransaction updatedTxn = DeletedBlocksTransaction
-          .newBuilder(tx)
-          .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
-          .build();
-      Set<ContainerReplica> replicas = containerManager
-          .getContainerReplicas(
-              ContainerID.valueOf(updatedTxn.getContainerID()));
-      for (ContainerReplica replica : replicas) {
-        UUID dnID = replica.getDatanodeDetails().getUuid();
-        if (!dnList.contains(replica.getDatanodeDetails())) {
-          continue;
-        }
-        Set<UUID> dnsWithTransactionCommitted =
-            transactionToDNsCommitMap.get(updatedTxn.getTxID());
-        if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
-            .contains(dnID)) {
-          // Transaction need not be sent to dns which have
-          // already committed it
-          transactions.addTransactionToDN(dnID, updatedTxn);
-        }
+      Set<DatanodeDetails> dnList, Set<ContainerReplica> replicas) {
+    DeletedBlocksTransaction updatedTxn =
+        DeletedBlocksTransaction.newBuilder(tx)
+            .setCount(transactionToRetryCountMap.getOrDefault(tx.getTxID(), 0))
+            .build();
+    for (ContainerReplica replica : replicas) {
+      UUID dnID = replica.getDatanodeDetails().getUuid();
+      if (!dnList.contains(replica.getDatanodeDetails())) {
+        continue;
       }
-    } catch (IOException e) {
-      LOG.warn("Got container info error.", e);
+      Set<UUID> dnsWithTransactionCommitted =
+          transactionToDNsCommitMap.get(updatedTxn.getTxID());
+      if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
+          .contains(dnID)) {
+        // Transaction need not be sent to dns which have
+        // already committed it
+        transactions.addTransactionToDN(dnID, updatedTxn);
+      }
     }
+  }
+
+  private Boolean checkInadequateReplica(Set<ContainerReplica> replicas,
+      DeletedBlocksTransaction txn) throws ContainerNotFoundException {
+    ContainerInfo containerInfo = containerManager
+        .getContainer(ContainerID.valueOf(txn.getContainerID()));
+    if (replicas.size() < containerInfo.getReplicationConfig()
+        .getRequiredNodes()) {
+      return true;
+    }
+    return false;
   }
 
   @Override
@@ -460,7 +463,13 @@ public class DeletedBlockLogImpl
               txIDs.add(txn.getTxID());
             } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
                 && !containerManager.getContainer(id).isOpen()) {
-              getTransaction(txn, transactions, dnList);
+              Set<ContainerReplica> replicas = containerManager
+                  .getContainerReplicas(
+                      ContainerID.valueOf(txn.getContainerID()));
+              if (checkInadequateReplica(replicas, txn)) {
+                continue;
+              }
+              getTransaction(txn, transactions, dnList, replicas);
               transactionToDNsCommitMap
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
             }
