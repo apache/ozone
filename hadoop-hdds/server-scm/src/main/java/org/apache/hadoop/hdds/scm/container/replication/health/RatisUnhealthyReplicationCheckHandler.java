@@ -37,8 +37,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  *   factor number of replicas and queue them for under/over replication if
  *   needed.
  *   </li>
- *   <li>If there is perfect replication of healthy replicas, remove any
- *   excess unhealthy replicas.
+ *   <li>If there is a mixture of unhealthy and healthy containers this
+ *   handler will only be called if there is no under or over replication after
+ *   excluding the empty containers. If there is under or over replication the
+ *   ECReplicationCheckHandler will take care of it first.
  *   </li>
  * </ul>
  */
@@ -65,10 +67,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     }
 
     // Now, consider UNHEALTHY replicas when calculating replication status
-    RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(container,
-            request.getContainerReplicas(), request.getPendingOps(),
-            request.getMaintenanceRedundancy(), true);
+    RatisContainerReplicaCount replicaCount = getReplicaCount(request);
     if (replicaCount.getUnhealthyReplicaCount() == 0) {
       LOG.debug("No UNHEALTHY replicas are present for container {} with " +
           "replicas [{}].", container, request.getContainerReplicas());
@@ -80,7 +79,10 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
           container.containerID());
     }
 
-    ContainerHealthResult health = checkReplication(request);
+    // At this point, we know there are only unhealthy replicas, so the
+    // container in UNHEALTHY, but it can also be over or under replicated with
+    // unhealthy replicas.
+    ContainerHealthResult health = checkReplication(replicaCount);
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
@@ -155,39 +157,29 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
    * Checks if the container is over or under replicated.
    */
   @VisibleForTesting
-  protected ContainerHealthResult checkReplication(
+  ContainerHealthResult checkReplication(ContainerCheckRequest request) {
+    return checkReplication(getReplicaCount(request));
+  }
+
+  private static RatisContainerReplicaCount getReplicaCount(
       ContainerCheckRequest request) {
-    RatisContainerReplicaCount replicaCount =
-        new RatisContainerReplicaCount(request.getContainerInfo(),
-            request.getContainerReplicas(), request.getPendingOps(),
-            request.getMaintenanceRedundancy(), true);
+    return new RatisContainerReplicaCount(request.getContainerInfo(),
+        request.getContainerReplicas(), request.getPendingOps(),
+        request.getMaintenanceRedundancy(), true);
+  }
+
+  private ContainerHealthResult checkReplication(
+      RatisContainerReplicaCount replicaCount) {
 
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
-      ContainerHealthResult.UnderReplicatedHealthResult result =
-          new ContainerHealthResult.UnderReplicatedHealthResult(
-              replicaCount.getContainer(),
-              replicaCount.getRemainingRedundancy(),
-              replicaCount.inSufficientDueToDecommission(false),
-              replicaCount.isSufficientlyReplicated(true),
-              replicaCount.isUnrecoverable());
-      result.setHasHealthyReplicas(replicaCount.getHealthyReplicaCount() > 0);
-      return result;
+      return replicaCount.toUnderHealthResult();
     }
 
     boolean isOverReplicated = replicaCount.isOverReplicated(false);
     if (isOverReplicated) {
-      boolean repOkWithPending = !replicaCount.isOverReplicated(true);
-      ContainerHealthResult.OverReplicatedHealthResult result =
-          new ContainerHealthResult.OverReplicatedHealthResult(
-              replicaCount.getContainer(),
-              replicaCount.getExcessRedundancy(false),
-              repOkWithPending);
-      result.setHasMismatchedReplicas(
-          replicaCount.getMisMatchedReplicaCount() > 0);
-      result.setIsSafelyOverReplicated(replicaCount.isSafelyOverReplicated());
-      return result;
+      return replicaCount.toOverHealthResult();
     }
 
     return new ContainerHealthResult.UnHealthyResult(

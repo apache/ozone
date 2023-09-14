@@ -72,7 +72,9 @@ Setup v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
 
 Setup secure v4 headers
-    ${result} =         Execute                    ozone s3 getsecret ${OM_HA_PARAM}
+    ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
+    ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
+    Return From Keyword if      ${output}
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -117,6 +119,12 @@ Create legacy bucket
     ${legacy_bucket} =   Set Variable               legacy-bucket-${postfix}
     ${result} =          Execute and checkrc        ozone sh bucket create -l LEGACY s3v/${legacy_bucket}   0
     [Return]             ${legacy_bucket}
+
+Create obs bucket
+    ${postfix} =         Generate Ozone String
+    ${bucket} =   Set Variable               obs-bucket-${postfix}
+    ${result} =          Execute and checkrc        ozone sh bucket create -l OBJECT_STORE s3v/${bucket}   0
+    [Return]             ${bucket}
 
 Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}

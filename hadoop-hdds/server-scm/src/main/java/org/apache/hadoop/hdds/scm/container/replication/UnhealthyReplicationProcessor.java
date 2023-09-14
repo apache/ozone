@@ -25,9 +25,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the respective ReplicationManager
@@ -41,12 +43,12 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           .getLogger(UnhealthyReplicationProcessor.class);
   private final ReplicationManager replicationManager;
   private volatile boolean runImmediately = false;
-  private final long intervalInMillis;
+  private final Supplier<Duration> interval;
 
   public UnhealthyReplicationProcessor(ReplicationManager replicationManager,
-                                       long intervalInMillis) {
+                                       Supplier<Duration> interval) {
     this.replicationManager = replicationManager;
-    this.intervalInMillis = intervalInMillis;
+    this.interval = interval;
   }
 
   /**
@@ -80,14 +82,11 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
    * Read messages from the ReplicationManager under replicated queue and,
    * form commands to correct replication. The commands are added
    * to the event queue and the PendingReplicaOps are adjusted.
-   *
-   * Note: this is a temporary implementation of this feature. A future
-   * version will need to limit the amount of messages assigned to each
-   * datanode, so they are not assigned too much work.
    */
   public void processAll(ReplicationQueue queue) {
     int processed = 0;
     int failed = 0;
+    int overloaded = 0;
     Map<ContainerHealthResult.HealthState, Integer> healthStateCntMap =
             Maps.newHashMap();
     List<HealthResult> failedOnes = new LinkedList<>();
@@ -104,6 +103,8 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
           inflightOperationLimitReached(replicationManager, inflightLimit)) {
         LOG.info("The maximum number of pending replicas ({}) are scheduled. " +
             "Ending the iteration.", inflightLimit);
+        replicationManager
+            .getMetrics().incrPendingReplicationLimitReachedTotal();
         break;
       }
       HealthResult healthResult =
@@ -115,11 +116,17 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         processContainer(healthResult);
         processed++;
         healthStateCntMap.compute(healthResult.getHealthState(),
-                (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+            (healthState, cnt) -> cnt == null ? 1 : (cnt + 1));
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("All targets overloaded when processing Health result of " +
+            "class: {} for container {}", healthResult.getClass(),
+            healthResult.getContainerInfo());
+        overloaded++;
+        failedOnes.add(healthResult);
       } catch (Exception e) {
         LOG.error("Error processing Health result of class: {} for " +
-                   "container {}", healthResult.getClass(),
-                healthResult.getContainerInfo(), e);
+                "container {}", healthResult.getClass(),
+            healthResult.getContainerInfo(), e);
         failed++;
         failedOnes.add(healthResult);
       }
@@ -127,9 +134,10 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
 
     failedOnes.forEach(result -> requeueHealthResult(queue, result));
 
-    if (processed > 0 || failed > 0) {
+    if (processed > 0 || failed > 0 || overloaded > 0) {
       LOG.info("Processed {} containers with health state counts {}, " +
-          "failed processing {}", processed, healthStateCntMap, failed);
+          "failed processing {}, deferred due to load {}",
+          processed, healthStateCntMap, failed, overloaded);
     }
   }
 
@@ -156,9 +164,14 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
         if (replicationManager.shouldRun()) {
           processAll(replicationManager.getQueue());
         }
+
+        final Duration duration = interval.get();
+        if (!runImmediately && LOG.isDebugEnabled()) {
+          LOG.debug("May wait {} before next run", duration);
+        }
         synchronized (this) {
           if (!runImmediately) {
-            wait(intervalInMillis);
+            wait(duration.toMillis());
           }
           runImmediately = false;
         }

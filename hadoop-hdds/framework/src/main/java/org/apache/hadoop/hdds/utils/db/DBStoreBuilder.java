@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import com.google.protobuf.MessageLite;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -90,7 +91,7 @@ public final class DBStoreBuilder {
   // any options. On build, this will be replaced with defaultCfOptions.
   private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
-  private CodecRegistry registry;
+  private final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
   private String rocksDbStat;
   // RocksDB column family write buffer size
   private long rocksDbCfWriteBufferSize;
@@ -99,11 +100,12 @@ public final class DBStoreBuilder {
   private boolean openReadOnly = false;
   private int maxFSSnapshots = 0;
   private final DBProfile defaultCfProfile;
-  private boolean enableCompactionLog;
+  private boolean enableCompactionDag;
   private boolean createCheckpointDirs = true;
   // this is to track the total size of dbUpdates data since sequence
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
+  private Integer maxNumberOfOpenFiles = null;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -136,7 +138,6 @@ public final class DBStoreBuilder {
       RocksDBConfiguration rocksDBConfiguration) {
     cfOptions = new HashMap<>();
     this.configuration = configuration;
-    this.registry = new CodecRegistry();
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
@@ -182,6 +183,12 @@ public final class DBStoreBuilder {
     }
   }
 
+  private void setDBOptionsProps(ManagedDBOptions dbOptions) {
+    if (maxNumberOfOpenFiles != null) {
+      dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
+    }
+  }
+
   /**
    * Builds a DBStore instance and returns that.
    *
@@ -200,7 +207,7 @@ public final class DBStoreBuilder {
       if (rocksDBOption == null) {
         rocksDBOption = getDefaultDBOptions(tableConfigs);
       }
-
+      setDBOptionsProps(rocksDBOption);
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
@@ -210,8 +217,8 @@ public final class DBStoreBuilder {
       }
 
       return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-          registry, openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
-          enableCompactionLog, maxDbUpdatesSizeThreshold, createCheckpointDirs,
+          registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
+          enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration);
     } finally {
       tableConfigs.forEach(TableConfig::close);
@@ -247,6 +254,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
+  public <T extends MessageLite> DBStoreBuilder addProto2Codec(Class<T> type) {
+    return addCodec(type, Proto2Codec.get(type));
+  }
+
   public DBStoreBuilder setDBOptions(ManagedDBOptions option) {
     rocksDBOption = option;
     return this;
@@ -269,8 +280,8 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setEnableCompactionLog(boolean enableCompactionLog) {
-    this.enableCompactionLog = enableCompactionLog;
+  public DBStoreBuilder setEnableCompactionDag(boolean enableCompactionDag) {
+    this.enableCompactionDag = enableCompactionDag;
     return this;
   }
 
@@ -285,6 +296,11 @@ public final class DBStoreBuilder {
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
     setDefaultCFOptions(prof.getColumnFamilyOptions());
+    return this;
+  }
+
+  public DBStoreBuilder setMaxNumberOfOpenFiles(Integer maxNumberOfOpenFiles) {
+    this.maxNumberOfOpenFiles = maxNumberOfOpenFiles;
     return this;
   }
 

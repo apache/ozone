@@ -17,99 +17,82 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import com.google.common.collect.ImmutableSet;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test the configuration reflection utility class.
  */
-@RunWith(Parameterized.class)
-public class TestConfigurationReflectionUtil {
+class TestConfigurationReflectionUtil {
 
-  private final ConfigType type;
-  private final String key;
-  private final String defaultValue;
-  private final Class testClass;
-  private final String fieldName;
-  private final boolean typePresent;
-  private final boolean keyPresent;
-  private final boolean defaultValuePresent;
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][]{
-        {ConfigurationExample.class, "waitTime",
-            ConfigType.TIME, true,
-            "ozone.scm.client.wait", true,
-            "30m", true},
-        {ConfigurationExampleGrandParent.class, "number",
-            ConfigType.AUTO, true,
-            "number", true,
-            "2", true},
-        {ConfigurationExample.class, "secure",
-            ConfigType.AUTO, true,
-            "ozone.scm.client.secure", true,
-            "true", true},
-        {ConfigurationExample.class, "no-such-field",
-            null, false,
-            "", false,
-            "", false},
-        {ConfigFileAppender.class, "document",
-            null, false,
-            "", false,
-            "", false},
-        {ConfigurationExample.class, "threshold",
-            ConfigType.DOUBLE, true,
-            "ozone.scm.client.threshold", true,
-            "10", true},
-    });
+  static Stream<Arguments> data() {
+    return Stream.of(
+        arguments(ConfigurationExample.class, "waitTime",
+            Optional.of(ConfigType.TIME),
+            Optional.of("ozone.scm.client.wait"),
+            Optional.of("30m")),
+        arguments(ConfigurationExampleGrandParent.class, "number",
+            Optional.of(ConfigType.AUTO),
+            Optional.of("number"),
+            Optional.of("2")),
+        arguments(ConfigurationExample.class, "secure",
+            Optional.of(ConfigType.AUTO),
+            Optional.of("ozone.scm.client.secure"),
+            Optional.of("true")),
+        arguments(ConfigurationExample.class, "no-such-field",
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty()),
+        arguments(ConfigFileAppender.class, "document",
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty()),
+        arguments(ConfigurationExample.class, "threshold",
+            Optional.of(ConfigType.DOUBLE),
+            Optional.of("ozone.scm.client.threshold"),
+            Optional.of("10"))
+    );
   }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public TestConfigurationReflectionUtil(
-      Class testClass, String fieldName,
-      ConfigType type, boolean typePresent,
-      String key, boolean keyPresent,
-      String defaultValue, boolean defaultValuePresent) {
-    this.testClass = testClass;
-    this.fieldName = fieldName;
-    this.typePresent = typePresent;
-    this.type = type;
-    this.key = key;
-    this.keyPresent = keyPresent;
-    this.defaultValue = defaultValue;
-    this.defaultValuePresent = defaultValuePresent;
+  @ParameterizedTest
+  @MethodSource("data")
+  void testForGivenClasses(Class<?> testClass, String fieldName,
+      Optional<ConfigType> expectedType,
+      Optional<String> expectedKey,
+      Optional<String> expectedDefault) {
+    Optional<ConfigType> type = ConfigurationReflectionUtil.getType(
+        testClass, fieldName);
+    assertEquals(expectedType, type);
+
+    Optional<String> key = ConfigurationReflectionUtil.getKey(
+        testClass, fieldName);
+    assertEquals(expectedKey, key);
+
+    Optional<String> defaultValue = ConfigurationReflectionUtil.getDefaultValue(
+        testClass, fieldName);
+    assertEquals(expectedDefault, defaultValue);
   }
 
   @Test
-  public void testForGivenClasses() {
-    Optional<ConfigType> actualType =
-        ConfigurationReflectionUtil.getType(
-            testClass, fieldName);
-    Assert.assertEquals(typePresent, actualType.isPresent());
-    if (typePresent) {
-      Assert.assertEquals(type, actualType.get());
-    }
+  void listReconfigurableProperties() {
+    Set<String> props =
+        ConfigurationReflectionUtil.mapReconfigurableProperties(
+            ConfigurationExample.class).keySet();
 
-    Optional<String> actualKey =
-        ConfigurationReflectionUtil.getKey(
-            testClass, fieldName);
-    Assert.assertEquals(keyPresent, actualKey.isPresent());
-    if (keyPresent) {
-      Assert.assertEquals(key, actualKey.get());
-    }
-    Optional<String> actualDefaultValue =
-        ConfigurationReflectionUtil.getDefaultValue(
-            testClass, fieldName);
-    Assert.assertEquals(defaultValuePresent, actualDefaultValue.isPresent());
-    if (defaultValuePresent) {
-      Assert.assertEquals(defaultValue, actualDefaultValue.get());
-    }
+    String prefix = "ozone.scm.client";
+    assertEquals(ImmutableSet.of(
+        prefix + ".dynamic",
+        prefix + ".grandpa.dyna"
+    ), props);
   }
 }

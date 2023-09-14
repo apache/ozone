@@ -93,19 +93,17 @@ public interface S3SecretManager {
    */
   S3SecretCache cache();
 
-  default void updateCache(String accessId, S3SecretValue secret, long txId) {
+  default void updateCache(String accessId, S3SecretValue secret) {
     S3SecretCache cache = cache();
     if (cache != null) {
-      cache.put(accessId, secret, txId);
+      cache.put(accessId, secret);
     }
   }
 
-  default void invalidateCacheEntry(String id, long txId) {
+  default void invalidateCacheEntry(String id) {
     S3SecretCache cache = cache();
     if (cache != null) {
-      cache.invalidate(id, txId);
+      cache.invalidate(id);
     }
   }
-
-
 }

@@ -22,13 +22,18 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.util.Time;
@@ -49,6 +54,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+
+import static org.junit.Assert.assertThrows;
 
 /**
  * Class tests OMKeyCommitRequest class.
@@ -248,14 +255,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    List<OmKeyInfo> toDeleteKeyList = ((OMKeyCommitResponse) omClientResponse).
-        getKeysToDelete().cloneOmKeyInfoList();
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyList
+        = ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
 
     // This is the first time to commit key, only the allocated but uncommitted
     // blocks should be deleted.
     Assert.assertEquals(1, toDeleteKeyList.size());
-    Assert.assertEquals(2, toDeleteKeyList.get(0).
-        getKeyLocationVersions().get(0).getLocationList().size());
+    Assert.assertEquals(2, toDeleteKeyList.values().stream().findFirst().get()
+        .cloneOmKeyInfoList().get(0).getKeyLocationVersions().get(0)
+        .getLocationList().size());
 
     // Entry should be deleted from openKey Table.
     omKeyInfo =
@@ -296,6 +304,26 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Test
+  public void testRejectHsyncIfNotEnabled() throws Exception {
+    OzoneConfiguration conf = ozoneManager.getConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, false);
+    BucketLayout bucketLayout = getBucketLayout();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10);
+
+    // hsync should throw OMException
+    assertThrows(OMException.class, () ->
+        doKeyCommit(true, allocatedKeyLocationList.subList(0, 5)));
+
+    // Regular key commit should still work
+    doKeyCommit(false, allocatedKeyLocationList.subList(0, 5));
+
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+  }
+
+  @Test
   public void testCommitWithHsyncIncrementalUsages() throws Exception {
     BucketLayout bucketLayout = getBucketLayout();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -307,26 +335,37 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         .get(bucketKey);
     long usedBytes = bucketInfo.getUsedBytes();
 
-    performHsyncCommit(allocatedKeyLocationList.subList(0, 5));
-    bucketInfo = omMetadataManager.getBucketTable()
-        .get(bucketKey);
+    // 1st commit of 3 blocks, HSync = true
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap =
+        doKeyCommit(true, allocatedKeyLocationList.subList(0, 3));
+    Assert.assertNull(keyToDeleteMap);
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     long firstCommitUsedBytes = bucketInfo.getUsedBytes();
-    Assert.assertEquals(500, firstCommitUsedBytes - usedBytes);
+    Assert.assertEquals(300, firstCommitUsedBytes - usedBytes);
 
-    performHsyncCommit(allocatedKeyLocationList);
-    bucketInfo = omMetadataManager.getBucketTable()
-        .get(bucketKey);
-    long nextCommitUsedBytes = bucketInfo.getUsedBytes();
+    // 2nd commit of 6 blocks, HSync = true
+    keyToDeleteMap = doKeyCommit(true, allocatedKeyLocationList.subList(0, 6));
+    Assert.assertNull(keyToDeleteMap);
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long secondCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(600, secondCommitUsedBytes - usedBytes);
 
-    Assert.assertEquals(1000, nextCommitUsedBytes - usedBytes);
+    // 3rd and final commit of all 10 blocks, HSync = false
+    keyToDeleteMap = doKeyCommit(false, allocatedKeyLocationList);
+    // keyToDeleteMap should be null / empty because none of the previous blocks
+    // should be deleted.
+    Assert.assertTrue(keyToDeleteMap == null || keyToDeleteMap.isEmpty());
+    bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    long thirdCommitUsedBytes = bucketInfo.getUsedBytes();
+    Assert.assertEquals(1000, thirdCommitUsedBytes - usedBytes);
   }
-  
-  private List<KeyLocation> performHsyncCommit(
+
+  private Map<String, RepeatedOmKeyInfo> doKeyCommit(boolean isHSync,
       List<KeyLocation> keyLocations) throws Exception {
     // allocated block list
     dataSize = keyLocations.size() * 100;
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
-        keyLocations, true));
+        keyLocations, isHSync));
     OMKeyCommitRequest omKeyCommitRequest =
         getOmKeyCommitRequest(modifiedOmRequest);
 
@@ -342,16 +381,22 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    // key must be prsent in both open key table and key table for hsync
+    // Key should be present in both OpenKeyTable and KeyTable with HSync commit
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(
             omKeyCommitRequest.getBucketLayout()).get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    if (isHSync) {
+      Assert.assertNotNull(omKeyInfo);
+    } else {
+      // Key should not exist in OpenKeyTable anymore with non-HSync commit
+      Assert.assertNull(omKeyInfo);
+    }
     omKeyInfo =
         omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout())
             .get(ozoneKey);
     Assert.assertNotNull(omKeyInfo);
-    return keyLocations;
+
+    return ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
   }
 
   @Test

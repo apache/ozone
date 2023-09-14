@@ -81,6 +81,8 @@ public class BlockOutputStream extends OutputStream {
       "Unexpected Storage Container Exception: ";
 
   private AtomicReference<BlockID> blockID;
+  private final AtomicReference<ChunkInfo> previousChunkInfo
+      = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
   private XceiverClientFactory xceiverClientFactory;
@@ -703,6 +705,19 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
+
+    final ChunkInfo previous = previousChunkInfo.getAndSet(chunkInfo);
+    final long expectedOffset = previous == null ? 0
+        : chunkInfo.getChunkName().equals(previous.getChunkName()) ?
+        previous.getOffset() : previous.getOffset() + previous.getLen();
+    if (chunkInfo.getOffset() != expectedOffset) {
+      throw new IOException("Unexpected offset: "
+          + chunkInfo.getOffset() + "(actual) != "
+          + expectedOffset + "(expected), "
+          + blockID + ", chunkInfo = " + chunkInfo
+          + ", previous = " + previous);
+    }
+
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, token, replicationIndex);

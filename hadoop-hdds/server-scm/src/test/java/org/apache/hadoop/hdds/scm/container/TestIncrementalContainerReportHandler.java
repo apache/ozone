@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -67,6 +69,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,6 +84,7 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
@@ -126,7 +130,8 @@ public class TestIncrementalContainerReportHandler {
             scmContext, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestIncrementalContainerReportHandler.class.getSimpleName()
+            + UUID.randomUUID());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
 
@@ -140,7 +145,7 @@ public class TestIncrementalContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            conf, Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault())))
         .build();
 
     this.publisher = Mockito.mock(EventPublisher.class);
@@ -191,6 +196,7 @@ public class TestIncrementalContainerReportHandler {
   @AfterEach
   public void tearDown() throws Exception {
     containerStateManager.close();
+    nodeManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
@@ -230,6 +236,126 @@ public class TestIncrementalContainerReportHandler {
     reportHandler.onMessage(icrFromDatanode, publisher);
     Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(container.containerID()).getState());
+  }
+
+  /**
+   * Tests that CLOSING to CLOSED transition for an EC container happens only
+   * when a CLOSED replica with first index or parity indexes is reported.
+   */
+  @Test
+  public void testClosingToClosedForECContainer()
+      throws NodeNotFoundException, IOException, TimeoutException {
+    // Create an EC 3-2 container
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo container = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    List<DatanodeDetails> dns = setupECContainerForTesting(container);
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
+    // index is 2; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
+    // index is 3; container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+
+    createAndHandleICR(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
+    // index is 1; container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container.containerID()).getState());
+
+    // Test with an EC 6-3 container
+    replicationConfig = new ECReplicationConfig(6, 3);
+    final ContainerInfo container2 = getECContainer(LifeCycleState.CLOSING,
+        PipelineID.randomId(), replicationConfig);
+    dns = setupECContainerForTesting(container2);
+
+    createAndHandleICR(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
+    // index is 6, container shouldn't transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container2.containerID()).getState());
+
+    createAndHandleICR(container2.containerID(),
+        ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
+    // index is 9, container should transition to CLOSED
+    Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container2.containerID()).getState());
+  }
+
+  /**
+   * Creates an ICR from the specified datanodeDetails for replica with the
+   * specified containerID. The replica's state is reported as the specified
+   * state. Then, creates an {@link IncrementalContainerReportHandler} and
+   * handles the ICR.
+   * @param containerID id of the replica
+   * @param state state of the replica to be reported
+   * @param datanodeDetails DN that hosts this replica
+   * @param replicaIndex index of the replica
+   */
+  private void createAndHandleICR(ContainerID containerID,
+                                  ContainerReplicaProto.State state,
+                                  DatanodeDetails datanodeDetails,
+                                  int replicaIndex) {
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(containerID, state,
+            datanodeDetails.getUuidString(), true, replicaIndex);
+    final IncrementalContainerReportFromDatanode icrFromDatanode =
+        new IncrementalContainerReportFromDatanode(datanodeDetails,
+            containerReport);
+
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+    reportHandler.onMessage(icrFromDatanode, publisher);
+  }
+
+  /**
+   * Creates the required number of DNs that will hold a replica each for the
+   * specified EC container. Registers these DNs with the NodeManager, adds
+   * this container and its replicas to ContainerStateManager etc.
+   * @param container must be an EC container
+   * @return List of datanodes that host replicas of this container
+   */
+  private List<DatanodeDetails> setupECContainerForTesting(
+      ContainerInfo container)
+      throws IOException, TimeoutException, NodeNotFoundException {
+    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
+        container.getReplicationType());
+    final int numDatanodes =
+        container.getReplicationConfig().getRequiredNodes();
+    // Register required number of datanodes with NodeManager
+    List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
+    for (int i = 0; i < numDatanodes; i++) {
+      dns.add(randomDatanodeDetails());
+      nodeManager.register(dns.get(i), null, null);
+    }
+
+    // Add this container to ContainerStateManager
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // Create its replicas and add them to ContainerStateManager
+    Set<ContainerReplica> replicas =
+        HddsTestUtils.getReplicasWithReplicaIndex(container.containerID(),
+            ContainerReplicaProto.State.CLOSING,
+            HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT,
+            HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT,
+            container.getSequenceId(),
+            dns.toArray(new DatanodeDetails[0]));
+    for (ContainerReplica r : replicas) {
+      containerStateManager.updateContainerReplica(container.containerID(), r);
+    }
+
+    // Tell NodeManager that each DN hosts a replica of this container
+    for (DatanodeDetails dn : dns) {
+      nodeManager.addContainer(dn, container.containerID());
+    }
+    return dns;
   }
 
   @Test
@@ -300,6 +426,47 @@ public class TestIncrementalContainerReportHandler {
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assertions.assertEquals(LifeCycleState.CLOSED,
+        containerManager.getContainer(container.containerID()).getState());
+  }
+
+  @Test
+  public void testOpenWithUnhealthyReplica() throws IOException {
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+
+    RatisReplicationConfig replicationConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+
+    final DatanodeDetails datanodeOne = nodes.get(0);
+    final DatanodeDetails datanodeTwo = nodes.get(1);
+    final DatanodeDetails datanodeThree = nodes.get(2);
+
+    final ContainerInfo container = getContainer(LifeCycleState.OPEN,
+        pipeline.getId());
+
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
+    final Set<ContainerReplica> containerReplicas = getReplicas(
+        container.containerID(), ContainerReplicaProto.State.OPEN,
+        datanodeOne, datanodeTwo, datanodeThree);
+
+    containerStateManager.addContainer(container.getProtobuf());
+    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
+        container.containerID(), r));
+
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(container.containerID(),
+            UNHEALTHY,
+            datanodeThree.getUuidString());
+    final IncrementalContainerReportFromDatanode icr =
+        new IncrementalContainerReportFromDatanode(
+            datanodeThree, containerReport);
+    reportHandler.onMessage(icr, publisher);
+    Assertions.assertEquals(LifeCycleState.CLOSING,
         containerManager.getContainer(container.containerID()).getState());
   }
 

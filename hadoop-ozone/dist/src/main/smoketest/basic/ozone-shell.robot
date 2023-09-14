@@ -38,8 +38,15 @@ RpcClient bucket acls
 RpcClient key acls
     Test Key Acls         o3://            om:9862     ${prefix}-acls
 
+# depends on being run between key and prefix tests
+Test native authorizer
+    Test native authorizer    o3://    om:9862    ${prefix}-acls
+
 RpcClient prefix acls
     Test Prefix Acls      o3://            om:9862     ${prefix}-acls
 
 RpcClient without host
     Test ozone shell      o3://            ${EMPTY}    ${prefix}-without-host
+
+RpcClient Delete key
+   Test Delete key with Trash       o3://            om:9862      ${prefix}-with-del

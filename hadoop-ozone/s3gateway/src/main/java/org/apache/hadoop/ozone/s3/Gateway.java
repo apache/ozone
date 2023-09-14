@@ -39,11 +39,13 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 
 import static org.apache.hadoop.hdds.StringUtils.startupShutdownMessage;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_PRINCIPAL_KEY;
@@ -62,6 +64,8 @@ public class Gateway extends GenericCli {
   private S3GatewayHttpServer httpServer;
   private S3GatewayMetrics metrics;
   private OzoneConfiguration ozoneConfiguration;
+
+  private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
   public static void main(String[] args) throws Exception {
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
@@ -120,12 +124,14 @@ public class Gateway extends GenericCli {
 
     LOG.info("Starting Ozone S3 gateway");
     HddsServerUtil.initializeMetrics(ozoneConfiguration, "S3Gateway");
+    jvmPauseMonitor.start();
     httpServer.start();
   }
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
     httpServer.stop();
+    jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
   }
 

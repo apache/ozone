@@ -31,9 +31,8 @@ import java.io.File;
  */
 public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
-  private File dbDir;
-
-  private ConfigurationSource config;
+  private final File dbDir;
+  private final ConfigurationSource config;
 
   /**
    * @param dbPath The absolute path to the .db file corresponding to this
@@ -64,12 +63,6 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   public ConfigurationSource getConfig() {
     return config;
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
-        getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
   }
 
   public abstract DBColumnFamilyDefinition<String, BlockData>

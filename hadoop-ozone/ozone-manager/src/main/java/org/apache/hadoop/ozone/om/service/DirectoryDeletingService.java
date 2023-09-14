@@ -16,20 +16,26 @@
  */
 package org.apache.hadoop.ozone.om.service;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -40,6 +46,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -71,9 +78,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // or write to same tables and can send deletion requests for same key
   // multiple times.
   private static final int DIR_DELETING_CORE_POOL_SIZE = 1;
+  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
 
   // Number of items(dirs/files) to be batched in an iteration.
   private final long pathLimitPerTask;
+  private final int ratisByteLimit;
+  private final AtomicBoolean suspended;
 
   public DirectoryDeletingService(long interval, TimeUnit unit,
       long serviceTimeout, OzoneManager ozoneManager,
@@ -83,6 +93,13 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.pathLimitPerTask = configuration
         .getInt(OZONE_PATH_DELETING_LIMIT_PER_TASK,
             OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT);
+    int limit = (int) configuration.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    // always go to 90% of max limit for request as other header will be added
+    this.ratisByteLimit = (int) (limit * 0.9);
+    this.suspended = new AtomicBoolean(false);
   }
 
   private boolean shouldRun() {
@@ -90,7 +107,23 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       // OzoneManager can be null for testing
       return true;
     }
-    return getOzoneManager().isLeaderReady();
+    return getOzoneManager().isLeaderReady() && !suspended.get();
+  }
+
+  /**
+   * Suspend the service.
+   */
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
+  }
+
+  /**
+   * Resume the service if suspended.
+   */
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
   }
 
   @Override
@@ -108,7 +141,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     @Override
-    public BackgroundTaskResult call() throws Exception {
+    public BackgroundTaskResult call() {
       if (shouldRun()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Running DirectoryDeletingService");
@@ -118,9 +151,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subDirNum = 0L;
         long subFileNum = 0L;
         long remainNum = pathLimitPerTask;
+        int consumedSize = 0;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         List<Pair<String, OmKeyInfo>> allSubDirList
             = new ArrayList<>((int) remainNum);
+
+        // Acquire active DB deletedDirectoryTable write lock because of the
+        // deletedDirTable read-write here to avoid interleaving with
+        // the table range delete operation in createOmSnapshotCheckpoint()
+        // that is called from OMSnapshotCreateResponse#addToDBBatch.
+        getOzoneManager().getMetadataManager().getTableLock(
+            OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().lock();
 
         Table.KeyValue<String, OmKeyInfo> pendingDeletedDirInfo;
         try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -140,6 +181,22 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 remainNum, pendingDeletedDirInfo.getValue(),
                 pendingDeletedDirInfo.getKey(), allSubDirList,
                 getOzoneManager().getKeyManager());
+            if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                request.getSerializedSize())) {
+              if (purgePathRequestList.size() != 0) {
+                // if message buffer reaches max limit, avoid sending further
+                remainNum = 0;
+                break;
+              }
+              // if directory itself is having a lot of keys / files,
+              // reduce capacity to minimum level
+              remainNum = MIN_ERR_LIMIT_PER_TASK;
+              request = prepareDeleteDirRequest(
+                  remainNum, pendingDeletedDirInfo.getValue(),
+                  pendingDeletedDirInfo.getKey(), allSubDirList,
+                  getOzoneManager().getKeyManager());
+            }
+            consumedSize += request.getSerializedSize();
             purgePathRequestList.add(request);
             remainNum = remainNum - request.getDeletedSubFilesCount();
             remainNum = remainNum - request.getMarkDeletedSubDirsCount();
@@ -152,12 +209,18 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             subFileNum += request.getDeletedSubFilesCount();
           }
 
-          optimizeDirDeletesAndSubmitRequest(remainNum, dirNum, subDirNum,
-              subFileNum, allSubDirList, purgePathRequestList, null, startTime);
+          optimizeDirDeletesAndSubmitRequest(
+              remainNum, dirNum, subDirNum, subFileNum,
+              allSubDirList, purgePathRequestList, null, startTime,
+              ratisByteLimit - consumedSize);
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
               "background task. Will retry at next run.", e);
+        } finally {
+          // Release deletedDirectoryTable write lock
+          getOzoneManager().getMetadataManager().getTableLock(
+              OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().unlock();
         }
       }
 
@@ -174,20 +237,38 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      OmSnapshot latestSnapshot =
-          metadataManager.getLatestSnapshot(deletedDirInfo.getVolumeName(),
-              deletedDirInfo.getBucketName(), omSnapshotManager);
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcLatestSnapshot =
+          metadataManager.getLatestActiveSnapshot(
+              deletedDirInfo.getVolumeName(),
+              deletedDirInfo.getBucketName(),
+              omSnapshotManager)) {
 
-      if (latestSnapshot != null) {
-        Table<String, OmDirectoryInfo> prevDirTable =
-            latestSnapshot.getMetadataManager().getDirectoryTable();
-        // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
-        // OzoneDeletePathKey. Changing it back to check the previous DirTable.
-        String prevDbKey = metadataManager.getOzoneDeletePathDirKey(key);
-        OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
-        return prevDirInfo != null &&
-            prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
+        if (rcLatestSnapshot != null) {
+          String dbRenameKey = metadataManager
+              .getRenameKey(deletedDirInfo.getVolumeName(),
+                  deletedDirInfo.getBucketName(), deletedDirInfo.getObjectID());
+          Table<String, OmDirectoryInfo> prevDirTable =
+              ((OmSnapshot) rcLatestSnapshot.get())
+                  .getMetadataManager().getDirectoryTable();
+          Table<String, OmKeyInfo> prevDeletedDirTable =
+              ((OmSnapshot) rcLatestSnapshot.get())
+                  .getMetadataManager().getDeletedDirTable();
+          OmKeyInfo prevDeletedDirInfo = prevDeletedDirTable.get(key);
+          if (prevDeletedDirInfo != null) {
+            return true;
+          }
+          String prevDirTableDBKey = metadataManager.getSnapshotRenamedTable()
+              .get(dbRenameKey);
+          // In OMKeyDeleteResponseWithFSO OzonePathKey is converted to
+          // OzoneDeletePathKey. Changing it back to check the previous DirTable
+          String prevDbKey = prevDirTableDBKey == null ?
+              metadataManager.getOzoneDeletePathDirKey(key) : prevDirTableDBKey;
+          OmDirectoryInfo prevDirInfo = prevDirTable.get(prevDbKey);
+          return prevDirInfo != null &&
+              prevDirInfo.getObjectID() == deletedDirInfo.getObjectID();
+        }
       }
+
       return false;
     }
   }

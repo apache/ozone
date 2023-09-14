@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.junit.After;
@@ -72,7 +74,8 @@ public class TestBucketRequest {
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
@@ -88,6 +91,10 @@ public class TestBucketRequest {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenAnswer(invocation -> new ResolvedBucket(
+            invocation.getArgument(0), invocation.getArgument(0)));
   }
 
   @After

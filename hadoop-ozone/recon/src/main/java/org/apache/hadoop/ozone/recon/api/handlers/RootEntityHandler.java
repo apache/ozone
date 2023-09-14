@@ -158,14 +158,14 @@ public class RootEntityHandler extends EntityHandler {
     FileSizeDistributionResponse distResponse =
         new FileSizeDistributionResponse();
     List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
-    int[] fileSizeDist = new int[ReconConstants.NUM_OF_BINS];
+    int[] fileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
 
     // accumulate file size distribution arrays from all buckets
     for (OmBucketInfo bucket : allBuckets) {
       long bucketObjectId = bucket.getObjectID();
       int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
       // add on each bin
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         fileSizeDist[i] += bucketFileSizeDist[i];
       }
     }

@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
-import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
@@ -124,21 +124,21 @@ public class ClusterStateEndpoint {
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(VOLUME_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(VOLUME_TABLE));
     GlobalStats bucketRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(BUCKET_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(BUCKET_TABLE));
     // Keys from OBJECT_STORE buckets.
     GlobalStats keyRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(KEY_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
     // Keys from FILE_SYSTEM_OPTIMIZED buckets
     GlobalStats fileRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(FILE_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
     // Keys from the DeletedTable
     GlobalStats deletedKeyRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(DELETED_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(DELETED_TABLE));
     // Directories from the DeletedDirectoryTable
     GlobalStats deletedDirRecord = globalStatsDao.findById(
-        TableCountTask.getRowKeyFromTable(DELETED_DIR_TABLE));
+        OmTableInsightTask.getTableCountKeyFromTable(DELETED_DIR_TABLE));
 
     if (volumeRecord != null) {
       builder.setVolumes(volumeRecord.getValue());
@@ -148,7 +148,7 @@ public class ClusterStateEndpoint {
     }
 
     Long totalKeys = 0L;
-    Long deletedKeys = 0L;
+    Long keysPendingDeletion = 0L;
     Long deletedDirs = 0L;
 
     if (keyRecord != null) {
@@ -158,14 +158,14 @@ public class ClusterStateEndpoint {
       totalKeys += fileRecord.getValue();
     }
     if (deletedKeyRecord != null) {
-      deletedKeys += deletedKeyRecord.getValue();
+      keysPendingDeletion += deletedKeyRecord.getValue();
     }
     if (deletedDirRecord != null) {
       deletedDirs += deletedDirRecord.getValue();
     }
 
     builder.setKeys(totalKeys);
-    builder.setDeletedKeys(deletedKeys);
+    builder.setKeysPendingDeletion(keysPendingDeletion);
     builder.setDeletedDirs(deletedDirs);
 
     // Subtract deleted containers from total containers.

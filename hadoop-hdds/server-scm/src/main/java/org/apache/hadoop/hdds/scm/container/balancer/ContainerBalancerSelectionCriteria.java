@@ -181,7 +181,8 @@ public class ContainerBalancerSelectionCriteria {
     return !isContainerClosed(container, node) || isECContainer(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
-        || breaksMaxSizeToMoveLimit(container, sizeMovedAlready);
+        || breaksMaxSizeToMoveLimit(container.containerID(),
+        container.getUsedBytes(), sizeMovedAlready);
   }
 
   /**
@@ -221,13 +222,14 @@ public class ContainerBalancerSelectionCriteria {
     return false;
   }
 
-  private boolean breaksMaxSizeToMoveLimit(ContainerInfo container,
-      long sizeMovedAlready) {
+  private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
+                                           long usedBytes,
+                                           long sizeMovedAlready) {
     // check max size to move per iteration limit
-    if (sizeMovedAlready + container.getUsedBytes() >
+    if (sizeMovedAlready + usedBytes >
         balancerConfiguration.getMaxSizeToMovePerIteration()) {
       LOG.debug("Removing container {} because it fails max size " +
-            "to move per iteration check.", container.containerID());
+          "to move per iteration check.", containerID);
       return true;
     }
     return false;

@@ -89,7 +89,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                    Time.now(), true);
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
@@ -114,7 +114,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
                 keyName, multipartUploadID, omKeyInfoFSO,
                 OzoneManagerProtocolProtos.Status.OK, unUsedParts,
-                omBucketInfo, null);
+                omBucketInfo);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -177,7 +177,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-            Time.now());
+            Time.now(), true);
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
@@ -199,7 +199,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
             keyName, multipartUploadID, omKeyInfoFSO,
             OzoneManagerProtocolProtos.Status.OK, unUsedParts,
-            null, null);
+            null);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -253,7 +253,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE,
             parentID + 8,
-            parentID, 8, Time.now());
+            parentID, 8, Time.now(), true);
     RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey);
     String ozoneKey = omMetadataManager
             .getOzoneKey(prevKey.getVolumeName(),
@@ -270,7 +270,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     // As 1 unused parts and 1 previously put-and-deleted object exist,
     // so 2 entries should be there in delete table.
-    Assert.assertEquals(2, omMetadataManager.countRowsInTable(
+    Assert.assertEquals(3, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
   }
 
@@ -316,14 +316,14 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentID + 9,
-                    parentID, 100, Time.now());
+                    parentID, 100, Time.now(), true);
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     unUsedParts.add(omKeyInfo);
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =
             createS3CompleteMPUResponseFSO(volumeName, bucketName, parentID,
                     keyName, multipartUploadID, omKeyInfoFSO,
                     OzoneManagerProtocolProtos.Status.OK, unUsedParts,
-                    omBucketInfo, null);
+                    omBucketInfo);
 
     s3MultipartUploadCompleteResponse.addToDBBatch(omMetadataManager,
             batchOperation);
@@ -382,8 +382,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     Assert.assertEquals(deleteEntryCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()));
 
-    String part1DeletedKeyName =
-        omMultipartKeyInfo.getPartKeyInfo(1).getPartName();
+    String part1DeletedKeyName = omMetadataManager.getOzoneDeletePathKey(
+        omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo().getObjectID(),
+        multipartKey);
 
     Assert.assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));

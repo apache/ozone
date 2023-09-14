@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -35,6 +36,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -98,6 +100,7 @@ public class TestOpenKeyCleanupService {
         SERVICE_INTERVAL.toMillis(), TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
         EXPIRE_THRESHOLD.toMillis(), TimeUnit.MILLISECONDS);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.setQuietMode(false);
     OmTestManagers omTestManagers = new OmTestManagers(conf);
     keyManager = omTestManagers.getKeyManager();
@@ -187,6 +190,69 @@ public class TestOpenKeyCleanupService {
     }
   }
 
+  /**
+   * In this test, we create a bunch of incomplete MPU keys and try to run
+   * openKeyCleanupService on it. We make sure that none of these incomplete
+   * MPU keys are actually deleted.
+   *
+   * @throws IOException - on Failure.
+   */
+  @ParameterizedTest
+  @CsvSource({
+      "9, 0",
+      "0, 8",
+      "6, 7",
+  })
+  public void testExcludeMPUOpenKeys(
+      int numDEFKeys, int numFSOKeys) throws Exception {
+    LOG.info("numDEFMpuKeys={}, numFSOMpuKeys={}",
+        numDEFKeys, numFSOKeys);
+
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL.toMillis());
+    final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
+    final long oldrunCount = openKeyCleanupService.getRunCount();
+    LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
+    assertEquals(0, oldkeyCount);
+
+    final OMMetrics metrics = om.getMetrics();
+    assertEquals(0, metrics.getNumKeyHSyncs());
+    assertEquals(0, metrics.getNumOpenKeysCleaned());
+    assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
+    createIncompleteMPUKeys(numDEFKeys, BucketLayout.DEFAULT);
+    createIncompleteMPUKeys(numFSOKeys, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // wait for open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD.toMillis());
+
+    // All MPU open keys should be skipped
+    assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(true, false,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    openKeyCleanupService.resume();
+
+    GenericTestUtils.waitFor(() -> openKeyCleanupService
+            .getRunCount() > oldrunCount,
+        (int) SERVICE_INTERVAL.toMillis(),
+        5 * (int) SERVICE_INTERVAL.toMillis());
+
+    // wait for requests to complete
+    Thread.sleep(SERVICE_INTERVAL.toMillis());
+
+    // No expired open keys fetched
+    assertEquals(openKeyCleanupService.getSubmittedOpenKeyCount(), oldkeyCount);
+    assertExpiredOpenKeys(true, false, BucketLayout.DEFAULT);
+    assertExpiredOpenKeys(true, false,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    assertEquals(0, metrics.getNumOpenKeysCleaned());
+  }
+
   void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,
       BucketLayout layout) throws IOException {
     final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
@@ -258,5 +324,87 @@ public class TestOpenKeyCleanupService {
     if (hsync) {
       writeClient.hsyncKey(keyArg, session.getId());
     }
+  }
+
+  private void createIncompleteMPUKeys(int mpuKeyCount,
+       BucketLayout bucketLayout) throws IOException {
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    for (int x = 0; x < mpuKeyCount; x++) {
+      if (RandomUtils.nextBoolean()) {
+        bucket = UUID.randomUUID().toString();
+        if (RandomUtils.nextBoolean()) {
+          volume = UUID.randomUUID().toString();
+        }
+      }
+      String key = UUID.randomUUID().toString();
+      createVolumeAndBucket(volume, bucket, bucketLayout);
+
+      final int numParts = RandomUtils.nextInt(0, 5);
+      // Create the MPU key
+      createIncompleteMPUKey(volume, bucket, key, numParts);
+    }
+  }
+
+  /**
+   * Create inflight multipart upload that are not completed / aborted yet.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @throws IOException
+   */
+  private void createIncompleteMPUKey(String volumeName, String bucketName,
+      String keyName, int numParts) throws IOException {
+    // Initiate MPU
+    OmKeyArgs keyArgs =
+        new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setAcls(Collections.emptyList())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+            .setLocationInfoList(new ArrayList<>())
+            .build();
+
+    OmMultipartInfo omMultipartInfo = writeClient.
+        initiateMultipartUpload(keyArgs);
+
+    // Commit MPU parts
+    for (int i = 1; i <= numParts; i++) {
+      OmKeyArgs partKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .setKeyName(keyName)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                  HddsProtos.ReplicationFactor.ONE))
+              .build();
+
+      OpenKeySession openKey = writeClient.openKey(partKeyArgs);
+
+      OmKeyArgs commitPartKeyArgs =
+          new OmKeyArgs.Builder()
+              .setVolumeName(volumeName)
+              .setBucketName(bucketName)
+              .setKeyName(keyName)
+              .setIsMultipartKey(true)
+              .setMultipartUploadID(omMultipartInfo.getUploadID())
+              .setMultipartUploadPartNumber(i)
+              .setAcls(Collections.emptyList())
+              .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                  HddsProtos.ReplicationFactor.ONE))
+              .setLocationInfoList(Collections.emptyList())
+              .build();
+
+      writeClient.commitMultipartUploadPart(commitPartKeyArgs, openKey.getId());
+    }
+
+    // MPU key is not completed / aborted, so it's still in the
+    // multipartInfoTable
   }
 }

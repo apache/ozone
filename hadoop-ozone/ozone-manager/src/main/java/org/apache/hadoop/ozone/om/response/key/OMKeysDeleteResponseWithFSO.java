@@ -83,6 +83,8 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       String deletedKey = omMetadataManager
           .getOzoneKey(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
               omKeyInfo.getKeyName());
+      deletedKey = omMetadataManager.getOzoneDeletePathKey(
+          omKeyInfo.getObjectID(), deletedKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
           ozoneDbKey, deletedKey, omKeyInfo);
     }

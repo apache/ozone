@@ -22,14 +22,12 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.codec.OmDBDiffReportEntryCodec;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.ozone.test.GenericTestUtils;
@@ -54,6 +52,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_REPORT_PERSISTENT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
@@ -151,6 +151,9 @@ public class TestSnapshotDiffCleanupService {
         TimeUnit.MILLISECONDS)
     ).thenReturn(TimeUnit.DAYS.toMillis(7));
 
+    when(config.getBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
+        OZONE_FILESYSTEM_SNAPSHOT_ENABLED_DEFAULT)).thenReturn(true);
+
     when(ozoneManager.getConfiguration()).thenReturn(config);
 
     jobTableCfd = new ColumnFamilyDescriptor(jobTableNameBytes,
@@ -163,15 +166,13 @@ public class TestSnapshotDiffCleanupService {
     purgedJobTableCfh = db.get().createColumnFamily(purgedJobTableCfd);
     reportTableCfh = db.get().createColumnFamily(reportTableCfd);
 
-    codecRegistry = new CodecRegistry();
 
-    // Integers are used for indexing persistent list.
-    codecRegistry.addCodec(Integer.class, new IntegerCodec());
+    final CodecRegistry.Builder b = CodecRegistry.newBuilder();
     // DiffReportEntry codec for Diff Report.
-    codecRegistry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
-        new OmDBDiffReportEntryCodec());
-    codecRegistry.addCodec(SnapshotDiffJob.class,
-        new SnapshotDiffJob.SnapshotDiffJobCodec());
+    b.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
+        SnapshotDiffReportOzone.getDiffReportEntryCodec());
+    b.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
+    codecRegistry = b.build();
     emptyReportEntry = codecRegistry.asRawData("{}");
 
     diffCleanupService = new SnapshotDiffCleanupService(
@@ -298,7 +299,7 @@ public class TestSnapshotDiffCleanupService {
     String jobKey = fromSnapshot + DELIMITER + toSnapshot;
 
     SnapshotDiffJob job = new SnapshotDiffJob(creationTime, jobId, jobStatus,
-        volume, bucket, fromSnapshot, toSnapshot, false, noOfEntries);
+        volume, bucket, fromSnapshot, toSnapshot, false, false, noOfEntries);
 
     db.get().put(jobTableCfh, codecRegistry.asRawData(jobKey),
         codecRegistry.asRawData(job));

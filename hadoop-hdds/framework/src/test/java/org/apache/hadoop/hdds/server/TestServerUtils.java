@@ -18,24 +18,180 @@
 package org.apache.hadoop.hdds.server;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.Test;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
 
 /**
  * Unit tests for {@link ServerUtils}.
  */
 public class TestServerUtils {
+
+  @Rule
+  public TemporaryFolder folder = new TemporaryFolder();
+
+  /**
+   * Test case for {@link ServerUtils#getPermissions}.
+   * Verifies the retrieval of permissions for different configs.
+   */
+  @Test
+  public void testGetPermissions() {
+    // Create an OzoneConfiguration object and set the permissions
+    // for different keys
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ReconConfigKeys.OZONE_RECON_DB_DIRS_PERMISSIONS, "750");
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS_PERMISSIONS, "775");
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS, "770");
+    conf.set(OzoneConfigKeys.OZONE_OM_DB_DIRS_PERMISSIONS, "700");
+
+    // Test getPermissions for different config names and assert the
+    // returned permissions
+    assertEquals("750",
+        ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, conf));
+    assertEquals("775",
+        ServerUtils.getPermissions(ScmConfigKeys.OZONE_SCM_DB_DIRS, conf));
+    assertEquals("770",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_METADATA_DIRS, conf));
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf));
+
+  }
+
+  @Test
+  public void testGetDirectoryFromConfigWithOctalPermissions()
+      throws IOException {
+    // Create a temporary directory
+    String filePath = folder.getRoot().getAbsolutePath();
+
+    // Create an OzoneConfiguration object
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
+    String componentName = "Ozone";
+    conf.set(key, filePath);
+
+    // Set octal permissions
+    String octalPermissionValue = "750";
+    String octalExpectedPermissions = "rwxr-x---";
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS,
+        octalPermissionValue);
+
+    // Get the directory using ServerUtils method
+    File directory =
+        ServerUtils.getDirectoryFromConfig(conf, key, componentName);
+
+    // Assert that the directory is not null and exists
+    assertNotNull(directory);
+    assertTrue(directory.exists());
+    assertTrue(directory.isDirectory());
+
+    // Get the path of the directory
+    Path directoryPath = directory.toPath();
+
+    // Convert the expected octal permissions string to a
+    // set of PosixFilePermission
+    Set<PosixFilePermission> octalExpectedPermissionSet =
+        PosixFilePermissions.fromString(octalExpectedPermissions);
+
+    // Get the actual permissions of the directory
+    Set<PosixFilePermission> actualPermissionSet =
+        Files.getPosixFilePermissions(directoryPath);
+
+    // Assert that the expected and actual permissions sets are equal
+    assertEquals(octalExpectedPermissionSet, actualPermissionSet);
+  }
+
+  @Test
+  public void testGetDirectoryFromConfigWithSymbolicPermissions()
+      throws IOException {
+    // Create a temporary directory
+    String filePath = folder.getRoot().getAbsolutePath();
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
+    String componentName = "Ozone";
+    conf.set(key, filePath);
+
+    // Set symbolic permissions
+    String symbolicPermissionValue = "rwx------";
+    String symbolicExpectedPermissions = "rwx------";
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS_PERMISSIONS,
+        symbolicPermissionValue);
+
+    File directory =
+        ServerUtils.getDirectoryFromConfig(conf, key, componentName);
+
+    assertNotNull(directory);
+    assertTrue(directory.exists());
+    assertTrue(directory.isDirectory());
+
+    Path directoryPath = directory.toPath();
+
+    Set<PosixFilePermission> symbolicExpectedPermissionSet =
+        PosixFilePermissions.fromString(symbolicExpectedPermissions);
+
+    Set<PosixFilePermission> actualPermissionSet =
+        Files.getPosixFilePermissions(directoryPath);
+
+    assertEquals(symbolicExpectedPermissionSet, actualPermissionSet);
+  }
+
+  @Test
+  public void testGetDirectoryFromConfigWithMultipleDirectories()
+      throws IOException {
+    // Create temporary directories
+    File dir1 = folder.newFolder("dir1");
+    File dir2 = folder.newFolder("dir2");
+
+    // Create an OzoneConfiguration object
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
+    String componentName = "Ozone";
+    conf.set(key, dir1.getAbsolutePath() + "," + dir2.getAbsolutePath());
+
+    // Assert that an IllegalArgumentException is thrown because Recon does not
+    // support multiple metadata dirs currently
+    assertThrows(IllegalArgumentException.class, () -> {
+      ServerUtils.getDirectoryFromConfig(conf, key, componentName);
+    });
+  }
+
+  @Test
+  public void testGetDirectoryFromConfigWithNoDirectory() {
+    // Create an empty OzoneConfiguration object
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
+    String componentName = "Ozone";
+
+    // Get the directory using ServerUtils method
+    File directory =
+        ServerUtils.getDirectoryFromConfig(conf, key, componentName);
+
+    // Assert that the directory is null
+    assertNull(directory);
+  }
 
   /**
    * Test {@link ServerUtils#getScmDbDir}.

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -41,9 +42,12 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -52,10 +56,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.times;
 
 /**
  * Tests for {@link RatisUnderReplicationHandler}.
@@ -65,10 +75,11 @@ public class TestRatisUnderReplicationHandler {
   private NodeManager nodeManager;
   private OzoneConfiguration conf;
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG =
-      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      RatisReplicationConfig.getInstance(THREE);
   private PlacementPolicy policy;
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
+  private ReplicationManagerMetrics metrics;
 
   @Before
   public void setup() throws NodeNotFoundException,
@@ -86,13 +97,15 @@ public class TestRatisUnderReplicationHandler {
     Mockito.when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManagerConfiguration.class));
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
       DatanodeDetails, and NodeState as HEALTHY.
     */
     Mockito.when(
-        replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+        replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
           return new NodeStatus(dn.getPersistedOpState(),
@@ -103,6 +116,8 @@ public class TestRatisUnderReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
         replicationManager, commandsSent, new AtomicBoolean(false));
     ReplicationTestUtil.mockRMSendDatanodeCommand(replicationManager,
+        commandsSent);
+    ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
         commandsSent);
   }
 
@@ -213,6 +228,8 @@ public class TestRatisUnderReplicationHandler {
     Assert.assertThrows(IOException.class,
         () -> handler.processAndSendCommands(replicas,
             Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(0, commandsSent.size());
+    Assert.assertEquals(0, metrics.getPartialReplicationTotal());
   }
 
   @Test
@@ -232,6 +249,130 @@ public class TestRatisUnderReplicationHandler {
     // One command should be sent to the replication manager as we could only
     // fine one node rather than two.
     Assert.assertEquals(1, commandsSent.size());
+    Assert.assertEquals(1, metrics.getPartialReplicationTotal());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyRemoveNone() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // No commands send, as there are only 2 replicas available.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyNoneHealthy() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    // All replicas UNHEALTHY so we do nothing.
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.UNHEALTHY, 0, 0);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    // No commands send, as no CLOSED replicas available.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyRemoveUnhealthy() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+        .Type.deleteContainerCommand, cmd.getValue().getType());
+  }
+
+  @Test
+  public void testNoTargetsFoundBecauseOfPlacementPolicyPendingDelete() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    List<ContainerReplicaOp> pending = Collections.singletonList(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        shouldDelete.getDatanodeDetails(), 0));
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            pending, getUnderReplicatedHealthResult(), 2));
+    // No commands sent as we have a pending delete.
+    Assert.assertEquals(0, commandsSent.size());
+  }
+
+  @Test
+  public void testNoTargetsFoundRemoveQuasiClosedWithLowestSeq() {
+    policy = ReplicationTestUtil.getNoNodesTestPlacementPolicy(nodeManager,
+        conf);
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    long sequenceID = 10;
+    container = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(THREE),
+        1, HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+    // This quasi closed is newer than the other one below, so it should not
+    // be removed.
+    replicas.add(createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+        sequenceID - 2));
+    // Unhealthy should be removed over the quasi-closed ones.
+    ContainerReplica shouldDelete = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY);
+    replicas.add(shouldDelete);
+
+    Assert.assertThrows(IOException.class,
+        () -> handler.processAndSendCommands(replicas,
+            Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+    Assert.assertEquals(1, commandsSent.size());
+    Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    Assert.assertEquals(shouldDelete.getDatanodeDetails(), cmd.getKey());
+    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+        .Type.deleteContainerCommand, cmd.getValue().getType());
   }
 
   @Test
@@ -301,10 +442,125 @@ public class TestRatisUnderReplicationHandler {
 
     // Ensure that the replica with SEQ=2 is the only source sent
     Mockito.verify(replicationManager).sendThrottledReplicationCommand(
-        Mockito.any(ContainerInfo.class),
+        any(ContainerInfo.class),
         Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
-        Mockito.any(DatanodeDetails.class), anyInt());
+        any(DatanodeDetails.class), anyInt());
   }
+
+  @Test
+  public void testCorrectUsedAndExcludedNodesPassed() throws IOException {
+    PlacementPolicy mockPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(mockPolicy.chooseDatanodes(any(), any(), any(),
+        anyInt(), anyLong(), anyLong()))
+        .thenReturn(Collections.singletonList(
+            MockDatanodeDetails.randomDatanodeDetails()));
+
+    ArgumentCaptor<List<DatanodeDetails>> usedNodesCaptor =
+        ArgumentCaptor.forClass(List.class);
+
+    ArgumentCaptor<List<DatanodeDetails>> excludedNodesCaptor =
+        ArgumentCaptor.forClass(List.class);
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(mockPolicy, conf, replicationManager);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    ContainerReplica good = createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, 1);
+    replicas.add(good);
+
+    ContainerReplica unhealthy = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY, 1);
+    replicas.add(unhealthy);
+
+    ContainerReplica decommissioning =
+        createContainerReplica(container.containerID(), 0,
+            DECOMMISSIONING, State.CLOSED, 1);
+    replicas.add(decommissioning);
+
+    ContainerReplica maintenance =
+        createContainerReplica(container.containerID(), 0,
+            IN_MAINTENANCE, State.CLOSED, 1);
+    replicas.add(maintenance);
+
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails pendingRemove = MockDatanodeDetails.randomDatanodeDetails();
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
+    pendingOps.add(ContainerReplicaOp.create(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingRemove, 0));
+
+    handler.processAndSendCommands(replicas, pendingOps,
+        getUnderReplicatedHealthResult(), 2);
+
+
+    Mockito.verify(mockPolicy, times(1)).chooseDatanodes(
+        usedNodesCaptor.capture(), excludedNodesCaptor.capture(), any(),
+        anyInt(), anyLong(), anyLong());
+
+    List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
+    List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();
+
+    Assertions.assertTrue(usedNodes.contains(good.getDatanodeDetails()));
+    Assertions.assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
+    Assertions.assertTrue(usedNodes.contains(pendingAdd));
+
+    Assertions.assertTrue(excludedNodes.contains(
+        unhealthy.getDatanodeDetails()));
+    Assertions.assertTrue(excludedNodes.contains(
+        decommissioning.getDatanodeDetails()));
+    Assertions.assertTrue(excludedNodes.contains(pendingRemove));
+  }
+
+  @Test
+  public void testUnderReplicationDueToQuasiClosedReplicaWithWrongSequenceID()
+      throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertNotEquals(
+            quasiClosedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
+  @Test
+  public void testOnlyQuasiClosedReplicaWithWrongSequenceIdIsAvailable()
+      throws IOException {
+    final long sequenceID = 20;
+    container = createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(1);
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getUnderReplicatedHealthResult(), 2, 2);
+    commands.forEach(
+        command -> Assert.assertEquals(
+            quasiClosedReplica.getDatanodeDetails(),
+            command.getKey()));
+  }
+
 
   /**
    * Tests whether the specified expectNumCommands number of commands are

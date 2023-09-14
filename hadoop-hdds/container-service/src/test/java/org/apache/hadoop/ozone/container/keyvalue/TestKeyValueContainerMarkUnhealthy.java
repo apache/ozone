@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -94,9 +93,11 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
-    HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
-        .toString()).build();
+    String dataDir = folder.newFolder("data").getAbsolutePath();
+    HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)
+        .conf(conf)
+        .datanodeUuid(datanodeId.toString())
+        .build();
     hddsVolume.format(scmId);
     hddsVolume.createWorkingDir(scmId, null);
 
@@ -109,8 +110,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    final File metaDir = GenericTestUtils.getRandomizedTestDir();
-    metaDir.mkdirs();
+    final File metaDir = folder.newFolder("meta");
     keyValueContainerData.setMetadataPath(metaDir.getPath());
 
 

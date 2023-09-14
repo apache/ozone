@@ -60,7 +60,8 @@ public class TestOMDelegationTokenRequest {
     conf = new OzoneConfiguration();
     ((OzoneConfiguration) conf)
         .set(OZONE_OM_DB_DIRS, folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf);
+    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf,
+        ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
   }
 

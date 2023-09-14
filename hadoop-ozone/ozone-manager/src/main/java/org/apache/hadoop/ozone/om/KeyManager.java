@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -119,16 +121,17 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
-   * Returns a list of pending deletion key info that ups to the given count.
-   * Each entry is a {@link BlockGroup}, which contains the info about the
-   * key name and all its associated block IDs. A pending deletion key is
-   * stored with #deleting# prefix in OM DB.
+   * Returns a PendingKeysDeletion. It has a list of pending deletion key info
+   * that ups to the given count.Each entry is a {@link BlockGroup}, which
+   * contains the info about the key name and all its associated block IDs.
+   * Second is a Mapping of Key-Value pair which is updated in the deletedTable.
    *
    * @param count max number of keys to return.
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @return a Pair of list of {@link BlockGroup} representing keys and blocks,
+   * and a hashmap for key-value pair to be updated in the deletedTable.
    * @throws IOException
    */
-  List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
+  PendingKeysDeletion getPendingDeletionKeys(int count) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
@@ -153,7 +156,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Deleting Service.
    * @return Background service.
    */
-  BackgroundService getDeletingService();
+  KeyDeletingService getDeletingService();
 
 
   OmMultipartUploadList listMultipartUploads(String volumeName,
@@ -246,11 +249,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns the instance of Snapshot SST Filtering service.
    * @return Background service.
    */
-  BackgroundService getSnapshotSstFilteringService();
+  SstFilteringService getSnapshotSstFilteringService();
 
   /**
    * Returns the instance of Snapshot Deleting service.
    * @return Background service.
    */
-  BackgroundService getSnapshotDeletingService();
+  SnapshotDeletingService getSnapshotDeletingService();
 }

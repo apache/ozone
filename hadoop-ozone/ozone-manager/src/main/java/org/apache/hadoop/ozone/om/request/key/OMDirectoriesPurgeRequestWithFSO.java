@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -41,7 +40,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import java.util.List;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -64,19 +62,15 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
-    OmSnapshot omFromSnapshot = null;
+    SnapshotInfo fromSnapshotInfo = null;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     try {
       if (fromSnapshot != null) {
-        SnapshotInfo snapshotInfo =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .get(fromSnapshot);
-        omFromSnapshot = (OmSnapshot) ozoneManager.getOmSnapshotManager()
-            .checkForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()));
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable()
+            .get(fromSnapshot);
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
@@ -127,7 +121,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
       }
     } catch (IOException ex) {
-      // Case of IOException for fromProtobuf will not hanppen
+      // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
       throw new IllegalStateException(ex);
@@ -145,7 +139,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, omFromSnapshot);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo);
     addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
         omDoubleBufferHelper);
 

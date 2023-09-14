@@ -228,7 +228,7 @@ public class ContainerBalancerTask implements Runnable {
           long sleepTime = 3 * nodeReportInterval;
           LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
               "for updated usage information from Datanodes.", sleepTime);
-          Thread.sleep(nodeReportInterval);
+          Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");
@@ -627,6 +627,8 @@ public class ContainerBalancerTask implements Runnable {
         selectedSources.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
+    metrics.incrementNumContainerMovesScheduled(
+        metrics.getNumContainerMovesScheduledInLatestIteration());
     metrics.incrementNumContainerMovesCompleted(
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
@@ -817,6 +819,7 @@ public class ContainerBalancerTask implements Runnable {
         future = moveManager.move(containerID, source,
             moveSelection.getTargetNode());
       }
+      metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
       future = future.whenComplete((result, ex) -> {
         metrics.incrementCurrentIterationContainerMoveMetric(result, 1);

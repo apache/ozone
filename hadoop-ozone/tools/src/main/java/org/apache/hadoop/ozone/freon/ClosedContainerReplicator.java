@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -42,7 +43,6 @@ import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.jetbrains.annotations.NotNull;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -50,8 +50,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Clock;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -168,7 +166,6 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
             + " (used as destination) should be empty");
   }
 
-  @NotNull
   private void initializeReplicationSupervisor(
       ConfigurationSource conf, int queueSize) throws IOException {
     String fakeDatanodeUuid = datanode;
@@ -209,10 +206,15 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
         new SimpleContainerDownloader(conf, null));
 
+    DatanodeConfiguration datanodeConfig =
+        conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setCommandQueueLimit(queueSize);
     ReplicationServer.ReplicationConfig replicationConfig
         = conf.getObject(ReplicationServer.ReplicationConfig.class);
-    supervisor = new ReplicationSupervisor(null, replicationConfig,
-        Clock.system(ZoneId.systemDefault()), queueSize);
+    supervisor = ReplicationSupervisor.newBuilder()
+        .datanodeConfig(datanodeConfig)
+        .replicationConfig(replicationConfig)
+        .build();
   }
 
   private void replicateContainer(long counter) throws Exception {

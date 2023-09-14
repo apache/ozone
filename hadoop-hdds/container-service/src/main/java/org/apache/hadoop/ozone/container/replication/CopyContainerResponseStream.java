@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 
 /**
  * Output stream adapter for CopyContainerResponse.
@@ -28,7 +28,7 @@ class CopyContainerResponseStream
     extends GrpcOutputStream<CopyContainerResponseProto> {
 
   CopyContainerResponseStream(
-      StreamObserver<CopyContainerResponseProto> streamObserver,
+      CallStreamObserver<CopyContainerResponseProto> streamObserver,
       long containerId, int bufferSize) {
     super(streamObserver, containerId, bufferSize);
   }

@@ -46,6 +46,10 @@ OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
 OZONE-SITE.XML_ozone.scm.dead.node.interval=45s
 OZONE-SITE.XML_hdds.heartbeat.interval=5s
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
+OZONE-SITE.XML_hdds.scm.replication.thread.interval=15s
+OZONE-SITE.XML_hdds.scm.replication.under.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
+OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
 
@@ -53,3 +57,6 @@ OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
+
+# Explicitly enable filesystem snapshot feature for this Docker compose cluster
+OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true

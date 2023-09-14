@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -381,7 +380,6 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
-  @Flaky("HDDS-8453")
   public void testDirDeletedTableCleanUpForSnapshot() throws Exception {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -450,6 +448,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 5);
 
+    long prevKdsRunCount = keyDeletingService.getRunCount().get();
+
+    // wait for at least 1 iteration of KeyDeletingService
+    GenericTestUtils.waitFor(
+        () -> (keyDeletingService.getRunCount().get() > prevKdsRunCount), 100,
+        10000);
+
     // KeyDeletingService and DirectoryDeletingService will not
     // clean up because the paths are part of a snapshot.
     assertTableRowCount(deletedDirTable, 0);
@@ -471,8 +476,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     // clean up because the paths are part of a snapshot.
     // As a result on 1 deleted dir and 3 deleted files will
     // remain in dirTable and keyTable respectively.
+    long prevDDSRunCount = dirDeletingService.getRunCount().get();
+    long prevKDSRunCount = keyDeletingService.getRunCount().get();
     assertTableRowCount(deletedDirTable, 1);
     assertTableRowCount(deletedKeyTable, 3);
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
+        prevDDSRunCount, 100, 10000);
+    GenericTestUtils.waitFor(() -> keyDeletingService.getRunCount().get() >
+        prevKDSRunCount, 100, 10000);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
