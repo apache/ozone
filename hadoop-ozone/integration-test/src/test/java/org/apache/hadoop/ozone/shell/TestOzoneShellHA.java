@@ -888,7 +888,8 @@ public class TestOzoneShellHA {
 
     // Test negative scenarios for --space-quota and --namespace-quota option
     args = new String[]{"volume", "create", "vol5", "--space-quota"};
-    executeWithError(ozoneShell, args, "Missing required parameter for option " +
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
         "'--space-quota' (<quotaInBytes>)");
     out.reset();
 
@@ -911,12 +912,14 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota"};
-    executeWithError(ozoneShell, args, "Missing required parameter for option " +
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
         "'--namespace-quota' (<quotaInNamespace>)");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
-    executeWithError(ozoneShell, args, "Invalid values for namespace quota: -1");
+    executeWithError(ozoneShell, args,
+        "Invalid values for namespace quota: -1");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5"};
@@ -924,22 +927,27 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5", "--space-quota"};
-    executeWithError(ozoneShell, args, "Missing required parameter for option " +
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
         "'--space-quota' (<quotaInBytes>)");
     out.reset();
 
-    args = new String[]{"bucket", "create", "vol5/buck5", "--space-quota", "-1"};
-    executeWithError(ozoneShell, args, "Invalid values for space quota: -1");
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "-1"};
+    executeWithError(ozoneShell, args,
+        "Invalid values for space quota: -1");
     out.reset();
 
-    args = new String[]{"bucket", "create", "vol5/buck5", "--space-quota", "test"};
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "test"};
     executeWithError(ozoneShell, args, "Invalid values for quota, " +
         "to ensure that the Quota format is legal(supported values are " +
         "B, KB, MB, GB and TB with positive long values). " +
         "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
     out.reset();
 
-    args = new String[]{"bucket", "create", "vol5/buck5", "--space-quota", "1.5GB"};
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "1.5GB"};
     executeWithError(ozoneShell, args, "Invalid values for quota, " +
         "to ensure that the Quota format is legal(supported values are " +
         "B, KB, MB, GB and TB with positive long values). " +
@@ -947,12 +955,14 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5", "--namespace-quota"};
-    executeWithError(ozoneShell, args, "Missing required parameter for option " +
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
         "'--namespace-quota' (<quotaInNamespace>)");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
-    executeWithError(ozoneShell, args, "Invalid values for namespace quota: -1");
+    executeWithError(ozoneShell, args,
+        "Invalid values for namespace quota: -1");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5"};
@@ -1023,7 +1033,8 @@ public class TestOzoneShellHA {
 
     String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4",
         "--space-quota"};
-    MissingParameterException mException = assertThrows(MissingParameterException.class,
+    MissingParameterException mException = assertThrows(
+        MissingParameterException.class,
         () -> execute(ozoneShell, volumeArgs5));
     assertTrue(mException.getMessage()
         .contains("Missing required parameter"));
