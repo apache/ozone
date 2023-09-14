@@ -263,6 +263,8 @@ public class OMException extends IOException {
     CONTAINS_SNAPSHOT,
     SSL_CONNECTION_FAILURE,
     RENAME_OPEN_FILE,
-    UNAUTHORIZED
+    UNAUTHORIZED,
+
+    S3_SECRET_ALREADY_EXISTS
   }
 }

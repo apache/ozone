@@ -19,8 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ./commonawslib.robot
-Suite Setup         Setup v4 headers
-
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${ENDPOINT_URL}         http://s3g:9878
