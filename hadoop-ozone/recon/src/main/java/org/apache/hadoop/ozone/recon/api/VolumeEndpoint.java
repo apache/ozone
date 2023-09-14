@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_STARTKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
 /**
  * Endpoint to fetch details about volumes.
@@ -63,10 +63,10 @@ public class VolumeEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT)
       @QueryParam(RECON_QUERY_LIMIT) int limit,
       @DefaultValue(StringUtils.EMPTY)
-      @QueryParam(RECON_QUERY_STARTKEY) String startKey
+      @QueryParam(RECON_QUERY_PREVKEY) String prevKey
   ) throws IOException {
     List<OmVolumeArgs> volumes = omMetadataManager.listVolumes(
-        startKey, limit);
+        prevKey, limit);
     List<VolumeMetadata> volumeMetadata = volumes.stream()
         .map(this::toVolumeMetadata).collect(Collectors.toList());
     VolumesResponse volumesResponse =
