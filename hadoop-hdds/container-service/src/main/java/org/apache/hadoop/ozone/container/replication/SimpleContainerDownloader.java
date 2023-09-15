@@ -96,7 +96,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   private static void logError(Exception e,
       long containerId, DatanodeDetails datanode, int datanodeIndex,
       int shuffledDatanodesSize) {
-    StringBuilder sb = new StringBuilder("Error on replicating container: {} from {}. ");
+    StringBuilder sb =
+        new StringBuilder("Error on replicating container: {} from {}. ");
     if (datanodeIndex < shuffledDatanodesSize - 1) {
       sb.append("Will try next datanode.");
     }
