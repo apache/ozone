@@ -133,6 +133,7 @@ public class DefaultCAServer implements CertificateServer {
   private Lock lock;
   private static boolean testSecureFlag;
   private BigInteger rootCertificateId;
+  private KeyPair rootCaKeyPair;
 
   /**
    * Create an Instance of DefaultCAServer.
@@ -218,6 +219,9 @@ public class DefaultCAServer implements CertificateServer {
 
   private KeyPair getCAKeys() throws IOException {
     KeyCodec keyCodec = new KeyCodec(config, componentName);
+    if (rootCaKeyPair != null) {
+      return rootCaKeyPair;
+    }
     try {
       return new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey());
     } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
@@ -383,6 +387,7 @@ public class DefaultCAServer implements CertificateServer {
   private void generateSelfSignedCA(SecurityConfig securityConfig) throws
       NoSuchAlgorithmException, NoSuchProviderException, IOException {
     KeyPair keyPair = generateKeys(securityConfig);
+    rootCaKeyPair = keyPair;
     generateRootCertificate(securityConfig, keyPair);
   }
 
@@ -436,6 +441,9 @@ public class DefaultCAServer implements CertificateServer {
    * @return True if the key files exist.
    */
   private boolean checkIfKeysExist() {
+    if (rootCaKeyPair != null) {
+      return true;
+    }
     if (!Files.exists(caKeysPath)) {
       return false;
     }
@@ -549,11 +557,7 @@ public class DefaultCAServer implements CertificateServer {
   private KeyPair generateKeys(SecurityConfig securityConfig)
       throws NoSuchProviderException, NoSuchAlgorithmException, IOException {
     HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
-    KeyPair keys = keyGenerator.generateKey();
-    KeyCodec keyPEMWriter = new KeyCodec(securityConfig,
-        componentName);
-    keyPEMWriter.writeKey(keys);
-    return keys;
+    return keyGenerator.generateKey();
   }
 
   /**

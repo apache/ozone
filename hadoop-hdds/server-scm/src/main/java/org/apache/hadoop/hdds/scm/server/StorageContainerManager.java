@@ -82,7 +82,6 @@ import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -871,38 +870,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           CAType.SUBORDINATE);
     }
 
-    // If primary SCM node Id is set it means this is a cluster which has
-    // performed init with SCM HA version code.
-    if (scmStorageConfig.checkPrimarySCMIdInitialized()) {
-      if (primaryScmNodeId.equals(scmStorageConfig.getScmId())) {
-        if (configurator.getCertificateServer() != null) {
-          rootCertificateServer = configurator.getCertificateServer();
-        } else {
-          rootCertificateServer =
-              HASecurityUtils.initializeRootCertificateServer(securityConfig,
-                  certificateStore, scmStorageConfig, new DefaultCAProfile());
-        }
-        persistPrimarySCMCerts();
-      } else {
-        rootCertificateServer = null;
-      }
-    } else {
-      // On an upgraded cluster primary scm nodeId will not be set as init will
-      // not be run again after upgrade. For an upgraded cluster, besides one
-      // intermediate CA server which is issuing certificates to DN and OM,
-      // we will have one root CA server too.
-      rootCertificateServer =
-          HASecurityUtils.initializeRootCertificateServer(securityConfig,
-              certificateStore, scmStorageConfig, new DefaultProfile());
-    }
-
     SecretKeyManager secretKeyManager = secretKeyManagerService != null ?
         secretKeyManagerService.getSecretKeyManager() : null;
 
-    // We need to pass getCACertificate as rootCA certificate,
-    // as for SCM CA is root-CA.
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
-        rootCertificateServer,
+        null,
         scmCertificateServer,
         scmCertificateClient,
         this,
