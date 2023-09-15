@@ -30,7 +30,7 @@
 
 BASIC_CHECKS="author bats checkstyle docs findbugs rat"
 UNIT_CHECKS="native unit"
-
+ALL_BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
 
 if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
     ALL_BASIC_CHECKS=" ${ALL_BASIC_CHECKS[*]} "         # add framing blanks
