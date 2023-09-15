@@ -82,10 +82,10 @@ function get_changed_files() {
 }
 
 function set_outputs_run_everything_and_exit() {
-    BASIC_CHECKS="author bats checkstyle docs findbugs native rat"
-    UNIT_TESTS="unit"
+    BASIC_CHECKS=$(grep -r '^#checks:' hadoop-ozone/dev-support/checks \
+                   | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev \
+                   | cut -f1 -d'.' | sed 's/^\|$/"/g'|paste -sd' '  -)
     compile_needed=true
-    unit_tests_needed=true
     compose_tests_needed=true
     dependency_check_needed=true
     integration_tests_needed=true
@@ -98,8 +98,6 @@ function set_outputs_run_everything_and_exit() {
 
 function set_output_skip_all_tests_and_exit() {
     BASIC_CHECKS=""
-    UNIT_TESTS=""
-    unit_tests_needed=false
     compose_tests_needed=false
     dependency_check_needed=false
     integration_tests_needed=false
@@ -474,7 +472,7 @@ function check_needs_unit_test() {
     filter_changed_files true
 
     if [[ ${match_count} != "0" ]]; then
-        add_unit_test unit
+        add_basic_check unit
     fi
 
     start_end::group_end
@@ -514,13 +512,6 @@ function add_basic_check() {
     fi
 }
 
-function add_unit_test() {
-    local unit_test_check="$1"
-    if [[ "$UNIT_TESTS" != *${unit_test_check}* ]]; then
-        UNIT_TESTS="${UNIT_TESTS} ${unit_test_check}"
-    fi
-}
-
 function calculate_test_types_to_run() {
     start_end::group_start "Count core/other files"
     verbosity::store_exit_on_error_status
@@ -529,7 +520,6 @@ function calculate_test_types_to_run() {
     COUNT_CORE_OTHER_CHANGED_FILES=$((COUNT_ALL_CHANGED_FILES - matched_files_count))
     readonly COUNT_CORE_OTHER_CHANGED_FILES
 
-    unit_tests_needed=false
     compose_tests_needed=false
     integration_tests_needed=false
     kubernetes_tests_needed=false
@@ -538,11 +528,10 @@ function calculate_test_types_to_run() {
         # Running all tests because some core or other files changed
         echo "Looks like ${COUNT_CORE_OTHER_CHANGED_FILES} core files changed, running all tests."
         echo
-        unit_tests_needed=true
         compose_tests_needed=true
         integration_tests_needed=true
         kubernetes_tests_needed=true
-        add_unit_test unit
+        add_basic_check unit
     else
         echo "All ${COUNT_ALL_CHANGED_FILES} changed files are known to be handled by specific checks."
         echo
@@ -550,7 +539,6 @@ function calculate_test_types_to_run() {
             compose_tests_needed="true"
         fi
         if [[ ${COUNT_INTEGRATION_CHANGED_FILES} != "0" ]]; then
-            unit_tests_needed="true"
             integration_tests_needed="true"
         fi
         if [[ ${COUNT_KUBERNETES_CHANGED_FILES} != "0" ]] || [[ ${COUNT_ROBOT_CHANGED_FILES} != "0" ]]; then
@@ -566,22 +554,17 @@ function set_outputs() {
     if [[ -n "${BASIC_CHECKS}" ]]; then
         initialization::ga_output needs-basic-checks "true"
     fi
-    if [[ -n "${UNIT_TESTS}" ]]; then
-        initialization::ga_output needs-basic-unit "true"
-    fi
     initialization::ga_output basic-checks \
         "$(initialization::parameters_to_json ${BASIC_CHECKS})"
-    initialization::ga_output basic-unit \
-            "$(initialization::parameters_to_json ${UNIT_TESTS})"
 
     : ${compile_needed:=false}
 
     if [[ "${compile_needed}" == "true" ]] ||  [[ "${compose_tests_needed}" == "true" ]] || [[ "${kubernetes_tests_needed}" == "true" ]]; then
         build_needed=true
     fi
+
     initialization::ga_output needs-build "${build_needed:-false}"
     initialization::ga_output needs-compile "${compile_needed}"
-    initialization::ga_output needs-basic-unit "${unit_tests_needed}"
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-dependency-check "${dependency_check_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
@@ -624,7 +607,6 @@ check_needs_compile
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"
-UNIT_TESTS=""
 check_needs_author
 check_needs_bats
 check_needs_checkstyle
