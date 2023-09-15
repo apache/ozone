@@ -52,6 +52,6 @@ if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
 fi
 
 initialization::ga_output basic-checks \
-        "$(initialization::parameters_to_json ${BASIC_CHECKS})"
+        "$(initialization::parameters_to_json ${ALL_BASIC_CHECKS})"
 initialization::ga_output basic-unit \
         "$(initialization::parameters_to_json ${UNIT_CHECKS})"
