@@ -401,7 +401,7 @@ final class TestSecureOzoneCluster {
         IOException ioException = assertThrows(IOException.class,
             securityClient::getCACertificate);
         assertTrue(ioException.getMessage().contains(cannotAuthMessage));
-        assertThrows(IOException.class,
+        ioException = assertThrows(IOException.class,
             () -> securityClient.getCertificate("1"));
         assertTrue(ioException.getMessage().contains(cannotAuthMessage));
       }
