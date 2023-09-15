@@ -39,7 +39,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
@@ -55,20 +54,13 @@ public class CodecBuffer implements AutoCloseable {
   private static class Constructor {
     private static volatile Function<ByteBuf, CodecBuffer> constructor
         = CodecBuffer::new;
-    private static final Supplier<Function<ByteBuf, CodecBuffer>> SUPPLIER
-        = MemoizedSupplier.valueOf(() -> constructor);
-
-    static void initialize(Function<ByteBuf, CodecBuffer> f) {
+    static void set(Function<ByteBuf, CodecBuffer> f) {
       constructor = f;
-      final Function<ByteBuf, CodecBuffer> got = SUPPLIER.get();
-      if (got != f) {
-        throw new IllegalStateException("Already initialized to " + got);
-      }
-      LOG.info("Successfully initialized constructor to " + f);
+      LOG.info("Successfully set constructor to " + f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
-      return SUPPLIER.get().apply(buf);
+      return constructor.apply(buf);
     }
   }
 
@@ -88,7 +80,7 @@ public class CodecBuffer implements AutoCloseable {
 
   /** Detect buffer leak in runtime. */
   public static void enableLeakDetection() {
-    Constructor.initialize(LeakDetector.INSTANCE);
+    Constructor.set(LeakDetector.INSTANCE);
   }
 
   /** The size of a buffer. */
