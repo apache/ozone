@@ -23,10 +23,14 @@ BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
  | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
  | sed 's/^\|$/"/g'|paste -sd' ')
 
+echo "All checks value..."
+echo $ALL_BASIC_CHECKS
 
 echo "Starting basic checks....."
-echo $(pwd)
-echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks)
+echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks | sort -u | cut -f1 -d':')
+echo "Starting basic checks processing..."
+echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
+| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \ )
 
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
              | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
@@ -38,7 +42,7 @@ echo $(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks)
 
 #BASIC_CHECKS="author bats checkstyle docs findbugs rat"
 #UNIT_CHECKS="native unit"
-ALL_BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
+#ALL_BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
 
 if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
     ALL_BASIC_CHECKS=" ${ALL_BASIC_CHECKS[*]} "         # add framing blanks
