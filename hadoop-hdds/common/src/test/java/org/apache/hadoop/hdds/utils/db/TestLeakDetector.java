@@ -35,7 +35,8 @@ public final class TestLeakDetector {
     // allocate a buffer but NOT release it.
     CodecBuffer.allocateHeap(3);
     // It should detect a buffer leak.
-    final AssertionError e = Assertions.assertThrows(AssertionError.class, CodecTestUtil::gc);
+    final AssertionError e = Assertions.assertThrows(
+        AssertionError.class, CodecTestUtil::gc);
     e.printStackTrace(System.out);
     Assertions.assertTrue(e.getMessage().startsWith("Found 1 leak"));
   }
