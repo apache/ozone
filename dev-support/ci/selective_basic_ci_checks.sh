@@ -24,9 +24,17 @@ BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
  | sed 's/^\|$/"/g'|paste -sd' ')
 
 
+echo "Starting basic checks....."
+echo $(pwd)
+echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks)
+
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
              | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
              | sed 's/^\|$/"/g'|paste -sd' ')
+
+echo "Unit checks starting...."
+echo $(ls hadoop-ozone/dev-support/checks)
+echo $(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks)
 
 #BASIC_CHECKS="author bats checkstyle docs findbugs rat"
 #UNIT_CHECKS="native unit"
