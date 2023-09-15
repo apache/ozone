@@ -159,16 +159,7 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
 import org.junit.jupiter.api.AfterEach;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -177,7 +168,15 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -594,8 +593,8 @@ final class TestSecureOzoneCluster {
     IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
     assertTrue(ioException.getMessage().contains(exMessage));
-    assertEquals("There should be no retry on AccessControlException", 1,
-        StringUtils.countMatches(logs.getOutput(), exMessage));
+    assertEquals(1, StringUtils.countMatches(logs.getOutput(), exMessage),
+        "There should be no retry on AccessControlException");
   }
 
   private void generateKeyPair() throws Exception {
@@ -954,7 +953,7 @@ final class TestSecureOzoneCluster {
             .build();
     SCMSecurityProtocolClientSideTranslatorPB scmClient =
         mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
+    when(scmClient.getOMCertChain(any(), anyString()))
         .thenReturn(responseProto);
 
     try (OMCertificateClient client =
@@ -985,7 +984,7 @@ final class TestSecureOzoneCluster {
           .setX509Certificate(pemCert)
           .setX509CACertificate(pemCert)
           .build();
-      when(scmClient.getOMCertChain(anyObject(), anyString()))
+      when(scmClient.getOMCertChain(any(), anyString()))
           .thenReturn(responseProto);
       String id2 = newCertHolder.getSerialNumber().toString();
 
@@ -1039,7 +1038,7 @@ final class TestSecureOzoneCluster {
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
             .build();
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
+    when(scmClient.getOMCertChain(any(), anyString()))
         .thenReturn(responseProto);
 
     try (OMCertificateClient client =
@@ -1051,19 +1050,16 @@ final class TestSecureOzoneCluster {
 
       // check that new cert ID should not equal to current cert ID
       String certId1 = newCertHolder.getSerialNumber().toString();
-      Assert.assertFalse(certId1.equals(
-          client.getCertificate().getSerialNumber().toString()));
+      assertNotEquals(certId1,
+          client.getCertificate().getSerialNumber().toString());
 
       // certificate failed to renew, client still hold the old expired cert.
       Thread.sleep(certificateLifetime * 1000);
-      Assert.assertTrue(certId.equals(
-          client.getCertificate().getSerialNumber().toString()));
-      try {
-        client.getCertificate().checkValidity();
-      } catch (Exception e) {
-        Assert.assertTrue(e instanceof CertificateExpiredException);
-      }
-      Assert.assertTrue(omLogs.getOutput().contains(
+      assertEquals(certId,
+          client.getCertificate().getSerialNumber().toString());
+      assertThrows(CertificateExpiredException.class,
+          () -> client.getCertificate().checkValidity());
+      assertTrue(omLogs.getOutput().contains(
           "Error while signing and storing SCM signed certificate."));
 
       // provide a new valid SCMGetCertResponseProto
@@ -1076,7 +1072,7 @@ final class TestSecureOzoneCluster {
           .setX509Certificate(pemCert)
           .setX509CACertificate(pemCert)
           .build();
-      when(scmClient.getOMCertChain(anyObject(), anyString()))
+      when(scmClient.getOMCertChain(any(), anyString()))
           .thenReturn(responseProto);
       String certId2 = newCertHolder.getSerialNumber().toString();
 
@@ -1125,9 +1121,9 @@ final class TestSecureOzoneCluster {
       DNCertificateClient mockClient = mock(DNCertificateClient.class);
       when(mockClient.getCertificate()).thenReturn(
           CertificateCodec.getX509Certificate(newCertHolder));
-      when(mockClient.timeBeforeExpiryGracePeriod(anyObject()))
+      when(mockClient.timeBeforeExpiryGracePeriod(any()))
           .thenReturn(Duration.ZERO);
-      when(mockClient.renewAndStoreKeyAndCertificate(anyObject())).thenThrow(
+      when(mockClient.renewAndStoreKeyAndCertificate(any())).thenThrow(
           new CertificateException("renewAndStoreKeyAndCert failed ",
               CertificateException.ErrorCode.ROLLBACK_ERROR));
 
@@ -1299,7 +1295,7 @@ final class TestSecureOzoneCluster {
 
         ServiceInfoEx serviceInfoEx = client.getObjectStore()
             .getClientProxy().getOzoneManagerClient().getServiceInfo();
-        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+        assertTrue(serviceInfoEx.getCaCertificate().equals(
             CertificateCodec.getPEMEncodedString(caCert)));
 
         // Wait for OM certificate to renewed
@@ -1311,7 +1307,7 @@ final class TestSecureOzoneCluster {
         // rerun the command using old client, it should succeed
         serviceInfoEx = client.getObjectStore()
             .getClientProxy().getOzoneManagerClient().getServiceInfo();
-        Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
+        assertTrue(serviceInfoEx.getCaCertificate().equals(
             CertificateCodec.getPEMEncodedString(caCert)));
       }
 
