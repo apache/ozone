@@ -227,7 +227,7 @@ public final class OzoneQuota {
       return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(quotaInNamespace + " is invalid. " +
-          "The quota value should be a positive integer.");
+          "The quota value should be a positive long.");
     }
   }
 
