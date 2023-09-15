@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -1827,6 +1828,56 @@ public class TestOmSnapshot {
     // Volume is empty
     assertThrows(IllegalArgumentException.class,
             () -> store.deleteSnapshot(nullstr, bucket, snap1));
+  }
+
+  @Test
+  public void testSnapshotQuotaHandling() throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buck-" + counter.incrementAndGet();
+    store.createVolume(volume);
+    OzoneVolume volume1 = store.getVolume(volume);
+    volume1.createBucket(bucket);
+    OzoneBucket bucket1 = volume1.getBucket(bucket);
+    bucket1.setQuota(OzoneQuota.parseQuota("102400000", "500"));
+    volume1.setQuota(OzoneQuota.parseQuota("204800000", "1000"));
+
+    long volUsedNamespaceInitial = volume1.getUsedNamespace();
+    long buckUsedNamspaceInitial = bucket1.getUsedNamespace();
+    long buckUsedBytesIntial = bucket1.getUsedBytes();
+
+    String key1 = "key-1-";
+    key1 = createFileKeyWithPrefix(bucket1, key1);
+
+    long volUsedNamespaceBefore = volume1.getUsedNamespace();
+    long buckUsedNamspaceBefore = bucket1.getUsedNamespace();
+    long buckUsedBytesBefore = bucket1.getUsedBytes();
+
+    String snap1 = "snap" + counter.incrementAndGet();
+    createSnapshot(volume, bucket, snap1);
+
+    long volUsedNamespaceAfter = volume1.getUsedNamespace();
+    long buckUsedNamespaceAfter = bucket1.getUsedNamespace();
+    long buckUsedBytesAfter = bucket1.getUsedBytes();
+
+    assertEquals(volUsedNamespaceBefore, volUsedNamespaceAfter);
+    assertEquals(buckUsedNamspaceBefore, buckUsedNamespaceAfter);
+    assertEquals(buckUsedBytesBefore, buckUsedBytesAfter);
+
+    store.deleteSnapshot(volume, bucket, snap1);
+
+    long volUsedNamespaceFinal = volume1.getUsedNamespace();
+    long buckUsedNamespaceFinal = bucket1.getUsedNamespace();
+    long buckUsedBytesFinal = bucket1.getUsedBytes();
+
+    assertEquals(volUsedNamespaceBefore, volUsedNamespaceFinal);
+    assertEquals(buckUsedNamspaceBefore, buckUsedNamespaceFinal);
+    assertEquals(buckUsedBytesBefore, buckUsedBytesFinal);
+
+    bucket1.deleteKey(key1);
+
+    assertEquals(volUsedNamespaceInitial, volume1.getUsedNamespace());
+    assertEquals(buckUsedNamspaceInitial, bucket1.getUsedNamespace());
+    assertEquals(buckUsedBytesIntial, bucket1.getUsedBytes());
   }
 
   @NotNull
