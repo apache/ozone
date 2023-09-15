@@ -315,7 +315,12 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     OzoneManagerProtocolProtos.OMRequest writeRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+            .setCreateVolumeRequest(CreateVolumeRequest.newBuilder()
+                .setVolumeInfo(VolumeInfo.newBuilder().setOwnerName("owner")
+                    .setAdminName("admin")
+                    .setVolume("vol1")
+                    .build()))
             .setVersion(ClientVersion.CURRENT_VERSION)
             .setClientId(UUID.randomUUID().toString())
             .build();

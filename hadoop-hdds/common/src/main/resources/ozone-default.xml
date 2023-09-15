@@ -2027,6 +2027,14 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.server.read.option</name>
+    <value>DEFAULT</value>
+    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
+    <description>Select the Ratis server read option.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.server.failure.timeout.duration</name>
     <value>120s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>

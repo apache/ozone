@@ -239,7 +239,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SERVER_READ_OPTION
       = "ozone.om.ratis.server.read.option";
   public static final Read.Option OZONE_OM_RATIS_SERVER_READ_OPTION_DEFAULT
-      = Read.Option.LINEARIZABLE;
+      = Read.Option.DEFAULT;
 
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
