@@ -73,6 +73,17 @@ jobs:
       basic-checks: ${{ steps.selective-basic-checks.outputs.basic-checks }}
       basic-unit: ${{ steps.selective-basic-checks.outputs.basic-unit }}
     steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+      - name: Fetch incoming commit ${{ github.sha }} with its parent
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+        if: github.event_name  == 'pull_request'
       - name: Selective Basic Checks
         id: selective-basic-checks
         env:
