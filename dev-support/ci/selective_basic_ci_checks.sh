@@ -30,7 +30,7 @@ echo "Starting basic checks....."
 echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks | sort -u | cut -f1 -d':')
 echo "Starting basic checks processing..."
 echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
-| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \ )
+| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
 
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
              | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
