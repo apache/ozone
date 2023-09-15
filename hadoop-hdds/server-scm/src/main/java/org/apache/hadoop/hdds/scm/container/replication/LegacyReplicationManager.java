@@ -1625,6 +1625,7 @@ public class LegacyReplicationManager {
     }
     final CommandForDatanode<T> datanodeCommand =
         new CommandForDatanode<>(datanode.getUuid(), command);
+    command.setDeadline(clock.millis() + rmConf.getEventTimeout());
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
     return true;
   }

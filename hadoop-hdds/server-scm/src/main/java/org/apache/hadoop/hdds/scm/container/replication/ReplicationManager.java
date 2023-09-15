@@ -651,7 +651,7 @@ public class ReplicationManager implements SCMService {
   public void sendDatanodeCommand(SCMCommand<?> command,
       ContainerInfo containerInfo, DatanodeDetails target)
       throws NotLeaderException {
-    long scmDeadline = clock.millis() + rmConf.eventTimeout;
+    long scmDeadline = clock.millis() + rmConf.getEventTimeout();
     sendDatanodeCommand(command, containerInfo, target, scmDeadline);
   }
 
