@@ -87,7 +87,7 @@ jobs:
       - name: Selective Basic Checks
         id: selective-basic-checks
         env:
-          ALL_BASIC_CHECKS: ${{ needs.build-info.outputs.all-basic-checks }}
+          ALL_BASIC_CHECKS: "${{ needs.build-info.outputs.all-basic-checks }}"
         run: dev-support/ci/selective_basic_ci_checks.sh
   build:
     needs:
