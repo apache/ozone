@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.apache.ozone.rocksdiff.CompactionLogEntry;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 
 import java.util.Map;
 

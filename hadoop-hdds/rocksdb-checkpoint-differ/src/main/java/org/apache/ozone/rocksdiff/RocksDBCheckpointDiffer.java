@@ -41,6 +41,8 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.ozone.compaction.log.CompactionFileInfo;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.graph.PrintableGraph;
 import org.apache.ozone.graph.PrintableGraph.GraphType;
@@ -166,7 +168,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * to save space.
    */
   static final String SST_FILE_EXTENSION = ".sst";
-  static final int SST_FILE_EXTENSION_LENGTH = SST_FILE_EXTENSION.length();
+  public static final int SST_FILE_EXTENSION_LENGTH =
+      SST_FILE_EXTENSION.length();
 
   private static final int LONG_MAX_STR_LEN =
       String.valueOf(Long.MAX_VALUE).length();
@@ -1165,12 +1168,12 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @VisibleForTesting
-  MutableGraph<CompactionNode> getForwardCompactionDAG() {
+  public MutableGraph<CompactionNode> getForwardCompactionDAG() {
     return forwardCompactionDAG;
   }
 
   @VisibleForTesting
-  MutableGraph<CompactionNode> getBackwardCompactionDAG() {
+  public MutableGraph<CompactionNode> getBackwardCompactionDAG() {
     return backwardCompactionDAG;
   }
 
@@ -1516,11 +1519,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public static Logger getLog() {
     return LOG;
-  }
-
-  @VisibleForTesting
-  public String getCurrentCompactionLogPath() {
-    return currentCompactionLogPath;
   }
 
   @VisibleForTesting

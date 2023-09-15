@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdiff;
+package org.apache.ozone.compaction.log;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.StringUtils;

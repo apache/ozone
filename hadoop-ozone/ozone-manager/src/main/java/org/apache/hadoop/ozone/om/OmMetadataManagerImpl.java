@@ -109,7 +109,7 @@ import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlock
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.rocksdiff.CompactionLogEntry;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -1952,6 +1952,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getSnapshotRenamedTable() {
     return snapshotRenamedTable;
+  }
+
+  @Override
+  public Table<String, CompactionLogEntry> getCompactionLogTable() {
+    return compactionLogTable;
   }
 
   /**

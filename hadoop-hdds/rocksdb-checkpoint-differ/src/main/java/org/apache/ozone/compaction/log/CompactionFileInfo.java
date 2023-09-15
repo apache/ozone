@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.ozone.rocksdiff;
+package org.apache.ozone.compaction.log;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
