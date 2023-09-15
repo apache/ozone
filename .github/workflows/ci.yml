@@ -25,6 +25,7 @@ jobs:
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
+      acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
       basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
       needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -58,6 +59,9 @@ jobs:
             # Run all checks
             dev-support/ci/selective_ci_checks.sh
           fi
+      - name: Acceptance suites
+        id: acceptance-suites
+        run: dev-support/ci/acceptance_suites.sh
   build:
     needs:
       - build-info
@@ -247,16 +251,7 @@ jobs:
     if: needs.build-info.outputs.needs-compose-tests == 'true'
     strategy:
       matrix:
-        suite:
-          - secure
-          - unsecure
-          - compat
-          - EC
-          - HA-secure
-          - HA-unsecure
-          - MR
-          - misc
-          - cert-rotation
+        suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
       fail-fast: false
     steps:
       - name: Checkout project

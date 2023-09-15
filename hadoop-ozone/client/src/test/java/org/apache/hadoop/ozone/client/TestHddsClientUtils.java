@@ -246,6 +246,7 @@ public class TestHddsClientUtils {
     final String upperCase = "notAname";
     final String endDot = "notaname.";
     final String startDot = ".notaname";
+    final String unicodeCharacters = "ｚｚｚ";
     final String tooShort = StringUtils.repeat("a",
         OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
 
@@ -257,6 +258,7 @@ public class TestHddsClientUtils {
     invalidNames.add(upperCase);
     invalidNames.add(endDot);
     invalidNames.add(startDot);
+    invalidNames.add(unicodeCharacters);
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
