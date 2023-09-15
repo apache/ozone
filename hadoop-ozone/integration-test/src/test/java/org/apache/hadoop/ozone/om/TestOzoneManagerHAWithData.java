@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -61,7 +60,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
-  @Flaky("HDDS-5994")
   public void testAllOMNodesRunningAndOneDown() throws Exception {
     createVolumeTest(true);
     createKeyTest(true);
@@ -317,7 +315,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   }
 
   @Test
-  @Flaky("HDDS-6074")
   public void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
