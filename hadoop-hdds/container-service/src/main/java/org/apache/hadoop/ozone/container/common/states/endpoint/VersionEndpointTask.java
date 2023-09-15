@@ -77,7 +77,7 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
           DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration, clusterId);
+              = new DatanodeLayoutStorage(configuration);
           layoutStorage.setClusterId(clusterId);
           layoutStorage.forceInitialize();
 
