@@ -19,14 +19,18 @@
 # shellcheck source=dev-support/ci/lib/_script_init.sh
 . dev-support/ci/lib/_script_init.sh
 
-BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
- | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
- | sed 's/^\|$/"/g'|paste -sd' '  -)
+#BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
+ #| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
+ #| sed 's/^\|$/"/g'|paste -sd' '  -)
 
 
-UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
-             | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
-             | sed 's/^\|$/"/g'|paste -sd' '  -)
+#UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
+             #| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
+             #| sed 's/^\|$/"/g'|paste -sd' '  -)
+
+BASIC_CHECKS="author bats checkstyle docs findbugs rat"
+UNIT_CHECKS="native unit"
+
 
 if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
     ALL_BASIC_CHECKS=" ${ALL_BASIC_CHECKS[*]} "         # add framing blanks
