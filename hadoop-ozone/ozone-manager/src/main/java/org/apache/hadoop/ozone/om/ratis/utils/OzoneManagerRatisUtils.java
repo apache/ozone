@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotUpdateSizeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
@@ -224,6 +225,8 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotMoveDeletedKeysRequest(omRequest);
     case SnapshotPurge:
       return new OMSnapshotPurgeRequest(omRequest);
+    case SnapshotUpdateSize:
+      return new OMSnapshotUpdateSizeRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {

@@ -321,6 +321,7 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case SnapshotUpdateSize:
     case UnknownCommand:
       return false;
     default:

@@ -141,6 +141,7 @@ enum Type {
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
+  SnapshotUpdateSize = 126;
 }
 
 enum SafeMode {
@@ -272,6 +273,7 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional SnapshotUpdateSizeRequest        SnapshotUpdateSizeRequest      = 126;
 }
 
 message OMResponse {
@@ -388,6 +390,7 @@ message OMResponse {
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional SnapshotUpdateSizeResponse        SnapshotUpdateSizeResponse    = 126;
 }
 
 enum Status {
@@ -1815,6 +1818,16 @@ message SnapshotPurgeRequest {
   repeated string updatedSnapshotDBKey = 2;
 }
 
+message SnapshotUpdateSizeRequest {
+  repeated SnapshotSize snapshotSize = 1;
+}
+
+message SnapshotSize {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
+}
+
 message DeleteTenantRequest {
     optional string tenantId = 1;
 }
@@ -1897,6 +1910,10 @@ message SnapshotMoveDeletedKeysResponse {
 }
 
 message SnapshotPurgeResponse {
+
+}
+
+message SnapshotUpdateSizeResponse {
 
 }
 
