@@ -236,7 +236,7 @@ public class OMDBDefinition extends DBDefinition.WithMap {
       COMPACTION_LOG_TABLE =
       new DBColumnFamilyDefinition<>(
           OmMetadataManagerImpl.COMPACTION_LOG_TABLE,
-          String.class,  // snapshot path
+          String.class,
           StringCodec.get(),
           CompactionLogEntry.class,
           CompactionLogEntry.getCodec());
