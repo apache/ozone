@@ -121,7 +121,7 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  public void testAllSCMAreRunning() throws Exception {
+  public void testPutKey() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
     Assertions.assertEquals(numOfSCMs, scms.size());
@@ -149,7 +149,7 @@ public class TestStorageContainerManagerHA {
     // verify timer based transaction buffer flush is working
     SnapshotInfo latestSnapshot = leaderScm.getScmHAManager()
         .asSCMHADBTransactionBuffer().getLatestSnapshot();
-    testPutKey();
+    doPutKey();
     final StorageContainerManager leaderScmTmp = leaderScm;
     GenericTestUtils.waitFor(() -> {
       if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
@@ -163,8 +163,7 @@ public class TestStorageContainerManagerHA {
     }, 2000, 30000);
   }
 
-  @Test
-  public void testPutKey() throws Exception {
+  private void doPutKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
