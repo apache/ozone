@@ -198,6 +198,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |                       |  2. /volumeId/bucketId/parentId/fileName        |
    * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
+   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
+   * |-------------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
