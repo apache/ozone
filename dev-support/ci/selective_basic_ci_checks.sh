@@ -19,32 +19,18 @@
 # shellcheck source=dev-support/ci/lib/_script_init.sh
 . dev-support/ci/lib/_script_init.sh
 
-BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
- | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
-
-echo "All checks value..."
-echo $ALL_BASIC_CHECKS
-
+# Remove the square brackets
 ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]#\[}"
 ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
 
-# Step 3: Replace commas with spaces to form a space-delimited list
+# Replace commas with spaces to form a space-delimited list
 SPACE_DELIMITED_ALL_CHECKS=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
 
-echo "Space-delimited list: $SPACE_DELIMITED_ALL_CHECKS"
-
-echo "Basic checks....."
-echo $BASIC_CHECKS
+BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
+ | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
 
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
  | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
-
-echo "Unit checks....."
-echo $UNIT_CHECKS
-
-#BASIC_CHECKS="author bats checkstyle docs findbugs rat"
-#UNIT_CHECKS="native unit"
-#ALL_BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
 
 if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
     SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "     # add framing blanks
