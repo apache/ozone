@@ -36,9 +36,10 @@ public class BucketsResponse {
    * An array of buckets.
    */
   @JsonProperty("buckets")
-  private Collection<BucketMetadata> buckets;
+  private Collection<BucketObjectDBInfo> buckets;
 
-  public BucketsResponse(long totalCount, Collection<BucketMetadata> buckets) {
+  public BucketsResponse(long totalCount,
+      Collection<BucketObjectDBInfo> buckets) {
     this.totalCount = totalCount;
     this.buckets = buckets;
   }
@@ -47,7 +48,7 @@ public class BucketsResponse {
     return totalCount;
   }
 
-  public Collection<BucketMetadata> getBuckets() {
+  public Collection<BucketObjectDBInfo> getBuckets() {
     return buckets;
   }
 }

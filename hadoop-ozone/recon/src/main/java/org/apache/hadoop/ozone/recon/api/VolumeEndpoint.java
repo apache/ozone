@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
-import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
@@ -34,7 +33,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -67,36 +65,10 @@ public class VolumeEndpoint {
   ) throws IOException {
     List<OmVolumeArgs> volumes = omMetadataManager.listVolumes(
         prevKey, limit);
-    List<VolumeMetadata> volumeMetadata = volumes.stream()
-        .map(this::toVolumeMetadata).collect(Collectors.toList());
+    List<VolumeObjectDBInfo> volumeMetadata = volumes.stream()
+        .map(VolumeObjectDBInfo::new).collect(Collectors.toList());
     VolumesResponse volumesResponse =
         new VolumesResponse(volumes.size(), volumeMetadata);
     return Response.ok(volumesResponse).build();
-  }
-
-  private VolumeMetadata toVolumeMetadata(OmVolumeArgs omVolumeArgs) {
-    if (omVolumeArgs == null) {
-      return null;
-    }
-
-    VolumeMetadata.Builder builder = VolumeMetadata.newBuilder();
-
-    List<AclMetadata> acls = new ArrayList<>();
-    if (omVolumeArgs.getAcls() != null) {
-      acls = omVolumeArgs.getAcls().stream()
-          .map(AclMetadata::toAclMetadata).collect(Collectors.toList());
-    }
-
-    return builder.withVolume(omVolumeArgs.getVolume())
-        .withOwner(omVolumeArgs.getOwnerName())
-        .withAdmin(omVolumeArgs.getAdminName())
-        .withCreationTime(omVolumeArgs.getCreationTime())
-        .withModificationTime(omVolumeArgs.getModificationTime())
-        .withQuotaInBytes(omVolumeArgs.getQuotaInBytes())
-        .withQuotaInNamespace(
-            omVolumeArgs.getQuotaInNamespace())
-        .withUsedNamespace(omVolumeArgs.getUsedNamespace())
-        .withAcls(acls)
-        .build();
   }
 }

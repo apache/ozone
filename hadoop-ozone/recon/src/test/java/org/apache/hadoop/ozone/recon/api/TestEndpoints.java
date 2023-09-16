@@ -66,14 +66,14 @@ import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
-import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
+import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
-import org.apache.hadoop.ozone.recon.api.types.VolumeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -886,7 +886,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   }
 
-  private void testVolumeResponse(VolumeMetadata volumeMetadata)
+  private void testVolumeResponse(VolumeObjectDBInfo volumeMetadata)
       throws IOException {
     String volumeName = volumeMetadata.getVolume();
     switch (volumeName) {
@@ -971,21 +971,21 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   }
 
-  private void testBucketResponse(BucketMetadata bucketMetadata)
+  private void testBucketResponse(BucketObjectDBInfo bucketMetadata)
       throws IOException {
-    String bucketName = bucketMetadata.getBucketName();
+    String bucketName = bucketMetadata.getName();
     switch (bucketName) {
     case "bucketOne":
       assertEquals("sampleVol2", bucketMetadata.getVolumeName());
-      assertEquals("DISK", bucketMetadata.getStorageType());
+      assertEquals(StorageType.DISK, bucketMetadata.getStorageType());
       assertNull(bucketMetadata.getSourceVolume());
       assertNull(bucketMetadata.getSourceBucket());
       assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());
       assertEquals(OzoneConsts.MB, bucketMetadata.getUsedBytes());
       assertEquals(5, bucketMetadata.getQuotaInNamespace());
       assertEquals(3, bucketMetadata.getUsedNamespace());
-      assertFalse(bucketMetadata.isVersionEnabled());
-      assertEquals("LEGACY", bucketMetadata.getBucketLayout());
+      assertFalse(bucketMetadata.isVersioningEnabled());
+      assertEquals(BucketLayout.LEGACY, bucketMetadata.getBucketLayout());
       assertEquals("TestUser2", bucketMetadata.getOwner());
 
 
@@ -999,15 +999,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       break;
     case "bucketTwo":
       assertEquals("sampleVol2", bucketMetadata.getVolumeName());
-      assertEquals("SSD", bucketMetadata.getStorageType());
+      assertEquals(StorageType.SSD, bucketMetadata.getStorageType());
       assertNull(bucketMetadata.getSourceVolume());
       assertNull(bucketMetadata.getSourceBucket());
       assertEquals(OzoneConsts.GB, bucketMetadata.getQuotaInBytes());
       assertEquals(100 * OzoneConsts.MB, bucketMetadata.getUsedBytes());
       assertEquals(5, bucketMetadata.getQuotaInNamespace());
       assertEquals(3, bucketMetadata.getUsedNamespace());
-      assertFalse(bucketMetadata.isVersionEnabled());
-      assertEquals("OBJECT_STORE", bucketMetadata.getBucketLayout());
+      assertFalse(bucketMetadata.isVersioningEnabled());
+      assertEquals(BucketLayout.OBJECT_STORE, bucketMetadata.getBucketLayout());
       assertEquals("TestUser2", bucketMetadata.getOwner());
 
       assertEquals(1, bucketMetadata.getAcls().size());
@@ -1090,7 +1090,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .stream().findFirst().get().getVolumeName());
     Assertions.assertEquals("bucketOne",
         bucketResponsePrevKeyWithoutVolume.getBuckets()
-            .stream().findFirst().get().getBucketName());
+            .stream().findFirst().get().getName());
 
     // Case 2: Volume is specified (prevKey is not ignored)
     // Test limit
@@ -1123,7 +1123,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .stream().findFirst().get().getVolumeName());
     Assertions.assertEquals("bucketTwo",
         bucketPrevKeyResponseWithVolume.getBuckets()
-            .stream().findFirst().get().getBucketName());
+            .stream().findFirst().get().getName());
 
     // Case 4: Test volume does not exist
     Response responseVolumeNotExist = bucketEndpoint.getBuckets(

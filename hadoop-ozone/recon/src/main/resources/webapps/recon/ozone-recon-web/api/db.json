@@ -1536,7 +1536,7 @@
         {
           "type": "USER",
           "name": "hadoop",
-          "aclScope": "ACCESS",
+          "scope": "ACCESS",
           "aclList": [
             "ALL"
           ]
@@ -1544,7 +1544,7 @@
         {
           "type": "GROUP",
           "name": "hadoop",
-          "aclScope": "ACCESS",
+          "scope": "ACCESS",
           "aclList": [
             "ALL"
           ]
@@ -2302,8 +2302,8 @@
     "buckets": [
       {
         "volumeName": "vol1",
-        "bucketName": "buck1",
-        "isVersionEnabled": false,
+        "name": "buck1",
+        "versioning": false,
         "storageType": "DISK",
         "creationTime": 1665588176660,
         "modificationTime": 1665590397315,
@@ -2328,8 +2328,8 @@
       },
       {
         "volumeName": "vol2",
-        "bucketName": "buck2",
-        "isVersionEnabled": true,
+        "name": "buck2",
+        "versioning": true,
         "storageType": "SSD",
         "creationTime": 1687189663661,
         "modificationTime": 1687189672598,
@@ -2361,8 +2361,8 @@
       },
       {
         "volumeName": "s3v",
-        "bucketName": "buck2",
-        "isVersionEnabled": false,
+        "name": "buck2",
+        "versioning": false,
         "storageType": "SSD",
         "creationTime": 1687189663661,
         "modificationTime": 1687189672598,
@@ -2396,8 +2396,8 @@
       },
       {
         "volumeName": "vol3",
-        "bucketName": "buck3",
-        "isVersionEnabled": true,
+        "name": "buck3",
+        "versioning": true,
         "storageType": "ARCHIVE",
         "creationTime": 1687189663661,
         "modificationTime": 1687189672598,
@@ -2430,8 +2430,8 @@
       },
       {
         "volumeName": "vol4",
-        "bucketName": "buck4",
-        "isVersionEnabled": false,
+        "name": "buck4",
+        "versioning": false,
         "storageType": "RAM_DISK",
         "creationTime": 1687189663661,
         "modificationTime": 1687189672598,

@@ -37,14 +37,14 @@ public class VolumesResponse {
    * An array of volumes.
    */
   @JsonProperty("volumes")
-  private Collection<VolumeMetadata> volumes;
+  private Collection<VolumeObjectDBInfo> volumes;
 
   public VolumesResponse() {
     this(0, new ArrayList<>());
   }
 
   public VolumesResponse(long totalCount,
-                         Collection<VolumeMetadata> volumes) {
+                         Collection<VolumeObjectDBInfo> volumes) {
     this.totalCount = totalCount;
     this.volumes = volumes;
   }
@@ -53,7 +53,7 @@ public class VolumesResponse {
     return totalCount;
   }
 
-  public Collection<VolumeMetadata> getVolumes() {
+  public Collection<VolumeObjectDBInfo> getVolumes() {
     return volumes;
   }
 }

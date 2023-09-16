@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
-import org.apache.hadoop.ozone.recon.api.types.BucketMetadata;
+import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
@@ -33,7 +32,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -68,49 +66,10 @@ public class BucketEndpoint {
   ) throws IOException {
     List<OmBucketInfo> buckets = omMetadataManager.listBucketsUnderVolume(
         volume, prevKey, limit);
-    List<BucketMetadata> bucketMetadata = buckets
-        .stream().map(this::toBucketMetadata).collect(Collectors.toList());
+    List<BucketObjectDBInfo> bucketMetadata = buckets
+        .stream().map(BucketObjectDBInfo::new).collect(Collectors.toList());
     BucketsResponse bucketsResponse =
         new BucketsResponse(buckets.size(), bucketMetadata);
     return Response.ok(bucketsResponse).build();
-  }
-
-  private BucketMetadata toBucketMetadata(OmBucketInfo omBucketInfo) {
-    if (omBucketInfo == null) {
-      return null;
-    }
-
-    BucketMetadata.Builder builder = BucketMetadata.newBuilder();
-
-    List<AclMetadata> acls = new ArrayList<>();
-    if (omBucketInfo.getAcls() != null) {
-      acls = omBucketInfo.getAcls().stream()
-          .map(AclMetadata::toAclMetadata).collect(Collectors.toList());
-    }
-
-    builder.withVolumeName(omBucketInfo.getVolumeName())
-        .withBucketName(omBucketInfo.getBucketName())
-        .withAcls(acls)
-        .withVersionEnabled(omBucketInfo.getIsVersionEnabled())
-        .withStorageType(omBucketInfo.getStorageType().toString().toUpperCase())
-        .withCreationTime(omBucketInfo.getCreationTime())
-        .withModificationTime(omBucketInfo.getModificationTime())
-        .withUsedBytes(omBucketInfo.getUsedBytes())
-        .withUsedNamespace(omBucketInfo.getUsedNamespace())
-        .withQuotaInBytes(omBucketInfo.getQuotaInBytes())
-        .withQuotaInNamespace(omBucketInfo.getQuotaInNamespace())
-        .withBucketLayout(
-            omBucketInfo.getBucketLayout().toString().toUpperCase())
-        .withOwner(omBucketInfo.getOwner());
-
-    if (omBucketInfo.getSourceVolume() != null) {
-      builder.withSourceVolume(omBucketInfo.getSourceVolume());
-    }
-
-    if (omBucketInfo.getSourceBucket() != null) {
-      builder.withSourceBucket(omBucketInfo.getSourceBucket());
-    }
-
-    return builder.build();
   }
 }

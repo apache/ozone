@@ -36,8 +36,8 @@ import CreatableSelect from "react-select/creatable";
 
 interface IBucketResponse {
   volumeName: string;
-  bucketName: string;
-  isVersionEnabled: boolean;
+  name: string;
+  versioning: boolean;
   storageType: string;
   bucketLayout: string;
   creationTime: number;
@@ -401,8 +401,8 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
       const dataSource: IBucket[] = buckets.map(bucket => {
         return {
           volumeName: bucket.volumeName,
-          bucketName: bucket.bucketName,
-          isVersionEnabled: bucket.isVersionEnabled,
+          bucketName: bucket.name,
+          isVersionEnabled: bucket.versioning,
           storageType: bucket.storageType,
           bucketLayout: bucket.bucketLayout,
           creationTime: bucket.creationTime,

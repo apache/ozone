@@ -17,28 +17,25 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Metadata object represents one Ozone ACL.
  */
-@XmlAccessorType(XmlAccessType.FIELD)
 public final class AclMetadata {
 
-  @XmlElement(name = "type")
+  @JsonProperty("type")
   private String type;
-  @XmlElement(name = "name")
+  @JsonProperty("name")
   private String name;
-  @XmlElement(name = "scope")
+  @JsonProperty("scope")
   private String scope;
-  @XmlElement(name = "aclList")
+  @JsonProperty("aclList")
   private List<String> aclList;
 
   private AclMetadata(Builder builder) {
@@ -118,7 +115,12 @@ public final class AclMetadata {
 
   }
 
-  public static AclMetadata toAclMetadata(OzoneAcl ozoneAcl) {
+  public static List<AclMetadata> fromOzoneAcls(List<OzoneAcl> ozoneAcls) {
+    return ozoneAcls.stream().map(AclMetadata::fromOzoneAcl)
+        .collect(Collectors.toList());
+  }
+
+  public static AclMetadata fromOzoneAcl(OzoneAcl ozoneAcl) {
     if (ozoneAcl == null) {
       return null;
     }
