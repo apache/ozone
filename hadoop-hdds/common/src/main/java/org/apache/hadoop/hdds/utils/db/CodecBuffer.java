@@ -51,7 +51,8 @@ import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
 public class CodecBuffer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
 
-  private static class Constructor {
+  /** To create {@link CodecBuffer} instances. */
+  private static class Factory {
     private static volatile Function<ByteBuf, CodecBuffer> constructor
         = CodecBuffer::new;
     static void set(Function<ByteBuf, CodecBuffer> f) {
@@ -64,11 +65,9 @@ public class CodecBuffer implements AutoCloseable {
     }
   }
 
-  static final class LeakDetector implements Function<ByteBuf, CodecBuffer> {
-    static final LeakDetector INSTANCE = new LeakDetector();
-
-    @Override
-    public CodecBuffer apply(ByteBuf buf) {
+  /** To detect buffer leak. */
+  private static class LeakDetector {
+    static CodecBuffer newCodecBuffer(ByteBuf buf) {
       return new CodecBuffer(buf) {
         @Override
         protected void finalize() {
@@ -78,9 +77,12 @@ public class CodecBuffer implements AutoCloseable {
     }
   }
 
-  /** Detect buffer leak in runtime. */
+  /**
+   * Detect buffer leak in runtime.
+   * Note that there is a severe performance penalty for leak detection.
+   */
   public static void enableLeakDetection() {
-    Constructor.set(LeakDetector.INSTANCE);
+    Factory.set(LeakDetector::newCodecBuffer);
   }
 
   /** The size of a buffer. */
@@ -139,7 +141,7 @@ public class CodecBuffer implements AutoCloseable {
    *                  the buffer's capacity can be increased if necessary.
    */
   static CodecBuffer allocate(int capacity, IntFunction<ByteBuf> allocator) {
-    return Constructor.newCodecBuffer(allocator.apply(capacity));
+    return Factory.newCodecBuffer(allocator.apply(capacity));
   }
 
   /**
@@ -160,7 +162,7 @@ public class CodecBuffer implements AutoCloseable {
 
   /** Wrap the given array. */
   public static CodecBuffer wrap(byte[] array) {
-    return Constructor.newCodecBuffer(Unpooled.wrappedBuffer(array));
+    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array));
   }
 
   private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
@@ -176,7 +178,7 @@ public class CodecBuffer implements AutoCloseable {
   private final ByteBuf buf;
   private final CompletableFuture<Void> released = new CompletableFuture<>();
 
-  CodecBuffer(ByteBuf buf) {
+  private CodecBuffer(ByteBuf buf) {
     this.buf = buf;
     this.elements = getStackTrace(LOG);
     assertRefCnt(1);
