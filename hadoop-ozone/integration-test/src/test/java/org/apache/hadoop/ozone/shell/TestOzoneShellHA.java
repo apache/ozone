@@ -96,6 +96,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
+import picocli.CommandLine.MissingParameterException;
 import picocli.CommandLine.IExceptionHandler2;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
@@ -659,7 +660,7 @@ public class TestOzoneShellHA {
         getClientConfForOFS(hostPrefix, cluster.getConf());
     OzoneFsShell shell = new OzoneFsShell(clientConf);
 
-    try (FileSystem fs = FileSystem.get(clientConf)) {
+    try {
       int res;
       // Test orphan link bucket when source volume removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
@@ -675,17 +676,29 @@ public class TestOzoneShellHA {
               "/linkvol/linkbuck"};
       execute(ozoneShell, args);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/vol1"});
-      assertEquals(0, res);
+      args =
+          new String[] {"volume", "delete", "vol1", "-r", "--yes"};
+      execute(ozoneShell, args);
+      out.reset();
+      OMException omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("vol1"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
 
-      res = ToolRunner.run(shell, new String[]{"-ls", "-R",
+      res = ToolRunner.run(shell, new String[]{"-ls",
           hostPrefix + "/linkvol"});
       assertEquals(0, res);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/linkvol"});
-      assertEquals(0, res);
+      args = new String[] {"bucket", "delete", "linkvol"
+              + OZONE_URI_DELIMITER + "linkbuck"};
+      execute(ozoneShell, args);
+      out.reset();
+
+      args = new String[] {"volume", "delete", "linkvol"};
+      execute(ozoneShell, args);
+      out.reset();
+      omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("linkvol"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
 
       // Test orphan link bucket when only source bucket removed
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p",
@@ -704,9 +717,17 @@ public class TestOzoneShellHA {
           "-skipTrash", hostPrefix + "/vol1/bucket1"});
       assertEquals(0, res);
 
-      res = ToolRunner.run(shell, new String[]{"-rm", "-R", "-f",
-          "-skipTrash", hostPrefix + "/linkvol"});
-      assertEquals(0, res);
+      args = new String[] {"bucket", "delete", "linkvol"
+              + OZONE_URI_DELIMITER + "linkbuck"};
+      execute(ozoneShell, args);
+      out.reset();
+
+      args = new String[] {"volume", "delete", "linkvol"};
+      execute(ozoneShell, args);
+      out.reset();
+      omExecution = assertThrows(OMException.class,
+          () -> client.getObjectStore().getVolume("linkvol"));
+      assertEquals(VOLUME_NOT_FOUND, omExecution.getResult());
     } finally {
       shell.close();
     }
@@ -884,6 +905,90 @@ public class TestOzoneShellHA {
         objectStore.getVolume("vol4").getBucket("buck4")
             .getQuotaInNamespace());
 
+
+    // Test negative scenarios for --space-quota and --namespace-quota option
+    args = new String[]{"volume", "create", "vol5", "--space-quota"};
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
+        "'--space-quota' (<quotaInBytes>)");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--space-quota", "-1"};
+    executeWithError(ozoneShell, args, "Invalid values for space quota: -1");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--space-quota", "test"};
+    executeWithError(ozoneShell, args, "Invalid values for quota, " +
+        "to ensure that the Quota format is legal(supported values are " +
+        "B, KB, MB, GB and TB with positive long values). " +
+        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--space-quota", "1.5GB"};
+    executeWithError(ozoneShell, args, "Invalid values for quota, " +
+        "to ensure that the Quota format is legal(supported values are " +
+        "B, KB, MB, GB and TB with positive long values). " +
+        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--namespace-quota"};
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
+        "'--namespace-quota' (<quotaInNamespace>)");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
+    executeWithError(ozoneShell, args,
+        "Invalid values for namespace quota: -1");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5"};
+    execute(ozoneShell, args);
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5", "--space-quota"};
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
+        "'--space-quota' (<quotaInBytes>)");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "-1"};
+    executeWithError(ozoneShell, args,
+        "Invalid values for space quota: -1");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "test"};
+    executeWithError(ozoneShell, args, "Invalid values for quota, " +
+        "to ensure that the Quota format is legal(supported values are " +
+        "B, KB, MB, GB and TB with positive long values). " +
+        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5",
+        "--space-quota", "1.5GB"};
+    executeWithError(ozoneShell, args, "Invalid values for quota, " +
+        "to ensure that the Quota format is legal(supported values are " +
+        "B, KB, MB, GB and TB with positive long values). " +
+        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5", "--namespace-quota"};
+    executeWithError(ozoneShell, args,
+        "Missing required parameter for option " +
+        "'--namespace-quota' (<quotaInNamespace>)");
+    out.reset();
+
+    args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
+    executeWithError(ozoneShell, args,
+        "Invalid values for namespace quota: -1");
+    out.reset();
+
+    args = new String[]{"bucket", "create", "vol5/buck5"};
+    execute(ozoneShell, args);
+    out.reset();
+
     // Test clrquota option.
     args = new String[]{"volume", "clrquota", "vol4"};
     executeWithError(ozoneShell, args, "At least one of the quota clear" +
@@ -913,7 +1018,7 @@ public class TestOzoneShellHA {
             .getQuotaInNamespace());
     out.reset();
 
-    // Test set volume quota to 0.
+    // Test set volume quota to invalid values.
     String[] volumeArgs1 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "0GB"};
     ExecutionException eException = assertThrows(ExecutionException.class,
@@ -923,14 +1028,55 @@ public class TestOzoneShellHA {
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
-        "--namespace-quota", "0"};
+        "--space-quota", "-1GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs2));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for space quota"));
+    out.reset();
+
+    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "test"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, volumeArgs3));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for quota"));
+    out.reset();
+
+    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota", "1.5GB"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, volumeArgs4));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for quota"));
+    out.reset();
+
+    String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4",
+        "--space-quota"};
+    MissingParameterException mException = assertThrows(
+        MissingParameterException.class,
+        () -> execute(ozoneShell, volumeArgs5));
+    assertTrue(mException.getMessage()
+        .contains("Missing required parameter"));
+    out.reset();
+
+    String[] volumeArgs6 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota", "0"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, volumeArgs6));
     assertTrue(eException.getMessage()
         .contains("Invalid values for namespace quota"));
     out.reset();
 
-    // Test set bucket quota to 0.
+    String[] volumeArgs7 = new String[]{"volume", "setquota", "vol4",
+        "--namespace-quota"};
+    mException = assertThrows(MissingParameterException.class,
+        () -> execute(ozoneShell, volumeArgs7));
+    assertTrue(mException.getMessage()
+        .contains("Missing required parameter"));
+    out.reset();
+
+    // Test set bucket quota to invalid values
     String[] bucketArgs1 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "0GB"};
     eException = assertThrows(ExecutionException.class,
@@ -940,26 +1086,66 @@ public class TestOzoneShellHA {
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
-        "--namespace-quota", "0"};
+        "--space-quota", "-1GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs2));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for space quota"));
+    out.reset();
+
+    String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "test"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, bucketArgs3));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for quota"));
+    out.reset();
+
+    String[] bucketArgs4 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota", "1.5GB"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, bucketArgs4));
+    assertTrue(eException.getMessage()
+        .contains("Invalid values for quota"));
+    out.reset();
+
+    String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--space-quota"};
+    mException = assertThrows(MissingParameterException.class,
+        () -> execute(ozoneShell, bucketArgs5));
+    assertTrue(mException.getMessage()
+        .contains("Missing required parameter"));
+    out.reset();
+
+    String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--namespace-quota", "0"};
+    eException = assertThrows(ExecutionException.class,
+        () -> execute(ozoneShell, bucketArgs6));
     assertTrue(eException.getMessage()
         .contains("Invalid values for namespace quota"));
     out.reset();
 
+    String[] bucketArgs7 = new String[]{"bucket", "setquota", "vol4/buck4",
+        "--namespace-quota"};
+    mException = assertThrows(MissingParameterException.class,
+        () -> execute(ozoneShell, bucketArgs7));
+    assertTrue(mException.getMessage()
+        .contains("Missing required parameter"));
+    out.reset();
+
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
-    String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
+    String[] bucketArgs8 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "1000B"};
-    execute(ozoneShell, bucketArgs3);
+    execute(ozoneShell, bucketArgs8);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInBytes());
     assertEquals(-1, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInNamespace());
 
-    String[] bucketArgs4 = new String[]{"bucket", "setquota", "vol4/buck4",
+    String[] bucketArgs9 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--namespace-quota", "100"};
-    execute(ozoneShell, bucketArgs4);
+    execute(ozoneShell, bucketArgs9);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInBytes());
@@ -967,9 +1153,9 @@ public class TestOzoneShellHA {
         .getBucket("buck4").getQuotaInNamespace());
 
     // test whether supports default quota unit as bytes.
-    String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
+    String[] bucketArgs10 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "500"};
-    execute(ozoneShell, bucketArgs5);
+    execute(ozoneShell, bucketArgs10);
     out.reset();
     assertEquals(500, objectStore.getVolume("vol4")
         .getBucket("buck4").getQuotaInBytes());
@@ -977,31 +1163,31 @@ public class TestOzoneShellHA {
         .getBucket("buck4").getQuotaInNamespace());
 
     // Test set volume quota without quota flag
-    String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4"};
-    executeWithError(ozoneShell, bucketArgs6,
+    String[] bucketArgs11 = new String[]{"bucket", "setquota", "vol4/buck4"};
+    executeWithError(ozoneShell, bucketArgs11,
         "At least one of the quota set flag is required");
     out.reset();
 
     // Test set volume spaceQuota or nameSpaceQuota to normal value.
-    String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
+    String[] volumeArgs8 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "1000B"};
-    execute(ozoneShell, volumeArgs3);
+    execute(ozoneShell, volumeArgs8);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(-1,
         objectStore.getVolume("vol4").getQuotaInNamespace());
 
-    String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
+    String[] volumeArgs9 = new String[]{"volume", "setquota", "vol4",
         "--namespace-quota", "100"};
-    execute(ozoneShell, volumeArgs4);
+    execute(ozoneShell, volumeArgs9);
     out.reset();
     assertEquals(1000, objectStore.getVolume("vol4").getQuotaInBytes());
     assertEquals(100,
         objectStore.getVolume("vol4").getQuotaInNamespace());
 
     // Test set volume quota without quota flag
-    String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4"};
-    executeWithError(ozoneShell, volumeArgs5,
+    String[] volumeArgs10 = new String[]{"volume", "setquota", "vol4"};
+    executeWithError(ozoneShell, volumeArgs10,
         "At least one of the quota set flag is required");
     out.reset();
     
@@ -1015,6 +1201,8 @@ public class TestOzoneShellHA {
     objectStore.deleteVolume("vol3");
     objectStore.getVolume("vol4").deleteBucket("buck4");
     objectStore.deleteVolume("vol4");
+    objectStore.getVolume("vol5").deleteBucket("buck5");
+    objectStore.deleteVolume("vol5");
   }
 
   @Test

@@ -26,11 +26,13 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.util.Time;
@@ -565,8 +567,18 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testGetExpiredOpenKeysExcludeMPUs() throws Exception {
+    testGetExpiredOpenKeysExcludeMPUKeys(BucketLayout.DEFAULT);
+  }
+
+  @Test
   public void testGetExpiredOpenKeysFSO() throws Exception {
     testGetExpiredOpenKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Test
+  public void testGetExpiredOpenKeysExcludeMPUsFSO() throws Exception {
+    testGetExpiredOpenKeysExcludeMPUKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   private void testGetExpiredOpenKeys(BucketLayout bucketLayout)
@@ -645,6 +657,94 @@ public class TestOmMetadataManager {
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
     assertTrue(expiredKeys.containsAll(names));
+  }
+
+  private void testGetExpiredOpenKeysExcludeMPUKeys(
+      BucketLayout bucketLayout) throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    // Add volume, bucket, key entries to DB.
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    final int numExpiredMPUOpenKeys = 4;
+    final long clientID = 1000L;
+    // To create expired keys, they will be assigned a creation time as
+    // old as the minimum expiration time.
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
+        OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+
+    final long expiredOpenKeyCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    // Ensure that "expired" MPU-related open keys are not fetched.
+    // MPU-related open keys, identified by isMultipartKey = false
+    for (int i = 0; i < numExpiredMPUOpenKeys; i++) {
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, "expired" + i,
+          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+          0L, expiredOpenKeyCreationTime, true);
+
+      final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
+          createOmMultipartKeyInfo(uploadId, expiredOpenKeyCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfo.setParentObjectID(i);
+        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+        OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
+            keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addMultipartKeyToOpenKeyTable(false,
+            keyInfo, uploadId, 0L, omMetadataManager);
+      }
+      OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo,
+          multipartKeyInfo, 0L, omMetadataManager);
+    }
+
+    // Return empty since only MPU-related open keys exist.
+    assertTrue(omMetadataManager.getExpiredOpenKeys(expireThreshold,
+        numExpiredMPUOpenKeys, bucketLayout).getOpenKeyBuckets().isEmpty());
+
+
+    // This is for MPU-related open keys prior to isMultipartKey fix in
+    // HDDS-9017. Although these open keys are MPU-related,
+    // the isMultipartKey flags are set to false
+    for (int i = numExpiredMPUOpenKeys; i < 2 * numExpiredMPUOpenKeys; i++) {
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, "expired" + i,
+          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+          0L, expiredOpenKeyCreationTime, false);
+
+      final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
+          createOmMultipartKeyInfo(uploadId, expiredOpenKeyCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfo.setParentObjectID(i);
+        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+        OMRequestTestUtils.addMultipartKeyToOpenFileTable(false,
+            keyInfo.getFileName(), keyInfo, uploadId, 0L, omMetadataManager);
+      } else {
+        OMRequestTestUtils.addMultipartKeyToOpenKeyTable(false,
+            keyInfo, uploadId, 0L, omMetadataManager);
+      }
+      OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo,
+          multipartKeyInfo, 0L, omMetadataManager);
+    }
+
+    // MPU-related open keys should not be fetched regardless of isMultipartKey
+    // flag if has the multipart upload characteristics
+    assertTrue(omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            numExpiredMPUOpenKeys, bucketLayout).getOpenKeyBuckets()
+        .isEmpty());
   }
 
   private List<String> getOpenKeyNames(

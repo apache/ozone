@@ -5149,11 +5149,11 @@
     "containerDiscrepancyInfo": []
   },
   "nonFSO": {
-    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/1105696238501917",
+    "lastKey": "11",
     "keysSummary": {
-      "totalUnreplicatedDataSize": 1000,
-      "totalReplicatedDataSize": 3000,
-      "totalOpenKeys": 0
+        "totalUnreplicatedDataSize": 10485760,
+        "totalReplicatedDataSize": 31457280,
+        "totalOpenKeys": 10
     },
     "nonFSO": [
       {
@@ -5184,7 +5184,7 @@
     "status": "OK"
   },
   "nonFSO1": {
-    "lastKey": "1/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/1105696238501917",
+    "lastKey": "21",
     "nonFSO": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
@@ -5214,11 +5214,48 @@
     "status": "OK"
   },
   "nonFSO2": {
+    "lastKey": "31",
+    "nonFSO": [
+      {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
+        "path": "nonfso 21",
+        "inStateSince": 1686156886632,
+        "size": 268435456,
+        "replicatedSize": 268435456,
+        "replicationInfo": {
+          "replicationFactor": "ONE",
+          "requiredNodes": 1,
+          "replicationType": "RATIS"
+      }
+      },
+      {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
+        "path": "nonfso 22",
+        "inStateSince": 1686156886632,
+        "size": 268435456,
+        "replicatedSize": 268435456,
+        "replicationInfo": {
+          "replicationFactor": "ONE",
+          "requiredNodes": 1,
+          "replicationType": "RATIS"
+      }
+      }
+    ],
+    "status": "OK"
+  },
+  "nonFSO3": {
+    "keysSummary": {
+        "totalUnreplicatedDataSize": 10485760,
+        "totalReplicatedDataSize": 31457280,
+        "totalOpenKeys": 10
+    },
     "lastKey": "",
-    "nonFSO": []
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "status": "OK"
   },
   "fso": {
-    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
+    "lastKey": "11",
     "fso": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
@@ -5352,7 +5389,7 @@
     "status": "OK"
   },
   "fso1": {
-    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2421/110569623850191713",
+    "lastKey": "21",
     "fso": [
       {
         "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
@@ -5461,21 +5498,15 @@
           "requiredNodes": 1,
           "replicationType": "RATIS"
         }
-      },
+      }
+    ],
+    "status": "OK"
+  },
+  "fso2": {
+    "lastKey": "31",
+    "fso": [
       {
-        "key": "fso 20 key",
-        "path": "20",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 21",
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
         "path": "21",
         "inStateSince": 1686156886632,
         "size": 268435456,
@@ -5501,7 +5532,7 @@
       {
         "key": "fso 23",
         "path": "23",
-        "inStateSince": 1686156887186,
+        "inStateSince": 1686156886632,
         "size": 268435456,
         "replicatedSize": 268435456,
         "replicationInfo": {
@@ -5525,7 +5556,7 @@
       {
         "key": "fso 25",
         "path": "25",
-        "inStateSince": 1686156887186,
+        "inStateSince": 1686156886632,
         "size": 268435456,
         "replicatedSize": 268435456,
         "replicationInfo": {
@@ -5535,7 +5566,7 @@
         }
       },
       {
-        "key": "fso 26",
+        "key": "fso 26 key",
         "path": "26",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5547,9 +5578,9 @@
         }
       },
       {
-        "key": "fso 27",
+        "key": "fso 17 key",
         "path": "27",
-        "inStateSince": 1686156887186,
+        "inStateSince": 1686156886632,
         "size": 268435456,
         "replicatedSize": 268435456,
         "replicationInfo": {
@@ -5559,7 +5590,7 @@
         }
       },
       {
-        "key": "fso 28",
+        "key": "fso 18 key",
         "path": "28",
         "inStateSince": 1686156887186,
         "size": 268435456,
@@ -5571,9 +5602,9 @@
         }
       },
       {
-        "key": "fso 29",
+        "key": "fso 19 key",
         "path": "29",
-        "inStateSince": 1686156887186,
+        "inStateSince": 1686156886632,
         "size": 268435456,
         "replicatedSize": 268435456,
         "replicationInfo": {
@@ -5583,44 +5614,8 @@
         }
       },
       {
-        "key": "fso 30",
-        "path": "30",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 31",
-        "path": "31",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 32",
-        "path": "32",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 33",
-        "path": "33",
+        "key": "fso 20 key",
+        "path": "20",
         "inStateSince": 1686156887186,
         "size": 268435456,
         "replicatedSize": 268435456,
@@ -5633,9 +5628,16 @@
     ],
     "status": "OK"
   },
-  "fso2": {
+  "fso3": {
+    "keysSummary": {
+      "totalUnreplicatedDataSize": 10485760,
+      "totalReplicatedDataSize": 31457280,
+      "totalOpenKeys": 10
+   },
     "lastKey": "",
-    "fso": []
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "status": "OK"
   },
   "keydeletePending":{
     "lastKey": "/volume/bucket1/rcmeevblsf/106/-9223372036843950335",
