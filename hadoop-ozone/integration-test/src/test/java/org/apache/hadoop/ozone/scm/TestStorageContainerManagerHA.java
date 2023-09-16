@@ -104,6 +104,7 @@ public class TestStorageContainerManagerHA {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
+    waitForLeaderToBeReady();
   }
 
   /**
@@ -118,7 +119,7 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  public void testPutKey() throws Exception {
+  void testAllSCMAreRunning() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
     Assertions.assertEquals(numOfSCMs, scms.size());
@@ -133,6 +134,13 @@ public class TestStorageContainerManagerHA {
       Assertions.assertEquals(peerSize, numOfSCMs);
     }
     Assertions.assertEquals(1, count);
+    Assertions.assertNotNull(leaderScm);
+
+    assertRatisRoles();
+
+    String leaderSCMId = leaderScm.getScmId();
+    checkSCMHAMetricsForAllSCMs(scms, leaderSCMId);
+
     count = 0;
     List<OzoneManager> oms = cluster.getOzoneManagersList();
     Assertions.assertEquals(numOfOMs, oms.size());
@@ -276,8 +284,7 @@ public class TestStorageContainerManagerHA {
     Assertions.assertTrue(StorageContainerManager.scmBootstrap(conf2));
   }
 
-  @Test
-  public void testGetRatisRolesDetail() {
+  private void assertRatisRoles() {
     Set<String> resultSet = new HashSet<>();
     for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
       resultSet.addAll(scm.getScmHAManager().getRatisServer().getRatisRoles());
@@ -286,18 +293,6 @@ public class TestStorageContainerManagerHA {
     Assertions.assertEquals(3, resultSet.size());
     Assertions.assertEquals(1,
         resultSet.stream().filter(x -> x.contains("LEADER")).count());
-  }
-
-  @Test
-  public void testSCMHAMetrics() throws InterruptedException, TimeoutException {
-    waitForLeaderToBeReady();
-
-    StorageContainerManager leaderSCM = cluster.getActiveSCM();
-    String leaderSCMId = leaderSCM.getScmId();
-    List<StorageContainerManager> scms =
-        cluster.getStorageContainerManagersList();
-
-    checkSCMHAMetricsForAllSCMs(scms, leaderSCMId);
   }
 
   private void checkSCMHAMetricsForAllSCMs(List<StorageContainerManager> scms,
