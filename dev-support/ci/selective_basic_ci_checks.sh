@@ -29,7 +29,7 @@ ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]#\[}"
 ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
 
 # Step 3: Replace commas with spaces to form a space-delimited list
-space_delimited="${ALL_BASIC_CHECKS//,/ }"
+space_delimited=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
 
 echo "Space-delimited list: $space_delimited"
 
