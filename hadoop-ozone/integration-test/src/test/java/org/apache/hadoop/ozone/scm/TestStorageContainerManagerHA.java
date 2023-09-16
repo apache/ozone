@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,8 +48,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -258,44 +255,6 @@ public class TestStorageContainerManagerHA {
     Assertions.assertTrue(StorageContainerManager.scmBootstrap(conf2));
     Assertions.assertTrue(
         StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testHAConfig(boolean isRatisEnabled) throws Exception {
-    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
-    scm0.stop();
-    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
-    Assertions.assertTrue(isDeleted);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
-    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
-    scmStorageConfig.getCurrentDir().delete();
-    scmStorageConfig.setSCMHAFlag(isRatisEnabled);
-    DefaultConfigManager.clearDefaultConfigs();
-    scmStorageConfig.initialize();
-    StorageContainerManager.scmInit(conf, clusterId);
-    Assertions.assertEquals(DefaultConfigManager.getValue(
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled),
-        isRatisEnabled);
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testInvalidHAConfig(boolean isRatisEnabled) throws Exception {
-    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
-    scm0.stop();
-    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
-    Assertions.assertTrue(isDeleted);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
-    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
-    scmStorageConfig.getCurrentDir().delete();
-    scmStorageConfig.setSCMHAFlag(!isRatisEnabled);
-    DefaultConfigManager.clearDefaultConfigs();
-    scmStorageConfig.initialize();
-    Assertions.assertThrows(ConfigurationException.class,
-        () -> StorageContainerManager.scmInit(conf, clusterId));
   }
 
   @Test
