@@ -20,25 +20,20 @@
 . dev-support/ci/lib/_script_init.sh
 
 BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
- | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
- | sed 's/^\|$/"/g'|paste -sd' ')
+ | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
 
 echo "All checks value..."
 echo $ALL_BASIC_CHECKS
 
-echo "Starting basic checks....."
-echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks | sort -u | cut -f1 -d':')
-echo "Starting basic checks processing..."
-echo $(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
-| sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
+echo "Basic checks....."
+echo $BASIC_CHECKS
 
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
              | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
              | sed 's/^\|$/"/g'|paste -sd' ')
 
-echo "Unit checks starting...."
-echo $(ls hadoop-ozone/dev-support/checks)
-echo $(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks)
+echo "Unit checks....."
+echo $UNIT_CHECKS
 
 #BASIC_CHECKS="author bats checkstyle docs findbugs rat"
 #UNIT_CHECKS="native unit"
