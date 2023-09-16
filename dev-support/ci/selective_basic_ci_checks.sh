@@ -29,9 +29,9 @@ ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]#\[}"
 ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
 
 # Step 3: Replace commas with spaces to form a space-delimited list
-space_delimited=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
+SPACE_DELIMITED_ALL_CHECKS=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
 
-echo "Space-delimited list: $space_delimited"
+echo "Space-delimited list: $SPACE_DELIMITED_ALL_CHECKS"
 
 echo "Basic checks....."
 echo $BASIC_CHECKS
@@ -46,10 +46,10 @@ echo $UNIT_CHECKS
 #UNIT_CHECKS="native unit"
 #ALL_BASIC_CHECKS="author bats checkstyle docs findbugs native rat unit"
 
-if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
-    ALL_BASIC_CHECKS=" ${ALL_BASIC_CHECKS[*]} "         # add framing blanks
+if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
+    SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "     # add framing blanks
     for item in ${BASIC_CHECKS[@]}; do
-      if [[ $ALL_BASIC_CHECKS =~ " $item " ]] ; then    # use $item as regexp
+      if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then          # use $item as regexp
         basic+=($item)
       fi
     done
@@ -57,7 +57,7 @@ if [[ -n "${ALL_BASIC_CHECKS}" ]]; then
         "$(initialization::parameters_to_json ${basic[@]})"
 
     for item in ${UNIT_CHECKS[@]}; do
-      if [[ $ALL_BASIC_CHECKS =~ " $item " ]] ; then    # use $item as regexp
+      if [[ $SPACE_DELIMITED_ALL_CHECKS =~ " $item " ]] ; then    # use $item as regexp
         unit+=($item)
       fi
     done
