@@ -25,12 +25,19 @@ BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
 echo "All checks value..."
 echo $ALL_BASIC_CHECKS
 
+ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]#\[}"
+ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
+
+# Step 3: Replace commas with spaces to form a space-delimited list
+space_delimited="${ALL_BASIC_CHECKS//,/ }"
+
+echo "Space-delimited list: $space_delimited"
+
 echo "Basic checks....."
 echo $BASIC_CHECKS
 
 UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
-             | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.' \
-             | sed 's/^\|$/"/g'|paste -sd' ')
+ | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
 
 echo "Unit checks....."
 echo $UNIT_CHECKS
