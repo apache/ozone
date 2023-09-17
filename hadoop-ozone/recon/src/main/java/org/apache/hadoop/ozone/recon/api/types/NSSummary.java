@@ -41,7 +41,7 @@ public class NSSummary {
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
          new HashSet<>(), "");
-    // Prevents redundant size computation for deleted directories.
+  // Avoids recalculating size for deleted directories, as it remains constant.
     isSizeOfDeletedDirectoryComputed = false;
   }
 
@@ -89,8 +89,9 @@ public class NSSummary {
     return isSizeOfDeletedDirectoryComputed;
   }
 
-  public void setIsSizeOfDeletedDirectoryComputed() {
-    this.isSizeOfDeletedDirectoryComputed = true;
+  public void setIsSizeOfDeletedDirectoryComputed(
+      Boolean isSizeOfDeletedDirComputed) {
+    this.isSizeOfDeletedDirectoryComputed = isSizeOfDeletedDirComputed;
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {

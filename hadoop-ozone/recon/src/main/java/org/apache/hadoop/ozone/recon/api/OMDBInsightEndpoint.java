@@ -585,17 +585,18 @@ public class OMDBInsightEndpoint {
       return nsSummary.getSizeOfFiles();
     }
 
-    // Initialize the total size
+    // Initialize the total size.
     long totalSize = nsSummary.getSizeOfFiles();
 
-    // Compute the size recursively
+    // Compute the size recursively.
     for (long childId : nsSummary.getChildDir()) {
       totalSize += fetchSizeForDeletedDirectory(childId);
     }
     // Update the size in the NSSummary and set sizeOfFilesSet to true to avoid
     // re-computation the next time.
     nsSummary.setSizeOfFiles(totalSize);
-    nsSummary.setIsSizeOfDeletedDirectoryComputed();
+    nsSummary.setIsSizeOfDeletedDirectoryComputed(true);
+    reconNamespaceSummaryManager.storeNSSummary(objectId, nsSummary);
     return totalSize;
   }
 

@@ -245,9 +245,6 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 700.
     Assert.assertEquals(10, entity.getUnreplicatedDataSize());
-
-    // Cleanup the tables.
-    cleanupTables();
   }
 
 
@@ -322,7 +319,7 @@ public class TestReconInsightsForDeletedDirectories {
             mock(GlobalStatsDao.class), namespaceSummaryManager);
 
     // Delete the entire root directory dir1.
-    fs.delete(new Path("/dir1/dir2/dir3"), true);
+    fs.delete(new Path("/dir1"), true);
     impl.syncDataFromOM();
     // Verify the entries in the Recon tables after sync.
     assertTableRowCount(reconFileTable, 3, true);
@@ -335,9 +332,6 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 1000.
     Assert.assertEquals(3, entity.getUnreplicatedDataSize());
-
-    // Cleanup the tables.
-    cleanupTables();
   }
 
   /**
@@ -399,8 +393,6 @@ public class TestReconInsightsForDeletedDirectories {
     // Assert the size of deleted directory is 100.
     Assert.assertEquals(100, entity.getUnreplicatedDataSize());
 
-    // Cleanup the tables.
-    cleanupTables();
   }
 
   private void createLargeDirectory(Path dir, int numSubdirs,
@@ -419,10 +411,95 @@ public class TestReconInsightsForDeletedDirectories {
   }
 
   /**
+   * This test case verifies the behavior of reusing a previously calculated
+   * size for a deleted directory in Recon. The calculation get triggered when
+   * the OMDBInsightEndpoint for deleted directory is invoked.
+   *
+   * @throws Exception if any error occurs during the test.
+   */
+  @Test
+  public void testReusingPreviouslyCalculatedSize()
+      throws Exception {
+
+    // Create a directory structure with 10 files and 3 nested directories.
+    Path path = new Path("/dir1/dir2/dir3");
+    fs.mkdirs(path);
+    // Create 3 files inside dir3.
+    for (int i = 1; i <= 3; i++) {
+      Path filePath = new Path(path, "testKey" + i);
+      try (FSDataOutputStream stream = fs.create(filePath)) {
+        stream.write(1);
+      }
+    }
+
+    // Sync data from Ozone Manager to Recon.
+    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
+        cluster.getReconServer().getOzoneManagerServiceProvider();
+    impl.syncDataFromOM();
+
+    // Retrieve tables from Recon's OM-DB.
+    ReconOMMetadataManager reconOmMetadataManagerInstance =
+        (ReconOMMetadataManager) cluster.getReconServer()
+            .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
+    Table<String, OmKeyInfo> reconFileTable =
+        reconOmMetadataManagerInstance.getKeyTable(getFSOBucketLayout());
+    Table<String, OmDirectoryInfo> reconDirTable =
+        reconOmMetadataManagerInstance.getDirectoryTable();
+    Table<String, OmKeyInfo> reconDeletedDirTable =
+        reconOmMetadataManagerInstance.getDeletedDirTable();
+
+    // Create an Instance of OMDBInsightEndpoint.
+    OzoneStorageContainerManager reconSCM =
+        cluster.getReconServer().getReconStorageContainerManager();
+    ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
+        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+            .getReconNamespaceSummaryManager();
+    OMDBInsightEndpoint omdbInsightEndpoint =
+        new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
+            mock(GlobalStatsDao.class), namespaceSummaryManager);
+
+    // Delete the entire root directory dir1.
+    fs.delete(new Path("/dir1"), true);
+    impl.syncDataFromOM();
+
+    // Verify the entries in the Recon tables after sync.
+    assertTableRowCount(reconFileTable, 3, true);
+    assertTableRowCount(reconDirTable, 2, true);
+    assertTableRowCount(reconDeletedDirTable, 1, true);
+    Long deletedDirObjectID = null;
+
+    // Fetch the object id of the deleted directory dir1.
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = reconDeletedDirTable.iterator()) {
+      Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+      deletedDirObjectID = entry.getValue().getObjectID();
+      Assert.assertEquals("dir1", entry.getValue().getKeyName());
+    }
+
+    // Retrieve the namespace summary for the deleted directory 'dir1'
+    // and verify that its size is 0 since it hasn't been calculated yet.
+    Assert.assertEquals(0,
+        namespaceSummaryManager.getNSSummary(deletedDirObjectID)
+            .getSizeOfFiles());
+
+    // Call the getDeletedDirInfo API to calculate the size of the deleted dir.
+    omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+    omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+
+    // Confirm the size as 3 when calling getDeletedDirInfo, as it's calculated
+    // and stored in the NSSummary instance.
+    Assert.assertEquals(3,
+        namespaceSummaryManager.getNSSummary(deletedDirObjectID)
+            .getSizeOfFiles());
+  }
+
+  /**
    * Cleans up the tables by removing all entries from the deleted directory,
    * file, and directory tables within the Ozone metadata manager. This method
    * iterates through the tables and removes all entries from each table.
    */
+  @AfterEach
   private void cleanupTables() throws IOException {
     OMMetadataManager metadataManager =
         cluster.getOzoneManager().getMetadataManager();

@@ -67,7 +67,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     final int resSize = NUM_OF_INTS * Integer.BYTES
         + (numOfChildDirs + 1) * Long.BYTES // 1 long field + list size
         + Short.BYTES // 2 dummy shorts to track length
-        + stringLen; // directory name length
+        + stringLen // directory name length
+        + 1; // for the boolean field
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
@@ -84,6 +85,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     }
     out.write(integerCodec.toPersistedFormat(stringLen));
     out.write(stringCodec.toPersistedFormat(dirName));
+    // Serialize the boolean field
+    out.write(object.getIsSizeOfDeletedDirectoryComputed() ? 1 : 0);
     return out.toByteArray();
   }
 
@@ -117,6 +120,11 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     assert (bytesRead == strLen);
     String dirName = stringCodec.fromPersistedFormat(buffer);
     res.setDirName(dirName);
+
+    // Deserialize the boolean field
+    byte boolByte = in.readByte();
+    res.setIsSizeOfDeletedDirectoryComputed(boolByte != 0);
+
     return res;
   }
 
@@ -128,6 +136,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     copy.setFileSizeBucket(object.getFileSizeBucket());
     copy.setChildDir(object.getChildDir());
     copy.setDirName(object.getDirName());
+    copy.setIsSizeOfDeletedDirectoryComputed(
+        object.getIsSizeOfDeletedDirectoryComputed());
     return copy;
   }
 }
