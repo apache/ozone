@@ -320,6 +320,7 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
     case UnknownCommand:
       return false;
     case EchoRPC:

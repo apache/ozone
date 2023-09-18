@@ -141,6 +141,8 @@ enum Type {
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
+
+  AbortExpiredMultiPartUploads = 126;
 }
 
 enum SafeMode {
@@ -272,6 +274,8 @@ message OMRequest {
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+
+  optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
 }
 
 message OMResponse {
@@ -388,6 +392,8 @@ message OMResponse {
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+
+  optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 126;
 }
 
 enum Status {
@@ -1559,6 +1565,24 @@ message MultipartUploadAbortRequest {
 message MultipartUploadAbortResponse {
 
 }
+
+message MultipartUploadsExpiredAbortRequest {
+  repeated ExpiredMultipartUploadsBucket expiredMultipartUploadsPerBucket = 1;
+}
+
+message ExpiredMultipartUploadsBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated ExpiredMultipartUploadInfo multipartUploads = 3;
+}
+
+message ExpiredMultipartUploadInfo {
+  required string name = 1;
+}
+
+message MultipartUploadsExpiredAbortResponse {
+}
+
 message MultipartUploadListPartsRequest {
     required string volume = 1;
     required string bucket = 2;

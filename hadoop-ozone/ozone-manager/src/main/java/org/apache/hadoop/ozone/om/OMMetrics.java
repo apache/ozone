@@ -85,6 +85,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numOpenKeysCleaned;
   private @Metric MutableCounterLong numOpenKeysHSyncCleaned;
 
+  private @Metric MutableCounterLong numExpiredMPUAbortRequests;
+  private @Metric MutableCounterLong numExpiredMPUSubmittedForAbort;
+  private @Metric MutableCounterLong numExpiredMPUAborted;
+  private @Metric MutableCounterLong numExpiredMPUPartsAborted;
+
   private @Metric MutableCounterLong numAddAcl;
   private @Metric MutableCounterLong numSetAcl;
   private @Metric MutableCounterLong numGetAcl;
@@ -123,6 +128,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
   private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
+  private @Metric MutableCounterLong numExpiredMPUAbortRequestFails;
   private @Metric MutableCounterLong numSnapshotCreateFails;
   private @Metric MutableCounterLong numSnapshotDeleteFails;
   private @Metric MutableCounterLong numSnapshotListFails;
@@ -816,6 +822,26 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numOpenKeyDeleteRequestFails.incr();
   }
 
+  public void incNumExpiredMPUAbortRequests() {
+    numExpiredMPUAbortRequests.incr();
+  }
+
+  public void incNumExpiredMPUSubmittedForAbort(long amount) {
+    numExpiredMPUSubmittedForAbort.incr(amount);
+  }
+
+  public void incNumExpiredMPUAborted() {
+    numExpiredMPUAborted.incr();
+  }
+
+  public void incNumExpiredMPUPartsAborted(long amount) {
+    numExpiredMPUPartsAborted.incr(amount);
+  }
+
+  public void incNumExpiredMpuAbortRequestFails() {
+    numExpiredMPUAbortRequestFails.incr();
+  }
+
   public void incNumAddAcl() {
     numAddAcl.incr();
   }
@@ -1131,6 +1157,31 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumOpenKeyDeleteRequestFails() {
     return numOpenKeyDeleteRequestFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUAbortRequests() {
+    return numExpiredMPUAbortRequests.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUSubmittedForAbort() {
+    return numExpiredMPUSubmittedForAbort.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUAborted() {
+    return numExpiredMPUAborted.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUAbortRequestFails() {
+    return numExpiredMPUAbortRequestFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumExpiredMPUPartsAborted() {
+    return numExpiredMPUPartsAborted.value();
   }
 
   public long getNumAddAcl() {

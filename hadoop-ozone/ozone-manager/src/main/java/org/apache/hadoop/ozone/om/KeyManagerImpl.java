@@ -17,8 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
@@ -81,10 +79,13 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -121,6 +122,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
@@ -174,6 +179,7 @@ public class KeyManagerImpl implements KeyManager {
   private final OMPerformanceMetrics metrics;
 
   private BackgroundService openKeyCleanupService;
+  private BackgroundService multipartUploadCleanupService;
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
@@ -292,6 +298,21 @@ public class KeyManagerImpl implements KeyManager {
         LOG.error("Error starting Snapshot Deleting Service", e);
       }
     }
+
+    if (multipartUploadCleanupService == null) {
+      long serviceInterval = configuration.getTimeDuration(
+          OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL,
+          OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = configuration.getTimeDuration(
+          OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT,
+          OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      multipartUploadCleanupService = new MultipartUploadCleanupService(
+          serviceInterval, TimeUnit.MILLISECONDS, serviceTimeout,
+          ozoneManager, configuration);
+      multipartUploadCleanupService.start();
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -319,6 +340,10 @@ public class KeyManagerImpl implements KeyManager {
     if (snapshotDeletingService != null) {
       snapshotDeletingService.shutdown();
       snapshotDeletingService = null;
+    }
+    if (multipartUploadCleanupService != null) {
+      multipartUploadCleanupService.shutdown();
+      multipartUploadCleanupService = null;
     }
   }
 
@@ -615,6 +640,14 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public List<ExpiredMultipartUploadsBucket> getExpiredMultipartUploads(
+      Duration expireThreshold, int maxParts)
+      throws IOException {
+    return metadataManager.getExpiredMultipartUploads(expireThreshold,
+        maxParts);
+  }
+
+  @Override
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
   }
@@ -629,8 +662,14 @@ public class KeyManagerImpl implements KeyManager {
     return dirDeletingService;
   }
 
+  @Override
   public BackgroundService getOpenKeyCleanupService() {
     return openKeyCleanupService;
+  }
+
+  @Override
+  public BackgroundService getMultipartUploadCleanupService() {
+    return multipartUploadCleanupService;
   }
 
   public SstFilteringService getSnapshotSstFilteringService() {
@@ -840,18 +879,8 @@ public class KeyManagerImpl implements KeyManager {
   private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
       String keyName, String uploadID) throws IOException {
     OMMetadataManager metaMgr = metadataManager;
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    final long volumeId = metaMgr.getVolumeId(volumeName);
-    final long bucketId = metaMgr.getBucketId(volumeName, bucketName);
-    long parentID =
-        OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
-                keyName, metaMgr);
-
-    String multipartKey = metaMgr.getMultipartKey(volumeId, bucketId,
-            parentID, fileName, uploadID);
-
-    return multipartKey;
+    return OMMultipartUploadUtils.getMultipartOpenKeyFSO(
+        volumeName, bucketName, keyName, uploadID, metaMgr);
   }
 
   /**
