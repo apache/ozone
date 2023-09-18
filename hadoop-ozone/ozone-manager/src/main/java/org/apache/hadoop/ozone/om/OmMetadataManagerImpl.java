@@ -753,7 +753,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
-        String.class, String.class);
+        String.class, CompactionLogEntry.class);
     checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
         addCacheMetrics);
   }
