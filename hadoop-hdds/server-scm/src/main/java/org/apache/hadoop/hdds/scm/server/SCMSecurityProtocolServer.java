@@ -463,7 +463,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
 
   @Override
   public synchronized String getRootCACertificate() throws IOException {
-    LOGGER.info("Getting Root CA certificate.");
+    LOGGER.debug("Getting Root CA certificate.");
     if (rootCertificateServer != null) {
       try {
         return CertificateCodec.getPEMEncodedString(

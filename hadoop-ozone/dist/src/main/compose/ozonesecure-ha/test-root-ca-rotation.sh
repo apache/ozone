@@ -38,9 +38,11 @@ execute_robot_test scm1.org kinit.robot
 
 # verify root CA rotation monitor task is active on leader
 wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | sed 's/StorageContainerManagerStarter//' | xargs  | xargs -I {} jstack {} | grep 'RootCARotationManager-Active'"
+execute_commands_in_container scm1.org "! find /data/metadata/scm/ca/keys"
 
 # wait and verify root CA is rotated
 wait_for_execute_command scm1.org 240 "ozone admin cert info 2"
+execute_commands_in_container scm1.org "! find /data/metadata/scm/ca/keys"
 
 # transfer leader to scm2.org
 execute_robot_test scm1.org scmha/scm-leader-transfer.robot

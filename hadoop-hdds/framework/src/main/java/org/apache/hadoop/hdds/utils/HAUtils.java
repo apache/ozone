@@ -372,7 +372,7 @@ public final class HAUtils {
   public static List<X509Certificate> buildCAX509List(
       CertificateClient certClient,
       ConfigurationSource conf) throws IOException {
-    if (certClient != null) {
+    if (certClient != null && !certClient.getAllRootCaCerts().isEmpty()) {
       return new ArrayList<>(certClient.getAllRootCaCerts());
     }
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
