@@ -207,8 +207,11 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
           iterator.seekToLast();
           String endKey = StringUtils.bytes2String(iterator.key());
 
-          CompactionFileInfo fileInfo =
-              new CompactionFileInfo(fileName, startKey, endKey, columnFamily);
+          CompactionFileInfo fileInfo = new CompactionFileInfo.Builder(fileName)
+              .setStartRange(startKey)
+              .setEndRange(endKey)
+              .setColumnFamily(columnFamily)
+              .build();
           response.add(fileInfo);
         } catch (RocksDBException rocksDBException) {
           throw new RuntimeException("Failed to read SST file: " + sstFile,

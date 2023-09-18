@@ -19,20 +19,21 @@
 package org.apache.ozone.compaction.log;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.util.Preconditions;
 
 /**
  * Dao to keep SST file information in the compaction log.
  */
-public class CompactionFileInfo {
+public final class CompactionFileInfo {
   private final String fileName;
   private final String startKey;
   private final String endKey;
   private final String columnFamily;
 
-  public CompactionFileInfo(String fileName,
-                            String startRange,
-                            String endRange,
-                            String columnFamily) {
+  private CompactionFileInfo(String fileName,
+                             String startRange,
+                             String endRange,
+                             String columnFamily) {
     this.fileName = fileName;
     this.startKey = startRange;
     this.endKey = endRange;
@@ -81,5 +82,49 @@ public class CompactionFileInfo {
   public String toString() {
     return String.format("fileName: '%s', startKey: '%s', endKey: '%s'," +
         " columnFamily: '%s'", fileName, startKey, endKey, columnFamily);
+  }
+
+  /**
+   * Builder of CompactionFileInfo.
+   */
+  public static class Builder {
+    private final String fileName;
+    private String startRange;
+    private String endRange;
+    private String columnFamily;
+
+    public Builder(String fileName) {
+      Preconditions.checkNotNull(fileName, "FileName is required parameter.");
+      this.fileName = fileName;
+    }
+
+    public Builder setStartRange(String startRange) {
+      this.startRange = startRange;
+      return this;
+    }
+
+    public Builder setEndRange(String endRange) {
+      this.endRange = endRange;
+      return this;
+    }
+
+    public Builder setColumnFamily(String columnFamily) {
+      this.columnFamily = columnFamily;
+      return this;
+    }
+
+    public CompactionFileInfo build() {
+      if ((startRange != null || endRange != null || columnFamily != null) &&
+          (startRange == null || endRange == null || columnFamily == null)) {
+        throw new IllegalArgumentException(
+            String.format("Either all of startRange, endRange and " +
+                    "columnFamily should be non-null or null. " +
+                    "startRange: '%s', endRange: '%s', columnFamily: '%s'.",
+                startRange, endRange, columnFamily));
+      }
+
+      return new CompactionFileInfo(fileName, startRange, endRange,
+          columnFamily);
+    }
   }
 }
