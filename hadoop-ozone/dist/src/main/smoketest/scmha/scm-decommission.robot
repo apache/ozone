@@ -37,8 +37,8 @@ Create volume bucket and put key
 
 Get Primordial SCM ID
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
-    ${primordial_node} =    Get Lines Containing String                     ${result}           scm1
-    ${primordial_split} =   Split String            ${primordial_node}      :
+    ${primordial_node} =    Get Lines Matching Pattern            ${result}         scm[1234].org:9894:LEADER*
+    ${primordial_split} =   Split String            ${primordial_node}         :
     ${primordial_scmId} =   Strip String            ${primordial_split[3]}
     [Return]                ${primordial_scmId}
 
@@ -52,9 +52,9 @@ Get SCM Node count
 Transfer Leader to non-primordial node Follower
     ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
                             LOG                     ${result}
-    ${follower_nodes} =     Get Lines Matching Pattern                      ${result}           scm[123].org:9894:FOLLOWER*
-    ${follower_node} =      Get Line                ${follower_nodes}        0
-    ${follower_split} =     Split String            ${follower_node}         :
+    ${follower_nodes} =     Get Lines Matching Pattern                     ${result}       scm[1234].org:9894:FOLLOWER*
+    ${follower_node} =      Get Line                ${follower_nodes}      0
+    ${follower_split} =     Split String            ${follower_node}       :
     ${follower_scmId} =     Strip String            ${follower_split[3]}
 
     ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -n ${follower_scmId}
