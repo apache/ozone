@@ -33,12 +33,12 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
-import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotUpdateSizeResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotUpdateSizeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,22 +105,22 @@ public class TestOMSnapshotSizeRequestAndResponse {
         createSnapshotUpdateSizeRequest();
 
     // Pre-Execute
-    OMSnapshotUpdateSizeRequest omSnapshotUpdateSizeRequest = new
-        OMSnapshotUpdateSizeRequest(snapshotUpdateSizeRequest);
-    OMRequest modifiedOmRequest = omSnapshotUpdateSizeRequest
+    OMSnapshotSetPropertyRequest omSnapshotSetPropertyRequest = new
+        OMSnapshotSetPropertyRequest(snapshotUpdateSizeRequest);
+    OMRequest modifiedOmRequest = omSnapshotSetPropertyRequest
         .preExecute(ozoneManager);
-    omSnapshotUpdateSizeRequest = new
-        OMSnapshotUpdateSizeRequest(modifiedOmRequest);
+    omSnapshotSetPropertyRequest = new
+        OMSnapshotSetPropertyRequest(modifiedOmRequest);
 
     // Validate and Update Cache
-    OMSnapshotUpdateSizeResponse omSnapshotUpdateSizeResponse =
-        (OMSnapshotUpdateSizeResponse) omSnapshotUpdateSizeRequest
+    OMSnapshotSetPropertyResponse omSnapshotSetPropertyResponse =
+        (OMSnapshotSetPropertyResponse) omSnapshotSetPropertyRequest
             .validateAndUpdateCache(ozoneManager, 200L,
             DOUBLE_BUFFER_HELPER);
 
     // Commit to DB.
     batchOperation = omMetadataManager.getStore().initBatchOperation();
-    omSnapshotUpdateSizeResponse.checkAndUpdateDB(omMetadataManager,
+    omSnapshotSetPropertyResponse.checkAndUpdateDB(omMetadataManager,
         batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
@@ -148,27 +148,27 @@ public class TestOMSnapshotSizeRequestAndResponse {
   }
 
   private OMRequest createSnapshotUpdateSizeRequest() throws IOException {
-    List<SnapshotSize> snapshotSizeList = new ArrayList<>();
+    List<SnapshotProperty> snapshotPropertyList = new ArrayList<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
              iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();
-        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
+        SnapshotProperty snapshotSize = SnapshotProperty.newBuilder()
             .setSnapshotKey(snapDbKey)
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveSizeAfterRepl)
             .build();
-        snapshotSizeList.add(snapshotSize);
+        snapshotPropertyList.add(snapshotSize);
       }
     }
-    SnapshotUpdateSizeRequest snapshotUpdateSizeRequest =
-        SnapshotUpdateSizeRequest.newBuilder()
-            .addAllSnapshotSize(snapshotSizeList)
+    SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
+        SetSnapshotPropertyRequest.newBuilder()
+            .addAllSnapshotProperty(snapshotPropertyList)
             .build();
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotUpdateSize)
-        .setSnapshotUpdateSizeRequest(snapshotUpdateSizeRequest)
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetSnapshotProperty)
+        .setSetSnapshotPropertyRequest(snapshotUpdateSizeRequest)
         .setClientId(UUID.randomUUID().toString())
         .build();
 

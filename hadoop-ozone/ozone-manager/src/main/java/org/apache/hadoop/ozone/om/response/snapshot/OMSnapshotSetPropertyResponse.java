@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Map;
@@ -34,20 +33,20 @@ import java.util.Map;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
 /**
- * Response for OMSnapshotUpdateSizeRequest.
+ * Response for OMSnapshotSetPropertyRequest.
  */
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
-public class OMSnapshotUpdateSizeResponse extends OMClientResponse {
+public class OMSnapshotSetPropertyResponse extends OMClientResponse {
   private final Map<String, SnapshotInfo> updatedSnapInfos;
 
-  public OMSnapshotUpdateSizeResponse(
+  public OMSnapshotSetPropertyResponse(
       @Nonnull OMResponse omResponse,
       Map<String, SnapshotInfo> updatedSnapInfos) {
     super(omResponse);
     this.updatedSnapInfos = updatedSnapInfos;
   }
 
-  public OMSnapshotUpdateSizeResponse(@Nonnull OMResponse omResponse) {
+  public OMSnapshotSetPropertyResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
     this.updatedSnapInfos = null;

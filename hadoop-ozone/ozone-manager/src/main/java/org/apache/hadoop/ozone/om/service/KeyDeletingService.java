@@ -46,8 +46,8 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotUpdateSizeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -485,28 +485,28 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     private void updateSnapshotExclusiveSize() {
 
-      List<SnapshotSize> snapshotSizeList = new ArrayList<>();
+      List<SnapshotProperty> snapshotPropertyList = new ArrayList<>();
       for (String dbKey: completedExclusiveSizeList) {
-        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
+        SnapshotProperty snapshotProperty = SnapshotProperty.newBuilder()
                 .setSnapshotKey(dbKey)
                 .setExclusiveSize(exclusiveSizeList.get(dbKey))
                 .setExclusiveReplicatedSize(
                     exclusiveReplicatedSizeList.get(dbKey))
                 .build();
-        snapshotSizeList.add(snapshotSize);
+        snapshotPropertyList.add(snapshotProperty);
         exclusiveSizeList.remove(dbKey);
         exclusiveReplicatedSizeList.remove(dbKey);
       }
 
-      if (!snapshotSizeList.isEmpty()) {
-        SnapshotUpdateSizeRequest snapshotUpdateSizeRequest =
-            SnapshotUpdateSizeRequest.newBuilder()
-                .addAllSnapshotSize(snapshotSizeList)
+      if (!snapshotPropertyList.isEmpty()) {
+        SetSnapshotPropertyRequest setSnapshotPropertyRequest =
+            SetSnapshotPropertyRequest.newBuilder()
+                .addAllSnapshotProperty(snapshotPropertyList)
                 .build();
 
         OMRequest omRequest = OMRequest.newBuilder()
-            .setCmdType(Type.SnapshotUpdateSize)
-            .setSnapshotUpdateSizeRequest(snapshotUpdateSizeRequest)
+            .setCmdType(Type.SetSnapshotProperty)
+            .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
             .setClientId(clientId.toString())
             .build();
 

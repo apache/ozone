@@ -26,10 +26,12 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotUpdateSizeResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -39,9 +41,11 @@ import java.util.Map;
 /**
  * Updates the exclusive size of the snapshot.
  */
-public class OMSnapshotUpdateSizeRequest extends OMClientRequest {
+public class OMSnapshotSetPropertyRequest extends OMClientRequest {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMSnapshotSetPropertyRequest.class);
 
-  public OMSnapshotUpdateSizeRequest(OMRequest omRequest) {
+  public OMSnapshotSetPropertyRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -54,24 +58,25 @@ public class OMSnapshotUpdateSizeRequest extends OMClientRequest {
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    OzoneManagerProtocolProtos.SnapshotUpdateSizeRequest
-        snapshotUpdateSizeRequest = getOmRequest()
-        .getSnapshotUpdateSizeRequest();
+    OzoneManagerProtocolProtos.SetSnapshotPropertyRequest
+        setSnapshotPropertyRequest = getOmRequest()
+        .getSetSnapshotPropertyRequest();
 
-    List<SnapshotSize> snapshotSizeList = snapshotUpdateSizeRequest
-        .getSnapshotSizeList();
+    List<SnapshotProperty> snapshotPropertyList = setSnapshotPropertyRequest
+        .getSnapshotPropertyList();
     Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
 
     try {
-      for (SnapshotSize snapshotSize: snapshotSizeList) {
-        String snapshotKey = snapshotSize.getSnapshotKey();
-        long exclusiveSize = snapshotSize.getExclusiveSize();
-        long exclusiveReplicatedSize = snapshotSize
+      for (SnapshotProperty snapshotProperty: snapshotPropertyList) {
+        String snapshotKey = snapshotProperty.getSnapshotKey();
+        long exclusiveSize = snapshotProperty.getExclusiveSize();
+        long exclusiveReplicatedSize = snapshotProperty
             .getExclusiveReplicatedSize();
         SnapshotInfo snapshotInfo = metadataManager
             .getSnapshotInfoTable().get(snapshotKey);
 
         if (snapshotInfo == null) {
+          LOG.error("SnapshotInfo for Snapshot: {} is not found", snapshotKey);
           continue;
         }
 
@@ -84,10 +89,10 @@ public class OMSnapshotUpdateSizeRequest extends OMClientRequest {
             CacheValue.get(trxnLogIndex, snapshotInfo));
         updatedSnapInfos.put(snapshotKey, snapshotInfo);
       }
-      omClientResponse = new OMSnapshotUpdateSizeResponse(
+      omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfos);
     } catch (IOException ex) {
-      omClientResponse = new OMSnapshotUpdateSizeResponse(
+      omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
