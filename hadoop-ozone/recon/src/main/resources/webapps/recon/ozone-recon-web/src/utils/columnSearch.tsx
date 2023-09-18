@@ -69,8 +69,16 @@ class ColumnSearch extends React.PureComponent {
     filterIcon: (filtered: boolean) => (
       <Icon type='search' style={{color: filtered ? '#1890ff' : undefined}}/>
     ),
-    onFilter: (value: string, record: any) =>
-      record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()),
+    onFilter: (value: string, record: any) => {
+      if (record[dataIndex] !== undefined || record[dataIndex] !== null) {
+        return typeof (record[dataIndex]) === typeof {}
+          ? Boolean (record[dataIndex].find(item => Object.values(item).toString().toLowerCase().includes(value.toLowerCase())))
+          : record[dataIndex].toString().toLowerCase().includes(value.toLowerCase())
+      }
+      else {
+        return;
+      }
+    },
     onFilterDropdownVisibleChange: (visible: boolean) => {
       if (visible) {
         setTimeout(() => {
