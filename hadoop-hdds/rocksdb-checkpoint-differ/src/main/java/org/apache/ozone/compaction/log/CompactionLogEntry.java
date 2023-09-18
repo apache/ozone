@@ -18,31 +18,22 @@
 
 package org.apache.ozone.compaction.log;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.SstFileReader;
-import org.rocksdb.SstFileReaderIterator;
+import org.apache.hadoop.util.Preconditions;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION_LENGTH;
-
 /**
  * Compaction log entry Dao to write to the compaction log file.
  */
-public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
+public final class CompactionLogEntry implements
+    CopyObject<CompactionLogEntry> {
   private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(CompactionLogEntryProto.class),
       CompactionLogEntry::getFromProtobuf,
@@ -58,7 +49,7 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
   private final List<CompactionFileInfo> outputFileInfoList;
   private final String compactionReason;
 
-  public CompactionLogEntry(long dbSequenceNumber,
+  private CompactionLogEntry(long dbSequenceNumber,
                             long compactionTime,
                             List<CompactionFileInfo> inputFileInfoList,
                             List<CompactionFileInfo> outputFileInfoList,
@@ -86,6 +77,10 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
     return compactionTime;
   }
 
+  public String getCompactionReason() {
+    return compactionReason;
+  }
+
   public CompactionLogEntryProto getProtobuf() {
     CompactionLogEntryProto.Builder builder = CompactionLogEntryProto
         .newBuilder()
@@ -96,15 +91,11 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
       builder.setCompactionReason(compactionReason);
     }
 
-    if (inputFileInfoList != null) {
-      inputFileInfoList.forEach(fileInfo ->
-          builder.addInputFileIntoList(fileInfo.getProtobuf()));
-    }
+    inputFileInfoList.forEach(fileInfo ->
+        builder.addInputFileIntoList(fileInfo.getProtobuf()));
 
-    if (outputFileInfoList != null) {
-      outputFileInfoList.forEach(fileInfo ->
-          builder.addOutputFileIntoList(fileInfo.getProtobuf()));
-    }
+    outputFileInfoList.forEach(fileInfo ->
+        builder.addOutputFileIntoList(fileInfo.getProtobuf()));
 
     return builder.build();
   }
@@ -120,10 +111,13 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
         .stream()
         .map(CompactionFileInfo::getFromProtobuf)
         .collect(Collectors.toList());
+    Builder builder = new Builder(proto.getDbSequenceNumber(),
+        proto.getCompactionTime(), inputFileInfo, outputFileInfo);
 
-    return new CompactionLogEntry(proto.getDbSequenceNumber(),
-        proto.getCompactionTime(), inputFileInfo, outputFileInfo,
-        proto.getCompactionReason());
+    if (proto.hasCompactionReason()) {
+      builder.setCompactionReason(proto.getCompactionReason());
+    }
+    return builder.build();
   }
 
   @Override
@@ -140,23 +134,21 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
   public static class Builder {
     private final long dbSequenceNumber;
     private final long compactionTime;
-    private List<String> inputFiles;
-    private List<String> outputFiles;
+    private final List<CompactionFileInfo> inputFileInfoList;
+    private final List<CompactionFileInfo> outputFileInfoList;
     private String compactionReason;
 
-    public Builder(long dbSequenceNumber, long compactionTime) {
+    public Builder(long dbSequenceNumber, long compactionTime,
+                   List<CompactionFileInfo> inputFileInfoList,
+                   List<CompactionFileInfo> outputFileInfoList) {
+      Preconditions.checkNotNull(inputFileInfoList,
+          "inputFileInfoList is required parameter.");
+      Preconditions.checkNotNull(outputFileInfoList,
+          "outputFileInfoList is required parameter.");
       this.dbSequenceNumber = dbSequenceNumber;
       this.compactionTime = compactionTime;
-    }
-
-    public Builder setInputFiles(List<String> inputFiles) {
-      this.inputFiles = inputFiles;
-      return this;
-    }
-
-    public Builder setOutputFiles(List<String> outputFiles) {
-      this.outputFiles = outputFiles;
-      return this;
+      this.inputFileInfoList = inputFileInfoList;
+      this.outputFileInfoList = outputFileInfoList;
     }
 
     public Builder setCompactionReason(String compactionReason) {
@@ -165,53 +157,8 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
     }
 
     public CompactionLogEntry build() {
-      try (ManagedOptions options = new ManagedOptions();
-           ManagedReadOptions readOptions = new ManagedReadOptions()) {
-        return new CompactionLogEntry(dbSequenceNumber, compactionTime,
-            toFileInfoList(inputFiles, options, readOptions),
-            toFileInfoList(outputFiles, options, readOptions),
-            compactionReason);
-      }
-    }
-
-    private List<CompactionFileInfo> toFileInfoList(
-        List<String> sstFiles,
-        ManagedOptions options,
-        ManagedReadOptions readOptions
-    ) {
-      if (CollectionUtils.isEmpty(sstFiles)) {
-        return Collections.emptyList();
-      }
-
-      final int fileNameOffset = sstFiles.get(0).lastIndexOf("/") + 1;
-      List<CompactionFileInfo> response = new ArrayList<>();
-
-      for (String sstFile : sstFiles) {
-        String fileName = sstFile.substring(fileNameOffset,
-            sstFile.length() - SST_FILE_EXTENSION_LENGTH);
-        SstFileReader fileReader = new SstFileReader(options);
-        try {
-          fileReader.open(sstFile);
-          String columnFamily = StringUtils.bytes2String(
-              fileReader.getTableProperties().getColumnFamilyName());
-          SstFileReaderIterator iterator = fileReader.newIterator(readOptions);
-          iterator.seekToFirst();
-          String startKey = StringUtils.bytes2String(iterator.key());
-          iterator.seekToLast();
-          String endKey = StringUtils.bytes2String(iterator.key());
-
-          CompactionFileInfo fileInfo = new CompactionFileInfo.Builder(fileName)
-              .setStartRange(startKey)
-              .setEndRange(endKey)
-              .setColumnFamily(columnFamily)
-              .build();
-          response.add(fileInfo);
-        } catch (RocksDBException rocksDBException) {
-          throw new RuntimeException("Failed to read SST file: " + sstFile,
-              rocksDBException);
-        }
-      }
-      return response;
+      return new CompactionLogEntry(dbSequenceNumber, compactionTime,
+          inputFileInfoList, outputFileInfoList, compactionReason);
     }
   }
 

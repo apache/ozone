@@ -21,6 +21,8 @@ package org.apache.ozone.compaction.log;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.util.Preconditions;
 
+import java.util.Objects;
+
 /**
  * Dao to keep SST file information in the compaction log.
  */
@@ -74,8 +76,19 @@ public final class CompactionFileInfo {
 
   public static CompactionFileInfo getFromProtobuf(
       HddsProtos.CompactionFileInfoProto proto) {
-    return new CompactionFileInfo(proto.getFileName(), proto.getStartKey(),
-        proto.getEndKey(), proto.getColumnFamily());
+    Builder builder = new Builder(proto.getFileName());
+
+    if (proto.hasStartKey()) {
+      builder.setStartRange(proto.getStartKey());
+    }
+    if (proto.hasEndKey()) {
+      builder.setEndRange(proto.getEndKey());
+    }
+    if (proto.hasColumnFamily()) {
+      builder.setColumnFamily(proto.getColumnFamily());
+    }
+
+    return builder.build();
   }
 
   @Override
@@ -126,5 +139,26 @@ public final class CompactionFileInfo {
       return new CompactionFileInfo(fileName, startRange, endRange,
           columnFamily);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof CompactionFileInfo)) {
+      return false;
+    }
+
+    CompactionFileInfo that = (CompactionFileInfo) o;
+    return Objects.equals(fileName, that.fileName) &&
+        Objects.equals(startKey, that.startKey) &&
+        Objects.equals(endKey, that.endKey) &&
+        Objects.equals(columnFamily, that.columnFamily);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(fileName, startKey, endKey, columnFamily);
   }
 }

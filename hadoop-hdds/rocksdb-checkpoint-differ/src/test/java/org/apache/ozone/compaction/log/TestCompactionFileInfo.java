@@ -18,6 +18,7 @@
 
 package org.apache.ozone.compaction.log;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionFileInfoProto;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -26,6 +27,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test class for CompactionFileInfo.
@@ -49,7 +51,6 @@ public class TestCompactionFileInfo {
     );
   }
 
-
   @ParameterizedTest(name = "{0}")
   @MethodSource("compactionFileInfoValidScenarios")
   public void testCompactionFileInfoValidScenario(String description,
@@ -63,7 +64,6 @@ public class TestCompactionFileInfo {
             .setEndRange(endRange).setColumnFamily(columnFamily).build();
     Assertions.assertNotNull(compactionFileInfo);
   }
-
 
   private static Stream<Arguments> compactionFileInfoInvalidScenarios() {
     return Stream.of(
@@ -150,5 +150,71 @@ public class TestCompactionFileInfo {
         () -> new CompactionFileInfo.Builder(fileName).setStartRange(startRange)
             .setEndRange(endRange).setColumnFamily(columnFamily).build());
     assertEquals(expectedMessage, exception.getMessage());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("compactionFileInfoValidScenarios")
+  public void testGetProtobuf(String description,
+                              String fileName,
+                              String startRange,
+                              String endRange,
+                              String columnFamily) {
+    CompactionFileInfo compactionFileInfo = new CompactionFileInfo
+        .Builder(fileName)
+        .setStartRange(startRange)
+        .setEndRange(endRange)
+        .setColumnFamily(columnFamily)
+        .build();
+
+    CompactionFileInfoProto protobuf = compactionFileInfo.getProtobuf();
+    assertEquals(fileName, protobuf.getFileName());
+
+    if (startRange != null) {
+      assertEquals(startRange, protobuf.getStartKey());
+    } else {
+      assertFalse(protobuf.hasStartKey());
+    }
+    if (endRange != null) {
+      assertEquals(endRange, protobuf.getEndKey());
+    } else {
+      assertFalse(protobuf.hasEndKey());
+    }
+    if (columnFamily != null) {
+      assertEquals(columnFamily, protobuf.getColumnFamily());
+    } else {
+      assertFalse(protobuf.hasColumnFamily());
+    }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("compactionFileInfoValidScenarios")
+  public void testFromProtobuf(String description,
+                               String fileName,
+                               String startRange,
+                               String endRange,
+                               String columnFamily) {
+    CompactionFileInfoProto.Builder builder = CompactionFileInfoProto
+        .newBuilder()
+        .setFileName(fileName);
+
+    if (startRange != null) {
+      builder = builder.setStartKey(startRange);
+    }
+    if (endRange != null) {
+      builder = builder.setEndKey(endRange);
+    }
+    if (columnFamily != null) {
+      builder = builder.setColumnFamily(columnFamily);
+    }
+
+    CompactionFileInfoProto protobuf = builder.build();
+
+    CompactionFileInfo compactionFileInfo =
+        CompactionFileInfo.getFromProtobuf(protobuf);
+
+    assertEquals(fileName, compactionFileInfo.getFileName());
+    assertEquals(startRange, compactionFileInfo.getStartKey());
+    assertEquals(endRange, compactionFileInfo.getEndKey());
+    assertEquals(columnFamily, compactionFileInfo.getColumnFamily());
   }
 }
