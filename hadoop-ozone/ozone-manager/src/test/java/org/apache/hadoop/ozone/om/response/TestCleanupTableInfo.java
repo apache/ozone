@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
@@ -132,7 +133,9 @@ public class TestCleanupTableInfo {
             invocationOnMock -> {
               Pair<String, String> pair =
                   Pair.of(TEST_VOLUME_NAME, TEST_BUCKET_NAME);
-              return new ResolvedBucket(pair, pair);
+              return new ResolvedBucket(TEST_VOLUME_NAME, TEST_BUCKET_NAME,
+                  TEST_VOLUME_NAME, TEST_BUCKET_NAME,
+                  "owner", BucketLayout.DEFAULT);
             }
         );
     when(om.getAclsEnabled()).thenReturn(false);

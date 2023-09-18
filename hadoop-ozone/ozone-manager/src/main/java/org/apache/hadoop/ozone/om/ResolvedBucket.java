@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 
@@ -34,37 +36,59 @@ import java.util.Objects;
  */
 public class ResolvedBucket {
 
-  private final Pair<String, String> requested;
-  private final Pair<String, String> resolved;
+  private final String requestedVolume;
+  private final String requestedBucket;
+  private final String realVolume;
+  private final String realBucket;
+  private final String bucketOwner;
+  private final BucketLayout bucketLayout;
 
-  public ResolvedBucket(Pair<String, String> requested,
-      Pair<String, String> resolved) {
-    this.requested = requested;
-    this.resolved = resolved;
+  public ResolvedBucket(String requestedVolume, String requestedBucket,
+      OmBucketInfo resolved) {
+    this(requestedVolume, requestedBucket,
+        resolved.getVolumeName(), resolved.getBucketName(),
+        resolved.getOwner(), resolved.getBucketLayout());
   }
 
-  public Pair<String, String> requested() {
-    return requested;
+  public ResolvedBucket(String requestedVolume, String requestedBucket,
+      String realVolume, String realBucket, String bucketOwner,
+      BucketLayout bucketLayout) {
+    this.requestedVolume = requestedVolume;
+    this.requestedBucket = requestedBucket;
+    this.realVolume = realVolume;
+    this.realBucket = realBucket;
+    this.bucketOwner = bucketOwner;
+    this.bucketLayout = bucketLayout;
   }
 
-  public Pair<String, String> resolved() {
-    return resolved;
+  public ResolvedBucket(Pair<String, String> requested, Pair<String, String> real, String owner, BucketLayout bucketLayout) {
+    this(requested.getLeft(), requested.getRight(),
+        real.getLeft(), real.getRight(),
+        owner, bucketLayout);
   }
 
   public String requestedVolume() {
-    return requested.getLeft();
+    return requestedVolume;
   }
 
   public String requestedBucket() {
-    return requested.getRight();
+    return requestedBucket;
   }
 
   public String realVolume() {
-    return resolved.getLeft();
+    return realVolume;
   }
 
   public String realBucket() {
-    return resolved.getRight();
+    return realBucket;
+  }
+
+  public String bucketOwner() {
+    return bucketOwner;
+  }
+
+  public BucketLayout bucketLayout() {
+    return bucketLayout;
   }
 
   public OmKeyArgs update(OmKeyArgs args) {
@@ -86,7 +110,8 @@ public class ResolvedBucket {
   }
 
   public boolean isLink() {
-    return !Objects.equals(requested, resolved);
+    return !Objects.equals(requestedVolume, realVolume)
+        || !Objects.equals(requestedBucket, realBucket);
   }
 
   public boolean isDangling() {

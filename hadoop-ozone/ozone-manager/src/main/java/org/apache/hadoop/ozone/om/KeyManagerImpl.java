@@ -377,12 +377,12 @@ public class KeyManagerImpl implements KeyManager {
     return edek;
   }
   @Override
-  public OmKeyInfo lookupKey(OmKeyArgs args, String clientAddress)
-      throws IOException {
+  public OmKeyInfo lookupKey(OmKeyArgs args, BucketLayout bucketLayout,
+      String clientAddress) throws IOException {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(metrics.getLookupReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args));
+        () -> readKeyInfo(args, bucketLayout));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.
@@ -406,7 +406,7 @@ public class KeyManagerImpl implements KeyManager {
     return value;
   }
 
-  private OmKeyInfo readKeyInfo(OmKeyArgs args) throws IOException {
+  private OmKeyInfo readKeyInfo(OmKeyArgs args, BucketLayout bucketLayout) throws IOException {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -415,9 +415,6 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      BucketLayout bucketLayout =
-          getBucketLayout(metadataManager, args.getVolumeName(),
-              args.getBucketName());
       keyName = OMClientRequest
           .validateAndNormalizeKey(enableFileSystemPaths, keyName,
               bucketLayout);
@@ -425,7 +422,7 @@ public class KeyManagerImpl implements KeyManager {
       if (bucketLayout.isFileSystemOptimized()) {
         value = getOmKeyInfoFSO(volumeName, bucketName, keyName);
       } else {
-        value = getOmKeyInfo(volumeName, bucketName, keyName);
+        value = getOmKeyInfo(volumeName, bucketName, keyName, bucketLayout);
         if (value != null) {
           // For Legacy & OBS buckets, any key is a file by default. This is to
           // keep getKeyInfo compatible with OFS clients.
@@ -459,11 +456,9 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
-                                 String keyName) throws IOException {
+      String keyName, BucketLayout bucketLayout) throws IOException {
     String keyBytes =
         metadataManager.getOzoneKey(volumeName, bucketName, keyName);
-    BucketLayout bucketLayout = getBucketLayout(metadataManager, volumeName,
-        bucketName);
     return metadataManager
         .getKeyTable(bucketLayout)
         .get(keyBytes);
@@ -477,7 +472,7 @@ public class KeyManagerImpl implements KeyManager {
                                    String keyName) throws IOException {
     OzoneFileStatus fileStatus = OMFileRequest.getOMKeyInfoIfExists(
         metadataManager, volumeName, bucketName, keyName, scmBlockSize,
-        ozoneManager.getDefaultReplicationConfig());
+        ozoneManager.getDefaultReplicationConfig(), false);
     if (fileStatus == null) {
       return null;
     }
@@ -908,7 +903,8 @@ public class KeyManagerImpl implements KeyManager {
       if (isBucketFSOptimized(volume, bucket)) {
         keyInfo = getOmKeyInfoFSO(volume, bucket, keyName);
       } else {
-        keyInfo = getOmKeyInfo(volume, bucket, keyName);
+        keyInfo = getOmKeyInfo(volume, bucket, keyName,
+            resolvedBucket.bucketLayout());
       }
       if (keyInfo == null) {
         throw new OMException("Key not found. Key:" + objectKey, KEY_NOT_FOUND);
@@ -1972,13 +1968,13 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public OmKeyInfo getKeyInfo(OmKeyArgs args, String clientAddress)
+  public OmKeyInfo getKeyInfo(OmKeyArgs args, BucketLayout bucketLayout, String clientAddress)
       throws IOException {
     Preconditions.checkNotNull(args);
 
     OmKeyInfo value = captureLatencyNs(
         metrics.getGetKeyInfoReadKeyInfoLatencyNs(),
-        () -> readKeyInfo(args));
+        () -> readKeyInfo(args, bucketLayout));
 
     // If operation is head, do not perform any additional steps based on flags.
     // As head operation does not need any of those details.

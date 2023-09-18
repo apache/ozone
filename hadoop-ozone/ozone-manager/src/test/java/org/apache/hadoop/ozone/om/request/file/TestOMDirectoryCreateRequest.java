@@ -102,7 +102,9 @@ public class TestOMDirectoryCreateRequest {
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
-        .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
+        .thenReturn(new ResolvedBucket("", "",
+            "", "", "",
+            BucketLayout.DEFAULT));
   }
 
   @After

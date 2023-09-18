@@ -109,8 +109,9 @@ public class TestS3MultipartRequest {
         .thenAnswer(inv -> {
           KeyArgs args = (KeyArgs) inv.getArguments()[0];
           return new ResolvedBucket(
-              Pair.of(args.getVolumeName(), args.getBucketName()),
-              Pair.of(args.getVolumeName(), args.getBucketName()));
+              args.getVolumeName(), args.getBucketName(),
+              args.getVolumeName(), args.getBucketName(),
+              "owner", BucketLayout.DEFAULT);
         });
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);

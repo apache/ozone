@@ -3783,7 +3783,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setKeyName(keyName)
         .build();
     OmKeyInfo omKeyInfo = ozoneManager.getKeyManager().getKeyInfo(keyArgs,
-        UUID.randomUUID().toString());
+        BucketLayout.DEFAULT, UUID.randomUUID().toString());
 
     OmKeyLocationInfoGroup latestVersionLocations =
         omKeyInfo.getLatestVersionLocations();
