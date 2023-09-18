@@ -813,9 +813,8 @@ public final class OmUtils {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
 
-  public static String format(List<ServiceInfo> nodes, int port,
-                              String leaderId) {
-    StringBuilder sb = new StringBuilder();
+   public static List<Map<String, String>> format(List<ServiceInfo> nodes, int port, String leaderId) {
+    List<Map<String, String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
         .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
@@ -825,26 +824,24 @@ public final class OmUtils {
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role =
-            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
-                "FOLLOWER";
-        sb.append(
-            String.format(
-                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
-                info.getHostname(),
-                info.getOmRoleInfo().getNodeId(),
-                port,
-                role
-            ));
+        String role = info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" : "FOLLOWER";
+        Map<String, String> omInfo = new HashMap<>();
+        omInfo.put("HostName", info.getHostname());
+        omInfo.put("Node-Id", info.getOmRoleInfo().getNodeId());
+        omInfo.put("Ratis-Port", String.valueOf(port));
+        omInfo.put("Role", role);
+
+        omInfoList.add(omInfo);
         count++;
       }
     }
     // Print Stand-alone if only one OM exists
-    if (count == 1) {
-      return "STANDALONE";
-    } else {
-      return sb.toString();
-    }
+   if (count == 1) {
+     // Return an empty list to indicate "STANDALONE"
+    return Collections.emptyList();
+  } else {
+      return omInfoList;
+   }
   }
 
   /**

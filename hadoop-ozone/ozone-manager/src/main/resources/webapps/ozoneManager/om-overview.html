@@ -28,7 +28,30 @@
     </tr>
     <tr>
         <td>OM Roles (HA)	</td>
-        <td>{{$ctrl.overview.jmx.RatisRoles}}</td>
+        <td> <table class="table table-striped om-roles-css" class="col-md-6">
+            <thead>
+            <tr>
+                <th>Host Name</th>
+                <th>Node ID</th>
+                <th>Ratis Port</th>
+                <th>Role</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr class="om-roles-background" ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id == roles[2].value">
+                <td>{{roles[3].value}}</td>
+                <td>{{roles[2].value}}</td>
+                <td>{{roles[1].value}}</td>
+                <td>{{roles[0].value}}</td>
+            </tr>
+            <tr ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id != roles[2].value">
+                <td>{{roles[3].value}}</td>
+                <td>{{roles[2].value}}</td>
+                <td>{{roles[1].value}}</td>
+                <td>{{roles[0].value}}</td>
+            </tr>
+            </tbody>
+        </table></td>
     </tr>
     <tr>
         <td>Current-Role</td>

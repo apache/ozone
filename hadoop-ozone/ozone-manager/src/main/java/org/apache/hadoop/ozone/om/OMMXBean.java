@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This is the JMX management interface for OM information.
@@ -29,7 +31,7 @@ public interface OMMXBean extends ServiceRuntimeInfo {
 
   String getRpcPort();
 
-  String getRatisRoles();
+  List<Map<String, String>> getRatisRoles();
 
   String getRatisLogDirectory();
 
