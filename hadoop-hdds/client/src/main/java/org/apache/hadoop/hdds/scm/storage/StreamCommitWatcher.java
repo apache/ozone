@@ -26,14 +26,10 @@ import java.util.List;
  * This class executes watchForCommit on ratis pipeline and releases
  * buffers once data successfully gets replicated.
  */
-public class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
+class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
   private final List<StreamBuffer> bufferList;
 
-  // total data which has been successfully flushed and acknowledged
-  // by all servers
-  private long totalAckDataLength;
-
-  public StreamCommitWatcher(XceiverClientSpi xceiverClient,
+  StreamCommitWatcher(XceiverClientSpi xceiverClient,
       List<StreamBuffer> bufferList) {
     super(xceiverClient);
     this.bufferList = bufferList;
@@ -41,14 +37,11 @@ public class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
 
   @Override
   void releaseBuffers(long index) {
+    long acked = 0;
     for (StreamBuffer buffer : remove(index)) {
-      totalAckDataLength += buffer.position();
+      acked += buffer.position();
       bufferList.remove(buffer);
     }
-  }
-
-  @Override
-  public long getTotalAckDataLength() {
-    return totalAckDataLength;
+    addAckDataLength(acked);
   }
 }

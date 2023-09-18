@@ -213,7 +213,7 @@ public class BlockDataStreamOutputEntryPool {
     if (keyArgs != null) {
       // in test, this could be null
       long length = getKeyLength();
-      org.apache.ratis.util.Preconditions.assertSame(length, offset, "length");
+      Preconditions.checkArgument(offset == length);
       keyArgs.setDataSize(length);
       keyArgs.setLocationInfoList(getLocationInfoList());
       // When the key is multipart upload part file upload, we should not

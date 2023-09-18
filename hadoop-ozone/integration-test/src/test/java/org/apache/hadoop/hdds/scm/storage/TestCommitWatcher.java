@@ -15,7 +15,7 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.client.rpc;
+package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.CommitWatcher;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;

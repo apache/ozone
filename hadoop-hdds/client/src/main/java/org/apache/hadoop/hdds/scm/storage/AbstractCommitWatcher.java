@@ -62,22 +62,31 @@ abstract class AbstractCommitWatcher<BUFFER> {
 
   private final XceiverClientSpi client;
 
+  private long totalAckDataLength;
+
   AbstractCommitWatcher(XceiverClientSpi client) {
     this.client = client;
   }
 
   @VisibleForTesting
-  public SortedMap<Long, List<BUFFER>> getCommitIndexMap() {
+  SortedMap<Long, List<BUFFER>> getCommitIndexMap() {
     return commitIndexMap;
   }
 
-  public void updateCommitInfoMap(long index, List<BUFFER> buffers) {
+  void updateCommitInfoMap(long index, List<BUFFER> buffers) {
     commitIndexMap.computeIfAbsent(index, k -> new LinkedList<>())
         .addAll(buffers);
   }
 
   /** @return the total data which has been acknowledged. */
-  abstract long getTotalAckDataLength();
+  long getTotalAckDataLength() {
+    return totalAckDataLength;
+  }
+
+  long addAckDataLength(long acked) {
+    totalAckDataLength += acked;
+    return totalAckDataLength;
+  }
 
   /**
    * Watch for commit for the first index.
@@ -88,7 +97,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
-  public XceiverClientReply watchOnFirstIndex() throws IOException {
+  XceiverClientReply watchOnFirstIndex() throws IOException {
     if (commitIndexMap.isEmpty()) {
       return null;
     }
@@ -104,7 +113,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return {@link XceiverClientReply} reply from raft client
    * @throws IOException in case watchForCommit fails
    */
-  public XceiverClientReply watchOnLastIndex() throws IOException {
+  XceiverClientReply watchOnLastIndex() throws IOException {
     if (commitIndexMap.isEmpty()) {
       return null;
     }
@@ -118,7 +127,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  public XceiverClientReply watchForCommit(long commitIndex)
+  XceiverClientReply watchForCommit(long commitIndex)
       throws IOException {
     final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
         = JavaUtils.memoize(CompletableFuture::new);
@@ -175,7 +184,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return ioException;
   }
 
-  public void cleanup() {
+  void cleanup() {
     commitIndexMap.clear();
     replies.clear();
   }

@@ -24,12 +24,9 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -40,59 +37,44 @@ import java.util.concurrent.ConcurrentMap;
  * This class executes watchForCommit on ratis pipeline and releases
  * buffers once data successfully gets replicated.
  */
-public class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CommitWatcher.class);
-
+class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   // A reference to the pool of buffers holding the data
-  private BufferPool bufferPool;
+  private final BufferPool bufferPool;
 
   // future Map to hold up all putBlock futures
-  private ConcurrentHashMap<Long,
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
-      futureMap;
+  private final ConcurrentMap<Long, CompletableFuture<
+      ContainerCommandResponseProto>> futureMap = new ConcurrentHashMap<>();
 
-  // total data which has been successfully flushed and acknowledged
-  // by all servers
-  private long totalAckDataLength;
-
-  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
+  CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
     super(xceiverClient);
     this.bufferPool = bufferPool;
-    futureMap = new ConcurrentHashMap<>();
   }
 
   @Override
   void releaseBuffers(long index) {
+    long acked = 0;
     for (ChunkBuffer buffer : remove(index)) {
-      totalAckDataLength += buffer.position();
+      acked += buffer.position();
       bufferPool.releaseBuffer(buffer);
     }
+    final long totalLength = addAckDataLength(acked);
     // When putBlock is called, a future is added.
-    // When putBlock reply, the future is removed below.
+    // When putBlock is replied, the future is removed below.
     // Therefore, the removed future should not be null.
     final CompletableFuture<ContainerCommandResponseProto> removed =
-        futureMap.remove(totalAckDataLength);
+        futureMap.remove(totalLength);
     Objects.requireNonNull(removed, () -> "Future not found for "
-        + totalAckDataLength + ": existing = " + futureMap.keySet());
+        + totalLength + ": existing = " + futureMap.keySet());
   }
 
-  public ConcurrentMap<Long,
-        CompletableFuture<ContainerProtos.
-            ContainerCommandResponseProto>> getFutureMap() {
+  ConcurrentMap<Long, CompletableFuture<
+      ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 
   @Override
-  public long getTotalAckDataLength() {
-    return totalAckDataLength;
-  }
-
   public void cleanup() {
     super.cleanup();
-    if (futureMap != null) {
-      futureMap.clear();
-    }
+    futureMap.clear();
   }
 }
