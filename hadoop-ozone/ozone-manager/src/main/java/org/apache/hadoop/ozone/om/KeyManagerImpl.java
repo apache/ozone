@@ -1429,13 +1429,13 @@ public class KeyManagerImpl implements KeyManager {
             if (remainingKey.contains(OZONE_URI_DELIMITER)) {
               continue;
             }
-            cacheKeyMap.put(cacheKey, fileStatus);
+            cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
           } else {
             String entryKeyName = cacheOmKeyInfo.getKeyName();
             String immediateChild = OzoneFSUtils.getImmediateChild(
                     entryKeyName, keyName);
             if (entryKeyName.equals(immediateChild)) {
-              cacheKeyMap.put(cacheKey, fileStatus);
+              cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
             } else {
               //If immediateChild isn't equal entryKeyName, it is a fakeDir.
               OmKeyInfo fakeDirEntry = createDirectoryKey(
@@ -1443,13 +1443,19 @@ public class KeyManagerImpl implements KeyManager {
               String fakeDirKey = metadataManager.getOzoneDirKey(
                   fakeDirEntry.getVolumeName(), fakeDirEntry.getBucketName(),
                   immediateChild);
-              cacheKeyMap.put(fakeDirKey, new OzoneFileStatus(
+              cacheKeyMap.putIfAbsent(fakeDirKey, new OzoneFileStatus(
                       fakeDirEntry, scmBlockSize, true));
             }
           }
         } else {
-          cacheKeyMap.put(cacheKey, fileStatus);
+          cacheKeyMap.putIfAbsent(cacheKey, fileStatus);
         }
+        // This else block has been added to capture deleted entries in cache.
+        // Adding deleted entries in cacheKeyMap as there is a possible race
+        // condition where table cache iterator is flushed already when
+        // using in the caller of this method.
+      } else if (cacheOmKeyInfo == null && !cacheKeyMap.containsKey(cacheKey)) {
+        cacheKeyMap.put(cacheKey, null);
       }
     }
   }
@@ -1556,8 +1562,14 @@ public class KeyManagerImpl implements KeyManager {
     countEntries = 0;
     // Convert results in cacheKeyMap to List
     for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
-      // No need to check if a key is deleted or not here, this is handled
-      // when adding entries to cacheKeyMap from DB.
+      // Here need to check if a key is deleted as cacheKeyMap will contain
+      // deleted entries as well. Adding deleted entries in cacheKeyMap is done
+      // as there is a possible race condition where table cache iterator is
+      // flushed already and isKeyDeleted check may not work as expected
+      // before putting entries in cacheKeyMap in findKeyInDbWithIterator call.
+      if (fileStatus == null) {
+        continue;
+      }
       fileStatusList.add(fileStatus);
       countEntries++;
       if (countEntries >= numEntries) {
@@ -1604,15 +1616,15 @@ public class KeyManagerImpl implements KeyManager {
         OmKeyInfo omKeyInfo = entry.getValue();
         String volumeName = omKeyInfo.getVolumeName();
         String bucketName = omKeyInfo.getBucketName();
-        if (!keyTable.isExist(entryInDb)) {
-          continue;
-        }
         if (entryInDb.startsWith(keyArgs)) {
           String entryKeyName = omKeyInfo.getKeyName();
           if (recursive) {
             // for recursive list all the entries
-            cacheKeyMap.putIfAbsent(entryInDb, new OzoneFileStatus(omKeyInfo,
-                scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
+            if (!cacheKeyMap.containsKey(entryInDb)) {
+              cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
+                  scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
+              countEntries++;
+            }
           } else {
             // get the child of the directory to list from the entry. For
             // example if directory to list is /a and entry is /a/b/c where
@@ -1622,29 +1634,34 @@ public class KeyManagerImpl implements KeyManager {
                 .getImmediateChild(entryKeyName, keyName);
             boolean isFile = OzoneFSUtils.isFile(immediateChild);
             if (isFile) {
-              cacheKeyMap.put(entryInDb,
-                  new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
+              if (!cacheKeyMap.containsKey(entryInDb)) {
+                cacheKeyMap.put(entryInDb,
+                    new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
+                countEntries++;
+              }
             } else {
               // if entry is a directory
-              if (!entryKeyName.equals(immediateChild)) {
-                OmKeyInfo fakeDirEntry = createDirectoryKey(
-                    omKeyInfo, immediateChild);
-                String fakeDirKey = metadataManager.getOzoneDirKey(
-                    volumeName, bucketName, immediateChild);
-                cacheKeyMap.put(fakeDirKey,
-                    new OzoneFileStatus(fakeDirEntry,
-                        scmBlockSize, true));
-              } else {
-                // If entryKeyName matches dir name, we have the info
-                cacheKeyMap.put(entryInDb,
-                    new OzoneFileStatus(omKeyInfo, scmBlockSize, true));
+              if (!cacheKeyMap.containsKey(entryInDb)) {
+                if (!entryKeyName.equals(immediateChild)) {
+                  OmKeyInfo fakeDirEntry = createDirectoryKey(
+                      omKeyInfo, immediateChild);
+                  String fakeDirKey = metadataManager.getOzoneDirKey(
+                      volumeName, bucketName, immediateChild);
+                  cacheKeyMap.put(fakeDirKey,
+                      new OzoneFileStatus(fakeDirEntry,
+                          scmBlockSize, true));
+                } else {
+                  // If entryKeyName matches dir name, we have the info
+                  cacheKeyMap.put(entryInDb,
+                      new OzoneFileStatus(omKeyInfo, 0, true));
+                }
+                countEntries++;
               }
               // skip the other descendants of this child directory.
               iterator.seek(getNextGreaterString(volumeName, bucketName,
                   immediateChild));
             }
           }
-          countEntries++;
         } else {
           break;
         }
@@ -1938,7 +1955,8 @@ public class KeyManagerImpl implements KeyManager {
               args.isForceUpdateContainerCacheFromSCM()));
 
       if (args.getSortDatanodes()) {
-        sortDatanodes(clientAddress, value);
+        captureLatencyNs(metrics.getGetKeyInfoSortDatanodesLatencyNs(),
+            () -> sortDatanodes(clientAddress, value));
       }
     }
     return value;

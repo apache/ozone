@@ -231,6 +231,30 @@ public class DatanodeConfiguration {
     return blockLimitPerInterval;
   }
 
+  @Config(key = "block.deleting.max.lock.holding.time",
+      defaultValue = "1s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION },
+      description =
+          "This configuration controls the maximum time that the block "
+          + "deleting service can hold the lock during the deletion of blocks. "
+          + "Once this configured time period is reached, the service will "
+          + "release and re-acquire the lock. This is not a hard limit as the "
+          + "time check only occurs after the completion of each transaction, "
+          + "which means the actual execution time may exceed this limit. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long blockDeletingMaxLockHoldingTime =
+      Duration.ofSeconds(1).toMillis();
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
+  }
+
+  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
+    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
+  }
+
   public void setBlockDeletionLimit(int limit) {
     this.blockLimitPerInterval = limit;
   }

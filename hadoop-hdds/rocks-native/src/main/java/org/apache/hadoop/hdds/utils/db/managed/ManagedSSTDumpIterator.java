@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.collect.Maps;
 import com.google.common.primitives.UnsignedLong;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.StringUtils;
@@ -31,6 +32,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,9 +61,16 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   private AtomicBoolean open;
   private StackTraceElement[] stackTrace;
 
-
   public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
                                 String sstFilePath, ManagedOptions options)
+      throws NativeLibraryNotLoadedException, IOException {
+    this(sstDumpTool, sstFilePath, options, null, null);
+  }
+
+  public ManagedSSTDumpIterator(ManagedSSTDumpTool sstDumpTool,
+                                String sstFilePath, ManagedOptions options,
+                                ManagedSlice lowerKeyBound,
+                                ManagedSlice upperKeyBound)
       throws IOException, NativeLibraryNotLoadedException {
     File sstFile = new File(sstFilePath);
     if (!sstFile.exists()) {
@@ -71,7 +81,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       throw new IOException(String.format("Path given: %s is not a file",
           sstFile.getAbsolutePath()));
     }
-    init(sstDumpTool, sstFile, options);
+    init(sstDumpTool, sstFile, options, lowerKeyBound, upperKeyBound);
     this.stackTrace = Thread.currentThread().getStackTrace();
   }
 
@@ -126,11 +136,26 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
   }
 
   private void init(ManagedSSTDumpTool sstDumpTool, File sstFile,
-                    ManagedOptions options)
+                    ManagedOptions options, ManagedSlice lowerKeyBound,
+                    ManagedSlice upperKeyBound)
       throws NativeLibraryNotLoadedException {
-    String[] args = {"--file=" + sstFile.getAbsolutePath(), "--command=scan",
-        "--silent"};
-    this.sstDumpToolTask = sstDumpTool.run(args, options);
+    Map<String, String> argMap = Maps.newHashMap();
+    argMap.put("file", sstFile.getAbsolutePath());
+    argMap.put("silent", null);
+    argMap.put("command", "scan");
+    // strings containing '\0' do not have the same value when encode UTF-8 on
+    // java which is 0. But in jni the utf-8 encoded value for '\0'
+    // becomes -64 -128. Thus the value becomes different.
+    // In order to support this, changes have been made on the rocks-tools
+    // to pass the address of the ManagedSlice and the jni can use the object
+    // of slice directly from there.
+    if (Objects.nonNull(lowerKeyBound)) {
+      argMap.put("from", String.valueOf(lowerKeyBound.getNativeHandle()));
+    }
+    if (Objects.nonNull(upperKeyBound)) {
+      argMap.put("to", String.valueOf(upperKeyBound.getNativeHandle()));
+    }
+    this.sstDumpToolTask = sstDumpTool.run(argMap, options);
     processOutput = sstDumpToolTask.getPipedOutput();
     intBuffer = new byte[4];
     open = new AtomicBoolean(true);
@@ -194,7 +219,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
       UnsignedLong sequenceNumber = getNextUnsignedLong()
           .orElseThrow(() -> new IllegalStateException(
               String.format("Error while trying to read sequence number" +
-                      " for key %s", StringUtils.bytes2String(key.get()))));
+                  " for key %s", StringUtils.bytes2String(key.get()))));
 
       Integer type = getNextNumberInStream()
           .orElseThrow(() -> new IllegalStateException(
@@ -256,7 +281,7 @@ public abstract class ManagedSSTDumpIterator<T> implements ClosableIterator<T> {
     private final byte[] value;
 
     private KeyValue(byte[] key, UnsignedLong sequence, Integer type,
-             byte[] value) {
+                     byte[] value) {
       this.key = key;
       this.sequence = sequence;
       this.type = type;

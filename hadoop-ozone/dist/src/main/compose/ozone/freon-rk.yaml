@@ -24,5 +24,5 @@ services:
       - docker-config
       - monitoring.conf
     environment:
-      - "OZONE-SITE.XML_ozone.replication=${OZONE_REPLICATION_FACTOR:-1}"
+      - "OZONE-SITE.XML_ozone.server.default.replication=${OZONE_REPLICATION_FACTOR:-1}"
     command: ["ozone","freon","rk"]

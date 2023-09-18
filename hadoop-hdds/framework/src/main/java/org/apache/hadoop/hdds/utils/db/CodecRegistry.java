@@ -52,7 +52,8 @@ public final class CodecRegistry {
         .addCodec(String.class, StringCodec.get())
         .addCodec(Long.class, LongCodec.get())
         .addCodec(Integer.class, IntegerCodec.get())
-        .addCodec(byte[].class, ByteArrayCodec.get());
+        .addCodec(byte[].class, ByteArrayCodec.get())
+        .addCodec(Boolean.class, BooleanCodec.get());
   }
 
   private static final class CodecMap {

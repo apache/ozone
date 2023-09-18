@@ -1039,12 +1039,12 @@ public interface OzoneManagerProtocol
    * to benchmark RPC communication performance.
    * @param payloadReq payload in request.
    * @param payloadSizeResp payload size of response.
+   * @param writeToRatis write to Ratis log if flag is set to true.
    * @throws IOException if there is error in the RPC communication.
    * @return EchoRPCResponse.
    */
-  EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                             int payloadSizeResp)
-          throws IOException;
+  EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+                             boolean writeToRatis) throws IOException;
 
 
   /**

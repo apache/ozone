@@ -59,6 +59,7 @@ function ozone_usage
   ozone_add_subcommand "dtutil" client "operations related to delegation tokens"
   ozone_add_subcommand "admin" client "Ozone admin tool"
   ozone_add_subcommand "debug" client "Ozone debug tool"
+  ozone_add_subcommand "checknative" client "checks if native libraries are loaded"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
@@ -229,6 +230,10 @@ function ozonecmd_case
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
+    checknative)
+        OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.checknative.CheckNative
+        OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     *)
       OZONE_CLASSNAME="${subcmd}"

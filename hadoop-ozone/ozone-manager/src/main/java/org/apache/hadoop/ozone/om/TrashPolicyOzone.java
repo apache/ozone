@@ -205,7 +205,11 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           }
 
           // move to current trash
-          fs.rename(path, trashPath);
+          boolean renamed = fs.rename(path, trashPath);
+          if (!renamed) {
+            LOG.error("Failed to move to trash: {}", path);
+            throw new IOException("Failed to move to trash: " + path);
+          }
           LOG.info("Moved: '" + path + "' to trash at: " + trashPath);
           return true;
         } catch (IOException e) {
