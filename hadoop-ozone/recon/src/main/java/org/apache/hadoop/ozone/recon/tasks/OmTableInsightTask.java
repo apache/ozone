@@ -392,6 +392,7 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
+
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName,
                                  Collection<String> sizeRelatedTables,
@@ -467,14 +468,37 @@ public class OmTableInsightTask implements ReconOmTask {
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unreplicatedSizeCountMap,
                                  HashMap<String, Long> replicatedSizeCountMap) {
+
+    if (event.getValue() != null) {
+      if (sizeRelatedTables.contains(tableName)) {
+        // Handle update for only size related tables
+        handleSizeRelatedTableUpdateEvent(event, tableName, objectCountMap,
+            unreplicatedSizeCountMap, replicatedSizeCountMap);
+      }
+    }
+  }
+
+
+  private void handleSizeRelatedTableUpdateEvent(
+      OMDBUpdateEvent<String, Object> event,
+      String tableName,
+      HashMap<String, Long> objectCountMap,
+      HashMap<String, Long> unreplicatedSizeCountMap,
+      HashMap<String, Long> replicatedSizeCountMap) {
+
+    if (event.getOldValue() == null) {
+      LOG.warn("Update event does not have the old Key Info for {}.",
+          event.getKey());
+      return;
+    }
     String countKey = getTableCountKeyFromTable(tableName);
     String unReplicatedSizeKey = getUnReplicatedSizeKeyFromTable(tableName);
     String replicatedSizeKey = getReplicatedSizeKeyFromTable(tableName);
-    // In Update event the count for the table will not change. So we don't
+
+    // In Update event the count for the open table will not change. So we don't
     // need to update the count. Except for RepeatedOmKeyInfo, for which the
     // size of omKeyInfoList can change
-    if (event.getValue() instanceof OmKeyInfo && event.getOldValue() != null &&
-        sizeRelatedTables.contains(tableName)) {
+    if (event.getValue() instanceof OmKeyInfo && event.getOldValue() != null) {
       // Handle UPDATE for OpenKeyTable & OpenFileTable
       OmKeyInfo oldKeyInfo = (OmKeyInfo) event.getOldValue();
       OmKeyInfo newKeyInfo = (OmKeyInfo) event.getValue();
@@ -485,7 +509,7 @@ public class OmTableInsightTask implements ReconOmTask {
           (k, size) -> size - oldKeyInfo.getReplicatedSize() +
               newKeyInfo.getReplicatedSize());
     } else if (event.getValue() instanceof RepeatedOmKeyInfo &&
-        sizeRelatedTables.contains(tableName) && event.getOldValue() != null) {
+        event.getOldValue() != null) {
       // Handle UPDATE for DeletedTable
       RepeatedOmKeyInfo oldRepeatedOmKeyInfo =
           (RepeatedOmKeyInfo) event.getOldValue();
@@ -559,7 +583,7 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
   public static String getTableCountKeyFromTable(String tableName) {
-    return tableName + "TableCount";
+    return tableName + "Count";
   }
 
   public static String getReplicatedSizeKeyFromTable(String tableName) {
