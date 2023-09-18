@@ -138,24 +138,17 @@ public class CompactionLogEntry implements CopyObject<CompactionLogEntry> {
    * Builder of CompactionLogEntry.
    */
   public static class Builder {
-    private long dbSequenceNumber;
-    private long compactionTime;
+    private final long dbSequenceNumber;
+    private final long compactionTime;
     private List<String> inputFiles;
     private List<String> outputFiles;
     private String compactionReason;
 
-    public Builder() {
-    }
-
-    public Builder setDbSequenceNumber(long dbSequenceNumber) {
+    public Builder(long dbSequenceNumber, long compactionTime) {
       this.dbSequenceNumber = dbSequenceNumber;
-      return this;
+      this.compactionTime = compactionTime;
     }
 
-    public Builder setCompactionTime(long compactionTime) {
-      this.compactionTime = compactionTime;
-      return this;
-    }
     public Builder setInputFiles(List<String> inputFiles) {
       this.inputFiles = inputFiles;
       return this;

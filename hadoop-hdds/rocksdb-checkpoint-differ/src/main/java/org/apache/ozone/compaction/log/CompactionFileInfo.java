@@ -64,10 +64,10 @@ public final class CompactionFileInfo {
       builder = builder.setStartKey(startKey);
     }
     if (endKey != null) {
-      builder = builder.setStartKey(endKey);
+      builder = builder.setEndKey(endKey);
     }
     if (columnFamily != null) {
-      builder = builder.setStartKey(columnFamily);
+      builder = builder.setColumnFamily(columnFamily);
     }
     return builder.build();
   }
