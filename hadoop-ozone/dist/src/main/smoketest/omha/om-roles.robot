@@ -21,10 +21,15 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 
 *** Test Cases ***
 List om roles
-    ${output} =         Execute          ozone admin om roles --service-id=omservice
-                        Should Match Regexp   ${output}  [om (: LEADER|)]
+    ${output_with_id_passed} =      Execute          ozone admin om roles --service-id=omservice
+                                    Should Match Regexp   ${output_with_id_passed}  [om (: LEADER|)]
+    ${output_without_id_passed} =   Execute          ozone admin om roles
+                                    Should Match Regexp   ${output_without_id_passed}  [om (: LEADER|)]
 
 List om roles as JSON
-    ${output} =         Execute          ozone admin om roles --service-id=omservice --json
-    ${leader} =         Execute          echo '${output}' | jq -r '.[] | select(.serverRole == "LEADER")'
-                        Should Not Be Equal       ${leader}       ${EMPTY}
+    ${output_with_id_passed} =      Execute          ozone admin om roles --service-id=omservice --json
+    ${leader} =                     Execute          echo '${output_with_id_passed}' | jq -r '.[] | select(.serverRole == "LEADER")'
+                                    Should Not Be Equal       ${leader}       ${EMPTY}
+    ${output_without_id_passed} =   Execute          ozone admin om roles
+    ${leader} =                     Execute          echo '${output_without_id_passed}' | jq -r '.[] | select(.serverRole == "LEADER")'
+                                    Should Not Be Equal       ${leader}       ${EMPTY}
