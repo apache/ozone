@@ -65,6 +65,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -74,6 +75,7 @@ import static org.mockito.Mockito.mock;
  */
 public class TestUpgradeManager {
 
+  private File testRoot;
   private String scmId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private UUID datanodeId;
@@ -93,24 +95,25 @@ public class TestUpgradeManager {
           .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).build();
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws Exception {
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(true);
     CONF.setFromObject(dc);
 
-    final File testRoot = GenericTestUtils
-        .getTestDir(TestUpgradeManager.class.getSimpleName());
+    testRoot =
+        GenericTestUtils.getTestDir(TestUpgradeManager.class.getSimpleName());
     if (testRoot.exists()) {
       FileUtils.cleanDirectory(testRoot);
     }
 
     final File volume1Path = new File(testRoot, "volume1");
     final File volume2Path = new File(testRoot, "volume2");
-    volume1Path.mkdirs();
-    volume2Path.mkdirs();
+
+    assertTrue(volume1Path.mkdirs());
+    assertTrue(volume2Path.mkdirs());
 
     final File metadataPath = new File(testRoot, "metadata");
-    metadataPath.mkdirs();
+    assertTrue(metadataPath.mkdirs());
 
     CONF.set(HDDS_DATANODE_DIR_KEY,
         volume1Path.getAbsolutePath() + "," + volume2Path.getAbsolutePath());
@@ -148,7 +151,7 @@ public class TestUpgradeManager {
 
   @After
   public void after() throws IOException {
-    //FileUtils.deleteDirectory(testRoot);
+    FileUtils.deleteDirectory(testRoot);
   }
 
   @Test
