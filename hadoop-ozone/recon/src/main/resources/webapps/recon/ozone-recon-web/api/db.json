@@ -2171,7 +2171,6 @@
     ]
   },
   "volumes": {
-    "status": "OK",
     "totalCount": 5,
     "volumes": [
       {
@@ -2297,7 +2296,6 @@
     ]
   },
   "buckets": {
-    "status": "OK",
     "totalCount": 5,
     "buckets": [
       {

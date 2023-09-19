@@ -800,8 +800,8 @@ Returns all the volumes in the cluster.
           "volume": "vol1",
           "owner": "testuser",
           "admin": "ozone",
-          "creationTime": "2019-11-26T21:18:43.688Z",
-          "modificationTime": "2019-11-26T21:18:46.062Z",
+          "creationTime": 1665588176660 ,
+          "modificationTime": 1665590397315,
           "quotaInNamespace": 2048,
           "quotaInBytes": 1073741824,
           "usedNamespace": 10,
@@ -851,13 +851,13 @@ If `volume` is specified, it returns only the buckets under `volume`.
 ```json
      {
      	"totalCount": 5,
-     	"buckets": [{{
+     	"buckets": [{
           "volumeName": "vol1",
           "bucketName": "buck1",
-          "isVersionEnabled": false,
+          "versioning": false,
           "storageType": "DISK",
-          "creationTime": "2019-11-26T21:19:20.855Z",
-          "modificationTime": "2019-11-26T21:19:20.991Z",
+          "creationTime": 1665588176616,
+          "modificationTime": 1665590392293,
           "usedBytes": 943718400,
           "usedNamespace": 40000,
           "quotaInBytes": 1073741824,
