@@ -79,7 +79,7 @@ public class VersionEndpointTask implements
           DatanodeLayoutStorage layoutStorage
               = new DatanodeLayoutStorage(configuration);
           layoutStorage.setClusterId(clusterId);
-          layoutStorage.forceInitialize();
+          layoutStorage.persistCurrentState();
 
           Preconditions.checkNotNull(scmId,
               "Reply from SCM: scmId cannot be null");
