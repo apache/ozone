@@ -144,8 +144,12 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
 
         for (PartKeyInfo partKeyInfo: abortInfo
             .getOmMultipartKeyInfo().getPartKeyInfoMap()) {
+          OmKeyInfo currentPartKeyInfo =
+              OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+          String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+              currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
           Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
-              partKeyInfo.getPartName()));
+              deleteKey));
         }
 
       }
@@ -162,8 +166,12 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
 
         for (PartKeyInfo partKeyInfo: abortInfo
             .getOmMultipartKeyInfo().getPartKeyInfoMap()) {
+          OmKeyInfo currentPartKeyInfo =
+              OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+          String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+              currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
           Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
-              partKeyInfo.getPartName()));
+              deleteKey));
         }
       }
     }
@@ -195,8 +203,13 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
 
         for (PartKeyInfo partKeyInfo: multipartAbortInfo
             .getOmMultipartKeyInfo().getPartKeyInfoMap()) {
+          OmKeyInfo currentPartKeyInfo =
+              OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+          String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+              currentPartKeyInfo.getObjectID(), multipartAbortInfo
+                  .getMultipartKey());
           Assert.assertFalse(omMetadataManager.getDeletedTable()
-              .isExist(partKeyInfo.getPartName()));
+              .isExist(deleteKey));
         }
       }
     }
