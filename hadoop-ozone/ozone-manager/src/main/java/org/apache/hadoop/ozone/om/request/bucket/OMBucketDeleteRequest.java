@@ -24,6 +24,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -138,6 +139,14 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         LOG.debug("bucket: {} is not empty ", bucketName);
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
+      }
+
+      // Check if bucket does not contain incomplete MPUs
+      if (omMetadataManager.containsIncompleteMPUs(volumeName, bucketName)) {
+        LOG.debug("bucket: {} still has incomplete multipart uploads",
+            bucketName);
+        throw new OMException("Bucket still has incomplete multipart uploads",
+            ResultCodes.BUCKET_NOT_EMPTY);
       }
 
       // appending '/' to end to eliminate cases where 2 buckets start with same
