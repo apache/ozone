@@ -386,7 +386,8 @@ public class DefaultCAServer implements CertificateServer {
    */
   private void generateSelfSignedCA(SecurityConfig securityConfig) throws
       NoSuchAlgorithmException, NoSuchProviderException, IOException {
-    KeyPair keyPair = generateKeys(securityConfig);
+    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
+    KeyPair keyPair = keyGenerator.generateKey();
     rootCaKeyPair = keyPair;
     generateRootCertificate(securityConfig, keyPair);
   }
@@ -543,21 +544,6 @@ public class DefaultCAServer implements CertificateServer {
   private boolean isExternalCaSpecified(SecurityConfig conf) {
     return !conf.getExternalRootCaCert().isEmpty() &&
         !conf.getExternalRootCaPrivateKeyPath().isEmpty();
-  }
-
-  /**
-   * Generates a KeyPair for the Certificate.
-   *
-   * @param securityConfig - SecurityConfig.
-   * @return Key Pair.
-   * @throws NoSuchProviderException  - on Error.
-   * @throws NoSuchAlgorithmException - on Error.
-   * @throws IOException              - on Error.
-   */
-  private KeyPair generateKeys(SecurityConfig securityConfig)
-      throws NoSuchProviderException, NoSuchAlgorithmException, IOException {
-    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
-    return keyGenerator.generateKey();
   }
 
   /**

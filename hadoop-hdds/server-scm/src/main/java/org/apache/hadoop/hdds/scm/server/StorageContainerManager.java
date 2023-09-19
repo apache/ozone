@@ -168,7 +168,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 
 import javax.management.ObjectName;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
@@ -885,34 +884,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     if (securityConfig.isAutoCARotationEnabled()) {
       rootCARotationManager = new RootCARotationManager(this);
-    }
-  }
-
-  /**
-   * Persist primary SCM root ca cert and sub-ca certs to DB.
-   */
-  private void persistPrimarySCMCerts() throws IOException {
-    BigInteger certSerial =
-        scmCertificateClient.getCertificate().getSerialNumber();
-    // Store the certificate in DB. On primary SCM when init happens, the
-    // certificate is not persisted to DB. As we don't have Metadatstore
-    // and ratis server initialized with statemachine. We need to do only
-    // for primary scm, for other bootstrapped scm's certificates will be
-    // persisted via ratis.
-    if (certificateStore.getCertificateByID(certSerial,
-        VALID_CERTS) == null) {
-      LOG.info("Storing sub-ca certificate serialId {} on primary SCM",
-          certSerial);
-      certificateStore.storeValidScmCertificate(
-          certSerial, scmCertificateClient.getCertificate());
-    }
-    X509Certificate rootCACert = scmCertificateClient.getCACertificate();
-    if (certificateStore.getCertificateByID(rootCACert.getSerialNumber(),
-        VALID_CERTS) == null) {
-      LOG.info("Storing root certificate serialId {}",
-          rootCACert.getSerialNumber());
-      certificateStore.storeValidScmCertificate(
-          rootCACert.getSerialNumber(), rootCACert);
     }
   }
 
