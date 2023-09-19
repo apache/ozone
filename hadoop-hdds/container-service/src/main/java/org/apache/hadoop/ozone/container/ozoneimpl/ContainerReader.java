@@ -225,7 +225,15 @@ public class ContainerReader implements Runnable {
           cleanupContainer(hddsVolume, kvContainer);
           return;
         }
-        containerSet.addContainer(kvContainer);
+        try {
+          containerSet.addContainer(kvContainer);
+        } catch (StorageContainerException e) {
+          if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
+            throw e;
+          }
+          resolveDuplicate((KeyValueContainer) containerSet.getContainer(
+              kvContainer.getContainerData().getContainerID()), kvContainer);
+        }
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
             "ContainerType is KeyValueContainer but cast to " +
@@ -237,6 +245,36 @@ public class ContainerReader implements Runnable {
       throw new StorageContainerException("Unrecognized ContainerType " +
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
+    }
+  }
+
+  private void resolveDuplicate(KeyValueContainer existing,
+      KeyValueContainer toAdd) throws IOException {
+
+    // Keep the copy with the largest BCSID
+    long existingBCSID = existing.getBlockCommitSequenceId();
+    long toAddBCSID = toAdd.getBlockCommitSequenceId();
+
+    if (existingBCSID >= toAddBCSID) {
+      // existing is newer or equal, so remove the one we have yet to load.
+      LOG.warn("Container {} is present at {} with a newer or equal BCSID " +
+          "than at {}. Removing the latter container.",
+          existing.getContainerData().getContainerID(),
+          existing.getContainerData().getContainerPath(),
+          toAdd.getContainerData().getContainerPath());
+      KeyValueContainerUtil.removeContainer(toAdd.getContainerData(),
+          hddsVolume.getConf());
+    } else {
+      LOG.warn("Container {} is present at {} with a lesser BCSID " +
+              "than at {}. Removing the former container.",
+          existing.getContainerData().getContainerID(),
+          existing.getContainerData().getContainerPath(),
+          toAdd.getContainerData().getContainerPath());
+      containerSet.removeContainer(
+          existing.getContainerData().getContainerID());
+      containerSet.addContainer(toAdd);
+      KeyValueContainerUtil.removeContainer(existing.getContainerData(),
+          hddsVolume.getConf());
     }
   }
 

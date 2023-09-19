@@ -32,12 +32,14 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -55,6 +57,10 @@ import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -325,6 +331,10 @@ public class TestContainerReader {
     MutableVolumeSet volumeSets =
         new MutableVolumeSet(datanodeId.toString(), clusterId, conf, null,
             StorageVolume.VolumeType.DATA_VOLUME, null);
+    for (StorageVolume v : volumeSets.getVolumesList()) {
+      StorageVolumeUtil.checkVolume(v, clusterId, clusterId, conf,
+          null, null);
+    }
     createDbInstancesForTestIfNeeded(volumeSets, clusterId, clusterId, conf);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.shutdownCache();
@@ -334,24 +344,26 @@ public class TestContainerReader {
 
     final int containerCount = 100;
     blockCount = containerCount;
+
+    KeyValueContainer conflict01 = null;
+    KeyValueContainer conflict02 = null;
+    KeyValueContainer conflict11 = null;
+    KeyValueContainer conflict12 = null;
+    long baseBCSID = 10L;
+
     for (int i = 0; i < containerCount; i++) {
-      KeyValueContainerData keyValueContainerData =
-          new KeyValueContainerData(i, layout,
-              (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-              datanodeId.toString());
-
-      KeyValueContainer keyValueContainer =
-          new KeyValueContainer(keyValueContainerData,
-              conf);
-      keyValueContainer.create(volumeSets, policy, clusterId);
-
-      List<Long> blkNames;
-      if (i % 2 == 0) {
-        blkNames = addBlocks(keyValueContainer, true);
-        markBlocksForDelete(keyValueContainer, true, blkNames, i);
+      if (i == 0) {
+        // Create a duplicate container with ID 0. Both have the same BSCID
+        conflict01 = createContainerWithId(0, volumeSets, policy, baseBCSID);
+        conflict02 = createContainerWithId(0, volumeSets, policy, baseBCSID);
+      } else if (i == 1) {
+        // Create a duplicate container with ID 1 so that the one has a
+        // larger BCSID
+        conflict11 = createContainerWithId(1, volumeSets, policy, baseBCSID);
+        conflict12 = createContainerWithId(
+            1, volumeSets, policy, baseBCSID - 1);
       } else {
-        blkNames = addBlocks(keyValueContainer, false);
-        markBlocksForDelete(keyValueContainer, false, blkNames, i);
+        createContainerWithId(i, volumeSets, policy, baseBCSID);
       }
     }
     // Close the RocksDB instance for this container and remove from the cache
@@ -378,9 +390,67 @@ public class TestContainerReader {
         " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
     Assert.assertEquals(containerCount,
         containerSet.getContainerMap().entrySet().size());
+    Assert.assertEquals(volumeSet.getFailedVolumesList().size(), 0);
+
+    // One of the conflict01 or conflict02 should have had its container path
+    // removed.
+    List<Path> paths = new ArrayList<>();
+    paths.add(Paths.get(conflict01.getContainerData().getContainerPath()));
+    paths.add(Paths.get(conflict02.getContainerData().getContainerPath()));
+    int exist = 0;
+    for (Path p : paths) {
+      if (Files.exists(p)) {
+        exist++;
+      }
+    }
+    Assert.assertEquals(1, exist);
+    Assert.assertTrue(paths.contains(Paths.get(
+        containerSet.getContainer(0).getContainerData().getContainerPath())));
+
+    // For conflict1, the one with the larger BCSID should win, which is
+    // conflict11.
+    Assert.assertFalse(Files.exists(Paths.get(
+        conflict12.getContainerData().getContainerPath())));
+    Assert.assertEquals(conflict11.getContainerData().getContainerPath(),
+        containerSet.getContainer(1).getContainerData().getContainerPath());
+
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
     Assert.assertEquals(0, cache.size());
+  }
+
+  private KeyValueContainer createContainerWithId(int id, VolumeSet volSet,
+      VolumeChoosingPolicy policy, long bcsid) throws Exception {
+    KeyValueContainerData keyValueContainerData =
+        new KeyValueContainerData(id, layout,
+            (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+            datanodeId.toString());
+
+    KeyValueContainer keyValueContainer =
+        new KeyValueContainer(keyValueContainerData,
+            conf);
+    keyValueContainer.create(volSet, policy, clusterId);
+
+    List<Long> blkNames;
+    if (id % 2 == 0) {
+      blkNames = addBlocks(keyValueContainer, true);
+      markBlocksForDelete(keyValueContainer, true, blkNames, id);
+    } else {
+      blkNames = addBlocks(keyValueContainer, false);
+      markBlocksForDelete(keyValueContainer, false, blkNames, id);
+    }
+    setBlockCommitSequence(keyValueContainerData, bcsid);
+    return keyValueContainer;
+  }
+
+  private void setBlockCommitSequence(KeyValueContainerData cData, long val)
+      throws IOException {
+    try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
+      metadataStore.getStore().getMetadataTable()
+          .put(cData.getBcsIdKey(), val);
+      metadataStore.getStore().flushDB();
+    }
+    cData.updateBlockCommitSequenceId(val);
   }
 
   @Test
