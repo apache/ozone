@@ -100,6 +100,18 @@ public interface StorageContainerLocationProtocol extends Closeable {
       throws IOException;
 
   /**
+   * getContainerWithPipeline with an optional sortDatanodes in container
+   * pipelines.
+   *
+   * @param containerID - ID of the container.
+   * @param shouldSortDatanodes - true to sort datanodes in container pipelines.
+   * @return ContainerWithPipeline - the container info with the pipeline.
+   * @throws IOException
+   */
+  ContainerWithPipeline getContainerPipeline(long containerID,
+      boolean shouldSortDatanodes) throws IOException;
+
+  /**
    * Gets the list of ReplicaInfo known by SCM for a given container.
    * @param containerId ID of the container
    * @return List of ReplicaInfo for the container or an empty list if none.
@@ -119,6 +131,20 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException;
+
+  /**
+   * getContainerWithPipelineBatch with an optional sortDatanodes in container
+   * pipelines.
+   *
+   * @param containerIDs - IDs of a batch of containers.
+   * @param shouldSortDatanodes - true to sort datanodes in container pipelines.
+   * @return List of ContainerWithPipeline
+   * - the container info with the pipeline.
+   * @throws IOException
+   */
+  List<ContainerWithPipeline> getContainerPipelineBatch(
+      Iterable<? extends Long> containerIDs, boolean shouldSortDatanodes)
+      throws IOException;
 
   /**
    * Ask SCM which containers of the given list exist.

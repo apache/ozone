@@ -117,7 +117,7 @@ public class TestScmClient {
         .getContainerWithPipelineBatch(eq(prepopulatedIds)))
         .thenReturn(new ArrayList<>(actualLocations.values()));
     Map<Long, Pipeline> locations =
-        scmClient.getContainerLocations(prepopulatedIds, false);
+        scmClient.getContainerLocations(prepopulatedIds, false, false);
     locations.forEach((id, pipeline) -> {
       Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });
@@ -136,7 +136,8 @@ public class TestScmClient {
           eq(expectedScmCallIds))).thenReturn(scmLocations);
     }
 
-    locations = scmClient.getContainerLocations(testContainerIds, forceRefresh);
+    locations =
+        scmClient.getContainerLocations(testContainerIds, forceRefresh, false);
     locations.forEach((id, pipeline) -> {
       Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });
@@ -154,7 +155,7 @@ public class TestScmClient {
         .getContainerWithPipelineBatch(newHashSet(1L)))
         .thenThrow(ioException);
     IOException actual = Assertions.assertThrows(IOException.class,
-        () -> scmClient.getContainerLocations(newHashSet(1L), false));
+        () -> scmClient.getContainerLocations(newHashSet(1L), false, false));
     Assertions.assertEquals(ioException, actual);
 
     RuntimeException runtimeException = new IllegalStateException("Test");
@@ -162,7 +163,7 @@ public class TestScmClient {
         .getContainerWithPipelineBatch(newHashSet(2L)))
         .thenThrow(runtimeException);
     RuntimeException actualRt = Assertions.assertThrows(RuntimeException.class,
-        () -> scmClient.getContainerLocations(newHashSet(2L), false));
+        () -> scmClient.getContainerLocations(newHashSet(2L), false, false));
     Assertions.assertEquals(runtimeException, actualRt.getCause());
   }
 

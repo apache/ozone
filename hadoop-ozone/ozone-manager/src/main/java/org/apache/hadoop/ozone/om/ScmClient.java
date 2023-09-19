@@ -31,10 +31,12 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT;
@@ -48,7 +50,7 @@ public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
-  private final LoadingCache<Long, Pipeline> containerLocationCache;
+  private final LoadingCache<PipelineCacheKey, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
@@ -62,7 +64,7 @@ public class ScmClient {
         "ContainerInfo");
   }
 
-  static LoadingCache<Long, Pipeline> createContainerLocationCache(
+  static LoadingCache<PipelineCacheKey, Pipeline> createContainerLocationCache(
       OzoneConfiguration configuration,
       StorageContainerLocationProtocol containerClient) {
     int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
@@ -75,21 +77,28 @@ public class ScmClient {
         .maximumSize(maxSize)
         .expireAfterWrite(ttl, unit)
         .recordStats()
-        .build(new CacheLoader<Long, Pipeline>() {
+        .build(new CacheLoader<PipelineCacheKey, Pipeline>() {
           @NotNull
           @Override
-          public Pipeline load(@NotNull Long key) throws Exception {
-            return containerClient.getContainerWithPipeline(key).getPipeline();
+          public Pipeline load(@NotNull PipelineCacheKey key) throws Exception {
+            return containerClient.getContainerPipeline(key.getContainerId(),
+                key.isDatanodeSorted()).getPipeline();
           }
 
           @NotNull
           @Override
-          public Map<Long, Pipeline> loadAll(
-              @NotNull Iterable<? extends Long> keys) throws Exception {
-            return containerClient.getContainerWithPipelineBatch(keys)
+          public Map<PipelineCacheKey, Pipeline> loadAll(
+              @NotNull Iterable<? extends PipelineCacheKey> keys)
+              throws Exception {
+            List<Long> containerIds =
+                StreamSupport.stream(keys.spliterator(), false)
+                    .map(PipelineCacheKey::getContainerId)
+                    .collect(Collectors.toList());
+            return containerClient.getContainerPipelineBatch(containerIds, true)
                 .stream()
                 .collect(Collectors.toMap(
-                    x -> x.getContainerInfo().getContainerID(),
+                    x -> new PipelineCacheKey(
+                        x.getContainerInfo().getContainerID(), true),
                     ContainerWithPipeline::getPipeline
                 ));
           }
@@ -105,13 +114,23 @@ public class ScmClient {
   }
 
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
-                                                  boolean forceRefresh)
-      throws IOException {
+      boolean forceRefresh, boolean sortDatanodes) throws IOException {
+    List<PipelineCacheKey> cacheKeys =
+        StreamSupport.stream(containerIds.spliterator(), false)
+            .map(containerId -> new PipelineCacheKey(containerId,
+                sortDatanodes))
+            .collect(Collectors.toList());
     if (forceRefresh) {
-      containerLocationCache.invalidateAll(containerIds);
+      containerLocationCache.invalidateAll(cacheKeys);
     }
     try {
-      return containerLocationCache.getAll(containerIds);
+      Map<PipelineCacheKey, Pipeline> pipelines =
+          containerLocationCache.getAll(cacheKeys);
+      return pipelines.entrySet().stream()
+          .collect(Collectors.toMap(
+              entry -> entry.getKey().getContainerId(),
+              Map.Entry::getValue
+          ));
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
     } catch (InvalidCacheLoadException e) {

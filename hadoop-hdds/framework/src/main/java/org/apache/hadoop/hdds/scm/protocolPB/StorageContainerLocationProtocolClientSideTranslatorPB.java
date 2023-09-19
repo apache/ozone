@@ -59,6 +59,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerPipelineBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
@@ -267,6 +269,28 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   }
 
+  @Override
+  public ContainerWithPipeline getContainerPipeline(long containerID,
+      boolean shouldSortDatanodes) throws IOException {
+    Preconditions.checkState(containerID >= 0,
+        "Container ID cannot be negative");
+    GetContainerPipelineRequestProto request =
+        GetContainerPipelineRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .setContainerID(containerID)
+            .setSortDatanodes(shouldSortDatanodes)
+            .build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerPipeline,
+            (builder) -> builder.setGetContainerPipelineRequest(request));
+
+    return ContainerWithPipeline.fromProtobuf(
+        response.getGetContainerWithPipelineResponse()
+            .getContainerWithPipeline());
+
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -308,6 +332,40 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetContainerWithPipelineBatch,
             (builder) -> builder
                 .setGetContainerWithPipelineBatchRequest(request));
+
+    List<HddsProtos.ContainerWithPipeline> protoCps = response
+        .getGetContainerWithPipelineBatchResponse()
+        .getContainerWithPipelinesList();
+
+    List<ContainerWithPipeline> cps = new ArrayList<>();
+
+    for (HddsProtos.ContainerWithPipeline cp : protoCps) {
+      cps.add(ContainerWithPipeline.fromProtobuf(cp));
+    }
+
+    return cps;
+  }
+
+  @Override
+  public List<ContainerWithPipeline> getContainerPipelineBatch(
+      Iterable<? extends Long> containerIDs, boolean shouldSortDatanodes)
+      throws IOException {
+    for (Long containerID: containerIDs) {
+      Preconditions.checkState(containerID >= 0,
+          "Container ID cannot be negative");
+    }
+
+    GetContainerPipelineBatchRequestProto request =
+        GetContainerPipelineBatchRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .addAllContainerIDs(containerIDs)
+            .setSortDatanodes(shouldSortDatanodes)
+            .build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerPipelineBatch,
+            (builder) -> builder
+                .setGetContainerPipelineBatchRequest(request));
 
     List<HddsProtos.ContainerWithPipeline> protoCps = response
         .getGetContainerWithPipelineBatchResponse()

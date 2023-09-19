@@ -1953,11 +1953,6 @@ public class KeyManagerImpl implements KeyManager {
       captureLatencyNs(metrics.getGetKeyInfoRefreshLocationLatencyNs(),
           () -> refreshPipelineFromCache(value,
               args.isForceUpdateContainerCacheFromSCM()));
-
-      if (args.getSortDatanodes()) {
-        captureLatencyNs(metrics.getGetKeyInfoSortDatanodesLatencyNs(),
-            () -> sortDatanodes(clientAddress, value));
-      }
     }
     return value;
   }
@@ -1973,7 +1968,7 @@ public class KeyManagerImpl implements KeyManager {
     // location is outdated, it'll call getKeyInfo with cacheRefresh=true
     // to request cache refresh on individual container.
     Map<Long, Pipeline> containerLocations =
-        scmClient.getContainerLocations(containerIds, false);
+        scmClient.getContainerLocations(containerIds, false, true);
 
     for (OmKeyInfo keyInfo : keyInfos) {
       setUpdatedContainerLocation(keyInfo, containerLocations);
@@ -1988,7 +1983,7 @@ public class KeyManagerImpl implements KeyManager {
 
     metrics.setForceContainerCacheRefresh(forceRefresh);
     Map<Long, Pipeline> containerLocations =
-        scmClient.getContainerLocations(containerIds, forceRefresh);
+        scmClient.getContainerLocations(containerIds, forceRefresh, true);
 
     setUpdatedContainerLocation(keyInfo, containerLocations);
   }

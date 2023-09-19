@@ -109,6 +109,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.Collection;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
@@ -134,6 +135,8 @@ public class SCMClientProtocolServer implements
   private final StorageContainerManager scm;
   private final OzoneConfiguration config;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+
+  private final SCMBlockProtocolServer blockProtocolServer;
 
   public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm,
@@ -176,6 +179,8 @@ public class SCMClientProtocolServer implements
             reconfigureServerProtocol);
     HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolPB.class,
         reconfigureService, clientRpcServer);
+
+    blockProtocolServer = new SCMBlockProtocolServer(conf, scm);
 
     clientRpcAddress =
         updateRPCListenAddress(conf,
@@ -297,6 +302,14 @@ public class SCMClientProtocolServer implements
     return new ContainerWithPipeline(container, pipeline);
   }
 
+  static String getClientAddress() {
+    String clientMachine = Server.getRemoteAddress();
+    if (clientMachine == null) { //not a RPC client
+      clientMachine = "";
+    }
+    return clientMachine;
+  }
+
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
@@ -314,6 +327,41 @@ public class SCMClientProtocolServer implements
               ContainerID.valueOf(containerID).toString()), ex));
       throw ex;
     }
+  }
+
+  @Override
+  public ContainerWithPipeline getContainerPipeline(long containerID,
+      boolean shouldSortNodes) throws IOException {
+    try {
+      ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.GET_CONTAINER_WITH_PIPELINE,
+          Collections.singletonMap("containerID",
+              ContainerID.valueOf(containerID).toString())));
+      if (shouldSortNodes) {
+        Pipeline pipeline = cp.getPipeline();
+        List<DatanodeDetails> nodes = pipeline.getNodes();
+        List<String> uuidList = toNodeUuid(nodes);
+        pipeline.setNodesInOrder(
+            blockProtocolServer.sortDatanodes(uuidList, getClientAddress()));
+        return new ContainerWithPipeline(cp.getContainerInfo(), pipeline);
+      }
+      return cp;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.GET_CONTAINER_WITH_PIPELINE,
+          Collections.singletonMap("containerID",
+              ContainerID.valueOf(containerID).toString()), ex));
+      throw ex;
+    }
+  }
+
+  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
+    List<String> nodeSet = new ArrayList<>(nodes.size());
+    for (DatanodeDetails node : nodes) {
+      nodeSet.add(node.getUuidString());
+    }
+    return nodeSet;
   }
 
   @Override
@@ -348,6 +396,43 @@ public class SCMClientProtocolServer implements
     for (Long containerID : containerIDs) {
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
+        cpList.add(cp);
+        strContainerIDs.append(ContainerID.valueOf(containerID).toString());
+        strContainerIDs.append(",");
+      } catch (IOException ex) {
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+            Collections.singletonMap("containerID",
+                ContainerID.valueOf(containerID).toString()), ex));
+        throw ex;
+      }
+    }
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+        Collections.singletonMap("containerIDs", strContainerIDs.toString())));
+
+    return cpList;
+  }
+
+  @Override
+  public List<ContainerWithPipeline> getContainerPipelineBatch(
+      Iterable<? extends Long> containerIDs, boolean shouldSortDatanodes)
+      throws IOException {
+    List<ContainerWithPipeline> cpList = new ArrayList<>();
+
+    StringBuilder strContainerIDs = new StringBuilder();
+    for (Long containerID : containerIDs) {
+      try {
+        ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
+        if (shouldSortDatanodes) {
+          Pipeline pipeline = cp.getPipeline();
+          List<DatanodeDetails> nodes = pipeline.getNodes();
+          List<String> uuidList = toNodeUuid(nodes);
+          pipeline.setNodesInOrder(blockProtocolServer.sortDatanodes(uuidList,
+              getClientAddress()));
+          cp = new ContainerWithPipeline(cp.getContainerInfo(), pipeline);
+        }
         cpList.add(cp);
         strContainerIDs.append(ContainerID.valueOf(containerID).toString());
         strContainerIDs.append(",");

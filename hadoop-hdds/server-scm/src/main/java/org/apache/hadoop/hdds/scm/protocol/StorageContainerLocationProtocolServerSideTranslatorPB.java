@@ -56,8 +56,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
@@ -134,6 +136,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipelineBatch;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerPipeline;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerPipelineBatch;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetExistContainerWithPipelinesInBatch;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
@@ -210,6 +214,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           || request.getCmdType() == ListContainer
           || request.getCmdType() == GetContainerWithPipeline
           || request.getCmdType() == GetContainerWithPipelineBatch
+          || request.getCmdType() == GetContainerPipeline
+          || request.getCmdType() == GetContainerPipelineBatch
           || request.getCmdType() == GetExistContainerWithPipelinesInBatch
           || request.getCmdType() == ListPipelines
           || request.getCmdType() == GetPipeline) {
@@ -235,6 +241,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           break;
         case GetContainerWithPipelineBatch:
           disallowECReplicationConfigInGetContainerWithPipelineBatchResponse(
+              response);
+          break;
+        case GetContainerPipeline:
+          disallowECReplicationConfigInGetContainerPipelineResponse(
+              response);
+          break;
+        case GetContainerPipelineBatch:
+          disallowECReplicationConfigInGetContainerPipelineBatchResponse(
               response);
           break;
         case GetExistContainerWithPipelinesInBatch:
@@ -316,8 +330,50 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     }
   }
 
+  private void disallowECReplicationConfigInGetContainerPipelineResponse(
+      ScmContainerLocationResponse response) throws SCMException {
+    if (!response.hasGetContainerWithPipelineResponse()) {
+      return;
+    }
+    if (!response.getGetContainerWithPipelineResponse()
+        .hasContainerWithPipeline()) {
+      return;
+    }
+    if (response.getGetContainerWithPipelineResponse()
+        .getContainerWithPipeline().hasContainerInfo()) {
+      HddsProtos.ContainerInfoProto containerInfo =
+          response.getGetContainerWithPipelineResponse()
+              .getContainerWithPipeline().getContainerInfo();
+      if (containerInfo.hasEcReplicationConfig()) {
+        throw new SCMException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG,
+            SCMException.ResultCodes.INTERNAL_ERROR);
+      }
+    }
+    if (response.getGetContainerWithPipelineResponse()
+        .getContainerWithPipeline().hasPipeline()) {
+      HddsProtos.Pipeline pipeline =
+          response.getGetContainerWithPipelineResponse()
+              .getContainerWithPipeline().getPipeline();
+      if (pipeline.hasEcReplicationConfig()) {
+        throw new SCMException(ERROR_RESPONSE_CONTAINS_EC_REPLICATION_CONFIG,
+            SCMException.ResultCodes.INTERNAL_ERROR);
+      }
+    }
+  }
+
   private void
       disallowECReplicationConfigInGetContainerWithPipelineBatchResponse(
+      ScmContainerLocationResponse response) throws SCMException {
+    if (!response.hasGetContainerWithPipelineBatchResponse()) {
+      return;
+    }
+    List<HddsProtos.ContainerWithPipeline> cwps =
+        response.getGetContainerWithPipelineBatchResponse()
+            .getContainerWithPipelinesList();
+    checkForECReplicationConfigIn(cwps);
+  }
+
+  private void disallowECReplicationConfigInGetContainerPipelineBatchResponse(
       ScmContainerLocationResponse response) throws SCMException {
     if (!response.hasGetContainerWithPipelineBatchResponse()) {
       return;
@@ -433,6 +489,23 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetContainerWithPipelineBatchResponse(
                 getContainerWithPipelineBatch(
                     request.getGetContainerWithPipelineBatchRequest(),
+                    request.getVersion()))
+            .build();
+      case GetContainerPipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerWithPipelineResponse(getContainerPipeline(
+                request.getGetContainerPipelineRequest(),
+                request.getVersion()))
+            .build();
+      case GetContainerPipelineBatch:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerWithPipelineBatchResponse(
+                getContainerPipelineBatch(
+                    request.getGetContainerPipelineBatchRequest(),
                     request.getVersion()))
             .build();
       case GetExistContainerWithPipelinesInBatch:
@@ -759,6 +832,31 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       int clientVersion) throws IOException {
     List<ContainerWithPipeline> containers = impl
         .getContainerWithPipelineBatch(request.getContainerIDsList());
+    GetContainerWithPipelineBatchResponseProto.Builder builder =
+        GetContainerWithPipelineBatchResponseProto.newBuilder();
+    for (ContainerWithPipeline container : containers) {
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+    }
+    return builder.build();
+  }
+
+  public GetContainerWithPipelineResponseProto getContainerPipeline(
+      GetContainerPipelineRequestProto request,
+      int clientVersion) throws IOException {
+    ContainerWithPipeline container =
+        impl.getContainerPipeline(request.getContainerID(),
+            request.getSortDatanodes());
+    return GetContainerWithPipelineResponseProto.newBuilder()
+        .setContainerWithPipeline(container.getProtobuf(clientVersion))
+        .build();
+  }
+
+  public GetContainerWithPipelineBatchResponseProto getContainerPipelineBatch(
+      GetContainerPipelineBatchRequestProto request,
+      int clientVersion) throws IOException {
+    List<ContainerWithPipeline> containers =
+        impl.getContainerPipelineBatch(request.getContainerIDsList(),
+            request.getSortDatanodes());
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
