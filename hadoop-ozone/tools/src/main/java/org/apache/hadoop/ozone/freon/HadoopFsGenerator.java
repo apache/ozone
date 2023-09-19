@@ -63,11 +63,11 @@ public class HadoopFsGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int copyBufferSize;
 
-  @Option(names = {"-sync"},
+  @Option(names = {"--sync"},
       description = "Type of operation to execute after a write. Supported " +
-      "options include none (default), hflush and hsync",
+      "options include NONE (default), HFLUSH and HSYNC",
       defaultValue = "none")
-  private String flushOrSync;
+  public static ContentGenerator.SyncOptions flushOrSync;
 
   private ContentGenerator contentGenerator;
 

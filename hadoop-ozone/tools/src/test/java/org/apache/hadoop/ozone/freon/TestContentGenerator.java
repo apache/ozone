@@ -102,7 +102,8 @@ public class TestContentGenerator {
         return true;
       }
     }
-    ContentGenerator generator = new ContentGenerator(20, 8, 3, "hsync");
+    ContentGenerator generator = new ContentGenerator(20, 8, 3,
+        ContentGenerator.SyncOptions.HSYNC);
 
     SyncableByteArrayOutputStream syncable =
         new SyncableByteArrayOutputStream();

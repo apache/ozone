@@ -54,9 +54,9 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
-  private String flushOrSync;
+  private SyncOptions flushOrSync;
 
-  enum SyncOptions {
+  public enum SyncOptions {
     NONE,
     HFLUSH,
     HSYNC
@@ -74,10 +74,10 @@ public class ContentGenerator {
         .getBytes(StandardCharsets.UTF_8);
   }
 
-  ContentGenerator(long keySize, int bufferSize, int copyBufferSize, String
-      flushOrSync) {
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize,
+      SyncOptions flushOrSync) {
     this(keySize, bufferSize, copyBufferSize);
-    this.flushOrSync = flushOrSync.toUpperCase();
+    this.flushOrSync = flushOrSync;
   }
 
   /**
@@ -103,12 +103,7 @@ public class ContentGenerator {
   }
 
   private void doFlushOrSync(OutputStream outputStream) throws IOException {
-    SyncOptions option = SyncOptions.NONE;
-    if (flushOrSync != null) {
-      option = SyncOptions.valueOf(flushOrSync);
-    }
-
-    switch (option) {
+    switch (flushOrSync) {
     case NONE:
       // noop
       break;
@@ -125,7 +120,8 @@ public class ContentGenerator {
       }
       break;
     default:
-      throw new IllegalArgumentException("Unsupported sync option" + option);
+      throw new IllegalArgumentException("Unsupported sync option"
+          + flushOrSync);
     }
   }
 
