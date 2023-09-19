@@ -19,17 +19,29 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-*** Test Cases ***
-List om roles
-    ${output_with_id_passed} =      Execute                 ozone admin om roles --service-id=omservice
-                                    Should Match Regexp     ${output_with_id_passed}  [om (: LEADER|)]
-    ${output_without_id_passed} =   Execute                 ozone admin om roles
-                                    Should Match Regexp     ${output_without_id_passed}  [om (: LEADER|)]
+*** Keywords ***
+Parse non json output
+     [Arguments]                     ${output}
+     Should Match Regexp             ${output}  [om (: LEADER|)]
 
-List om roles as JSON
+Parse json output
+     [Arguments]                     ${output}
+     ${leader} =                     Execute                 echo '${output}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
+                                     Should Not Be Equal     ${leader}       ${EMPTY}
+
+*** Test Cases ***
+List om roles with OM service ID passed
+    ${output_with_id_passed} =      Execute                 ozone admin om roles --service-id=omservice
+                                    Parse non json output   ${output_with_id_passed}
+
+List om roles without OM service ID passed
+    ${output_without_id_passed} =   Execute                 ozone admin om roles
+                                    Parse non json output   ${output_without_id_passed}
+
+List om roles as JSON with OM service ID passed
     ${output_with_id_passed} =      Execute                 ozone admin om roles --service-id=omservice --json
-    ${leader} =                     Execute                 echo '${output_with_id_passed}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
-                                    Should Not Be Equal     ${leader}       ${EMPTY}
+                                    Parse json output       ${output_with_id_passed}
+
+List om roles as JSON without OM service ID passed
     ${output_without_id_passed} =   Execute                 ozone admin om roles --json
-    ${leader} =                     Execute                 echo '${output_without_id_passed}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
-                                    Should Not Be Equal     ${leader}       ${EMPTY}
+                                    Parse json output       ${output_without_id_passed}
