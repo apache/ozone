@@ -132,6 +132,10 @@ public final class S3ErrorTable {
       "exceeds the maximum allowed metadata size of " +
       S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB + "KB", HTTP_BAD_REQUEST);
 
+  public static final OS3Exception BUCKET_ALREADY_EXISTS = new OS3Exception(
+      "BucketAlreadyExists", "The requested bucket name is not available" +
+      " as it already exists.", HTTP_CONFLICT);
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }
