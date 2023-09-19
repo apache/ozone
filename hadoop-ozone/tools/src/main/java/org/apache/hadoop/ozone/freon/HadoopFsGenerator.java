@@ -67,7 +67,7 @@ public class HadoopFsGenerator extends BaseFreonGenerator
       description = "Type of operation to execute after a write. Supported " +
       "options include NONE (default), HFLUSH and HSYNC",
       defaultValue = "none")
-  public static ContentGenerator.SyncOptions flushOrSync;
+  private static ContentGenerator.SyncOptions flushOrSync;
 
   private ContentGenerator contentGenerator;
 

@@ -56,7 +56,7 @@ public class ContentGenerator {
 
   private SyncOptions flushOrSync;
 
-  public enum SyncOptions {
+  enum SyncOptions {
     NONE,
     HFLUSH,
     HSYNC
