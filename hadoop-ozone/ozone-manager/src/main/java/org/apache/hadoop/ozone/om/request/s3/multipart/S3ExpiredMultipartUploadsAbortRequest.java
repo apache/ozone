@@ -201,9 +201,13 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+
+      if (omBucketInfo == null) {
+        LOG.warn("Volume: {}, Bucket: {} does not exist, skipping deletion.",
+            volumeName, bucketName);
+        return;
+      }
 
       // Do not use getBucketLayout since the expired MPUs request might
       // contains MPUs from all kind of buckets
