@@ -26,11 +26,13 @@ ALL_BASIC_CHECKS="${ALL_BASIC_CHECKS[@]%\]}"
 # Replace commas with spaces to form a space-delimited list
 SPACE_DELIMITED_ALL_CHECKS=$(echo "$ALL_BASIC_CHECKS" | tr -d '"' | tr ',' ' ')
 
-BASIC_CHECKS=$(grep -r '^#checks:basic' hadoop-ozone/dev-support/checks \
- | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
+BASIC_CHECKS=$(grep -lr '^#checks:basic' hadoop-ozone/dev-support/checks \
+                       | sort -u | xargs -n1 basename \
+                       | cut -f1 -d'.')
 
-UNIT_CHECKS=$(grep -r '^#checks:unit' hadoop-ozone/dev-support/checks \
- | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev | cut -f1 -d'.')
+UNIT_CHECKS=$(grep -lr '^#checks:unit' hadoop-ozone/dev-support/checks \
+                       | sort -u | xargs -n1 basename \
+                       | cut -f1 -d'.')
 
 if [[ -n "${SPACE_DELIMITED_ALL_CHECKS}" ]]; then
     SPACE_DELIMITED_ALL_CHECKS=" ${SPACE_DELIMITED_ALL_CHECKS[*]} "     # add framing blanks

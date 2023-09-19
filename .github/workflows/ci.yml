@@ -26,10 +26,9 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      all-basic-checks: ${{ steps.selective-checks.outputs.basic-checks }}
       needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
-      basic-checks: ${{ steps.selective-basic-checks.outputs.basic-checks }}
-      basic-unit: ${{ steps.selective-basic-checks.outputs.basic-unit }}
+      basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
+      basic-unit: ${{ steps.categorize-basic-checks.outputs.basic-unit }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
@@ -64,31 +63,11 @@ jobs:
       - name: Acceptance suites
         id: acceptance-suites
         run: dev-support/ci/acceptance_suites.sh
-  pre-checks:
-    needs:
-      - build-info
-    runs-on: ubuntu-20.04
-    timeout-minutes: 45
-    outputs:
-      basic-checks: ${{ steps.selective-basic-checks.outputs.basic-checks }}
-      basic-unit: ${{ steps.selective-basic-checks.outputs.basic-unit }}
-    steps:
-      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-      - name: Fetch incoming commit ${{ github.sha }} with its parent
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 2
-          persist-credentials: false
-        if: github.event_name  == 'pull_request'
-      - name: Selective Basic Checks
-        id: selective-basic-checks
+      - name: Categorize Basic Checks
+        id: categorize-basic-checks
         env:
-          ALL_BASIC_CHECKS: "${{ needs.build-info.outputs.all-basic-checks }}"
-        run: dev-support/ci/selective_basic_ci_checks.sh
+          ALL_BASIC_CHECKS: "${{ steps.selective-checks.outputs.basic-checks }}"
+        run: dev-support/ci/categorize_basic_checks.sh
   build:
     needs:
       - build-info
@@ -191,13 +170,12 @@ jobs:
   basic:
     needs:
       - build-info
-      - pre-checks
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
-        check: ${{ fromJson(needs.pre-checks.outputs.basic-checks) }}
+        check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: false
     steps:
       - name: Checkout project
@@ -244,14 +222,13 @@ jobs:
   unit:
     needs:
       - build-info
-      - pre-checks
       - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     if: needs.build-info.outputs.needs-basic-checks == 'true'
     strategy:
       matrix:
-        check: ${{ fromJson(needs.pre-checks.outputs.basic-unit) }}
+        check: ${{ fromJson(needs.build-info.outputs.basic-unit) }}
       fail-fast: false
     steps:
       - name: Checkout project

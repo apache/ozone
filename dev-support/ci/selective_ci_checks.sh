@@ -82,9 +82,9 @@ function get_changed_files() {
 }
 
 function set_outputs_run_everything_and_exit() {
-    BASIC_CHECKS=$(grep -r '^#checks:' hadoop-ozone/dev-support/checks \
-                   | sort -u | cut -f1 -d':' | rev | cut -f1 -d'/' | rev \
-                   | cut -f1 -d'.')
+    BASIC_CHECKS=$(grep -lr '^#checks:' hadoop-ozone/dev-support/checks \
+                       | sort -u | xargs -n1 basename \
+                       | cut -f1 -d'.')
     compile_needed=true
     compose_tests_needed=true
     dependency_check_needed=true
