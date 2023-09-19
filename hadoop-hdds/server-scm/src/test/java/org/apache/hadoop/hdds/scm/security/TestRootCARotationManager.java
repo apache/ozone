@@ -330,11 +330,12 @@ public class TestRootCARotationManager {
         () -> logs.getOutput().contains("isPostProcessing is true for"),
         100, 20000);
 
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("isPostProcessing is false"),
-        100, 20000);
     doNothing().when(statefulServiceStateManager)
         .deleteConfiguration(Mockito.anyString());
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("isPostProcessing is false") &&
+            logs.getOutput().contains("Stateful configuration is deleted"),
+        100, 20000);
     verify(statefulServiceStateManager, times(1))
         .deleteConfiguration(Mockito.anyString());
   }
