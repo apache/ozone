@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -155,7 +156,7 @@ public class GrpcReplicationClient implements AutoCloseable {
    */
   public static class StreamDownloader
       implements StreamObserver<CopyContainerResponseProto> {
-
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 8 * 1024;
     private final CompletableFuture<Path> response;
     private final long containerId;
     private final OutputStream stream;
@@ -170,7 +171,10 @@ public class GrpcReplicationClient implements AutoCloseable {
         Preconditions.checkNotNull(outputPath, "Output path cannot be null");
         Path parentPath = Preconditions.checkNotNull(outputPath.getParent());
         Files.createDirectories(parentPath);
-        stream = new FileOutputStream(outputPath.toFile());
+        final FileOutputStream fileOutputStream =
+            new FileOutputStream(outputPath.toFile());
+        stream = new BufferedOutputStream(fileOutputStream,
+            DEFAULT_WRITE_BUFFER_SIZE);
       } catch (IOException e) {
         throw new UncheckedIOException(
             "Output path can't be used: " + outputPath, e);
