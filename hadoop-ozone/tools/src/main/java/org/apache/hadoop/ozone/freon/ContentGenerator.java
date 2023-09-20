@@ -72,6 +72,7 @@ public class ContentGenerator {
     this.copyBufferSize = copyBufferSize;
     buffer = RandomStringUtils.randomAscii(bufferSize)
         .getBytes(StandardCharsets.UTF_8);
+    this.flushOrSync = SyncOptions.NONE;
   }
 
   ContentGenerator(long keySize, int bufferSize, int copyBufferSize,
