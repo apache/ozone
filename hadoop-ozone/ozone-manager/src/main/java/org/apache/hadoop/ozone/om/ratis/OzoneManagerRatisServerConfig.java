@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.RatisServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
@@ -34,7 +35,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
  */
 @ConfigGroup(prefix = OMConfigKeys.OZONE_OM_HA_PREFIX + "."
     + RaftServerConfigKeys.PREFIX)
-public class OzoneManagerRatisServerConfig {
+public class OzoneManagerRatisServerConfig extends RatisServerConfig {
 
   @Config(key = "retrycache.expirytime",
       defaultValue = "300s",

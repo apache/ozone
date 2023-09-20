@@ -34,7 +34,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
  */
 @ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
     + RaftServerConfigKeys.PREFIX)
-public class DatanodeRatisServerConfig {
+public class DatanodeRatisServerConfig extends RatisServerConfig {
 
   @Config(key = "rpc.request.timeout",
       defaultValue = "60s",
