@@ -90,7 +90,7 @@ public class NSSummary {
   }
 
   public void setIsSizeOfDeletedDirectoryComputed(
-      Boolean isSizeOfDeletedDirComputed) {
+      boolean isSizeOfDeletedDirComputed) {
     this.isSizeOfDeletedDirectoryComputed = isSizeOfDeletedDirComputed;
   }
 
