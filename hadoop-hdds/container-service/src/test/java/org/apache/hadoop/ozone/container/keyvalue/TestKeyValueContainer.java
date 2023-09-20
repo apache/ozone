@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -62,6 +63,7 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TemporaryFolder;
 
 import org.junit.runner.RunWith;
@@ -91,6 +93,9 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
@@ -935,5 +940,105 @@ public class TestKeyValueContainer {
       // since there are no blocks in rocksdb
       Assert.assertTrue(container.getContainerData().isEmpty());
     }
+  }
+
+  /**
+   * Test import schema V2 replica to V3 enabled HddsVolume.
+   */
+  @Test
+  public void testImportV2ReplicaToV3HddsVolume() throws Exception {
+    final String testDir = GenericTestUtils.getTempPath(
+        TestKeyValueContainer.class.getSimpleName() + "-"
+            + UUID.randomUUID());
+    try {
+      testMixedSchemaImport(testDir, false);
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  /**
+   * Test import schema V3 replica to V3 disabled HddsVolume.
+   */
+  @Test
+  public void testImportV3ReplicaToV2HddsVolume() throws Exception {
+    final String testDir = GenericTestUtils.getTempPath(
+        TestKeyValueContainer.class.getSimpleName() + "-"
+            + UUID.randomUUID());
+    try {
+      testMixedSchemaImport(testDir, true);
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  private void testMixedSchemaImport(String dir,
+      boolean schemaV3Enabled) throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    final String dir1 = dir + (schemaV3Enabled ? "/v3" : "/v2");
+
+    // create HddsVolume
+    HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)
+        .conf(conf).datanodeUuid(datanodeId.toString()).build();
+    conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
+    StorageVolumeUtil.checkVolume(hddsVolume1, scmId, scmId, conf, null, null);
+    hddsVolumes.clear();
+    hddsVolumes.add(hddsVolume1);
+
+    // create container
+    long containerId = 1;
+    KeyValueContainerData data = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    container.create(volumeSet, volumeChoosingPolicy, scmId);
+    long pendingDeleteBlockCount = 20;
+    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+      Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
+      metadataTable.put(data.getPendingDeleteBlockCountKey(),
+          pendingDeleteBlockCount);
+    }
+    container.close();
+
+    // verify container schema
+    if (schemaV3Enabled) {
+      Assert.assertEquals(SCHEMA_V3,
+          container.getContainerData().getSchemaVersion());
+    } else {
+      Assert.assertEquals(SCHEMA_V2,
+          container.getContainerData().getSchemaVersion());
+    }
+
+    //export container
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+    File file1 = new File(dir1 + "/" + containerId);
+    if (!file1.createNewFile()) {
+      Assertions.fail("Failed to create file " + file1.getAbsolutePath());
+    }
+    try (FileOutputStream fos = new FileOutputStream(file1)) {
+      container.exportContainerData(fos, packer);
+    }
+
+    // create new HddsVolume
+    conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, !schemaV3Enabled);
+    final String dir2 = dir + (schemaV3Enabled ? "/v2" : "/v3");
+    HddsVolume hddsVolume2 = new HddsVolume.Builder(dir2)
+        .conf(conf).datanodeUuid(datanodeId.toString()).build();
+    StorageVolumeUtil.checkVolume(hddsVolume2, scmId, scmId, conf, null, null);
+    hddsVolumes.clear();
+    hddsVolumes.add(hddsVolume2);
+
+    // import container to new HddsVolume
+    KeyValueContainer importedContainer = new KeyValueContainer(data, conf);
+    importedContainer.populatePathFields(scmId, hddsVolume2);
+    try (FileInputStream fio = new FileInputStream(file1)) {
+      importedContainer.importContainerData(fio, packer);
+    }
+
+    Assert.assertEquals(schemaV3Enabled ? SCHEMA_V3 : SCHEMA_V2,
+        importedContainer.getContainerData().getSchemaVersion());
+    Assert.assertEquals(pendingDeleteBlockCount,
+        importedContainer.getContainerData().getNumPendingDeletionBlocks());
   }
 }
