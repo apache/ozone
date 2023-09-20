@@ -117,6 +117,11 @@ public interface ContainerStateManager {
   /**
    *
    */
+  Set<ContainerID> getContainerIDs(String ownerName);
+
+  /**
+   *
+   */
   ContainerInfo getContainer(ContainerID id);
 
   /**

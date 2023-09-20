@@ -305,7 +305,7 @@ public class ContainerStateMap {
    * @param ownerName - Name of the NameService.
    * @return - NavigableSet of ContainerIDs.
    */
-  NavigableSet<ContainerID> getContainerIDsByOwner(final String ownerName) {
+  public NavigableSet<ContainerID> getContainerIDsByOwner(final String ownerName) {
     Preconditions.checkNotNull(ownerName);
     return ownerMap.getCollection(ownerName);
   }

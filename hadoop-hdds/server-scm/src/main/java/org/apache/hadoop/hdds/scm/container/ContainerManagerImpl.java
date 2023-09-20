@@ -28,6 +28,7 @@ import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -362,18 +363,10 @@ public class ContainerManagerImpl implements ContainerManager {
       Pipeline pipeline, String owner) throws IOException {
     NavigableSet<ContainerID> containerIDs =
         pipelineManager.getContainersInPipeline(pipeline.getId());
-    Iterator<ContainerID> containerIDIterator = containerIDs.iterator();
-    while (containerIDIterator.hasNext()) {
-      ContainerID cid = containerIDIterator.next();
-      try {
-        if (!getContainer(cid).getOwner().equals(owner)) {
-          containerIDIterator.remove();
-        }
-      } catch (ContainerNotFoundException e) {
-        LOG.error("Could not find container info for container {}", cid, e);
-        containerIDIterator.remove();
-      }
-    }
+    containerIDs = new TreeSet<>(containerIDs);
+    final Set<ContainerID> containerIDsByOwner =
+        containerStateManager.getContainerIDs(owner);
+    containerIDs.retainAll(containerIDsByOwner);
     return containerIDs;
   }
 

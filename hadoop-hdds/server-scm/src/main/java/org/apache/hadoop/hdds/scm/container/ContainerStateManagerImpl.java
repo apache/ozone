@@ -291,6 +291,16 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
+  public Set<ContainerID> getContainerIDs(final String owner) {
+    lock.readLock().lock();
+    try {
+      return containers.getContainerIDsByOwner(owner);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
   public ContainerInfo getContainer(final ContainerID id) {
     try (AutoCloseableLock ignored = readLock(id)) {
       return containers.getContainerInfo(id);
