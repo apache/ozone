@@ -92,7 +92,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -983,8 +982,8 @@ public class TestKeyValueContainer {
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
     StorageVolumeUtil.checkVolume(hddsVolume1, scmId, scmId, conf, null, null);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
-        .thenReturn(hddsVolume1);
+    hddsVolumes.clear();
+    hddsVolumes.add(hddsVolume1);
 
     // create container
     long containerId = 1;
@@ -1027,10 +1026,8 @@ public class TestKeyValueContainer {
     HddsVolume hddsVolume2 = new HddsVolume.Builder(dir2)
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
     StorageVolumeUtil.checkVolume(hddsVolume2, scmId, scmId, conf, null, null);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
-        .thenReturn(hddsVolume2);
-    Mockito.when(volumeSet.getVolumesList()).thenReturn(
-        singletonList(hddsVolume2));
+    hddsVolumes.clear();
+    hddsVolumes.add(hddsVolume2);
 
     // import container to new HddsVolume
     KeyValueContainer importedContainer = new KeyValueContainer(data, conf);
