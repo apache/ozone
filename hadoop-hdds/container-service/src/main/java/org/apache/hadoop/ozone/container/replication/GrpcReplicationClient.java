@@ -156,7 +156,7 @@ public class GrpcReplicationClient implements AutoCloseable {
    */
   public static class StreamDownloader
       implements StreamObserver<CopyContainerResponseProto> {
-    private static final int DEFAULT_WRITE_BUFFER_SIZE = 8 * 1024;
+    private static final int DEFAULT_WRITE_BUFFER_SIZE = 8 * 1024 * 1024;
     private final CompletableFuture<Path> response;
     private final long containerId;
     private final OutputStream stream;
