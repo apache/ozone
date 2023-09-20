@@ -504,6 +504,8 @@ enum Status {
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
     UNAUTHORIZED = 91;
+
+    S3_SECRET_ALREADY_EXISTS = 92;
 }
 
 /**

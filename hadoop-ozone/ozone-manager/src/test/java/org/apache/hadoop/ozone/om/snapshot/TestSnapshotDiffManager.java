@@ -811,14 +811,25 @@ public class TestSnapshotDiffManager {
           .thenAnswer(i -> {
             int keyVal = Integer.parseInt(((OmKeyInfo)i.getArgument(0))
                 .getKeyName().substring(3));
-            return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25);
+            return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25
+                && keyVal % 8 == 0);
           });
+
 
       Table<String, OmKeyInfo> fromSnapTable = mock(Table.class);
       Table<String, OmKeyInfo> toSnapTable = mock(Table.class);
       when(fromSnapTable.get(anyString())).thenAnswer(i -> {
         OmKeyInfo keyInfo = mock(OmKeyInfo.class);
         Mockito.when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
+        Mockito.when(keyInfo.isKeyInfoSame(Mockito.any(OmKeyInfo.class),
+            Mockito.eq(false), Mockito.eq(false),
+            Mockito.eq(false), Mockito.eq(false)))
+            .thenAnswer(k -> {
+              int keyVal = Integer.parseInt(((String)i.getArgument(0))
+                  .substring(3));
+              return !(keyVal % 4 == 2 && keyVal >= 0 && keyVal <= 25 &&
+                  keyVal % 8 != 0);
+            });
         return keyInfo;
       });
       when(toSnapTable.get(anyString())).thenAnswer(i -> {

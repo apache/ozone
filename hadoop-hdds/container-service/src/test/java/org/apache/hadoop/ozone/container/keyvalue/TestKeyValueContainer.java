@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -82,6 +83,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -118,7 +120,7 @@ public class TestKeyValueContainer {
 
   private final ContainerLayoutVersion layout;
   private String schemaVersion;
-  private HddsVolume hddsVolume;
+  private List<HddsVolume> hddsVolumes;
 
   // Use one configuration object across parameterized runs of tests.
   // This preserves the column family options in the container options
@@ -144,15 +146,27 @@ public class TestKeyValueContainer {
     CONF.setFromObject(dc);
 
     datanodeId = UUID.randomUUID();
-    hddsVolume = new HddsVolume.Builder(folder.getRoot()
+
+    hddsVolumes = new ArrayList<>();
+
+    hddsVolumes.add(new HddsVolume.Builder(folder.getRoot()
         .getAbsolutePath()).conf(CONF).datanodeUuid(datanodeId
-        .toString()).build();
-    StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, CONF, null, null);
+        .toString()).build());
+    StorageVolumeUtil.checkVolume(hddsVolumes.get(0), scmId, scmId, CONF,
+        null, null);
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
-        .thenReturn(hddsVolume);
+    Mockito.when(volumeSet.getVolumesList())
+        .thenAnswer(i -> hddsVolumes.stream()
+            .map(v -> (StorageVolume) v)
+            .collect(Collectors.toList()));
+    Mockito.when(volumeChoosingPolicy
+        .chooseVolume(anyList(), anyLong())).thenAnswer(
+            invocation -> {
+              List<HddsVolume> volumes = invocation.getArgument(0);
+              return volumes.get(0);
+            });
 
     keyValueContainerData = new KeyValueContainerData(1L,
         layout,
@@ -202,6 +216,40 @@ public class TestKeyValueContainer {
     // be created.
     KeyValueContainerUtil.parseKVContainerData(data, CONF);
     Assert.assertTrue(chunksDir.exists());
+  }
+
+  @Test
+  public void testNextVolumeTriedOnWriteFailure() throws Exception {
+    HddsVolume newVolume = new HddsVolume.Builder(
+        folder.newFolder().getAbsolutePath())
+        .conf(CONF).datanodeUuid(datanodeId.toString()).build();
+    StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
+    hddsVolumes.add(newVolume);
+
+    // Override the class, so that the first time we call it, it throws
+    // simulating a disk or write failure. The second time it should be ok
+
+    final AtomicInteger callCount = new AtomicInteger(0);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF)  {
+
+      @Override
+      protected void createContainerMetaData(File containerMetaDataPath,
+          File chunksPath, File dbFile, String schemaVers,
+          ConfigurationSource configuration) throws IOException {
+        if (callCount.get() == 0) {
+          callCount.incrementAndGet();
+          throw new IOException("Injected failure");
+        } else {
+          callCount.incrementAndGet();
+          super.createContainerMetaData(containerMetaDataPath, chunksPath,
+              dbFile, schemaVers, configuration);
+        }
+      }
+    };
+    testCreateContainer();
+    // We should have called the mocked class twice. Once to get an error and
+    // then retry without a failure.
+    assertEquals(2, callCount.get());
   }
 
   @Test
@@ -454,6 +502,7 @@ public class TestKeyValueContainer {
   @Test
   public void testDiskFullExceptionCreateContainer() throws Exception {
 
+    Mockito.reset(volumeChoosingPolicy);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
     try {
@@ -705,6 +754,7 @@ public class TestKeyValueContainer {
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
     StorageVolumeUtil.checkVolume(newVolume, scmId, scmId, CONF, null, null);
     List<HddsVolume> volumeList = new ArrayList<>();
+    HddsVolume hddsVolume = hddsVolumes.get(0);
     volumeList.add(hddsVolume);
     volumeList.add(newVolume);
 
@@ -719,6 +769,7 @@ public class TestKeyValueContainer {
     KeyValueContainer container;
     List<File> exportFiles = new ArrayList<>();
     for (HddsVolume volume: volumeList) {
+      Mockito.reset(volumeChoosingPolicy);
       Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
           .thenReturn(volume);
       for (int index = 0; index < count; index++, containerId++) {

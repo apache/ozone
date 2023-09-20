@@ -237,16 +237,12 @@ public class TestWatchForCommit {
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert
-        .assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
-    Assert
         .assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     validateData(keyName, data1);
   }
 
