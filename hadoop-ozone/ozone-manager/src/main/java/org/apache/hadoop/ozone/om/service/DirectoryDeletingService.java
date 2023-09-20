@@ -250,7 +250,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       long subDirNum = 0L;
       long subFileNum = 0L;
       int consumedSize = 0;
-      List<String> fullyExpandedSnapshots = new ArrayList<>();
       List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
       try (TableIterator<String, ? extends Table.KeyValue
           <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
@@ -279,7 +278,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             if (snapDeletedDirTable.isEmpty()) {
               // TODO: [SNAPSHOT] Update Snapshot state using
               //  SetSnapshotProperty from HDDS-7743 (YET TO BE MERGED)
-              fullyExpandedSnapshots.add(currOmSnapshot.getSnapshotTableKey());
               continue;
             }
 
