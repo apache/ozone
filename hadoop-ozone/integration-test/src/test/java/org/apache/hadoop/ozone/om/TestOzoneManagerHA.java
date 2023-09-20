@@ -216,6 +216,7 @@ public abstract class TestOzoneManagerHA {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
