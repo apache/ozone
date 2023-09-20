@@ -40,6 +40,8 @@ public class DatanodeConfiguration {
 
   static final String CONTAINER_DELETE_THREADS_MAX_KEY =
       "hdds.datanode.container.delete.threads.max";
+  static final String CONTAINER_CLOSE_THREADS_MAX_KEY =
+      "hdds.datanode.container.close.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
   public static final String DISK_CHECK_FILE_SIZE_KEY =
@@ -115,6 +117,7 @@ public class DatanodeConfiguration {
   private int numReadThreadPerVolume = 10;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   /**
@@ -129,6 +132,19 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of threads used to close containers on a datanode
+   * simultaneously.
+   */
+  @Config(key = "container.close.threads.max",
+      type = ConfigType.INT,
+      defaultValue = "3",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to close containers " +
+          "on a datanode"
+  )
+  private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
 
   /**
    * The maximum number of threads used to handle delete block commands.
@@ -503,6 +519,13 @@ public class DatanodeConfiguration {
       containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
     }
 
+    if (containerCloseThreads < 1) {
+      LOG.warn(CONTAINER_CLOSE_THREADS_MAX_KEY + " must be greater than zero" +
+              " and was set to {}. Defaulting to {}",
+          containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
+      containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
+    }
+
     if (periodicDiskCheckIntervalMinutes < 1) {
       LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -619,6 +642,14 @@ public class DatanodeConfiguration {
 
   public int getContainerDeleteThreads() {
     return containerDeleteThreads;
+  }
+
+  public void setContainerCloseThreads(int containerCloseThreads) {
+    this.containerCloseThreads = containerCloseThreads;
+  }
+
+  public int getContainerCloseThreads() {
+    return containerCloseThreads;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {

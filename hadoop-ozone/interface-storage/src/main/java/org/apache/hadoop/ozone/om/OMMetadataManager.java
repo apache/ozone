@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 
 /**
  * OM metadata manager interface.
@@ -397,6 +398,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, String> getSnapshotRenamedTable();
 
+  Table<String, CompactionLogEntry> getCompactionLogTable();
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
