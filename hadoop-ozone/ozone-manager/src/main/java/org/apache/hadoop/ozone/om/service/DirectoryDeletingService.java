@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
@@ -50,6 +51,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 
 /**
  * This is a background service to delete orphan directories and its
@@ -212,7 +215,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           optimizeDirDeletesAndSubmitRequest(
               remainNum, dirNum, subDirNum, subFileNum,
               allSubDirList, purgePathRequestList, null, startTime,
-              ratisByteLimit - consumedSize);
+              ratisByteLimit - consumedSize, getOzoneManager().getKeyManager());
 
         } catch (IOException e) {
           LOG.error("Error while running delete directories and files " +
@@ -222,11 +225,123 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           getOzoneManager().getMetadataManager().getTableLock(
               OmMetadataManagerImpl.DELETED_DIR_TABLE).writeLock().unlock();
         }
+
+        try {
+          if (remainNum > 0) {
+            expandSnapshotDirectories(remainNum);
+          }
+        } catch (Exception e) {
+          LOG.error("Error while running deep clean on snapshots. Will " +
+              "retry at next run.", e);
+        }
       }
 
       // place holder by returning empty results of this call back.
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
+
+    private void expandSnapshotDirectories(long remainNum) throws IOException {
+      OmSnapshotManager omSnapshotManager =
+          getOzoneManager().getOmSnapshotManager();
+      Table<String, SnapshotInfo> snapshotInfoTable =
+          getOzoneManager().getMetadataManager().getSnapshotInfoTable();
+
+      long dirNum = 0L;
+      long subDirNum = 0L;
+      long subFileNum = 0L;
+      int consumedSize = 0;
+      List<String> fullyExpandedSnapshots = new ArrayList<>();
+      List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
+      try (TableIterator<String, ? extends Table.KeyValue
+          <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
+
+        while (remainNum > 0 && iterator.hasNext()) {
+          SnapshotInfo currSnapInfo = iterator.next().getValue();
+
+          // Expand deleted dirs only on active snapshot. Deleted Snapshots
+          // will be cleaned up by SnapshotDeletingService.
+          if (!currSnapInfo.getSnapshotStatus().equals(SNAPSHOT_ACTIVE) ||
+              currSnapInfo.getExpandedDeletedDir()) {
+            continue;
+          }
+
+          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+                   rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
+              currSnapInfo.getVolumeName(),
+              currSnapInfo.getBucketName(),
+              getSnapshotPrefix(currSnapInfo.getName()),
+              true)) {
+
+            OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+            Table<String, OmKeyInfo> snapDeletedDirTable =
+                currOmSnapshot.getMetadataManager().getDeletedDirTable();
+
+            if (snapDeletedDirTable.isEmpty()) {
+              // TODO: [SNAPSHOT] Update Snapshot state using
+              //  SetSnapshotProperty from HDDS-7743 (YET TO BE MERGED)
+              fullyExpandedSnapshots.add(currOmSnapshot.getSnapshotTableKey());
+              continue;
+            }
+
+            Table.KeyValue<String, OmKeyInfo> deletedDirInfo;
+            List<Pair<String, OmKeyInfo>> allSubDirList
+                = new ArrayList<>((int) remainNum);
+
+            try (TableIterator<String, ? extends Table.KeyValue<String,
+                OmKeyInfo>> deletedIterator = snapDeletedDirTable.iterator()) {
+
+              long startTime = Time.monotonicNow();
+              deletedDirInfo = deletedIterator.next();
+
+              PurgePathRequest request = prepareDeleteDirRequest(
+                  remainNum, deletedDirInfo.getValue(),
+                  deletedDirInfo.getKey(), allSubDirList,
+                  currOmSnapshot.getKeyManager());
+              if (isBufferLimitCrossed(ratisByteLimit, consumedSize,
+                  request.getSerializedSize())) {
+                if (purgePathRequestList.size() != 0) {
+                  // if message buffer reaches max limit, avoid sending further
+                  remainNum = 0;
+                  break;
+                }
+                // if directory itself is having a lot of keys / files,
+                // reduce capacity to minimum level
+                remainNum = MIN_ERR_LIMIT_PER_TASK;
+                request = prepareDeleteDirRequest(
+                    remainNum, deletedDirInfo.getValue(),
+                    deletedDirInfo.getKey(), allSubDirList,
+                    currOmSnapshot.getKeyManager());
+              }
+
+              consumedSize += request.getSerializedSize();
+              purgePathRequestList.add(request);
+              remainNum = remainNum - request.getDeletedSubFilesCount();
+              remainNum = remainNum - request.getMarkDeletedSubDirsCount();
+              // Count up the purgeDeletedDir, subDirs and subFiles
+              if (request.getDeletedDir() != null
+                  && !request.getDeletedDir().isEmpty()) {
+                dirNum++;
+              }
+              subDirNum += request.getMarkDeletedSubDirsCount();
+              subFileNum += request.getDeletedSubFilesCount();
+
+              optimizeDirDeletesAndSubmitRequest(
+                  remainNum, dirNum, subDirNum, subFileNum,
+                  allSubDirList, purgePathRequestList,
+                  currSnapInfo.getTableKey(), startTime,
+                  ratisByteLimit - consumedSize,
+                  currOmSnapshot.getKeyManager());
+
+            } catch (IOException e) {
+              LOG.error("Error while expanding snapshot " +
+                  currSnapInfo.getTableKey() + " deleted directories and " +
+                  "files. Will retry at next run.", e);
+            }
+          }
+        }
+      }
+    }
+
 
     private boolean previousSnapshotHasDir(
         KeyValue<String, OmKeyInfo> pendingDeletedDirInfo) throws IOException {

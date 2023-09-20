@@ -832,6 +832,7 @@ message SnapshotInfo {
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
+  optional bool expandedDeletedDir = 19;
 }
 
 message SnapshotDiffJobProto {

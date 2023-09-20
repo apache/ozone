@@ -128,6 +128,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long referencedReplicatedSize;
   private long exclusiveSize;
   private long exclusiveReplicatedSize;
+  private boolean expandedDeletedDir;
 
   /**
    * Private constructor, constructed via builder.
@@ -168,7 +169,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
                        long referencedSize,
                        long referencedReplicatedSize,
                        long exclusiveSize,
-                       long exclusiveReplicatedSize) {
+                       long exclusiveReplicatedSize,
+                       boolean expandedDeletedDir) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -187,6 +189,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = referencedReplicatedSize;
     this.exclusiveSize = exclusiveSize;
     this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+    this.expandedDeletedDir = expandedDeletedDir;
   }
 
   public void setName(String name) {
@@ -285,6 +288,14 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.sstFiltered = sstFiltered;
   }
 
+  public boolean getExpandedDeletedDir() {
+    return expandedDeletedDir;
+  }
+
+  public void setExpandedDeletedDir(boolean expandedDeletedDir) {
+    this.expandedDeletedDir = expandedDeletedDir;
+  }
+
   public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
       newBuilder() {
     return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
@@ -308,7 +319,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedSize(referencedSize)
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
-        .setExclusiveReplicatedSize(exclusiveReplicatedSize);
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setExpandedDeletedDir(expandedDeletedDir);
   }
 
   /**
@@ -333,6 +345,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long referencedReplicatedSize;
     private long exclusiveSize;
     private long exclusiveReplicatedSize;
+    private boolean expandedDeletedDir;
 
     public Builder() {
       // default values
@@ -428,6 +441,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       this.exclusiveReplicatedSize = exclusiveReplicatedSize;
       return this;
     }
+    public Builder setExpandedDeletedDir(boolean expandedDeletedDir) {
+      this.expandedDeletedDir = expandedDeletedDir;
+      return this;
+    }
+
 
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
@@ -449,7 +467,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
           referencedSize,
           referencedReplicatedSize,
           exclusiveSize,
-          exclusiveReplicatedSize
+          exclusiveReplicatedSize,
+          expandedDeletedDir
       );
     }
   }
@@ -471,7 +490,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setReferencedSize(referencedSize)
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
-            .setExclusiveReplicatedSize(exclusiveReplicatedSize);
+            .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+            .setExpandedDeletedDir(expandedDeletedDir);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -542,6 +562,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
       osib.setExclusiveReplicatedSize(
           snapshotInfoProto.getExclusiveReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasExpandedDeletedDir()) {
+      osib.setExpandedDeletedDir(
+          snapshotInfoProto.getExpandedDeletedDir());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -661,7 +686,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setDeepClean(true);
+        .setDeepClean(true)
+        .setExpandedDeletedDir(false);
 
     if (snapshotId != null) {
       builder.setCheckpointDir(getCheckpointDirName(snapshotId));
@@ -694,7 +720,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         referencedSize == that.referencedSize &&
         referencedReplicatedSize == that.referencedReplicatedSize &&
         exclusiveSize == that.exclusiveSize &&
-        exclusiveReplicatedSize == that.exclusiveReplicatedSize;
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
+        expandedDeletedDir == that.expandedDeletedDir;
   }
 
   @Override
@@ -705,7 +732,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
         deepClean, sstFiltered,
         referencedSize, referencedReplicatedSize,
-        exclusiveSize, exclusiveReplicatedSize);
+        exclusiveSize, exclusiveReplicatedSize, expandedDeletedDir);
   }
 
   /**
@@ -732,6 +759,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setExpandedDeletedDir(expandedDeletedDir)
         .build();
   }
 }

@@ -33,7 +33,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
@@ -42,6 +44,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
@@ -57,6 +61,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -84,9 +90,11 @@ public class TestDirectoryDeletingServiceWithFSO {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2000);
-    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 5);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 100);
+    conf.setInt(OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK, 10);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -493,7 +501,97 @@ public class TestDirectoryDeletingServiceWithFSO {
     cleanupTables();
   }
 
-  private void cleanupTables() throws IOException {
+  @Test
+  public void testExpandDirDeletedTableForAllSnapshot() throws Exception {
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
+    DirectoryDeletingService dirDeletingService =
+        (DirectoryDeletingService) cluster.getOzoneManager().getKeyManager()
+            .getDirDeletingService();
+    dirDeletingService.suspend();
+    /* For each snapshot
+        DirTable                               KeyTable
+    /v/b/snapDir                       /v/b/snapDir/testKey0 - testKey5
+    /v/b/snapDir/root/              /v/b/snapDir/root/parentDir0/file1 - file10
+    /v/b/snapDir/root/parentDir0/   /v/b/snapDir/root/parentDir1/file1 - file10
+    /v/b/snapDir/root/parentDir1/   /v/b/snapDir/root/parentDir2/file1 - file10
+    /v/b/snapDir/root/parentDir2/
+     */
+
+    for (int i = 1; i <= 5; i++) {
+      createSnapshotForDirectoryDeletingServiceTest("snap" + i, i);
+    }
+
+    dirDeletingService.resume();
+    long prevDDSRunCount = dirDeletingService.getRunCount().get();
+
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
+        prevDDSRunCount + 10, 100, 10000);
+
+    try (TableIterator<String, ? extends Table.KeyValue
+        <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
+      SnapshotInfo currSnapInfo = iterator.next().getValue();
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+               rcCurrOmSnapshot = cluster.getOzoneManager()
+          .getOmSnapshotManager().checkForSnapshot(
+          currSnapInfo.getVolumeName(),
+          currSnapInfo.getBucketName(),
+          getSnapshotPrefix(currSnapInfo.getName()),
+          true)) {
+
+        OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+        Table<String, OmKeyInfo> snapDeletedDirTable =
+            currOmSnapshot.getMetadataManager().getDeletedDirTable();
+        Table<String, RepeatedOmKeyInfo> deletedTable =
+            currOmSnapshot.getMetadataManager().getDeletedTable();
+        assertTrue(snapDeletedDirTable.isEmpty());
+        assertTableRowCount(deletedTable, 15);
+      }
+    }
+    cleanupTables();
+  }
+
+  private void createSnapshotForDirectoryDeletingServiceTest(
+      String rootPath, int count) throws Exception {
+
+    Table<String, OmKeyInfo> deletedDirTable =
+        cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    Table<String, SnapshotInfo> snapshotInfoTable =
+        cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
+    Path root = new Path("/" + rootPath);
+    Path appRoot = new Path(root, "root");
+    // Create  parent dir from root.
+    fs.mkdirs(root);
+
+    // Added 5 sub files inside root dir
+    for (int i = 0; i < 5; i++) {
+      Path path = new Path(root, "testKey" + i);
+      try (FSDataOutputStream stream = fs.create(path)) {
+        stream.write(1);
+      }
+    }
+
+    // Add 2*5 more sub files in different level
+    for (int i = 0; i < 2; i++) {
+      Path parent = new Path(appRoot, "parentDir" + i);
+      for (int j = 1; j <= 5; j++) {
+        Path child = new Path(parent, "file" + j);
+        ContractTestUtils.touch(fs, child);
+      }
+    }
+
+    // Delete dir
+    fs.delete(root, true);
+    // For 1st snapshot deletedDiTable will be expanded, as DeletedDirService
+    // runs every 100ms for this test
+    if (count != 1) {
+      assertTableRowCount(deletedDirTable, 1);
+    }
+    client.getObjectStore().createSnapshot(volumeName, bucketName, rootPath);
+    assertTableRowCount(snapshotInfoTable, count);
+  }
+
+  private void cleanupTables() throws Exception {
     OMMetadataManager metadataManager =
         cluster.getOzoneManager().getMetadataManager();
 
@@ -507,6 +605,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
         .iterator()) {
       removeAllFromDB(it);
+    }
+
+    try (TableIterator<?, ?> it = metadataManager.getSnapshotInfoTable()
+        .iterator()) {
+      removeAllFromDB(it);
+      cluster.getOzoneManager().getOmSnapshotManager()
+          .getSnapshotCache().invalidateAll();
     }
   }
 
