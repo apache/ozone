@@ -54,8 +54,8 @@ Setup credentials for S3
     Run Keyword         Setup dummy credentials for S3
 
 Try to create a bucket using S3 API
-    # Note: S3 API does not return error if the bucket already exists
-    ${output} =         Create bucket with name    ${PREFIX}-bucket
+    # Note: S3 API returns error if the bucket already exists
+    ${output} =         Create bucket with name    ${PREFIX}-bucket2
                         Should Be Equal    ${output}    ${None}
 
 Create key using S3 API
