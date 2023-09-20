@@ -706,23 +706,23 @@ public final class OMFileRequest {
   public static OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
       OmDirectoryInfo dirInfo, String keyName) {
 
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
-    builder.setParentObjectID(dirInfo.getParentObjectID())
-            .setKeyName(keyName)
-            .setAcls(dirInfo.getAcls())
-            .addAllMetadata(dirInfo.getMetadata())
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setCreationTime(dirInfo.getCreationTime())
-            .setModificationTime(dirInfo.getModificationTime())
-            .setObjectID(dirInfo.getObjectID())
-            .setUpdateID(dirInfo.getUpdateID())
-            .setFileName(dirInfo.getName())
-            .setReplicationConfig(RatisReplicationConfig
-                    .getInstance(HddsProtos.ReplicationFactor.ONE))
-            .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())));
-    return builder.build();
+    return new OmKeyInfo.Builder()
+        .setParentObjectID(dirInfo.getParentObjectID())
+        .setKeyName(keyName)
+        .setAcls(dirInfo.getAcls())
+        .addAllMetadata(dirInfo.getMetadata())
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime())
+        .setObjectID(dirInfo.getObjectID())
+        .setUpdateID(dirInfo.getUpdateID())
+        .setFileName(dirInfo.getName())
+        .setReplicationConfig(RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setOmKeyLocationInfos(Collections.singletonList(
+                new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .build();
   }
 
   /**
@@ -748,16 +748,16 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    OmDirectoryInfo.Builder builder = new OmDirectoryInfo.Builder();
-    builder.setParentObjectID(keyInfo.getParentObjectID())
-            .setAcls(keyInfo.getAcls())
-            .addAllMetadata(keyInfo.getMetadata())
-            .setCreationTime(keyInfo.getCreationTime())
-            .setModificationTime(keyInfo.getModificationTime())
-            .setObjectID(keyInfo.getObjectID())
-            .setUpdateID(keyInfo.getUpdateID())
-            .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
-    return builder.build();
+    return new OmDirectoryInfo.Builder()
+        .setParentObjectID(keyInfo.getParentObjectID())
+        .setAcls(keyInfo.getAcls())
+        .addAllMetadata(keyInfo.getMetadata())
+        .setCreationTime(keyInfo.getCreationTime())
+        .setModificationTime(keyInfo.getModificationTime())
+        .setObjectID(keyInfo.getObjectID())
+        .setUpdateID(keyInfo.getUpdateID())
+        .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()))
+        .build();
   }
 
   /**
