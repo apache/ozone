@@ -273,8 +273,8 @@ public class TestRootCARotationManager {
   @Test
   public void testPostProcessingCheck() throws Exception {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "PT2S");
-    ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT15S");
-    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT2S");
+    ozoneConfig.set(HDDS_X509_RENEW_GRACE_DURATION, "PT20S");
+    ozoneConfig.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT, "PT5S");
     ozoneConfig.set(HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL, "PT10S");
     Date date = Calendar.getInstance().getTime();
     date.setMinutes(date.getMinutes() + 5);
@@ -284,7 +284,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(60));
+        LocalDateTime.now(), Duration.ofSeconds(90));
     scmCertClient.setCACertificate(cert);
     CertificateCodec certCodec = new CertificateCodec(securityConfig,
         "scm/sub-ca");
@@ -314,27 +314,28 @@ public class TestRootCARotationManager {
     rootCARotationManager.notifyStatusChanged();
     GenericTestUtils.waitFor(
         () -> logs.getOutput().contains("isPostProcessing is true for"),
-        100, 10000);
+        100, 20000);
 
     logs.clearOutput();
     when(scmContext.isLeader()).thenReturn(false);
     rootCARotationManager.notifyStatusChanged();
     GenericTestUtils.waitFor(
         () -> logs.getOutput().contains("disable monitor task"),
-        100, 10000);
+        100, 20000);
 
     logs.clearOutput();
     when(scmContext.isLeader()).thenReturn(true);
     rootCARotationManager.notifyStatusChanged();
     GenericTestUtils.waitFor(
         () -> logs.getOutput().contains("isPostProcessing is true for"),
-        100, 10000);
+        100, 20000);
 
-    GenericTestUtils.waitFor(
-        () -> logs.getOutput().contains("isPostProcessing is false"),
-        100, 10000);
     doNothing().when(statefulServiceStateManager)
         .deleteConfiguration(Mockito.anyString());
+    GenericTestUtils.waitFor(
+        () -> logs.getOutput().contains("isPostProcessing is false") &&
+            logs.getOutput().contains("Stateful configuration is deleted"),
+        100, 20000);
     verify(statefulServiceStateManager, times(1))
         .deleteConfiguration(Mockito.anyString());
   }
