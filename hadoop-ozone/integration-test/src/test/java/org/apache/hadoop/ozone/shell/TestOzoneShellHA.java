@@ -919,13 +919,13 @@ public class TestOzoneShellHA {
 
     args = new String[]{"volume", "create", "vol5", "--space-quota", "test"};
     executeWithError(ozoneShell, args, "test is invalid. " +
-        "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+        "The quota value should be a positive integer " +
         "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--space-quota", "1.5GB"};
     executeWithError(ozoneShell, args, "1.5GB is invalid. " +
-        "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+        "The quota value should be a positive integer " +
         "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
@@ -959,14 +959,14 @@ public class TestOzoneShellHA {
     args = new String[]{"bucket", "create", "vol5/buck5",
         "--space-quota", "test"};
     executeWithError(ozoneShell, args, "test is invalid. " +
-        "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+        "The quota value should be a positive integer " +
         "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5",
         "--space-quota", "1.5GB"};
     executeWithError(ozoneShell, args, "1.5GB is invalid. " +
-        "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+        "The quota value should be a positive integer " +
         "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
@@ -1037,7 +1037,7 @@ public class TestOzoneShellHA {
         () -> execute(ozoneShell, volumeArgs3));
     assertTrue(eException.getMessage()
         .contains("test is invalid. " +
-            "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+            "The quota value should be a positive integer " +
             "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
@@ -1047,7 +1047,7 @@ public class TestOzoneShellHA {
         () -> execute(ozoneShell, volumeArgs4));
     assertTrue(eException.getMessage()
         .contains("1.5GB is invalid. " +
-            "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+            "The quota value should be a positive integer " +
             "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
@@ -1099,7 +1099,7 @@ public class TestOzoneShellHA {
         () -> execute(ozoneShell, bucketArgs3));
     assertTrue(eException.getMessage()
         .contains("test is invalid. " +
-            "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+            "The quota value should be a positive integer " +
             "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
@@ -1109,7 +1109,7 @@ public class TestOzoneShellHA {
         () -> execute(ozoneShell, bucketArgs4));
     assertTrue(eException.getMessage()
         .contains("1.5GB is invalid. " +
-            "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+            "The quota value should be a positive integer " +
             "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 

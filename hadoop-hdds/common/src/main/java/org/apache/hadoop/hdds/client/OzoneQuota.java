@@ -191,7 +191,7 @@ public final class OzoneQuota {
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(quotaInBytes + " is invalid. " +
-          "The quota value should be a positive integer between 1 and Long.MAX_VALUE" +
+          "The quota value should be a positive integer " +
           "with byte numeration(B, KB, MB, GB and TB)");
     }
 
@@ -225,7 +225,7 @@ public final class OzoneQuota {
       return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(quotaInNamespace + " is invalid. " +
-          "The quota value should be a positive integer between 1 and Long.MAX_VALUE");
+          "The quota value should be a positive integer");
     }
   }
 
