@@ -71,7 +71,7 @@ public class CodecBuffer implements AutoCloseable {
       return new CodecBuffer(buf) {
         @Override
         protected void finalize() {
-          finalizeImpl();
+          detectLeaks();
         }
       };
     }
@@ -189,10 +189,15 @@ public class CodecBuffer implements AutoCloseable {
   }
 
   /**
-   * Provide an implementation of the {@link #finalize()} method.
+   * Detect buffer leak by asserting that the underlying buffer is released
+   * when this object is garbage collected.
+   * This method may be invoked inside the {@link #finalize()} method
+   * or using a {@link java.lang.ref.ReferenceQueue}.
    * For performance reason, this class does not override {@link #finalize()}.
+   *
+   * @see #enableLeakDetection()
    */
-  void finalizeImpl() {
+  void detectLeaks() {
     // leak detection
     final int capacity = buf.capacity();
     if (!released.isDone() && capacity > 0) {
