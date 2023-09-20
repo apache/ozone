@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -108,6 +109,7 @@ import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlock
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -196,6 +198,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |                       |  2. /volumeId/bucketId/parentId/fileName        |
    * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
+   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
+   * |-------------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -224,6 +228,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
   public static final String SNAPSHOT_RENAMED_TABLE =
       "snapshotRenamedTable";
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -246,7 +252,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_TABLE
+      SNAPSHOT_RENAMED_TABLE,
+      COMPACTION_LOG_TABLE
   };
 
   private DBStore store;
@@ -276,6 +283,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table snapshotInfoTable;
   private Table snapshotRenamedTable;
+  private Table compactionLogTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -614,6 +622,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
         .addTable(SNAPSHOT_RENAMED_TABLE)
+        .addTable(COMPACTION_LOG_TABLE)
         .addCodec(OzoneTokenIdentifier.class, TokenIdentifierCodec.get())
         .addCodec(OmKeyInfo.class, OmKeyInfo.getCodec(true))
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
@@ -628,7 +637,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, OmDBTenantState.getCodec())
         .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
         .addCodec(OmDBUserPrincipalInfo.class, OmDBUserPrincipalInfo.getCodec())
-        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec());
+        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec())
+        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec());
   }
 
   /**
@@ -741,6 +751,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
+
+    compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
+        String.class, CompactionLogEntry.class);
+    checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
+        addCacheMetrics);
   }
 
   /**
@@ -1567,7 +1582,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                   prevKeyTableDBKey = getOzonePathKey(volumeId,
                       bucketInfo.getObjectID(),
                       info.getParentObjectID(),
-                      info.getKeyName());
+                      info.getFileName());
                 } else if (prevKeyTableDBKey == null) {
                   prevKeyTableDBKey = getOzoneKey(info.getVolumeName(),
                       info.getBucketName(),
@@ -1686,6 +1701,44 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return rcOmSnapshot.orElse(null);
   }
 
+  /**
+   * Decide whether the open key is a multipart upload related key.
+   * @param openKeyInfo open key related to multipart upload
+   * @param openDbKey db key of open key related to multipart upload, which
+   *                  might have different format depending on the bucket
+   *                  layout
+   * @return true open key is a multipart upload related key.
+   *         false otherwise.
+   */
+  private boolean isOpenMultipartKey(OmKeyInfo openKeyInfo, String openDbKey)
+      throws IOException {
+    if (OMMultipartUploadUtils.isMultipartKeySet(openKeyInfo)) {
+      return true;
+    }
+
+    String multipartUploadId =
+        OMMultipartUploadUtils.getUploadIdFromDbKey(openDbKey);
+
+    if (StringUtils.isEmpty(multipartUploadId)) {
+      return false;
+    }
+
+    String multipartInfoDbKey = getMultipartKey(openKeyInfo.getVolumeName(),
+        openKeyInfo.getBucketName(), openKeyInfo.getKeyName(),
+        multipartUploadId);
+
+    // In addition to checking isMultipartKey flag in the open key info,
+    // multipartInfoTable needs to be checked to handle multipart upload
+    // open keys that already set isMultipartKey = false prior to HDDS-9017.
+    // These open keys should not be deleted since doing so will result in
+    // orphan MPUs (i.e. multipart upload exists in multipartInfoTable, but
+    // does not exist in the openKeyTable/openFileTable). These orphan MPUs
+    // will not be able to be aborted / completed by the user
+    // since the MPU abort and complete requests require the open MPU keys
+    // to exist in the open key/file table.
+    return getMultipartInfoTable().isExist(multipartInfoDbKey);
+  }
+
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
@@ -1710,6 +1763,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
         final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
+
+        if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
+          continue;
+        }
 
         if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
           final String clientIdString
@@ -1897,6 +1954,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getSnapshotRenamedTable() {
     return snapshotRenamedTable;
+  }
+
+  @Override
+  public Table<String, CompactionLogEntry> getCompactionLogTable() {
+    return compactionLogTable;
   }
 
   /**

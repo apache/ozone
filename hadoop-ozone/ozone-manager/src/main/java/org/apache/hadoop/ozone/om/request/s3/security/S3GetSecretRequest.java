@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,7 +168,18 @@ public class S3GetSecretRequest extends OMClientRequest {
                 assignS3SecretValue = null;
               }
             } else {
-              // Found in S3SecretTable.
+              final OMMultiTenantManager multiTenantManager =
+                  ozoneManager.getMultiTenantManager();
+              if (multiTenantManager == null ||
+                  !multiTenantManager.getTenantForAccessID(accessId)
+                      .isPresent()) {
+                // Access Id is not assigned to any tenant and
+                // Secret is found in S3SecretTable. No secret is returned.
+                throw new OMException("Secret for '" + accessId +
+                    "' already exists", OMException.ResultCodes.
+                    S3_SECRET_ALREADY_EXISTS);
+              }
+              // For tenant getsecret, secret is always returned
               awsSecret.set(s3SecretValue.getAwsSecret());
               assignS3SecretValue = null;
             }

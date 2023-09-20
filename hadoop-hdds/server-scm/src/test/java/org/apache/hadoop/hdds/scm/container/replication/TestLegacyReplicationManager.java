@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
@@ -64,6 +66,9 @@ import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Disabled;
@@ -112,6 +117,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.CONTAINER_NUM_KEYS_DEFAULT;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.CONTAINER_USED_BYTES_DEFAULT;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicaBuilder;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.mockito.Mockito.when;
@@ -834,6 +840,104 @@ public class TestLegacyReplicationManager {
     }
 
     /**
+     * 2 closed replica
+     * 1 quasi-closed replicas
+     * SCM state is closed.
+     * Expectation: The replicate container command should only contain the
+     * closed replicas as sources.
+     */
+    @Test
+    public void testOnlyMatchingClosedReplicasReplicated()
+        throws IOException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica quasiReplica = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica closedReplica1 = getReplicas(
+          id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      final ContainerReplica closedReplica2 = getReplicas(
+          id, State.CLOSED, 1000L, datanodeDetails.getUuid(), datanodeDetails);
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, quasiReplica);
+      containerStateManager.updateContainerReplica(id, closedReplica1);
+      containerStateManager.updateContainerReplica(id, closedReplica2);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Optional<CommandForDatanode> cmdOptional =
+          datanodeCommandHandler.getReceivedCommands().stream().findFirst();
+      Assertions.assertTrue(cmdOptional.isPresent());
+      SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
+      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
+
+      // Only the closed replicas should have been used as sources.
+      List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
+      Assertions.assertEquals(2, repSources.size());
+      Assertions.assertTrue(repSources.containsAll(
+          Arrays.asList(closedReplica1.getDatanodeDetails(),
+              closedReplica2.getDatanodeDetails())));
+      Assertions.assertFalse(
+          repSources.contains(quasiReplica.getDatanodeDetails()));
+    }
+
+    /**
+     * 2 quasi-closed replicas
+     * 1 unhealthy replica
+     * SCM state is quasi-closed.
+     * Expectation: The replicate container command should only contain the
+     * quasi-closed replicas as sources.
+     */
+    @Test
+    public void testOnlyMatchingQuasiClosedReplicasReplicated()
+        throws IOException {
+      final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+      final ContainerID id = container.containerID();
+      final UUID originNodeId = UUID.randomUUID();
+      final ContainerReplica quasiReplica1 = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final ContainerReplica quasiReplica2 = getReplicas(
+          id, QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+      final DatanodeDetails datanodeDetails = randomDatanodeDetails();
+      final ContainerReplica unhealthyReplica = getReplicas(
+          id, UNHEALTHY, 1000L, datanodeDetails.getUuid(), datanodeDetails);
+
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, quasiReplica1);
+      containerStateManager.updateContainerReplica(id, quasiReplica2);
+      containerStateManager.updateContainerReplica(id, unhealthyReplica);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      Assertions.assertEquals(1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Optional<CommandForDatanode> cmdOptional =
+          datanodeCommandHandler.getReceivedCommands().stream().findFirst();
+      Assertions.assertTrue(cmdOptional.isPresent());
+      SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
+      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
+
+      // Only the quasi closed replicas should have been used as a sources.
+      List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
+      Assertions.assertEquals(2, repSources.size());
+      Assertions.assertTrue(repSources.containsAll(
+          Arrays.asList(quasiReplica1.getDatanodeDetails(),
+              quasiReplica2.getDatanodeDetails())));
+      Assertions.assertFalse(
+          repSources.contains(unhealthyReplica.getDatanodeDetails()));
+    }
+
+    /**
      * Container is closed.
      * 2 quasi-closed replicas.
      * 1 unhealthy replica.
@@ -923,6 +1027,204 @@ public class TestLegacyReplicationManager {
       assertExactDeleteTargets(unhealthyReplica.getDatanodeDetails());
     }
 
+    /**
+     * In small clusters, handling an under replicated container can get
+     * blocked because DNs are occupied by unhealthy replicas. This
+     * would make the placement policy throw an exception because it could
+     * not find any target datanodes for new replicas.
+     *
+     * Situation:
+     * Consider a CLOSED container with replicas 1 CLOSED, 1 QUASI_CLOSED with
+     * same seq id as the container, and 1 QUASI_CLOSED with smaller seq id.
+     * Placement policy is mocked to simulate no other target DNs are available.
+     *
+     * Expectation:
+     * 1st iteration: QUASI_CLOSED with same seq id should get closed, and the
+     * one with smaller seq id should get deleted to free up a DN.
+     * 2nd iteration: Any CLOSED replica should be replicated.
+     * 3rd iteration: Container should be OK now.
+     */
+    @Test
+    public void testUnderReplicationBlockedByUnhealthyReplicas()
+        throws IOException, TimeoutException {
+      /*
+      In the first iteration, throw an SCMException to simulate that placement
+      policy could not find any targets. In the second iteration, return a list
+      of required targets.
+       */
+      Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
+          Mockito.any(), Mockito.any(), Mockito.anyInt(),
+              Mockito.anyLong(), Mockito.anyLong()))
+          .thenAnswer(invocation -> {
+            throw new SCMException(
+                SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+          })
+          .thenAnswer(invocation -> {
+            int nodesRequired = invocation.getArgument(2);
+            List<DatanodeDetails> nodes = new ArrayList<>(nodesRequired);
+            while (nodesRequired != 0) {
+              nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+              nodesRequired--;
+            }
+            return nodes;
+          });
+
+      final ContainerInfo container = createContainer(LifeCycleState.CLOSED);
+      addReplicaToDn(container, randomDatanodeDetails(), CLOSED,
+          container.getSequenceId());
+      ContainerReplica quasiToDelete = addReplicaToDn(container,
+          randomDatanodeDetails(), QUASI_CLOSED, container.getSequenceId() - 1);
+      ContainerReplica quasi2 = addReplicaToDn(container,
+          randomDatanodeDetails(), QUASI_CLOSED, container.getSequenceId());
+
+      // First RM iteration.
+      // this container is under replicated by 2 replicas.
+      // quasi2 should be closed since its BCSID matches the container's.
+      // delete command should be sent for quasiToDelete to unblock under rep
+      // handling.
+      assertDeleteScheduled(1);
+      Assertions.assertTrue(datanodeCommandHandler.received(
+          SCMCommandProto.Type.closeContainerCommand,
+          quasi2.getDatanodeDetails()));
+      Assertions.assertTrue(datanodeCommandHandler.received(
+          SCMCommandProto.Type.deleteContainerCommand,
+          quasiToDelete.getDatanodeDetails()));
+      assertUnderReplicatedCount(1);
+
+      // Update RM with the results of the close and delete commands
+      ContainerReplica quasiToClosed = getReplicaBuilder(
+          container.containerID(), CLOSED, quasi2.getBytesUsed(),
+          quasi2.getKeyCount(), container.getSequenceId(),
+          quasi2.getOriginDatanodeId(), quasi2.getDatanodeDetails()).build();
+      containerStateManager.updateContainerReplica(container.containerID(),
+          quasiToClosed);
+      containerStateManager.removeContainerReplica(
+          container.containerID(), quasiToDelete);
+
+      // Second RM iteration
+      // Now that we have a free DN, a closed replica should be replicated
+      assertReplicaScheduled(1);
+      assertUnderReplicatedCount(1);
+
+      // Process the replicate command and report the replica back to SCM.
+      List<CommandForDatanode> replicateCommands = datanodeCommandHandler
+          .getReceivedCommands().stream()
+          .filter(c -> c.getCommand().getType()
+              .equals(SCMCommandProto.Type.replicateContainerCommand))
+          .collect(Collectors.toList());
+      Assertions.assertEquals(1, replicateCommands.size());
+      // Report the new replica to SCM.
+      for (CommandForDatanode replicateCommand: replicateCommands) {
+        DatanodeDetails newNode = createDatanodeDetails(
+            replicateCommand.getDatanodeId());
+        ContainerReplica newReplica = getReplicas(
+            container.containerID(), CLOSED,
+            container.getSequenceId(), newNode.getUuid(), newNode);
+        containerStateManager.updateContainerReplica(container.containerID(),
+            newReplica);
+      }
+
+      // Third RM iteration
+      assertReplicaScheduled(0);
+      assertUnderReplicatedCount(0);
+      assertOverReplicatedCount(0);
+    }
+
+    /**
+     * Test for when a quasi_closed container's under replication cannot be
+     * solved because there are UNHEALTHY replicas occupying datanodes.
+     */
+    @Test
+    public void testUnderRepQuasiClosedContainerBlockedByUnhealthyReplicas()
+        throws IOException, TimeoutException {
+      Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
+              Mockito.anyList(), Mockito.any(), Mockito.anyInt(),
+              Mockito.anyLong(), Mockito.anyLong()))
+          .thenAnswer(invocation -> {
+            List<DatanodeDetails> excluded = invocation.getArgument(0);
+            if (excluded.size() == 3) {
+              throw new SCMException(
+                  SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+            } else {
+              int nodesRequired = invocation.getArgument(2);
+              List<DatanodeDetails> nodes = new ArrayList<>(nodesRequired);
+              while (nodesRequired != 0) {
+                DatanodeDetails dn =
+                    MockDatanodeDetails.randomDatanodeDetails();
+                nodeManager.register(dn, NodeStatus.inServiceHealthy());
+                nodes.add(dn);
+                nodesRequired--;
+              }
+              return nodes;
+            }
+          });
+
+      final ContainerInfo container =
+          createContainer(LifeCycleState.QUASI_CLOSED);
+      ContainerReplica quasi1 = addReplicaToDn(container,
+          randomDatanodeDetails(), QUASI_CLOSED, container.getSequenceId());
+      DatanodeDetails nodeForQuasi2 =
+          MockDatanodeDetails.randomDatanodeDetails();
+      nodeManager.register(nodeForQuasi2, NodeStatus.inServiceHealthy());
+      ContainerReplica quasi2 = getReplicaBuilder(container.containerID(),
+          QUASI_CLOSED, container.getUsedBytes(), container.getNumberOfKeys(),
+          container.getSequenceId(), quasi1.getOriginDatanodeId(),
+          nodeForQuasi2).build();
+      containerStateManager
+          .updateContainerReplica(container.containerID(), quasi2);
+      ContainerReplica unhealthy = addReplicaToDn(container,
+          randomDatanodeDetails(), UNHEALTHY, container.getSequenceId());
+
+      // First RM iteration.
+      // this container is under replicated by 1 replica.
+      // delete command should be sent for unhealthy to unblock under rep
+      // handling.
+      assertDeleteScheduled(1);
+      Assertions.assertTrue(datanodeCommandHandler.received(
+          SCMCommandProto.Type.deleteContainerCommand,
+          unhealthy.getDatanodeDetails()));
+
+      List<CommandForDatanode> commands = datanodeCommandHandler
+          .getReceivedCommands();
+      Assertions.assertEquals(1, commands.size());
+      DeleteContainerCommand deleteContainerCommand =
+          (DeleteContainerCommand) commands.get(0).getCommand();
+      Assertions.assertTrue(deleteContainerCommand.isForce());
+
+      assertUnderReplicatedCount(1);
+      // Update RM with the result of delete command
+      containerStateManager.removeContainerReplica(
+          container.containerID(), unhealthy);
+
+      // Second RM iteration
+      // Now that we have a free DN, a quasi_closed replica should be replicated
+      assertReplicaScheduled(1);
+      assertUnderReplicatedCount(1);
+
+      // Process the replicate command and report the replica back to SCM.
+      List<CommandForDatanode> replicateCommands =
+          datanodeCommandHandler.getReceivedCommands().stream()
+              .filter(command -> command.getCommand().getType()
+                  .equals(SCMCommandProto.Type.replicateContainerCommand))
+              .collect(Collectors.toList());
+      Assertions.assertEquals(1, replicateCommands.size());
+      ReplicateContainerCommand command = (ReplicateContainerCommand)
+          replicateCommands.iterator().next().getCommand();
+      List<DatanodeDetails> sources = command.getSourceDatanodes();
+      Assertions.assertTrue(sources.contains(quasi1.getDatanodeDetails()) &&
+          sources.contains(quasi2.getDatanodeDetails()));
+      ContainerReplica replica3 =
+          getReplicas(container.containerID(), QUASI_CLOSED,
+              container.getSequenceId(), quasi1.getOriginDatanodeId(),
+              MockDatanodeDetails.randomDatanodeDetails());
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica3);
+
+      // Third RM iteration
+      assertReplicaScheduled(0);
+      assertUnderReplicatedCount(0);
+      assertOverReplicatedCount(0);
+    }
 
     /**
      * $numReplicas unhealthy replicas.
@@ -1562,6 +1864,89 @@ public class TestLegacyReplicationManager {
           report.getStat(LifeCycleState.QUASI_CLOSED));
       Assertions.assertEquals(0, report.getStat(
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+    }
+
+    /**
+     * 2 quasi-closed replicas.
+     * 2 unique origin IDs with different BCSIDs.
+     * Expectation: Container is closed, then replicated on the next iteration.
+     */
+    @Test
+    public void testCloseableIsClosedBeforeReplication() throws IOException {
+      final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
+      final ContainerID id = container.containerID();
+      final ContainerReplica replicaOne = getReplicas(
+          id, QUASI_CLOSED, 1000L, UUID.randomUUID(), randomDatanodeDetails());
+      final ContainerReplica replicaTwo = getReplicas(
+          id, QUASI_CLOSED, 900L, UUID.randomUUID(), randomDatanodeDetails());
+      containerStateManager.addContainer(container.getProtobuf());
+      containerStateManager.updateContainerReplica(id, replicaOne);
+      containerStateManager.updateContainerReplica(id, replicaTwo);
+
+      // Since we have 2/3 replicas, the container should be closed on this
+      // iteration. The replica with the higher BCSID can be closed.
+      int currentCloseCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.closeContainerCommand));
+
+      // The highest BCSID replica should have been closed.
+      Optional<CommandForDatanode> cmd =
+          datanodeCommandHandler.getReceivedCommands().stream().findFirst();
+      Assertions.assertTrue(cmd.isPresent());
+      Assertions.assertEquals(replicaOne.getDatanodeDetails().getUuid(),
+          cmd.get().getDatanodeId());
+
+      ReplicationManagerReport report = replicationManager.getContainerReport();
+      // Container will register as closed after the closed replica is
+      // reported in the next iteration.
+      Assertions.assertEquals(0,
+          report.getStat(LifeCycleState.CLOSED));
+      // Legacy replication manager does not count over/under replicated
+      // status until the container is eligible to be replicated.
+      Assertions.assertEquals(0, report.getStat(
+          ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+      Assertions.assertEquals(1,
+          report.getStat(LifeCycleState.QUASI_CLOSED));
+      Assertions.assertEquals(0, report.getStat(
+          ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+
+      // Move the higher BCSID replica to closed state.
+      final ContainerReplica closedReplicaOne = getReplicas(
+          id, CLOSED, 1000L, replicaOne.getOriginDatanodeId(),
+          replicaOne.getDatanodeDetails());
+      containerStateManager.updateContainerReplica(id, closedReplicaOne);
+
+      // On the next iteration, the container should be replicated.
+      currentCloseCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+      int currentReplicateCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+      // No more close commands should be sent.
+      Assertions.assertEquals(currentCloseCommandCount,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.closeContainerCommand));
+      // Two replicate commands should be triggered for the now closed
+      // container.
+      Assertions.assertEquals(currentReplicateCommandCount + 2,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+      Assertions.assertEquals(currentReplicateCommandCount + 2,
+          replicationManager.getMetrics().getReplicationCmdsSentTotal());
+      Assertions.assertEquals(1, getInflightCount(InflightType.REPLICATION));
+      Assertions.assertEquals(1, replicationManager.getMetrics()
+          .getInflightReplication());
+
+      // Once the replicas are closed, moving the container to CLOSED state
+      // in SCM is done on the container report, not in the replication manager.
     }
   }
 

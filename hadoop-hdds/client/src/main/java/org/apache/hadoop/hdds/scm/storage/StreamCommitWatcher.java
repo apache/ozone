@@ -18,191 +18,30 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.ratis.util.JavaUtils;
-import org.apache.ratis.util.MemoizedSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
  * buffers once data successfully gets replicated.
  */
-public class StreamCommitWatcher {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(StreamCommitWatcher.class);
-
-  private Map<Long, List<StreamBuffer>> commitIndexMap;
+class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
   private final List<StreamBuffer> bufferList;
 
-  // total data which has been successfully flushed and acknowledged
-  // by all servers
-  private long totalAckDataLength;
-  private final ConcurrentMap<Long, CompletableFuture<XceiverClientReply>>
-      replies = new ConcurrentHashMap<>();
-
-  private final XceiverClientSpi xceiverClient;
-
-  public StreamCommitWatcher(XceiverClientSpi xceiverClient,
+  StreamCommitWatcher(XceiverClientSpi xceiverClient,
       List<StreamBuffer> bufferList) {
-    this.xceiverClient = xceiverClient;
-    commitIndexMap = new ConcurrentSkipListMap<>();
+    super(xceiverClient);
     this.bufferList = bufferList;
-    totalAckDataLength = 0;
   }
 
-  public void updateCommitInfoMap(long index, List<StreamBuffer> buffers) {
-    commitIndexMap.computeIfAbsent(index, k -> new LinkedList<>())
-        .addAll(buffers);
-  }
-
-  int getCommitInfoMapSize() {
-    return commitIndexMap.size();
-  }
-
-  /**
-   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply streamWatchOnFirstIndex() throws IOException {
-    if (!commitIndexMap.isEmpty()) {
-      // wait for the  first commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndexMap.keySet().stream().mapToLong(v -> v).min()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for first index {} to catch up", index);
-      }
-      return streamWatchForCommit(index);
-    } else {
-      return null;
+  @Override
+  void releaseBuffers(long index) {
+    long acked = 0;
+    for (StreamBuffer buffer : remove(index)) {
+      acked += buffer.position();
+      bufferList.remove(buffer);
     }
-  }
-
-  /**
-   * Calls watch for commit for the last index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return {@link XceiverClientReply} reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply streamWatchOnLastIndex()
-      throws IOException {
-    if (!commitIndexMap.isEmpty()) {
-      // wait for the  commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndexMap.keySet().stream().mapToLong(v -> v).max()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for last flush Index {} to catch up", index);
-      }
-      return streamWatchForCommit(index);
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * calls watchForCommit API of the Ratis Client. This method is for streaming
-   * and no longer requires releaseBuffers
-   * @param commitIndex log index to watch for
-   * @return minimum commit index replicated to all nodes
-   * @throws IOException IOException in case watch gets timed out
-   */
-  public XceiverClientReply streamWatchForCommit(long commitIndex)
-      throws IOException {
-    final MemoizedSupplier<CompletableFuture<XceiverClientReply>> supplier
-        = JavaUtils.memoize(CompletableFuture::new);
-    final CompletableFuture<XceiverClientReply> f = replies.compute(commitIndex,
-        (key, value) -> value != null ? value : supplier.get());
-    if (!supplier.isInitialized()) {
-      // future already exists
-      return f.join();
-    }
-
-    try {
-      XceiverClientReply reply =
-          xceiverClient.watchForCommit(commitIndex);
-      f.complete(reply);
-      final CompletableFuture<XceiverClientReply> removed
-          = replies.remove(commitIndex);
-      Preconditions.checkState(removed == f);
-
-      adjustBuffers(reply.getLogIndex());
-      return reply;
-    } catch (InterruptedException e) {
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    } catch (TimeoutException | ExecutionException e) {
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    }
-  }
-
-  void releaseBuffersOnException() {
-    adjustBuffers(xceiverClient.getReplicatedMinCommitIndex());
-  }
-
-  private void adjustBuffers(long commitIndex) {
-    List<Long> keyList = commitIndexMap.keySet().stream()
-        .filter(p -> p <= commitIndex).collect(Collectors.toList());
-    if (!keyList.isEmpty()) {
-      releaseBuffers(keyList);
-    }
-  }
-
-  private long releaseBuffers(List<Long> indexes) {
-    Preconditions.checkArgument(!commitIndexMap.isEmpty());
-    for (long index : indexes) {
-      Preconditions.checkState(commitIndexMap.containsKey(index));
-      final List<StreamBuffer> buffers = commitIndexMap.remove(index);
-      final long length =
-          buffers.stream().mapToLong(StreamBuffer::position).sum();
-      totalAckDataLength += length;
-      for (StreamBuffer byteBuffer : buffers) {
-        bufferList.remove(byteBuffer);
-      }
-    }
-    return totalAckDataLength;
-  }
-
-  public long getTotalAckDataLength() {
-    return totalAckDataLength;
-  }
-
-  private IOException getIOExceptionForWatchForCommit(long commitIndex,
-                                                       Exception e) {
-    LOG.warn("watchForCommit failed for index {}", commitIndex, e);
-    IOException ioException = new IOException(
-        "Unexpected Storage Container Exception: " + e.toString(), e);
-    releaseBuffersOnException();
-    return ioException;
-  }
-
-  public void cleanup() {
-    if (commitIndexMap != null) {
-      commitIndexMap.clear();
-    }
-    commitIndexMap = null;
+    addAckDataLength(acked);
   }
 }

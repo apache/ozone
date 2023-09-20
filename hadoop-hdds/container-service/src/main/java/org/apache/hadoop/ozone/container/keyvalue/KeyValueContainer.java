@@ -29,6 +29,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -150,72 +151,108 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          maxSize);
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      // Set volume before getContainerDBFile(), because we may need the
-      // volume to deduce the db file.
-      containerData.setVolume(containerVolume);
+      List<HddsVolume> volumes
+          = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+      while (true) {
+        HddsVolume containerVolume;
+        try {
+          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+        } catch (DiskOutOfSpaceException ex) {
+          throw new StorageContainerException("Container creation failed, " +
+              "due to disk out of space", ex, DISK_OUT_OF_SPACE);
+        } catch (IOException ex) {
+          throw new StorageContainerException(
+              "Container creation failed. " + ex.getMessage(), ex,
+              CONTAINER_INTERNAL_ERROR);
+        }
 
-      long containerID = containerData.getContainerID();
-      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        try {
+          String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+          // Set volume before getContainerDBFile(), because we may need the
+          // volume to deduce the db file.
+          containerData.setVolume(containerVolume);
+
+          long containerID = containerData.getContainerID();
+          String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
-      // Set schemaVersion before the dbFile since we have to
-      // choose the dbFile location based on schema version.
-      String schemaVersion = VersionedDatanodeFeatures.SchemaV3
-          .chooseSchemaVersion(config);
-      containerData.setSchemaVersion(schemaVersion);
+          // Set schemaVersion before the dbFile since we have to
+          // choose the dbFile location based on schema version.
+          String schemaVersion = VersionedDatanodeFeatures.SchemaV3
+              .chooseSchemaVersion(config);
+          containerData.setSchemaVersion(schemaVersion);
 
-      containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
-      containerData.setMetadataPath(containerMetaDataPath.getPath());
+          containerMetaDataPath = KeyValueContainerLocationUtil
+              .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
+          containerData.setMetadataPath(containerMetaDataPath.getPath());
 
-      File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, idDir, containerID);
+          File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
+              hddsVolumeDir, idDir, containerID);
 
-      // Check if it is new Container.
-      ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
+          // Check if it is new Container.
+          ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
 
-      //Create Metadata path chunks path and metadata db
-      File dbFile = getContainerDBFile();
+          //Create Metadata path chunks path and metadata db
+          File dbFile = getContainerDBFile();
 
-      KeyValueContainerUtil.createContainerMetaData(
-              containerMetaDataPath, chunksPath, dbFile,
+          createContainerMetaData(containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
 
-      //Set containerData for the KeyValueContainer.
-      containerData.setChunksPath(chunksPath.getPath());
-      containerData.setDbFile(dbFile);
+          //Set containerData for the KeyValueContainer.
+          containerData.setChunksPath(chunksPath.getPath());
+          containerData.setDbFile(dbFile);
 
-      // Create .container file
-      File containerFile = getContainerFile();
-      createContainerFile(containerFile);
+          // Create .container file
+          File containerFile = getContainerFile();
+          createContainerFile(containerFile);
 
-    } catch (StorageContainerException ex) {
-      if (containerMetaDataPath != null && containerMetaDataPath.getParentFile()
-          .exists()) {
-        FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          return;
+        } catch (StorageContainerException ex) {
+          if (containerMetaDataPath != null
+              && containerMetaDataPath.getParentFile().exists()) {
+            FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          }
+          throw ex;
+        } catch (FileAlreadyExistsException ex) {
+          throw new StorageContainerException("Container creation failed " +
+              "because ContainerFile already exists", ex,
+              CONTAINER_ALREADY_EXISTS);
+        } catch (IOException ex) {
+          // This is a general catch all - no space left of device, which should
+          // not happen as the volume Choosing policy should filter out full
+          // disks, but it may still be possible if the disk quickly fills,
+          // or some IO error on the disk etc. In this case we try again with a
+          // different volume if there are any left to try.
+          if (containerMetaDataPath != null &&
+              containerMetaDataPath.getParentFile().exists()) {
+            FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          }
+          volumes.remove(containerVolume);
+          LOG.error("Exception attempting to create container {} on volume {}" +
+              " remaining volumes to try {}", containerData.getContainerID(),
+              containerVolume.getHddsRootDir(), volumes.size(), ex);
+          if (volumes.size() == 0) {
+            throw new StorageContainerException(
+                "Container creation failed. " + ex.getMessage(), ex,
+                CONTAINER_INTERNAL_ERROR);
+          }
+        }
       }
-      throw ex;
-    } catch (DiskOutOfSpaceException ex) {
-      throw new StorageContainerException("Container creation failed, due to " +
-          "disk out of space", ex, DISK_OUT_OF_SPACE);
-    } catch (FileAlreadyExistsException ex) {
-      throw new StorageContainerException("Container creation failed because " +
-          "ContainerFile already exists", ex, CONTAINER_ALREADY_EXISTS);
-    } catch (IOException ex) {
-      if (containerMetaDataPath != null && containerMetaDataPath.getParentFile()
-          .exists()) {
-        FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
-      }
-
-      throw new StorageContainerException(
-          "Container creation failed. " + ex.getMessage(), ex,
-          CONTAINER_INTERNAL_ERROR);
     } finally {
       volumeSet.readUnlock();
     }
+  }
+
+
+  /**
+   * The Static method call is wrapped in a protected instance method so it can
+   * be overridden in tests.
+   */
+  @VisibleForTesting
+  protected void createContainerMetaData(File containerMetaDataPath,
+      File chunksPath, File dbFile, String schemaVersion,
+      ConfigurationSource configuration) throws IOException {
+    KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
+        chunksPath, dbFile, schemaVersion, configuration);
   }
 
   /**

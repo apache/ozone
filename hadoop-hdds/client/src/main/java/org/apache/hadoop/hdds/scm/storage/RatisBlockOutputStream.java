@@ -92,7 +92,7 @@ public class RatisBlockOutputStream extends BlockOutputStream
 
   @VisibleForTesting
   public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitWatcher.getCommitIndex2flushedDataMap();
+    return commitWatcher.getCommitIndexMap();
   }
 
   @Override

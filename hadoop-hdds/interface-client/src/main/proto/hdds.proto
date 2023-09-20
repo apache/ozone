@@ -480,3 +480,18 @@ message DeletedBlocksTransactionInfo {
     repeated int64 localID = 3;
     optional int32 count = 4;
 }
+
+message CompactionFileInfoProto {
+    optional string fileName = 1;
+    optional string startKey = 2;
+    optional string endKey = 3;
+    optional string columnFamily = 4;
+}
+
+message CompactionLogEntryProto {
+    optional uint64 dbSequenceNumber = 1;
+    optional uint64 compactionTime = 2;
+    repeated CompactionFileInfoProto inputFileIntoList = 3;
+    repeated CompactionFileInfoProto outputFileIntoList = 4;
+    optional string compactionReason = 5;
+}

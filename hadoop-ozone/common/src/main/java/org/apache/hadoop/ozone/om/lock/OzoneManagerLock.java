@@ -31,12 +31,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
+import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.hdds.utils.CompositeKey.combineKeys;
@@ -99,14 +102,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   public OzoneManagerLock(ConfigurationSource conf) {
     omLockMetrics = OMLockMetrics.create();
-
-    // TODO: for now, guava Striped doesn't allow create a striped
-    //  ReadWriteLock with fair-lock yet.
-    //  https://github.com/google/guava/issues/2514.
-    //  We may have to consider implement our own striped locks.
-    //boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
-    //    OZONE_MANAGER_FAIR_LOCK_DEFAULT);
-
     Map<Resource, Striped<ReadWriteLock>> stripedLockMap =
         new EnumMap<>(Resource.class);
     for (Resource r : Resource.values()) {
@@ -117,17 +112,19 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
   private Striped<ReadWriteLock> createStripeLock(Resource r,
       ConfigurationSource conf) {
+    boolean fair = conf.getBoolean(OZONE_MANAGER_FAIR_LOCK,
+        OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX +
         r.getName().toLowerCase();
     int size = conf.getInt(stripeSizeKey,
         OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT);
-    return Striped.readWriteLock(size);
+    return SimpleStriped.readWriteLock(size, fair);
   }
 
   private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
-    Striped<ReadWriteLock> lockStriped = stripedLockByResource.get(resource);
+    Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
     Object key = combineKeys(keys);
-    return (ReentrantReadWriteLock) lockStriped.get(key);
+    return (ReentrantReadWriteLock) striped.get(key);
   }
 
   /**
@@ -267,12 +264,12 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
     } else {
-      Striped<ReadWriteLock> stripedLocks =
+      Striped<ReadWriteLock> striped =
           stripedLockByResource.get(Resource.USER_LOCK);
       // The result of bulkGet is always sorted in a consistent order.
       // This prevents deadlocks.
       Iterable<ReadWriteLock> locks =
-          stripedLocks.bulkGet(Arrays.asList(firstUser, secondUser));
+          striped.bulkGet(Arrays.asList(firstUser, secondUser));
       for (ReadWriteLock lock : locks) {
         lock.writeLock().lock();
       }
@@ -290,10 +287,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    Striped<ReadWriteLock> stripedLocks =
+    Striped<ReadWriteLock> striped =
         stripedLockByResource.get(Resource.USER_LOCK);
     Iterable<ReadWriteLock> locks =
-        stripedLocks.bulkGet(Arrays.asList(firstUser, secondUser));
+        striped.bulkGet(Arrays.asList(firstUser, secondUser));
     for (ReadWriteLock lock : locks) {
       lock.writeLock().unlock();
     }
