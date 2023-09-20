@@ -2115,32 +2115,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public boolean containsIncompleteMPUs(String volume, String bucket)
       throws IOException {
-    String prefixKey =
+    String keyPrefix =
         OmMultipartUpload.getDbKey(volume, bucket, "");
 
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
-        cacheIterator = getMultipartInfoTable().cacheIterator();
-
-    // First iterate all the entries in cache.
-    while (cacheIterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
-          cacheIterator.next();
-      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey) &&
-          cacheEntry.getValue().getCacheValue() != null) {
-        return true;
-      }
+    // First check in table cache
+    if (isKeyPresentInTableCache(keyPrefix, multipartInfoTable)) {
+      return true;
     }
 
-    try (TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-             iterator = getMultipartInfoTable().iterator()) {
-      iterator.seek(prefixKey);
-
-      while (iterator.hasNext()) {
-        KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
-        if (entry.getKey().startsWith(prefixKey)) {
-          return true;
-        }
-      }
+    // Check in table
+    if (isKeyPresentInTable(keyPrefix, multipartInfoTable)) {
+      return true;
     }
 
     return false;
