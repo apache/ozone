@@ -28,7 +28,6 @@ import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -77,9 +76,9 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-  @Category(UnhealthyTest.class)
-  @Unhealthy("Since the cluster doesn't have unbalanced nodes, ContainerBalancer" +
-      " stops before the assertion checks whether balancer is running.")
+  @Category(UnhealthyTest.class) @Unhealthy("Since the cluster doesn't have " +
+      "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
+      "whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {
     // test normally start and stop
     boolean running = containerBalancerClient.getContainerBalancerStatus();
