@@ -22,26 +22,34 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 *** Keywords ***
 Parse non json output
      [Arguments]                     ${output}
-     Should Match Regexp             ${output}  [om (: LEADER|)]
+     Should Match Regexp             ${output}                  [om (: LEADER|)]
 
 Parse json output
      [Arguments]                     ${output}
-     ${leader} =                     Execute                 echo '${output}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
-                                     Should Not Be Equal     ${leader}       ${EMPTY}
+     ${leader} =                     Execute                    echo '${output}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
+                                     Should Not Be Equal        ${leader}       ${EMPTY}
 
 *** Test Cases ***
 List om roles with OM service ID passed
-    ${output_with_id_passed} =      Execute                 ozone admin om roles --service-id=omservice
-                                    Parse non json output   ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                     ozone admin om roles --service-id=omservice
+                                    Parse non json output       ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                     ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice
+                                    Parse non json output       ${output_with_id_passed}
 
 List om roles without OM service ID passed
-    ${output_without_id_passed} =   Execute                 ozone admin om roles
-                                    Parse non json output   ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute                     ozone admin om roles
+                                    Parse non json output       ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error    ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles
+                                    Should Contain              ${output_without_id_passed}      Please specify the service ID to be finalized.
 
 List om roles as JSON with OM service ID passed
-    ${output_with_id_passed} =      Execute                 ozone admin om roles --service-id=omservice --json
-                                    Parse json output       ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                     ozone admin om roles --service-id=omservice --json
+                                    Parse json output           ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                     ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice --json
+                                    Parse json output           ${output_with_id_passed}
 
 List om roles as JSON without OM service ID passed
-    ${output_without_id_passed} =   Execute                 ozone admin om roles --json
-                                    Parse json output       ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute                     ozone admin om roles --json
+                                    Parse json output           ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error    ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --json
+                                    Should Contain              ${output_without_id_passed}      Please specify the service ID to be finalized.
