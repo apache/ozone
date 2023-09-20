@@ -297,8 +297,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           // in delete table are not used by any read/write operations.
 
           // Unlike normal MPU abort request where the MPU open keys needs
-          // to exist. For OpenKeyCleanupService version prior to
-          // SPDI-97585, these MPU open keys might already be deleted,
+          // to exist. For OpenKeyCleanupService run prior to
+          // HDDS-9017, these MPU open keys might already be deleted,
           // causing "orphan" MPU keys (MPU entry exist in
           // multipartInfoTable, but not in openKeyTable).
           // We can skip this existence check and just delete the

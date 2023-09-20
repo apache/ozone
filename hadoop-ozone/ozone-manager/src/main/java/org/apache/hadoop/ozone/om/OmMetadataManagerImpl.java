@@ -950,6 +950,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     String volumeId = String.valueOf(getVolumeId(
             omBucketInfo.getVolumeName()));
     String bucketId = String.valueOf(omBucketInfo.getObjectID());
+
     BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
 
     // keyPrefix is different in case of fileTable and keyTable.
