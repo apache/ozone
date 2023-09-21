@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
@@ -427,11 +429,11 @@ public class DeletedBlockLogImpl
       DeletedBlocksTransaction txn) throws ContainerNotFoundException {
     ContainerInfo containerInfo = containerManager
         .getContainer(ContainerID.valueOf(txn.getContainerID()));
-    if (replicas.size() < containerInfo.getReplicationConfig()
-        .getRequiredNodes()) {
-      return true;
-    }
-    return false;
+    ReplicationManager replicationManager =
+        scmContext.getScm().getReplicationManager();
+    ContainerHealthResult result = replicationManager
+        .getContainerReplicationHealth(containerInfo, replicas);
+    return result.getHealthState() != ContainerHealthResult.HealthState.HEALTHY;
   }
 
   @Override
