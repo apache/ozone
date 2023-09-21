@@ -145,6 +145,8 @@ public class TestKeyValueContainer {
 
   @Before
   public void setUp() throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
     dc.setAutoCompactionSmallSstFileNum(100);
     dc.setRocksdbDeleteObsoleteFilesPeriod(5000);
