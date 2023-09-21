@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -58,7 +59,10 @@ final class OzoneFileSystemTests {
     };
     OzoneConfiguration config = new OzoneConfiguration(conf);
     config.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
-    FileSystem subject = FileSystem.get(config);
+    URI uri = FileSystem.getDefaultUri(config);
+    config.setBoolean(
+        String.format("fs.%s.impl.disable.cache", uri.getScheme()), true);
+    FileSystem subject = FileSystem.get(uri, config);
     Path dir = new Path(Objects.requireNonNull(rootPath), "listStatusIterator");
     try {
       Set<String> paths = new TreeSet<>();
