@@ -203,8 +203,9 @@ jobs:
           java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        continue-on-error: true
       - name: Summary of failures
-        run: cat target/${{ matrix.check }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
@@ -249,8 +250,9 @@ jobs:
           java-version: 8
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh
+        continue-on-error: true
       - name: Summary of failures
-        run: cat target/${{ matrix.check }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
   dependency:
     needs:
@@ -315,8 +317,9 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_VOLUME_OWNER: 1000
+        continue-on-error: true
       - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
@@ -350,8 +353,9 @@ jobs:
           sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           popd
           ./hadoop-ozone/dev-support/checks/kubernetes.sh
+        continue-on-error: true
       - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
@@ -401,11 +405,13 @@ jobs:
       - name: Execute tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         if: matrix.profile != 'flaky'
+        continue-on-error: true
       - name: Execute flaky tests
         run: hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600
         if: matrix.profile == 'flaky'
+        continue-on-error: true
       - name: Summary of failures
-        run: cat target/${{ github.job }}/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
