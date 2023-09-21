@@ -107,16 +107,20 @@ public class ReplicaManagerInsight extends BaseInsightPoint {
         "replication_manager_metrics_ec_partial_reconstruction_skipped_total"));
     ecMetrics.addMetrics(new MetricDisplay(
         "EcPartialReconstructionCriticalTotal",
-        "replication_manager_metrics_ec_partial_reconstruction_critical_total"));
+        "replication_manager_metrics_ec_partial_reconstruction_" +
+            "critical_total"));
     ecMetrics.addMetrics(new MetricDisplay(
         "EcPartialReconstructionNoneOverloadedTotal",
-        "replication_manager_metrics_ec_partial_reconstruction_none_overloaded_total"));
+        "replication_manager_metrics_ec_partial_reconstruction_none_" +
+            "overloaded_total"));
     ecMetrics.addMetrics(new MetricDisplay(
         "EcPartialReplicationForOutOfServiceReplicasTotal",
-        "replication_manager_metrics_ec_partial_replication_for_out_of_service_replicas_total"));
+        "replication_manager_metrics_ec_partial_replication_for_" +
+            "out_of_service_replicas_total"));
     ecMetrics.addMetrics(new MetricDisplay(
         "EcPartialReplicationForMisReplicationTotal",
-        "replication_manager_metrics_ec_partial_replication_for_mis_replication_total"));
+        "replication_manager_metrics_ec_partial_replication_for_" +
+            "mis_replication_total"));
     display.add(ecMetrics);
 
     MetricGroupDisplay replicaMetrics = new MetricGroupDisplay(Type.SCM,
@@ -163,7 +167,8 @@ public class ReplicaManagerInsight extends BaseInsightPoint {
         "replication_manager_metrics_partial_replication_total"));
     replicaMetrics.addMetrics(new MetricDisplay(
         "PartialReplicationForMisReplicationTotal",
-        "replication_manager_metrics_partial_replication_for_mis_replication_total"));
+        "replication_manager_metrics_partial_replication_for_" +
+            "mis_replication_total"));
     display.add(replicaMetrics);
     return display;
   }
