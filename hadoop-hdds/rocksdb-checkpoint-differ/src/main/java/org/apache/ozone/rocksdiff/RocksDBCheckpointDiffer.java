@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -164,7 +165,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * to save space.
    */
   static final String SST_FILE_EXTENSION = ".sst";
-  private static final int SST_FILE_EXTENSION_LENGTH =
+  public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
 
   private static final int LONG_MAX_STR_LEN =
@@ -185,6 +186,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private final AtomicInteger tarballRequestCount;
   private final String dagPruningServiceName = "CompactionDagPruningService";
+  private AtomicBoolean suspended;
 
   /**
    * This is a package private constructor and should not be used other than
@@ -222,6 +224,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.suspended = new AtomicBoolean(false);
 
     long pruneCompactionDagDaemonRunIntervalInMs =
         configuration.getTimeDuration(
@@ -1163,6 +1166,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * time to be in compaction DAG and removes them from the DAG.
    */
   public void pruneOlderSnapshotsWithCompactionHistory() {
+    if (!shouldRun()) {
+      return;
+    }
+
     List<Path> olderSnapshotsLogFilePaths =
         getOlderSnapshotsCompactionLogFilePaths();
     List<String> lastCompactionSstFiles =
@@ -1481,6 +1488,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * non-leaf nodes of the DAG.
    */
   public synchronized void pruneSstFiles() {
+    if (!shouldRun()) {
+      return;
+    }
+
     Set<String> nonLeafSstFiles;
     nonLeafSstFiles = forwardCompactionDAG.nodes().stream()
         .filter(node -> !forwardCompactionDAG.successors(node).isEmpty())
@@ -1507,6 +1518,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     tarballRequestCount.decrementAndGet();
   }
 
+  public boolean shouldRun() {
+    return !suspended.get();
+  }
+
   @VisibleForTesting
   public int getTarballRequestCount() {
     return tarballRequestCount.get();
@@ -1530,6 +1545,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   @VisibleForTesting
   public ConcurrentHashMap<String, CompactionNode> getCompactionNodeMap() {
     return compactionNodeMap;
+  }
+
+  @VisibleForTesting
+  public void resume() {
+    suspended.set(false);
+  }
+
+  @VisibleForTesting
+  public void suspend() {
+    suspended.set(true);
   }
 
   /**

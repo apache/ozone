@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,6 +61,8 @@ public class BlockDeletingService extends BackgroundService {
   // Task priority is useful when a to-delete block has weight.
   private static final int TASK_PRIORITY_DEFAULT = 1;
 
+  private final Duration blockDeletingMaxLockHoldingTime;
+
   public BlockDeletingService(OzoneContainer ozoneContainer,
                               long serviceInterval, long serviceTimeout,
                               TimeUnit timeUnit, int workerSize,
@@ -77,6 +80,8 @@ public class BlockDeletingService extends BackgroundService {
     }
     this.conf = conf;
     dnConf = conf.getObject(DatanodeConfiguration.class);
+    this.blockDeletingMaxLockHoldingTime =
+        dnConf.getBlockDeletingMaxLockHoldingTime();
     metrics = BlockDeletingServiceMetrics.create();
   }
 
@@ -244,6 +249,10 @@ public class BlockDeletingService extends BackgroundService {
 
   public BlockDeletingServiceMetrics getMetrics() {
     return metrics;
+  }
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return blockDeletingMaxLockHoldingTime;
   }
 
   public int getBlockLimitPerInterval() {

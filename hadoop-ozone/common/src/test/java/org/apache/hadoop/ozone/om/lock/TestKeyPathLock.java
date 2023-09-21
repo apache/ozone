@@ -92,7 +92,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
 
         testSameKeyPathWriteLockMultiThreadingUtil(iterations, lock, counter,
             countDownLatch, listTokens, sampleResourceName);
-      });
+      }, "Thread-" + i);
 
       threads[i].start();
     }
@@ -136,8 +136,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     // Now all threads have been instantiated.
     Assert.assertEquals(0, countDownLatch.getCount());
 
-    lock.acquireWriteHashedLock(resource,
-        generateResourceHashCode(resource, sampleResourceName));
+    lock.acquireWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
 
     /**
@@ -153,8 +152,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     //  Thread-2 -> 101 - 200 and so on.
     listTokens.add(counter.getCount());
 
-    lock.releaseWriteHashedLock(resource,
-        generateResourceHashCode(resource, sampleResourceName));
+    lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());
   }
 
@@ -187,8 +185,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
 
         testDiffKeyPathWriteLockMultiThreadingUtil(lock, countDown,
             sampleResourceName);
-      });
-
+      }, "Thread-" + i);
       threads[i].start();
     }
 
@@ -218,26 +215,15 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
       OzoneManagerLock lock, CountDownLatch countDown,
       String[] sampleResourceName) {
 
-    lock.acquireWriteHashedLock(resource,
-        generateResourceHashCode(resource, sampleResourceName));
+    lock.acquireWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
 
     // Waiting for all the threads to be instantiated/to reach
-    // acquireWriteHashedLock.
+    // acquireWriteLock.
     countDown.countDown();
-    while (countDown.getCount() > 0) {
-      try {
-        Thread.sleep(500);
-        LOG.info("countDown.getCount() -> " + countDown.getCount());
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-
     Assert.assertEquals(1, lock.getCurrentLocks().size());
 
-    lock.releaseWriteHashedLock(resource,
-        generateResourceHashCode(resource, sampleResourceName));
+    lock.releaseWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Released by " + Thread.currentThread().getName());
   }
 
@@ -255,8 +241,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     String[] resourceName = new String[]{volumeName, bucketName, keyName},
         higherResourceName = new String[]{volumeName, bucketName};
 
-    lock.acquireWriteHashedLock(resource,
-        generateResourceHashCode(resource, resourceName));
+    lock.acquireWriteLock(resource, resourceName);
     try {
       lock.acquireWriteLock(higherResource, higherResourceName);
       fail("testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() failed");
@@ -281,8 +266,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     String[] resourceName = new String[]{volumeName, bucketName, keyName},
         higherResourceName = new String[]{volumeName, bucketName};
 
-    lock.acquireReadHashedLock(resource,
-        generateResourceHashCode(resource, resourceName));
+    lock.acquireReadLock(resource, resourceName);
     try {
       lock.acquireWriteLock(higherResource, higherResourceName);
       fail("testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() failed");
@@ -307,8 +291,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     String[] resourceName = new String[]{volumeName, bucketName, keyName},
         higherResourceName = new String[]{volumeName, bucketName};
 
-    lock.acquireReadHashedLock(resource,
-        generateResourceHashCode(resource, resourceName));
+    lock.acquireReadLock(resource, resourceName);
     try {
       lock.acquireReadLock(higherResource, higherResourceName);
       fail("testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() failed");
@@ -333,8 +316,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     String[] resourceName = new String[]{volumeName, bucketName, keyName},
         higherResourceName = new String[]{volumeName, bucketName};
 
-    lock.acquireWriteHashedLock(resource,
-        generateResourceHashCode(resource, resourceName));
+    lock.acquireWriteLock(resource, resourceName);
     try {
       lock.acquireReadLock(higherResource, higherResourceName);
       fail("testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() failed");

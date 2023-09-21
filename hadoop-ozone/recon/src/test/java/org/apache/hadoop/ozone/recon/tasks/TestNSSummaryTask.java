@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,13 +36,12 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.Assert;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,11 +60,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
  * support for OBS buckets. Check that the NSSummary
  * for the OBS bucket is null.
  */
-@RunWith(Enclosed.class)
+@SuppressFBWarnings
 public final class TestNSSummaryTask {
-
-  @ClassRule
-  public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
@@ -107,16 +104,16 @@ public final class TestNSSummaryTask {
   private TestNSSummaryTask() {
   }
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    initializeNewOmMetadataManager(TEMPORARY_FOLDER.newFolder());
+  @BeforeAll
+  public static void setUp(@TempDir File tmpDir) throws Exception {
+    initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        TEMPORARY_FOLDER.newFolder());
+        new File(tmpDir, "recon"));
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMPORARY_FOLDER)
+        new ReconTestInjector.Builder(tmpDir)
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
@@ -138,14 +135,15 @@ public final class TestNSSummaryTask {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy reprocess.
    */
-  public static class TestReprocess {
+  @Nested
+  public class TestReprocess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
-    private static NSSummary nsSummaryForBucket3;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket3;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws Exception {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       NSSummary staleNSSummary = new NSSummary();
@@ -212,17 +210,18 @@ public final class TestNSSummaryTask {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy process.
    */
-  public static class TestProcess {
+  @Nested
+  public class TestProcess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
-    private static NSSummary nsSummaryForBucket3;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket3;
 
-    private static OMDBUpdateEvent keyEvent1;
-    private static OMDBUpdateEvent keyEvent2;
+    private OMDBUpdateEvent keyEvent1;
+    private OMDBUpdateEvent keyEvent2;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws IOException {
       nSSummaryTask.reprocess(reconOMMetadataManager);
       nSSummaryTask.process(processEventBatch());
 
@@ -237,7 +236,7 @@ public final class TestNSSummaryTask {
       Assert.assertNull(nsSummaryForBucket3);
     }
 
-    private static OMUpdateEventBatch processEventBatch() throws IOException {
+    private OMUpdateEventBatch processEventBatch() throws IOException {
       // put file5 under bucket 2
       String omPutKey =
           OM_KEY_PREFIX + VOL +

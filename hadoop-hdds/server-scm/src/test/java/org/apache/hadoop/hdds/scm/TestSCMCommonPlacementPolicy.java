@@ -506,7 +506,7 @@ public class TestSCMCommonPlacementPolicy {
     }
 
     @Override
-    protected int getRequiredRackCount(int numReplicas) {
+    protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
       return Math.min(numReplicas, rackCnt);
     }
   }

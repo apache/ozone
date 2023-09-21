@@ -503,6 +503,9 @@ enum Status {
     CONTAINS_SNAPSHOT = 88;
     SSL_CONNECTION_FAILURE = 89;
     RENAME_OPEN_FILE = 90;
+    UNAUTHORIZED = 91;
+
+    S3_SECRET_ALREADY_EXISTS = 92;
 }
 
 /**
@@ -1609,6 +1612,7 @@ message PartInfo {
 message EchoRPCRequest {
     optional bytes payloadReq = 1;
     optional int32 payloadSizeResp = 2;
+    optional bool readOnly = 3 [default = true];
 }
 
 /**
