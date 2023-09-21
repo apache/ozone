@@ -337,7 +337,26 @@ stop_docker_env(){
   copy_daemon_logs
   save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --ansi never down
+    down_repeats=3
+    result=0
+    for i in $(seq 1 $down_repeats)
+    do
+      docker-compose --ansi never down
+      result=$?
+      if [[ $result -eq 0 ]]
+      then
+        echo "Docker-compose down successful"
+        break
+      else
+        echo "Error while trying to shut down docker containers"
+        sleep 5
+      fi
+    done
+
+    if [[ $result -ne 0 ]]
+    then
+      echo "Couldn't remove all docker containers after $down_repeats repeats."
+    fi
   fi
 }
 
