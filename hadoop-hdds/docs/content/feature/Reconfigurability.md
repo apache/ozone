@@ -40,7 +40,7 @@ The meaning of command options:
 
 ## Retrieve the reconfigurable properties list
 To retrieve all the reconfigurable properties list for a specific component in Ozone,
-you can use the command: `ozone admin reconfig properties --address=<ip:port>`.
+you can use the command: `ozone admin reconfig --address=<ip:port> properties`.
 This command will list all the properties that can be dynamically reconfigured at runtime for specific component.<br>
 
 > For example, get the Ozone OM reconfigurable properties list.

@@ -59,6 +59,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKD
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
+
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
           .map(Enum::name)
@@ -334,5 +335,4 @@ public class OzoneConfiguration extends Configuration
             OZONE_CONTAINER_COPY_WORKDIR)
     });
   }
-
 }

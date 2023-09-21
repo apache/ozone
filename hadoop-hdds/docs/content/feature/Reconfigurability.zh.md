@@ -38,7 +38,7 @@ ozone admin reconfig --address=<ip:port> start|status|properties
     - **properties**: 列出支持动态加载的配置项
 
 ## 获取可动态加载的属性列表
-要获取 Ozone 中指定组件的可动态加载属性列表, 可以使用命令 `ozone admin reconfig properties --address=<ip:port>`。
+要获取 Ozone 中指定组件的可动态加载属性列表, 可以使用命令 `ozone admin reconfig --address=<ip:port> properties`。
 这个命令将会列出所有可以在运行时动态加载的属性。
 
 > 例如, 获取 Ozone OM 可动态加载属性列表
