@@ -420,37 +420,37 @@ public abstract class TestOzoneRpcClientAbstract {
             () -> store.getVolume(volumeName).getBucket(bucketName)
                 .setQuota(OzoneQuota.parseQuota("0GB", "10")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for space quota"));
+        .startsWith("Invalid value for space quota"));
 
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("10GB", "0")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for namespace quota"));
+        .startsWith("Invalid value for namespace quota"));
 
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("1GB", "-100")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for namespace quota"));
+        .startsWith("Invalid value for namespace quota"));
 
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("1TEST", "100")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for quota"));
+        .startsWith("1TEST is invalid."));
 
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("9223372036854775808 BYTES", "100")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for quota"));
+        .startsWith("9223372036854775808 BYTES is invalid."));
 
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).getBucket(bucketName).setQuota(
             OzoneQuota.parseQuota("-10GB", "100")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for space quota"));
+        .startsWith("Invalid value for space quota"));
 
   }
 
@@ -491,33 +491,33 @@ public abstract class TestOzoneRpcClientAbstract {
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "0GB", "10")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for space quota"));
+        .startsWith("Invalid value for space quota"));
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "10GB", "0")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for namespace quota"));
+        .startsWith("Invalid value for namespace quota"));
 
     // The unit should be legal.
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "1TEST", "1000")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for quota"));
+        .startsWith("1TEST is invalid."));
 
     // The setting value cannot be greater than LONG.MAX_VALUE BYTES.
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "9223372036854775808 B", "1000")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for quota"));
+        .startsWith("9223372036854775808 B is invalid."));
 
     // The value cannot be negative.
     exception = assertThrows(IllegalArgumentException.class,
         () -> store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
             "-10GB", "1000")));
     assertTrue(exception.getMessage()
-        .startsWith("Invalid values for space quota"));
+        .startsWith("Invalid value for space quota"));
   }
 
   @Test
