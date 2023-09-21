@@ -95,7 +95,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     return validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper, BucketLayout.DEFAULT);
+        omDoubleBufferHelper, getBucketLayout());
   }
 
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
