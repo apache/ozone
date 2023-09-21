@@ -19,10 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.UnhealthyTest;
-import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -45,35 +43,35 @@ public class TestOzoneFileInterfacesWithFSO extends TestOzoneFileInterfaces {
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testReplication() throws IOException {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testPathToKey() throws Exception {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testFileSystemInit() throws IOException {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("TODO:HDDS-2939")
   public void testDirectory() {
 
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("TODO:HDDS-2939")
   public void testOzFsReadWrite() {
 
   }
