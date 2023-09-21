@@ -26,6 +26,7 @@ ${BUCKET}                      generated
 ${KEY_NAME}                    key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
+${OZONE_S3_ADDRESS_STYLE}      path
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -85,6 +86,8 @@ Setup secure v4 headers
                         Execute                    aws configure set aws_access_key_id ${accessKey}
                         Execute                    aws configure set aws_secret_access_key ${secret}
                         Execute                    aws configure set region us-west-1
+                        Execute                    aws configure set default.s3.addressing_style ${OZONE_S3_ADDRESS_STYLE}
+
 
 Setup dummy credentials for S3
                         Execute                    aws configure set default.s3.signature_version s3v4
