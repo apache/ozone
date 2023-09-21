@@ -315,6 +315,9 @@ jobs:
           KEEP_IMAGE: false
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_VOLUME_OWNER: 1000
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -347,6 +350,9 @@ jobs:
           sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           popd
           ./hadoop-ozone/dev-support/checks/kubernetes.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
@@ -400,7 +406,7 @@ jobs:
         if: matrix.profile == 'flaky'
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
-        if: always()
+        if: ${{ !cancelled() }}
       - name: Archive build results
         uses: actions/upload-artifact@v3
         if: always()
