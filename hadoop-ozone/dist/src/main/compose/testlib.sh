@@ -216,7 +216,7 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" bash -c "jps | grep -v Jps")
+    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
   done
 }
 
@@ -278,7 +278,7 @@ save_container_logs() {
   local output_name=$(get_output_name)
   local c
   for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
-    docker logs "${c}" &>> "$RESULT_DIR/docker-${output_name}${c}.log"
+    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
   done
 }
 

@@ -82,4 +82,12 @@ public abstract class StatefulService implements SCMService {
     }
 
   }
+
+  /**
+   * Deletes the persisted configuration mapped to the specified serviceName.
+   * @throws IOException on failure
+   */
+  protected final void deleteConfiguration() throws IOException {
+    stateManager.deleteConfiguration(getServiceName());
+  }
 }

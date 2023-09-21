@@ -139,15 +139,15 @@ public final class DiskCheckUtil {
         fos.getFD().sync();
       } catch (FileNotFoundException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s for " +
-            "volume check.", testFile), notFoundEx);
+            "volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
       } catch (SyncFailedException syncEx) {
         logError(storageDir, String.format("Could sync file %s to disk.",
-            testFile), syncEx);
+            testFile.getAbsolutePath()), syncEx);
         return false;
       } catch (IOException ioEx) {
         logError(storageDir, String.format("Could not write file %s " +
-            "for volume check.", testFile), ioEx);
+            "for volume check.", testFile.getAbsolutePath()), ioEx);
         return false;
       }
 
@@ -157,17 +157,17 @@ public final class DiskCheckUtil {
         int numBytesRead = fis.read(readBytes);
         if (numBytesRead != numBytesToWrite) {
           logError(storageDir, String.format("%d bytes written to file %s " +
-                  "but %d bytes were read back.", numBytesToWrite, testFile,
-              numBytesRead));
+                  "but %d bytes were read back.", numBytesToWrite,
+              testFile.getAbsolutePath(), numBytesRead));
           return false;
         }
       } catch (FileNotFoundException notFoundEx) {
         logError(storageDir, String.format("Could not find file %s " +
-            "for volume check.", testFile), notFoundEx);
+            "for volume check.", testFile.getAbsolutePath()), notFoundEx);
         return false;
       } catch (IOException ioEx) {
         logError(storageDir, String.format("Could not read file %s " +
-            "for volume check.", testFile), ioEx);
+            "for volume check.", testFile.getAbsolutePath()), ioEx);
         return false;
       }
 
@@ -175,14 +175,14 @@ public final class DiskCheckUtil {
       if (!Arrays.equals(writtenBytes, readBytes)) {
         logError(storageDir, String.format("%d Bytes read from file " +
                 "%s do not match the %d bytes that were written.",
-            writtenBytes.length, testFile, readBytes.length));
+            writtenBytes.length, testFile.getAbsolutePath(), readBytes.length));
         return false;
       }
 
       // Delete the file.
       if (!testFile.delete()) {
         logError(storageDir, String.format("Could not delete file %s " +
-            "for volume check.", testFile));
+            "for volume check.", testFile.getAbsolutePath()));
         return false;
       }
 

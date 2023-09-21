@@ -67,6 +67,11 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
+        .setSstFiltered(false)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
         .build();
   }
 
@@ -85,6 +90,11 @@ public class TestOmSnapshotInfo {
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
         .setDeepClean(true)
+        .setSstFiltered(false)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
         .build();
   }
 
@@ -116,6 +126,19 @@ public class TestOmSnapshotInfo {
         snapshotInfoEntryActual.getSnapshotStatus());
     Assert.assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
         snapshotInfoEntryActual.getDbTxSequenceNumber());
+    Assert.assertEquals(snapshotInfoEntryExpected.getDeepClean(),
+        snapshotInfoEntryActual.getDeepClean());
+    Assert.assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
+        snapshotInfoEntryActual.getSstFiltered());
+    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
+        snapshotInfoEntryActual.getReferencedSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getReferencedReplicatedSize(),
+        snapshotInfoEntryActual.getReferencedReplicatedSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveSize(),
+        snapshotInfoEntryActual.getExclusiveSize());
+    Assert.assertEquals(snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
+        snapshotInfoEntryActual.getExclusiveReplicatedSize());
+
     Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
@@ -137,6 +160,21 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getBucketName());
     Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
+    Assert.assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
+        snapshotInfoActual.getDbTxSequenceNumber());
+    Assert.assertEquals(snapshotInfoExpected.getDeepClean(),
+        snapshotInfoActual.getDeepClean());
+    Assert.assertEquals(snapshotInfoExpected.isSstFiltered(),
+        snapshotInfoActual.isSstFiltered());
+    Assert.assertEquals(snapshotInfoExpected.getReferencedSize(),
+        snapshotInfoActual.getReferencedSize());
+    Assert.assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),
+        snapshotInfoActual.getReferencedReplicatedSize());
+    Assert.assertEquals(snapshotInfoExpected.getExclusiveSize(),
+        snapshotInfoActual.getExclusiveSize());
+    Assert.assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
+        snapshotInfoActual.getExclusiveReplicatedSize());
+
     Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 

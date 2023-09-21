@@ -89,7 +89,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                    Time.now(), true);
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
@@ -177,7 +177,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-            Time.now());
+            Time.now(), true);
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
@@ -253,7 +253,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE,
             parentID + 8,
-            parentID, 8, Time.now());
+            parentID, 8, Time.now(), true);
     RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey);
     String ozoneKey = omMetadataManager
             .getOzoneKey(prevKey.getVolumeName(),
@@ -316,7 +316,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
                     HddsProtos.ReplicationType.RATIS,
                     HddsProtos.ReplicationFactor.ONE,
                     parentID + 9,
-                    parentID, 100, Time.now());
+                    parentID, 100, Time.now(), true);
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     unUsedParts.add(omKeyInfo);
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =

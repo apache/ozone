@@ -45,11 +45,12 @@ import org.apache.commons.io.FileUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Assertions;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -214,7 +215,7 @@ public class TestChunkUtils {
   }
 
   @Test
-  public void readMissingFile() throws Exception {
+  public void readMissingFile() {
     // given
     int len = 123;
     int offset = 0;
@@ -222,7 +223,7 @@ public class TestChunkUtils {
     ByteBuffer[] bufs = BufferUtils.assignByteBuffers(len, len);
 
     // when
-    StorageContainerException e = LambdaTestUtils.intercept(
+    StorageContainerException e = assertThrows(
         StorageContainerException.class,
         () -> ChunkUtils.readData(nonExistentFile, bufs, offset, len, null));
 

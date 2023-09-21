@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.io.File;
 import java.util.List;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +34,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -49,10 +47,10 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
@@ -73,16 +71,16 @@ public class TestPipelinePlacementFactory {
   private NetworkTopologyImpl cluster;
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
-  private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
 
   private static final long STORAGE_CAPACITY = 100L;
 
   @BeforeEach
-  public void setup() {
+  public void setup(@TempDir File testDir) {
     //initialize ozone config for tests
     conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
   }
 
   private void setupRacks(int datanodeCount, int nodesPerRack,
@@ -133,9 +131,6 @@ public class TestPipelinePlacementFactory {
           .thenReturn(dn);
     }
 
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);

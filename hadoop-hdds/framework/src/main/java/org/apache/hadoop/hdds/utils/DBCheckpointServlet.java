@@ -21,9 +21,12 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +40,7 @@ import org.apache.commons.fileupload.FileItemIterator;
 import org.apache.commons.fileupload.FileItemStream;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.fileupload.util.Streams;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -72,6 +76,7 @@ public class DBCheckpointServlet extends HttpServlet
   private boolean isSpnegoEnabled;
   private transient OzoneAdmins admins;
   private transient BootstrapStateHandler.Lock lock;
+  private transient File bootstrapTempData;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
                          boolean omAclEnabled,
@@ -85,12 +90,29 @@ public class DBCheckpointServlet extends HttpServlet
     if (dbStore == null) {
       LOG.error(
           "Unable to set metadata snapshot request. DB Store is null");
+      throw new ServletException("DB Store is null");
     }
 
     this.aclEnabled = omAclEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
     lock = new Lock();
+
+    // Create a directory for temp bootstrap data
+    File dbLocation = dbStore.getDbLocation();
+    if (dbLocation == null) {
+      throw new NullPointerException("dblocation null");
+    }
+    String tempData = dbLocation.getParent();
+    if (tempData == null) {
+      throw new NullPointerException("tempData dir is null");
+    }
+    bootstrapTempData = Paths.get(tempData,
+        "temp-bootstrap-data").toFile();
+    if (!bootstrapTempData.exists() &&
+        !bootstrapTempData.mkdirs()) {
+      throw new ServletException("Failed to make:" + bootstrapTempData);
+    }
   }
 
   private boolean hasPermission(UserGroupInformation user) {
@@ -171,13 +193,11 @@ public class DBCheckpointServlet extends HttpServlet
       LOG.info("Received excluding SST {}", receivedSstList);
     }
 
+    Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
-      if (dbStore.getRocksDBCheckpointDiffer() != null) {
-        dbStore.getRocksDBCheckpointDiffer().incrementTarballRequestCount();
-      }
-
-      checkpoint = dbStore.getCheckpoint(flush);
-
+      tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
+          "bootstrap-data-");
+      checkpoint = getCheckpoint(tmpdir, flush);
       if (checkpoint == null || checkpoint.getCheckpointLocation() == null) {
         LOG.error("Unable to process metadata snapshot request. " +
             "Checkpoint request returned null.");
@@ -198,7 +218,7 @@ public class DBCheckpointServlet extends HttpServlet
 
       Instant start = Instant.now();
       writeDbDataToStream(checkpoint, request,
-          response.getOutputStream(), receivedSstList, excludedSstList);
+          response.getOutputStream(), receivedSstList, excludedSstList, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -220,11 +240,12 @@ public class DBCheckpointServlet extends HttpServlet
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       dbMetrics.incNumCheckpointFails();
     } finally {
-      if (dbStore.getRocksDBCheckpointDiffer() != null) {
-        synchronized (dbStore.getRocksDBCheckpointDiffer()) {
-          dbStore.getRocksDBCheckpointDiffer().decrementTarballRequestCount();
-          dbStore.getRocksDBCheckpointDiffer().notifyAll();
+      try {
+        if (tmpdir != null) {
+          FileUtils.deleteDirectory(tmpdir.toFile());
         }
+      } catch (IOException e) {
+        LOG.error("unable to delete: " + tmpdir);
       }
 
       if (checkpoint != null) {
@@ -236,6 +257,11 @@ public class DBCheckpointServlet extends HttpServlet
         }
       }
     }
+  }
+
+  public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
+      throws IOException {
+    return dbStore.getCheckpoint(flush);
   }
 
   /**
@@ -310,13 +336,17 @@ public class DBCheckpointServlet extends HttpServlet
       HttpServletRequest ignoredRequest,
       OutputStream destination,
       List<String> toExcludeList,
-      List<String> excludedList)
+      List<String> excludedList, Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
     Objects.requireNonNull(excludedList);
 
     writeDBCheckpointToStream(checkpoint, destination,
         toExcludeList, excludedList);
+  }
+
+  public DBStore getDbStore() {
+    return dbStore;
   }
 
   @Override

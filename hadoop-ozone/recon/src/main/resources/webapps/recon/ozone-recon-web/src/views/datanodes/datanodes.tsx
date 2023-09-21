@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import {Table, Icon, Tooltip} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
@@ -37,6 +36,7 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -303,6 +303,8 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+let cancelSignal: AbortController;
+
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
 
@@ -320,7 +322,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   }
 
   _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const selectedColumns = (selected as IOption[]);
+    const selectedColumns = (selected == null ? [] : selected as IOption[]);
     this.setState({
       selectedColumns
     });
@@ -339,7 +341,10 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-    axios.get('/api/v1/datanodes').then(response => {
+    
+    const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
+    cancelSignal = controller;
+    request.then(response => {
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
@@ -387,6 +392,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelSignal && cancelSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {

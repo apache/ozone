@@ -341,15 +341,16 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
   }
 
   @Test
-  public void testSettingQuotaWithEncryption() throws Exception {
+  public void testSettingQuotaWithEncryptionAndOwner() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
     OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
-                    .setKeyName(TEST_KEY).build());
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setOwner("testUser")
+        .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
+            .setKeyName(TEST_KEY).build());
 
     OMRequestTestUtils.addVolumeToDB(
             volumeName, omMetadataManager);
@@ -378,6 +379,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             dbBucketInfo.getQuotaInBytes());
     Assert.assertEquals(1000L,
             dbBucketInfo.getQuotaInNamespace());
+    Assert.assertEquals("testUser",
+        dbBucketInfo.getOwner());
   }
 
   @Test

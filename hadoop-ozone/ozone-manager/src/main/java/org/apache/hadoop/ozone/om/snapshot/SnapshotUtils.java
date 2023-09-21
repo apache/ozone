@@ -36,6 +36,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
 /**
  * Util class for snapshot diff APIs.
@@ -93,7 +94,7 @@ public final class SnapshotUtils {
   }
 
   /**
-   * Throws OMException FILE_NOT_FOUND if snapshot directory does not exist.
+   * Throws OMException TIMEOUT if snapshot directory does not exist.
    * @param checkpoint Snapshot checkpoint directory
    */
   public static void checkSnapshotDirExist(File checkpoint)
@@ -101,7 +102,8 @@ public final class SnapshotUtils {
     if (!checkpoint.exists()) {
       throw new OMException("Unable to load snapshot. " +
           "Snapshot checkpoint directory '" + checkpoint.getAbsolutePath() +
-          "' does not exists.", FILE_NOT_FOUND);
+          "' does not exist yet. Please wait a few more seconds before " +
+          "retrying", TIMEOUT);
     }
   }
 

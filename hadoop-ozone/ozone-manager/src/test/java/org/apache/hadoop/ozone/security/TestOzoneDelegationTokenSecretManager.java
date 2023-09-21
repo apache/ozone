@@ -53,11 +53,13 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -273,10 +275,11 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER, TEST_USER);
-    LambdaTestUtils.intercept(AccessControlException.class,
-        "rougeUser tries to renew a token", () -> {
-          secretManager.renewToken(token, "rougeUser");
-        });
+    AccessControlException exception =
+        assertThrows(AccessControlException.class,
+            () -> secretManager.renewToken(token, "rougeUser"));
+    assertTrue(exception.getMessage()
+        .startsWith("rougeUser tries to renew a token"));
   }
 
   /**
@@ -291,10 +294,12 @@ public class TestOzoneDelegationTokenSecretManager {
         TEST_USER,
         TEST_USER);
     Thread.sleep(101);
-    LambdaTestUtils.intercept(IOException.class,
-        "testUser tried to renew an expired token", () -> {
-          secretManager.renewToken(token, TEST_USER.toString());
-        });
+
+    IOException ioException =
+        assertThrows(IOException.class,
+            () -> secretManager.renewToken(token, TEST_USER.toString()));
+    assertTrue(ioException.getMessage()
+        .startsWith("testUser tried to renew an expired token"));
   }
 
   /**
@@ -309,9 +314,11 @@ public class TestOzoneDelegationTokenSecretManager {
         TEST_USER,
         TEST_USER);
     Thread.sleep(15);
-    LambdaTestUtils.intercept(IOException.class, "is expired", () -> {
-      secretManager.renewToken(token, TEST_USER.toString());
-    });
+
+    IOException ioException =
+        assertThrows(IOException.class,
+            () -> secretManager.renewToken(token, TEST_USER.toString()));
+    assertTrue(ioException.getMessage().contains("is expired"));
   }
 
   @Test
@@ -321,9 +328,9 @@ public class TestOzoneDelegationTokenSecretManager {
     secretManager.start(certificateClient);
     OzoneTokenIdentifier identifier = secretManager.createIdentifier();
     // Check basic details.
-    Assert.assertTrue(identifier.getOwner().equals(new Text("")));
-    Assert.assertTrue(identifier.getRealUser().equals(new Text("")));
-    Assert.assertTrue(identifier.getRenewer().equals(new Text("")));
+    assertEquals(identifier.getOwner(), new Text(""));
+    assertEquals(identifier.getRealUser(), new Text(""));
+    assertEquals(identifier.getRenewer(), new Text(""));
   }
 
   @Test
@@ -344,10 +351,12 @@ public class TestOzoneDelegationTokenSecretManager {
     Token<OzoneTokenIdentifier> token = secretManager.createToken(TEST_USER,
         TEST_USER,
         TEST_USER);
-    LambdaTestUtils.intercept(AccessControlException.class,
-        "rougeUser is not authorized to cancel the token", () -> {
-          secretManager.cancelToken(token, "rougeUser");
-        });
+
+    AccessControlException exception =
+        assertThrows(AccessControlException.class,
+            () -> secretManager.cancelToken(token, "rougeUser"));
+    assertTrue(exception.getMessage()
+        .startsWith("rougeUser is not authorized to cancel the token"));
   }
 
   @Test
@@ -413,9 +422,11 @@ public class TestOzoneDelegationTokenSecretManager {
     identifier.setAwsAccessId("testuser2");
     identifier.setOwner(new Text("testuser2"));
     // Case 1: User don't have aws secret set.
-    LambdaTestUtils.intercept(SecretManager.InvalidToken.class, " No S3 " +
-            "secret found for S3 identifier",
-        () -> secretManager.retrievePassword(identifier));
+    SecretManager.InvalidToken invalidToken =
+        assertThrows(SecretManager.InvalidToken.class,
+            () -> secretManager.retrievePassword(identifier));
+    assertTrue(invalidToken.getMessage()
+        .startsWith("No S3 secret found for S3 identifier"));
 
     // Case 2: Invalid hash in string to sign.
     identifier.setStrToSign("AWS4-HMAC-SHA256\n" +
@@ -423,9 +434,11 @@ public class TestOzoneDelegationTokenSecretManager {
         "20190221/us-west-1/s3/aws4_request\n" +
         "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d91851294efc47d" +
         "+invalidhash");
-    LambdaTestUtils.intercept(SecretManager.InvalidToken.class, " No S3 " +
-            "secret found for S3 identifier",
+
+    invalidToken = assertThrows(SecretManager.InvalidToken.class,
         () -> secretManager.retrievePassword(identifier));
+    assertTrue(invalidToken.getMessage()
+        .startsWith("No S3 secret found for S3 identifier"));
 
     // Case 3: Invalid hash in authorization hmac.
     identifier.setSignature("56ec73ba1974f8feda8365c3caef89c5d4a688d" +
@@ -434,9 +447,11 @@ public class TestOzoneDelegationTokenSecretManager {
         "20190221T002037Z\n" +
         "20190221/us-west-1/s3/aws4_request\n" +
         "c297c080cce4e0927779823d3fd1f5cae71481a8f7dfc7e18d91851294efc47d");
-    LambdaTestUtils.intercept(SecretManager.InvalidToken.class, " No S3 " +
-            "secret found for S3 identifier",
+
+    invalidToken = assertThrows(SecretManager.InvalidToken.class,
         () -> secretManager.retrievePassword(identifier));
+    assertTrue(invalidToken.getMessage()
+        .startsWith("No S3 secret found for S3 identifier"));
   }
 
   /**

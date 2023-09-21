@@ -90,8 +90,8 @@ public class DatanodeDetails extends NodeImpl implements
   private long setupTime;
   private String revision;
   private String buildDate;
-  private HddsProtos.NodeOperationalState persistedOpState;
-  private long persistedOpStateExpiryEpochSec = 0;
+  private volatile HddsProtos.NodeOperationalState persistedOpState;
+  private volatile long persistedOpStateExpiryEpochSec = 0;
   private int initialVersion;
   private int currentVersion;
 

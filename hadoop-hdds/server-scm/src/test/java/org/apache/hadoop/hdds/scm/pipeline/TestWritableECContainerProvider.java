@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.runners.Parameterized;
@@ -59,7 +59,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
@@ -67,6 +66,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
@@ -100,15 +100,13 @@ public class TestWritableECContainerProvider {
   }
 
   @BeforeEach
-  public void setup() throws IOException {
+  void setup(@TempDir File testDir) throws IOException {
     repConfig = new ECReplicationConfig(3, 2);
     conf = new OzoneConfiguration();
 
     providerConf = conf.getObject(WritableECContainerProviderConfig.class);
 
     containers = new HashMap<>();
-    File testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -237,6 +235,8 @@ public class TestWritableECContainerProvider {
   @MethodSource("policies")
   public void testNewPipelineNotCreatedIfAllPipelinesExcluded(
       PipelineChoosePolicy policy) throws IOException {
+    final int nodeCount = nodeManager.getNodeCount(null, null);
+    providerConf.setMinimumPipelines(nodeCount);
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -244,8 +244,7 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude all the associated
-    // containers.
+    // We have the min limit of pipelines, but then exclude them all
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addPipeline(c.getPipelineID());
@@ -256,8 +255,30 @@ public class TestWritableECContainerProvider {
 
   @ParameterizedTest
   @MethodSource("policies")
+  void newPipelineCreatedIfSoftLimitReached(PipelineChoosePolicy policy)
+      throws IOException {
+
+    providerConf.setMinimumPipelines(1);
+    provider = createSubject(policy);
+    ContainerInfo container = provider.getContainer(
+        1, repConfig, OWNER, new ExcludeList());
+
+    ExcludeList exclude = new ExcludeList();
+    exclude.addPipeline(container.getPipelineID());
+    exclude.addDatanode(
+        pipelineManager.getPipeline(container.getPipelineID()).getFirstNode());
+
+    ContainerInfo newContainer = provider.getContainer(
+        1, repConfig, OWNER, exclude);
+    assertNotSame(container, newContainer);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
   public void testNewPipelineNotCreatedIfAllContainersExcluded(
       PipelineChoosePolicy policy) throws IOException {
+    final int nodeCount = nodeManager.getNodeCount(null, null);
+    providerConf.setMinimumPipelines(nodeCount);
     provider = createSubject(policy);
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < providerConf.getMinimumPipelines(); i++) {
@@ -265,7 +286,8 @@ public class TestWritableECContainerProvider {
           1, repConfig, OWNER, new ExcludeList());
       allocatedContainers.add(container);
     }
-    // We have the min limit of pipelines, but then exclude them all
+    // We have the min limit of pipelines, but then exclude all the associated
+    // containers.
     ExcludeList exclude = new ExcludeList();
     for (ContainerInfo c : allocatedContainers) {
       exclude.addConatinerId(c.containerID());
@@ -447,6 +469,43 @@ public class TestWritableECContainerProvider {
         1, repConfig, OWNER, new ExcludeList());
     assertFalse(allocatedContainers.contains(newContainer));
     for (ContainerInfo c : allocatedContainers) {
+      Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
+      assertEquals(CLOSED, pipeline.getPipelineState());
+    }
+  }
+
+  /**
+   * Suppose there's a closed container but its pipeline is still open. This
+   * pipeline is also present in the excludeList. Such a pipeline should not
+   * be included in the count of open pipelines and should be closed.
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-9142">...</a>
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testExcludedOpenPipelineWithClosedContainerIsClosed(
+      PipelineChoosePolicy policy) throws IOException {
+    int nodeCount = nodeManager.getNodeCount(
+        org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy());
+    providerConf.setMinimumPipelines(nodeCount);
+    provider = createSubject(policy);
+    Set<ContainerInfo> allocated = assertDistinctContainers(nodeCount);
+    assertEquals(nodeCount, allocated.size());
+
+    ExcludeList excludeList = new ExcludeList();
+    // close all of these containers
+    for (ContainerInfo container : allocated) {
+      // Remove the container from the pipeline to simulate closing the
+      // container
+      pipelineManager.removeContainerFromPipeline(
+          container.getPipelineID(), container.containerID());
+      excludeList.addPipeline(container.getPipelineID());
+    }
+
+    // expecting a new container to be created
+    ContainerInfo containerInfo = provider.getContainer(1, repConfig, OWNER,
+        excludeList);
+    assertFalse(allocated.contains(containerInfo));
+    for (ContainerInfo c : allocated) {
       Pipeline pipeline = pipelineManager.getPipeline(c.getPipelineID());
       assertEquals(CLOSED, pipeline.getPipelineState());
     }

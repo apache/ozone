@@ -83,7 +83,6 @@ import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -669,7 +668,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Disabled("HDDS-5098")
   public void testScmDetectStaleAndDeadNode()
       throws IOException, InterruptedException, AuthenticationException {
     final int interval = 100;
@@ -721,13 +719,13 @@ public class TestSCMNodeManager {
           "Expected to find 1 stale node");
       assertEquals(staleNode.getUuid(), staleNodeList.get(0).getUuid(),
           "Stale node is not the expected ID");
-      Thread.sleep(1000);
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(1,
           nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
               .get(HddsProtos.NodeState.STALE.name()).intValue());
 
+      Thread.sleep(1000);
       // heartbeat good nodes again.
       for (DatanodeDetails dn : nodeList) {
         nodeManager.processHeartbeat(dn, layoutInfo);

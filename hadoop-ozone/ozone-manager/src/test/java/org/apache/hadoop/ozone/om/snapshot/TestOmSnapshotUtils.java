@@ -18,15 +18,21 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
@@ -78,4 +84,42 @@ public class TestOmSnapshotUtils {
     assertEquals(tree1Files, tree2Files);
     GenericTestUtils.deleteDirectory(tempDir);
   }
+
+
+  private static Stream<Arguments> testCasesForIgnoreSnapshotGc() {
+    SnapshotInfo filteredSnapshot =
+        SnapshotInfo.newBuilder().setSstFiltered(true).setName("snap1").build();
+    SnapshotInfo unFilteredSnapshot =
+        SnapshotInfo.newBuilder().setSstFiltered(false).setName("snap1")
+            .build();
+    // {IsSnapshotFiltered,isSnapshotDeleted,IsSstServiceEnabled = ShouldIgnore}
+    return Stream.of(Arguments.of(filteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, false),
+        Arguments.of(filteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
+        Arguments.of(unFilteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, true),
+        Arguments.of(unFilteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
+        Arguments.of(filteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
+        Arguments.of(unFilteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
+        Arguments.of(unFilteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true),
+        Arguments.of(filteredSnapshot,
+            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true));
+  }
+
+  @ParameterizedTest
+  @MethodSource("testCasesForIgnoreSnapshotGc")
+  public void testProcessSnapshotLogicInSDS(SnapshotInfo snapshotInfo,
+      SnapshotInfo.SnapshotStatus status, boolean isSstFilteringSvcEnabled,
+      boolean expectedOutcome) {
+    snapshotInfo.setSnapshotStatus(status);
+    assertEquals(expectedOutcome,
+        SnapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo,
+            isSstFilteringSvcEnabled));
+  }
+
 }

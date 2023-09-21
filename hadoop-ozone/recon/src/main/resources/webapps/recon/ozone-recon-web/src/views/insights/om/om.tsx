@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import { Table, Tabs, Menu, Dropdown, Icon, Tooltip } from 'antd';
 import { PaginationConfig } from 'antd/lib/pagination';
 import filesize from 'filesize';
@@ -26,6 +25,7 @@ import { showDataFetchError, byteToSize } from 'utils/common';
 import './om.less';
 import { ColumnSearch } from 'utils/columnSearch';
 import { Link } from 'react-router-dom';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 
 const size = filesize.partial({ standard: 'iec' });
@@ -308,6 +308,12 @@ interface IOmdbInsightsState {
   prevClickable :boolean
 }
 
+let cancelMismatchedEndpointSignal: AbortController;
+let cancelOpenKeysSignal: AbortController;
+let cancelDeletePendingSignal: AbortController;
+let cancelDeletedKeysSignal: AbortController;
+let cancelRowExpandSignal: AbortController;
+
 export class Om extends React.Component<Record<string, object>, IOmdbInsightsState> {
 
   constructor(props = {}) {
@@ -448,14 +454,34 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, this.state.prevKeyMismatch, this.state.mismatchMissingState);
   };
 
+  componentWillUnmount(): void {
+    cancelMismatchedEndpointSignal && cancelMismatchedEndpointSignal.abort();
+    cancelOpenKeysSignal && cancelOpenKeysSignal.abort();
+    cancelDeletePendingSignal && cancelDeletePendingSignal.abort();
+    cancelDeletedKeysSignal && cancelDeletedKeysSignal.abort();
+    cancelRowExpandSignal && cancelRowExpandSignal.abort();
+  }
+
   fetchMismatchContainers = (limit: number, prevKeyMismatch: number, mismatchMissingState: any) => {
     this.setState({
       loading: true,
       clickable: true,
       prevClickable: true
     });
+
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ]);
+
     const mismatchEndpoint = `/api/v1/containers/mismatch?limit=${limit}&prevKey=${prevKeyMismatch}&missingIn=${mismatchMissingState}`
-    axios.get(mismatchEndpoint).then(mismatchContainersResponse => {
+    const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
+    cancelMismatchedEndpointSignal = controller;
+    request.then(mismatchContainersResponse => {
       const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
       if (mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.lastKey === null) {
         //No Further Records may be last record
@@ -497,6 +523,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       prevClickable:true
     });
 
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ]);
+
     let openKeysEndpoint;
     if (prevKeyOpen === "") {
       openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${limit}&prevKey`;
@@ -505,7 +540,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       openKeysEndpoint = `/api/v1/keys/open?includeFso=${includeFso}&includeNonFso=${includeNonFso}&limit=${limit}&prevKey=${prevKeyOpen}`;
     }
 
-    axios.get(openKeysEndpoint).then(openKeysResponse => {
+    const { request, controller } = AxiosGetHelper(openKeysEndpoint, cancelOpenKeysSignal)
+    cancelOpenKeysSignal = controller
+    request.then(openKeysResponse => {
       const openKeys = openKeysResponse && openKeysResponse.data;
       let allopenKeysResponse: any[] = [];
       for (let key in openKeys) {
@@ -553,6 +590,16 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       clickable: true,
       prevClickable :true
     });
+
+     //Cancel any previous pending request
+     cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ]);
+
     keysPendingExpanded =[];
     let deletePendingKeysEndpoint;
     if (prevKeyDeletePending === "" || prevKeyDeletePending === undefined ) {
@@ -561,7 +608,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     else {
       deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${limit}&prevKey=${prevKeyDeletePending}`;
     }
-    axios.get(deletePendingKeysEndpoint).then(deletePendingKeysResponse => {
+
+    const { request, controller } = AxiosGetHelper(deletePendingKeysEndpoint, cancelDeletePendingSignal);
+    cancelDeletePendingSignal = controller;
+
+    request.then(deletePendingKeysResponse => {
       const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
       //Use Summation Logic iterate through all object and find sum of all datasize
       let deletedKeyInfoData = [];
@@ -666,8 +717,20 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       clickable: true,
       prevClickable: true
     });
+
+    //Cancel any previous pending request
+    cancelRequests([
+      cancelMismatchedEndpointSignal,
+      cancelOpenKeysSignal,
+      cancelDeletePendingSignal,
+      cancelDeletedKeysSignal,
+      cancelRowExpandSignal
+    ]);
+
     const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${limit}&prevKey=${prevKeyDeleted}`;
-    axios.get(deletedKeysEndpoint).then(deletedKeysResponse => {
+    const { request, controller } = AxiosGetHelper(deletedKeysEndpoint, cancelDeletedKeysSignal);
+    cancelDeletedKeysSignal = controller 
+    request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
       deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
       if (deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.lastKey === null) {
@@ -704,7 +767,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   changeTab = (activeKey: any) => {
-    //when changing tab make empty all datasets and prevkey and deafult filtering to intial values
+    //when changing tab make empty all datasets and prevkey and deafult filtering to intial values also cancel all pending requests
     mismatchPrevKeyList = [0];
     openPrevKeyList =[""];
     keysPendingPrevList =[""];
@@ -845,7 +908,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
         };
       });
-      axios.get(`/api/v1/containers/${record.containerId}/keys`).then(response => {
+
+      const { request, controller } = AxiosGetHelper(`/api/v1/containers/${record.containerId}/keys`, cancelRowExpandSignal);
+      cancelRowExpandSignal = controller;
+
+      request.then(response => {
         const containerKeysResponse: IContainerKeysResponse = response.data;
         this.setState(({ expandedRowData }) => {
           const expandedRowState: IExpandedRowState =
@@ -864,8 +931,17 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        showDataFetchError(error.toString());
+        if (error.name === "CanceledError") {
+          showDataFetchError(cancelRowExpandSignal.signal.reason)
+        }
+        else {
+          console.log(error);
+          showDataFetchError(error.toString());
+        }
       });
+    }
+    else {
+      cancelRowExpandSignal && cancelRowExpandSignal.abort()
     }
   };
 

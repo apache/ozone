@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -97,6 +98,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
@@ -186,7 +189,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |-------------------------------------------------------------------------|
    * |  Column Family        |        VALUE                                    |
    * |-------------------------------------------------------------------------|
-   * |  snapshotInfoTable    | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
    * |-------------------------------------------------------------------------|
    * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
    * |                       |  1. /volumeId/bucketId/parentId/dirName         |
@@ -377,13 +380,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
       File metaDir = new File(snapshotDir);
       String dbName = OM_DB_NAME + snapshotDirName;
+      Duration maxPollDuration =
+          Duration.ofMillis(conf.getTimeDuration(
+              OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT,
+              OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT,
+              TimeUnit.MILLISECONDS));
       // The check is only to prevent every snapshot read to perform a disk IO
       // and check if a checkpoint dir exists. If entry is present in cache,
       // it is most likely DB entries will get flushed in this wait time.
       if (isSnapshotInCache) {
         File checkpoint =
             Paths.get(metaDir.toPath().toString(), dbName).toFile();
-        RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint);
+        RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint,
+            maxPollDuration);
         // Check if the snapshot directory exists.
         checkSnapshotDirExist(checkpoint);
       }
@@ -719,6 +728,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String.class, OmDBTenantState.class);
     checkTableStatus(tenantStateTable, TENANT_STATE_TABLE, addCacheMetrics);
 
+    // TODO: [SNAPSHOT] Consider FULL_CACHE for snapshotInfoTable since
+    //  exclusiveSize in SnapshotInfo can be frequently updated.
     // path -> snapshotInfo (snapshot info for snapshot)
     snapshotInfoTable = this.store.getTable(SNAPSHOT_INFO_TABLE,
         String.class, SnapshotInfo.class);
@@ -1346,7 +1357,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
              snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue< String, SnapshotInfo> snapshotinfo;
+      KeyValue<String, SnapshotInfo> snapshotinfo;
       snapshotIter.seek(previous);
       while (snapshotIter.hasNext() && count < maxListResult) {
         snapshotinfo = snapshotIter.next();

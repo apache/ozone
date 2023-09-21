@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
@@ -122,6 +123,7 @@ public class DatanodeStateMachine implements Closeable {
   private final MeasuredReplicator pullReplicatorWithMetrics;
   private final MeasuredReplicator pushReplicatorWithMetrics;
   private final ReplicationSupervisorMetrics replicationSupervisorMetrics;
+  private final NettyMetrics nettyMetrics;
   private final ECReconstructionMetrics ecReconstructionMetrics;
   // This is an instance variable as mockito needs to access it in a test
   @SuppressWarnings("FieldCanBeLocal")
@@ -257,6 +259,7 @@ public class DatanodeStateMachine implements Closeable {
         .build();
 
     queueMetrics = DatanodeQueueMetrics.create(this);
+    nettyMetrics = NettyMetrics.create();
   }
 
   @VisibleForTesting
@@ -434,6 +437,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (queueMetrics != null) {
       DatanodeQueueMetrics.unRegister();
+    }
+
+    if (nettyMetrics != null) {
+      nettyMetrics.unregister();
     }
   }
 

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -58,7 +59,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
@@ -102,6 +102,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -154,7 +155,7 @@ public class TestOzoneFileSystem {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public Timeout timeout = Timeout.seconds(600);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -181,6 +182,7 @@ public class TestOzoneFileSystem {
 
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     if (!bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
       conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
           enabledFileSystemPaths);
@@ -225,11 +227,9 @@ public class TestOzoneFileSystem {
   @After
   public void cleanup() {
     try {
-      FileStatus[] fileStatuses = fs.listStatus(ROOT);
-      for (FileStatus fileStatus : fileStatuses) {
-        fs.delete(fileStatus.getPath(), true);
-      }
-    } catch (IOException ex) {
+      deleteRootDir();
+    } catch (IOException | InterruptedException ex) {
+      LOG.error("Failed to cleanup files.", ex);
       fail("Failed to cleanup files.");
     }
   }
@@ -390,13 +390,11 @@ public class TestOzoneFileSystem {
     checkInvalidPath(file1);
   }
 
-  private void checkInvalidPath(Path path) throws Exception {
-    try {
-      LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
-          () -> fs.create(path, false));
-    } catch (AssertionError e) {
-      fail("testCreateWithInvalidPaths failed for path" + path);
-    }
+  private void checkInvalidPath(Path path) {
+    InvalidPathException pathException = assertThrows(
+        InvalidPathException.class, () -> fs.create(path, false)
+    );
+    assertTrue(pathException.getMessage().contains("Invalid path Name"));
   }
 
   @Test
@@ -797,20 +795,34 @@ public class TestOzoneFileSystem {
    *
    * @throws IOException DB failure
    */
-  protected void deleteRootDir() throws IOException {
+  protected void deleteRootDir() throws IOException, InterruptedException {
     FileStatus[] fileStatuses = fs.listStatus(ROOT);
 
     if (fileStatuses == null) {
       return;
     }
+    deleteRootRecursively(fileStatuses);
 
-    for (FileStatus fStatus : fileStatuses) {
-      fs.delete(fStatus.getPath(), true);
-    }
+    // Waiting for double buffer flush before calling listStatus() again
+    // seem to have mitigated the flakiness in cleanup(), but at the cost of
+    // almost doubling the test run time. M1 154s->283s (all 4 sets of params)
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    // TODO: Investigate whether listStatus() is correctly iterating cache.
 
     fileStatuses = fs.listStatus(ROOT);
     if (fileStatuses != null) {
-      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+      for (FileStatus fileStatus : fileStatuses) {
+        LOG.error("Unexpected file, should have been deleted: {}", fileStatus);
+      }
+      Assert.assertEquals(
+          "Delete root failed!", 0, fileStatuses.length);
+    }
+  }
+
+  private static void deleteRootRecursively(FileStatus[] fileStatuses)
+      throws IOException {
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
     }
   }
 
@@ -1440,8 +1452,10 @@ public class TestOzoneFileSystem {
         fs.exists(new Path(dest, "sub_dir1")));
 
     // Test if one path belongs to other FileSystem.
-    LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
+    IllegalArgumentException exception = assertThrows(
+        IllegalArgumentException.class,
         () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+    assertTrue(exception.getMessage().contains("Wrong FS"));
   }
 
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
