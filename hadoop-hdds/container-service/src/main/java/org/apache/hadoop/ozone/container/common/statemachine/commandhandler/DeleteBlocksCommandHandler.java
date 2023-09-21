@@ -106,7 +106,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     this.containerSet = container.getContainerSet();
     this.conf = conf;
     this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
-    this.tryLockTimeoutMs = dnConf.getBlockDeleteCommandHandleLockTimeoutMs();
+    this.tryLockTimeoutMs = dnConf.getBlockDeleteMaxLockWaitTimeoutMs();
     schemaHandlers = new HashMap<>();
     schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
     schemaHandlers.put(SCHEMA_V2, this::markBlocksForDeletionSchemaV2);
@@ -268,8 +268,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         switch (containerType) {
         case KeyValueContainer:
           KeyValueContainer keyValueContainer = (KeyValueContainer)cont;
-          KeyValueContainerData containerData = (KeyValueContainerData)
-              cont.getContainerData();
+          KeyValueContainerData containerData =
+              keyValueContainer.getContainerData();
           if (keyValueContainer.
               writeLockTryLock(tryLockTimeoutMs, TimeUnit.MILLISECONDS)) {
             try {
@@ -282,7 +282,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                     "Only schema version 1,2,3 are supported.");
               }
             } finally {
-              cont.writeUnlock();
+              keyValueContainer.writeUnlock();
             }
             txResultBuilder.setContainerID(containerId)
                 .setSuccess(true);
@@ -297,11 +297,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               "Delete Blocks Command Handler is not implemented for " +
                   "containerType {}", containerType);
         }
-      } catch (IOException | InterruptedException e) {
+      } catch (IOException e) {
         LOG.warn("Failed to delete blocks for container={}, TXID={}",
             tx.getContainerID(), tx.getTxID(), e);
-        txResultBuilder.setContainerID(containerId)
-            .setSuccess(false);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (InterruptedException e) {
+        LOG.warn("InterruptedException while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        Thread.currentThread().interrupt();
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -438,7 +442,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private void markBlocksForDeletionSchemaV3(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
-    int newDeletionBlocks = 0;
     DeletionMarker schemaV3Marker = (table, batch, tid, txn) -> {
       Table<String, DeletedBlocksTransaction> delTxTable =
           (Table<String, DeletedBlocksTransaction>) table;
@@ -446,21 +449,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           txn);
     };
 
-    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+    markBlocksForDeletionTransaction(containerData, delTX,
         delTX.getTxID(), schemaV3Marker);
   }
 
   private void markBlocksForDeletionSchemaV2(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
-    int newDeletionBlocks = 0;
     DeletionMarker schemaV2Marker = (table, batch, tid, txn) -> {
       Table<Long, DeletedBlocksTransaction> delTxTable =
           (Table<Long, DeletedBlocksTransaction>) table;
       delTxTable.putWithBatch(batch, tid, txn);
     };
 
-    markBlocksForDeletionTransaction(containerData, delTX, newDeletionBlocks,
+    markBlocksForDeletionTransaction(containerData, delTX,
         delTX.getTxID(), schemaV2Marker);
   }
 
@@ -474,8 +476,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   private void markBlocksForDeletionTransaction(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX,
-      int newDeletionBlocks, long txnID, DeletionMarker marker)
+      long txnID, DeletionMarker marker)
       throws IOException {
+    int newDeletionBlocks = 0;
     long containerId = delTX.getContainerID();
     logDeleteTransaction(containerId, containerData, delTX);
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
