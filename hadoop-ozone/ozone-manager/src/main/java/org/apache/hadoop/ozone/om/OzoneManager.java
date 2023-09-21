@@ -3027,8 +3027,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         return Collections.emptyList();
       }
       return OmUtils.format(serviceList, port, leaderId.getId().toString());
-    }
-    else {
+    } else {
       return Collections.emptyList();
     }
   }

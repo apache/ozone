@@ -27,33 +27,6 @@
         <td>{{$ctrl.role.Id}}</td>
     </tr>
     <tr>
-        <td>OM Roles (HA)	</td>
-        <td> <table class="table table-striped om-roles-css" class="col-md-6">
-            <thead>
-            <tr>
-                <th>Host Name</th>
-                <th>Node ID</th>
-                <th>Ratis Port</th>
-                <th>Role</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr class="om-roles-background" ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id == roles[2].value">
-                <td>{{roles[3].value}}</td>
-                <td>{{roles[2].value}}</td>
-                <td>{{roles[1].value}}</td>
-                <td>{{roles[0].value}}</td>
-            </tr>
-            <tr ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id != roles[2].value">
-                <td>{{roles[3].value}}</td>
-                <td>{{roles[2].value}}</td>
-                <td>{{roles[1].value}}</td>
-                <td>{{roles[0].value}}</td>
-            </tr>
-            </tbody>
-        </table></td>
-    </tr>
-    <tr>
         <td>Current-Role</td>
         <td>{{$ctrl.role.Role}}</td>
     </tr>
@@ -71,6 +44,35 @@
     </tr>
     </tbody>
 </table>
+
+<div ng-show="$ctrl.overview.jmx.RatisRoles.length > 0">
+    <h2>OM Roles (HA)</h2>
+    <table class="table table-striped table-bordered" class="col-md-6">
+        <thead>
+        <tr>
+            <th>Host Name</th>
+            <th>Node ID</th>
+            <th>Ratis Port</th>
+            <th>Role</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr class="om-roles-background" ng-repeat="roles in $ctrl.overview.jmx.RatisRoles"
+            ng-if="$ctrl.role.Id == roles[2].value">
+            <td>{{roles[3].value}}</td>
+            <td>{{roles[2].value}}</td>
+            <td>{{roles[1].value}}</td>
+            <td>{{roles[0].value}}</td>
+        </tr>
+        <tr ng-repeat="roles in $ctrl.overview.jmx.RatisRoles" ng-if="$ctrl.role.Id != roles[2].value">
+            <td>{{roles[3].value}}</td>
+            <td>{{roles[2].value}}</td>
+            <td>{{roles[1].value}}</td>
+            <td>{{roles[0].value}}</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
 
 <h2>Meta-Data Volume Information</h2>
 <table class="table table-bordered table-striped" class="col-md-6">
