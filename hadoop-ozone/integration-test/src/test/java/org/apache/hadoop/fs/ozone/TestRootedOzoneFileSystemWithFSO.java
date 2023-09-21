@@ -24,12 +24,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
-import org.apache.ozone.test.UnhealthyTest;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -76,35 +74,35 @@ public class TestRootedOzoneFileSystemWithFSO
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testTempMount() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testOzoneFsServiceLoader() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testCreateWithInvalidPaths() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testDeleteEmptyVolume() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testMkdirNonExistentVolume() {
     // ignore as this is not relevant to PREFIX layout changes
   }
@@ -113,7 +111,7 @@ public class TestRootedOzoneFileSystemWithFSO
    * OFS: Test recursive listStatus on root and volume.
    */
   @Override
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-4360")
+  @Ignore("TODO:HDDS-4360")
   public void testListStatusRootAndVolumeRecursive() throws IOException {
   }
 

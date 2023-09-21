@@ -33,13 +33,11 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.UnhealthyTest;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -87,6 +85,12 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
   @Override
   public void cleanup() {
     super.cleanup();
+    try {
+      deleteRootDir();
+    } catch (IOException e) {
+      LOG.info("Failed to cleanup DB tables.", e);
+      fail("Failed to cleanup DB tables." + e.getMessage());
+    }
   }
 
   private static final Logger LOG =
@@ -94,21 +98,21 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testGetDirectoryModificationTime() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testOzoneFsServiceLoader() {
     // ignore as this is not relevant to PREFIX layout changes
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("HDDS-2939")
   public void testCreateWithInvalidPaths() {
     // ignore as this is not relevant to PREFIX layout changes
   }
@@ -453,13 +457,13 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-2939")
+  @Ignore("TODO:HDDS-2939")
   public void testListStatusWithIntermediateDir() throws Exception {
   }
 
   @Override
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-5012")
+  @Ignore("TODO:HDDS-5012")
   public void testListStatusOnLargeDirectory() throws Exception {
   }
 
