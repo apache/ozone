@@ -54,9 +54,7 @@ public class BlockDeletingService extends BackgroundService {
   private final OzoneContainer ozoneContainer;
   private final ContainerDeletionChoosingPolicy containerDeletionPolicy;
   private final ConfigurationSource conf;
-
-  private final int blockLimitPerInterval;
-
+  private final DatanodeConfiguration dnConf;
   private final BlockDeletingServiceMetrics metrics;
 
   // Task priority is useful when a to-delete block has weight.
@@ -78,8 +76,7 @@ public class BlockDeletingService extends BackgroundService {
       throw new RuntimeException(e);
     }
     this.conf = conf;
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
-    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    dnConf = conf.getObject(DatanodeConfiguration.class);
     metrics = BlockDeletingServiceMetrics.create();
   }
 
@@ -116,7 +113,7 @@ public class BlockDeletingService extends BackgroundService {
       // The chosen result depends on what container deletion policy is
       // configured.
       List<ContainerBlockInfo> containers =
-          chooseContainerForBlockDeletion(blockLimitPerInterval,
+          chooseContainerForBlockDeletion(getBlockLimitPerInterval(),
               containerDeletionPolicy);
 
       BackgroundTask
@@ -247,6 +244,10 @@ public class BlockDeletingService extends BackgroundService {
 
   public BlockDeletingServiceMetrics getMetrics() {
     return metrics;
+  }
+
+  public int getBlockLimitPerInterval() {
+    return dnConf.getBlockDeletionLimit();
   }
 
   private static class BlockDeletingTaskBuilder {
