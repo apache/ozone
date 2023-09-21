@@ -32,6 +32,7 @@ interface INavBarProps extends RouteComponentProps<object> {
   onCollapse: (arg: boolean) => void;
   isHeatmapAvailable: boolean;
   isLoading: boolean;
+  location: object
 }
 
 class NavBar extends React.Component<INavBarProps> {
@@ -71,14 +72,9 @@ class NavBar extends React.Component<INavBarProps> {
     });
   };
 
-  refresh = () => {
-    console.log("refresh");
-    this.props.history.push('/Heatmap');
-    window.location.reload();
-    }
-
   render() {
     const {location} = this.props;
+    const { isHeatmapAvailable } = this.state;
     return (
       <Sider
         collapsible
@@ -140,12 +136,17 @@ class NavBar extends React.Component<INavBarProps> {
             <Link to='/DiskUsage'/>
           </Menu.Item>
           {
-            this.state.isHeatmapAvailable ?
+            isHeatmapAvailable ?
               <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
-                <Link to='/Heatmap' onClick={this.refresh}/>
-              </Menu.Item> : ""
+                <Link to={{
+                  pathname: '/Heatmap',
+                  state: { isHeatmapAvailable: true}
+                }}
+                />
+              </Menu.Item>
+              : ""
           }
         </Menu>
       </Sider>
