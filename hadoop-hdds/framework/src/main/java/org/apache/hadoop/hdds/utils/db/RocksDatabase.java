@@ -80,6 +80,8 @@ public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
+  private static final ManagedReadOptions DEFAULT_READ_OPTION =
+      new ManagedReadOptions();
 
   private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
       new HashMap<>();
@@ -738,9 +740,10 @@ public final class RocksDatabase implements Closeable {
   Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
       throws IOException {
     assertClose();
-    try (ManagedReadOptions options = new ManagedReadOptions()) {
+    try {
       counter.incrementAndGet();
-      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      final int size = db.get().get(family.getHandle(),
+          DEFAULT_READ_OPTION, key, outValue);
       LOG.debug("get: size={}, remaining={}",
           size, outValue.asReadOnlyBuffer().remaining());
       return size == ManagedRocksDB.NOT_FOUND ? null : size;

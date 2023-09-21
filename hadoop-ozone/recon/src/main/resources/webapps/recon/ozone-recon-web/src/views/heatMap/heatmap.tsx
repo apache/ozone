@@ -133,8 +133,8 @@ export class Heatmap extends React.Component<Record<string, object>, ITreeState>
     const value = e.target.value;
     let inputValid = "";
     let helpMessage = ""
-    // Only allow letters, numbers,underscores and forward slashes
-    const regex = /^[a-zA-Z0-9_/]*$/;
+    // Only allow letters, numbers,underscores and forward slashes and hyphen
+    const regex = /^[a-zA-Z0-9_/-]*$/;
     if (!regex.test(value)) {
       helpMessage = "Please enter valid path"
       inputValid = "error"

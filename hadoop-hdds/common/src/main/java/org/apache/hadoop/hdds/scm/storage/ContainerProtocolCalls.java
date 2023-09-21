@@ -388,39 +388,6 @@ public final class ContainerProtocolCalls  {
    * @param blockID ID of the block
    * @param data the data of the chunk to write
    * @param token a token for this block (may be null)
-   * @throws IOException if there is an error while performing the call
-   */
-  public static void writeChunk(XceiverClientSpi xceiverClient, ChunkInfo chunk,
-      BlockID blockID, ByteString data,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException {
-    WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto
-        .newBuilder()
-        .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-        .setChunkData(chunk)
-        .setData(data);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
-        .newBuilder()
-        .setCmdType(Type.WriteChunk)
-        .setContainerID(blockID.getContainerID())
-        .setDatanodeUuid(id)
-        .setWriteChunk(writeChunkRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
-    xceiverClient.sendCommand(request, getValidatorList());
-  }
-
-  /**
-   * Calls the container protocol to write a chunk.
-   *
-   * @param xceiverClient client to perform call
-   * @param chunk information about chunk to write
-   * @param blockID ID of the block
-   * @param data the data of the chunk to write
-   * @param token a token for this block (may be null)
    * @throws IOException if there is an I/O error while performing the call
    */
   public static XceiverClientReply writeChunkAsync(

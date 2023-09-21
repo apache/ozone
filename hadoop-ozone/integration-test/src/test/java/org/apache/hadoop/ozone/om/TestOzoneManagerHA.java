@@ -205,7 +205,6 @@ public abstract class TestOzoneManagerHA {
   @AfterEach
   public void resetCluster()
       throws IOException {
-    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
@@ -216,6 +215,7 @@ public abstract class TestOzoneManagerHA {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

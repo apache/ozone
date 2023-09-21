@@ -400,27 +400,8 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    acquireWriteLock();
-    try {
-      Pipeline pipeline = stateManager.getPipeline(pipelineID);
-      stateManager.removeContainerFromPipeline(pipelineID, containerID);
-      if (pipeline.getReplicationConfig().getReplicationType()
-          == ReplicationType.EC) {
-        // For EC, a pipeline is used for only a single container. When that
-        // container is closed or removed from the pipeline, the pipeline should
-        // also be closed. For EC, if a pipeline had a container and then the
-        // container is removed via this method, the pipeline is no longer
-        // useful - nothing will allocate a new container on it. Therefore, we
-        // close the pipeline here to free up the pipeline slot for a new
-        // pipeline to get created
-        closePipeline(pipeline, true);
-      }
-    } catch (PipelineNotFoundException e) {
-      LOG.warn("Pipeline {} not found when removing container {}",
-          pipelineID, containerID, e);
-    } finally {
-      releaseWriteLock();
-    }
+    // should not lock here, since no ratis operation happens.
+    stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override

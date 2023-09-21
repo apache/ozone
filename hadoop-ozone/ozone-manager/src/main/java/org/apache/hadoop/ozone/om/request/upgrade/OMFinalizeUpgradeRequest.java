@@ -67,7 +67,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
     try {
       if (ozoneManager.getAclsEnabled()) {
-        final UserGroupInformation ugi = createUGI();
+        UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
               + "Superuser privilege is required to finalize upgrade.",

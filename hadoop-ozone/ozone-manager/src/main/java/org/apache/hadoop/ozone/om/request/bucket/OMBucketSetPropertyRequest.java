@@ -235,7 +235,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       OzoneManager ozoneManager, String volumeName, String bucketName)
       throws IOException {
     if (ozoneManager.getAccessAuthorizer().isNative()) {
-      UserGroupInformation ugi = createUGI();
+      UserGroupInformation ugi = createUGIForApi();
       String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
           IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
       if (!ozoneManager.isAdmin(ugi) &&
