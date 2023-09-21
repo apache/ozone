@@ -563,7 +563,7 @@ public class TestDefaultCertificateClient {
     Logger logger = mock(Logger.class);
     String certId = cert.getSerialNumber().toString();
     DefaultCertificateClient client = new DefaultCertificateClient(
-        conf, null, logger, certId, compName, null, null
+        conf, null, logger, certId, compName, "", null, null
     ) {
 
       @Override

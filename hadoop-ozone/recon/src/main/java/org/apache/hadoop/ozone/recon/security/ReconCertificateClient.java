@@ -56,7 +56,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
       Consumer<String> saveCertIdCallback,
       Runnable shutdownCallback) {
     super(config, scmSecurityClient, LOG, storage.getReconCertSerialId(),
-        COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
+        COMPONENT_NAME, "", saveCertIdCallback, shutdownCallback);
     this.clusterID = storage.getClusterID();
     this.reconID = storage.getReconId();
   }

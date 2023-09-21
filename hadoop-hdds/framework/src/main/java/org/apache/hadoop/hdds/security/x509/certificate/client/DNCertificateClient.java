@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -58,6 +59,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
       Runnable shutdown
   ) {
     super(securityConfig, scmSecurityClient, LOG, certSerialId, COMPONENT_NAME,
+        HddsUtils.threadNamePrefix(datanodeDetails.getUuidString()),
         saveCertId, shutdown);
     this.dn = datanodeDetails;
   }

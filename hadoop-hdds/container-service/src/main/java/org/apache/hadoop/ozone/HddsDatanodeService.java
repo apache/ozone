@@ -278,8 +278,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         if (secConf.isTokenEnabled()) {
           SecretKeyProtocol secretKeyProtocol =
               HddsServerUtil.getSecretKeyClientForDatanode(conf);
-          secretKeyClient = DefaultSecretKeyClient.create(conf,
-              secretKeyProtocol);
+          secretKeyClient = DefaultSecretKeyClient.create(
+              conf, secretKeyProtocol, "");
           secretKeyClient.start(conf);
         }
       }
