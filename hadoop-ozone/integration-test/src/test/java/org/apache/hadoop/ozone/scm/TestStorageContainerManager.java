@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -93,6 +94,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
+import org.apache.log4j.Level;
+import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -410,6 +413,9 @@ public class TestStorageContainerManager {
       GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
           GenericTestUtils.LogCapturer.captureLogs(
               SCMDatanodeHeartbeatDispatcher.LOG);
+      LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
+      GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
+          GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
       GenericTestUtils.LogCapturer versionEndPointTaskLog =
           GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
       // Initially empty
@@ -428,13 +434,18 @@ public class TestStorageContainerManager {
           datanode.getDatanodeDetails());
       GenericTestUtils.waitFor(
           () -> scmDnHBDispatcherLog.getOutput().contains(expectedLog), 100,
-          3000);
+          5000);
       ExitUtil.disableSystemExit();
       // As part of processing response for re-register, DN EndpointStateMachine
       // goes to GET-VERSION state which checks if there is already existing
       // version file on the DN & if the clusterID matches with that of the SCM
       // In this case, it won't match and gets InconsistentStorageStateException
       // and DN shuts down.
+      String expectedLog2 = "Received SCM notification to register."
+          + " Interrupt HEARTBEAT and transit to GETVERSION state.";
+      GenericTestUtils.waitFor(
+          () -> heartbeatEndpointTaskLog.getOutput().contains(expectedLog2),
+          100, 5000);
       GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
           5000);
       Assert.assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
