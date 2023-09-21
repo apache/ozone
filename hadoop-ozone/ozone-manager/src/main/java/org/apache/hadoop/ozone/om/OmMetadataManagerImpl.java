@@ -109,6 +109,7 @@ import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlock
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -197,6 +198,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * |                       |  2. /volumeId/bucketId/parentId/fileName        |
    * |                       |  3. /volumeName/bucketName/keyName              |
    * |-------------------------------------------------------------------------|
+   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
+   * |-------------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -225,6 +228,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
   public static final String SNAPSHOT_RENAMED_TABLE =
       "snapshotRenamedTable";
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
 
   static final String[] ALL_TABLES = new String[] {
       USER_TABLE,
@@ -247,7 +252,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       PRINCIPAL_TO_ACCESS_IDS_TABLE,
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
-      SNAPSHOT_RENAMED_TABLE
+      SNAPSHOT_RENAMED_TABLE,
+      COMPACTION_LOG_TABLE
   };
 
   private DBStore store;
@@ -277,6 +283,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table snapshotInfoTable;
   private Table snapshotRenamedTable;
+  private Table compactionLogTable;
 
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -615,6 +622,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addTable(TENANT_STATE_TABLE)
         .addTable(SNAPSHOT_INFO_TABLE)
         .addTable(SNAPSHOT_RENAMED_TABLE)
+        .addTable(COMPACTION_LOG_TABLE)
         .addCodec(OzoneTokenIdentifier.class, TokenIdentifierCodec.get())
         .addCodec(OmKeyInfo.class, OmKeyInfo.getCodec(true))
         .addCodec(RepeatedOmKeyInfo.class, RepeatedOmKeyInfo.getCodec(true))
@@ -629,7 +637,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .addCodec(OmDBTenantState.class, OmDBTenantState.getCodec())
         .addCodec(OmDBAccessIdInfo.class, OmDBAccessIdInfo.getCodec())
         .addCodec(OmDBUserPrincipalInfo.class, OmDBUserPrincipalInfo.getCodec())
-        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec());
+        .addCodec(SnapshotInfo.class, SnapshotInfo.getCodec())
+        .addCodec(CompactionLogEntry.class, CompactionLogEntry.getCodec());
   }
 
   /**
@@ -742,6 +751,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     checkTableStatus(snapshotRenamedTable, SNAPSHOT_RENAMED_TABLE,
         addCacheMetrics);
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
+
+    compactionLogTable = this.store.getTable(COMPACTION_LOG_TABLE,
+        String.class, CompactionLogEntry.class);
+    checkTableStatus(compactionLogTable, COMPACTION_LOG_TABLE,
+        addCacheMetrics);
   }
 
   /**
@@ -1940,6 +1954,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getSnapshotRenamedTable() {
     return snapshotRenamedTable;
+  }
+
+  @Override
+  public Table<String, CompactionLogEntry> getCompactionLogTable() {
+    return compactionLogTable;
   }
 
   /**

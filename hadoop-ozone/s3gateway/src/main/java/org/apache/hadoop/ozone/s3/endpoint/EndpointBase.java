@@ -173,9 +173,9 @@ public abstract class EndpointBase implements Auditor {
       } else if (ex.getResult() == ResultCodes.TIMEOUT ||
           ex.getResult() == ResultCodes.INTERNAL_ERROR) {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
-        // S3 does not return error for bucket already exists, it just
-        // returns the location.
+      } else if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
+        throw newError(S3ErrorTable.BUCKET_ALREADY_EXISTS, bucketName, ex);
+      } else {
         throw ex;
       }
     }

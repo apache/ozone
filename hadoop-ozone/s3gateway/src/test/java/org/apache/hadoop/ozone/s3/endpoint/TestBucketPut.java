@@ -28,7 +28,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
+import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import org.junit.Assert;
@@ -73,6 +75,13 @@ public class TestBucketPut {
     Response response = bucketEndpoint.put(bucketName, null, null, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());
+    try {
+      // Create-bucket on an existing bucket fails
+      bucketEndpoint.put(bucketName, null, null, null);
+    } catch (OS3Exception ex) {
+      Assert.assertEquals(HTTP_CONFLICT, ex.getHttpCode());
+      Assert.assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
+    }
   }
 
   @Test
