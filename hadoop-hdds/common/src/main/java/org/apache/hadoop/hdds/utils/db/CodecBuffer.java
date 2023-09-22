@@ -37,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
@@ -47,8 +48,42 @@ import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
  * A buffer used by {@link Codec}
  * for supporting RocksDB direct {@link ByteBuffer} APIs.
  */
-public final class CodecBuffer implements AutoCloseable {
+public class CodecBuffer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(CodecBuffer.class);
+
+  /** To create {@link CodecBuffer} instances. */
+  private static class Factory {
+    private static volatile Function<ByteBuf, CodecBuffer> constructor
+        = CodecBuffer::new;
+    static void set(Function<ByteBuf, CodecBuffer> f) {
+      constructor = f;
+      LOG.info("Successfully set constructor to " + f);
+    }
+
+    static CodecBuffer newCodecBuffer(ByteBuf buf) {
+      return constructor.apply(buf);
+    }
+  }
+
+  /** To detect buffer leak. */
+  private static class LeakDetector {
+    static CodecBuffer newCodecBuffer(ByteBuf buf) {
+      return new CodecBuffer(buf) {
+        @Override
+        protected void finalize() {
+          detectLeaks();
+        }
+      };
+    }
+  }
+
+  /**
+   * Detect buffer leak in runtime.
+   * Note that there is a severe performance penalty for leak detection.
+   */
+  public static void enableLeakDetection() {
+    Factory.set(LeakDetector::newCodecBuffer);
+  }
 
   /** The size of a buffer. */
   public static class Capacity {
@@ -106,7 +141,7 @@ public final class CodecBuffer implements AutoCloseable {
    *                  the buffer's capacity can be increased if necessary.
    */
   static CodecBuffer allocate(int capacity, IntFunction<ByteBuf> allocator) {
-    return new CodecBuffer(allocator.apply(capacity));
+    return Factory.newCodecBuffer(allocator.apply(capacity));
   }
 
   /**
@@ -127,7 +162,7 @@ public final class CodecBuffer implements AutoCloseable {
 
   /** Wrap the given array. */
   public static CodecBuffer wrap(byte[] array) {
-    return new CodecBuffer(Unpooled.wrappedBuffer(array));
+    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array));
   }
 
   private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
@@ -153,8 +188,16 @@ public final class CodecBuffer implements AutoCloseable {
     Preconditions.assertSame(expected, buf.refCnt(), "refCnt");
   }
 
-  @Override
-  protected void finalize() throws Throwable {
+  /**
+   * Detect buffer leak by asserting that the underlying buffer is released
+   * when this object is garbage collected.
+   * This method may be invoked inside the {@link #finalize()} method
+   * or using a {@link java.lang.ref.ReferenceQueue}.
+   * For performance reason, this class does not override {@link #finalize()}.
+   *
+   * @see #enableLeakDetection()
+   */
+  void detectLeaks() {
     // leak detection
     final int capacity = buf.capacity();
     if (!released.isDone() && capacity > 0) {
@@ -169,7 +212,6 @@ public final class CodecBuffer implements AutoCloseable {
         buf.release(refCnt);
       }
     }
-    super.finalize();
   }
 
   @Override

@@ -914,21 +914,19 @@ public class TestOzoneShellHA {
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--space-quota", "-1"};
-    executeWithError(ozoneShell, args, "Invalid values for space quota: -1");
+    executeWithError(ozoneShell, args, "Invalid value for space quota: -1");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--space-quota", "test"};
-    executeWithError(ozoneShell, args, "Invalid values for quota, " +
-        "to ensure that the Quota format is legal(supported values are " +
-        "B, KB, MB, GB and TB with positive long values). " +
-        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    executeWithError(ozoneShell, args, "test is invalid. " +
+        "The quota value should be a positive integer " +
+        "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--space-quota", "1.5GB"};
-    executeWithError(ozoneShell, args, "Invalid values for quota, " +
-        "to ensure that the Quota format is legal(supported values are " +
-        "B, KB, MB, GB and TB with positive long values). " +
-        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    executeWithError(ozoneShell, args, "1.5GB is invalid. " +
+        "The quota value should be a positive integer " +
+        "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota"};
@@ -939,7 +937,7 @@ public class TestOzoneShellHA {
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
     executeWithError(ozoneShell, args,
-        "Invalid values for namespace quota: -1");
+        "Invalid value for namespace quota: -1");
     out.reset();
 
     args = new String[]{"volume", "create", "vol5"};
@@ -955,23 +953,21 @@ public class TestOzoneShellHA {
     args = new String[]{"bucket", "create", "vol5/buck5",
         "--space-quota", "-1"};
     executeWithError(ozoneShell, args,
-        "Invalid values for space quota: -1");
+        "Invalid value for space quota: -1");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5",
         "--space-quota", "test"};
-    executeWithError(ozoneShell, args, "Invalid values for quota, " +
-        "to ensure that the Quota format is legal(supported values are " +
-        "B, KB, MB, GB and TB with positive long values). " +
-        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    executeWithError(ozoneShell, args, "test is invalid. " +
+        "The quota value should be a positive integer " +
+        "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5",
         "--space-quota", "1.5GB"};
-    executeWithError(ozoneShell, args, "Invalid values for quota, " +
-        "to ensure that the Quota format is legal(supported values are " +
-        "B, KB, MB, GB and TB with positive long values). " +
-        "And the quota value cannot be greater than Long.MAX_VALUE BYTES");
+    executeWithError(ozoneShell, args, "1.5GB is invalid. " +
+        "The quota value should be a positive integer " +
+        "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5", "--namespace-quota"};
@@ -982,7 +978,7 @@ public class TestOzoneShellHA {
 
     args = new String[]{"volume", "create", "vol5", "--namespace-quota", "-1"};
     executeWithError(ozoneShell, args,
-        "Invalid values for namespace quota: -1");
+        "Invalid value for namespace quota: -1");
     out.reset();
 
     args = new String[]{"bucket", "create", "vol5/buck5"};
@@ -1024,7 +1020,7 @@ public class TestOzoneShellHA {
     ExecutionException eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs1));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
@@ -1032,7 +1028,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs2));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
@@ -1040,7 +1036,9 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs3));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for quota"));
+        .contains("test is invalid. " +
+            "The quota value should be a positive integer " +
+            "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
     String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
@@ -1048,7 +1046,9 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs4));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for quota"));
+        .contains("1.5GB is invalid. " +
+            "The quota value should be a positive integer " +
+            "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
     String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4",
@@ -1065,7 +1065,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs6));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for namespace quota"));
+        .contains("Invalid value for namespace quota"));
     out.reset();
 
     String[] volumeArgs7 = new String[]{"volume", "setquota", "vol4",
@@ -1082,7 +1082,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs1));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -1090,7 +1090,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs2));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for space quota"));
+        .contains("Invalid value for space quota"));
     out.reset();
 
     String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -1098,7 +1098,9 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs3));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for quota"));
+        .contains("test is invalid. " +
+            "The quota value should be a positive integer " +
+            "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
     String[] bucketArgs4 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -1106,7 +1108,9 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs4));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for quota"));
+        .contains("1.5GB is invalid. " +
+            "The quota value should be a positive integer " +
+            "with byte numeration(B, KB, MB, GB and TB)"));
     out.reset();
 
     String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
@@ -1122,7 +1126,7 @@ public class TestOzoneShellHA {
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs6));
     assertTrue(eException.getMessage()
-        .contains("Invalid values for namespace quota"));
+        .contains("Invalid value for namespace quota"));
     out.reset();
 
     String[] bucketArgs7 = new String[]{"bucket", "setquota", "vol4/buck4",

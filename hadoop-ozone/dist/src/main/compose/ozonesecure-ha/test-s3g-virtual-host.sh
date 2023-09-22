@@ -15,33 +15,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-unsecure
+#suite:HA-secure
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-export SCM=scm1
-export OM_SERVICE_ID=omservice
+export SECURITY_ENABLED=true
+export OM_SERVICE_ID="omservice"
+export SCM=scm1.org
+export COMPOSE_FILE=docker-compose.yaml:s3g-virtual-host.yaml
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env 5
+start_docker_env
 
-execute_robot_test ${SCM} basic/ozone-shell-single.robot
-execute_robot_test ${SCM} basic/links.robot
-
-execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:link -N ozonefs-ofs-link ozonefs/ozonefs.robot
-
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-exclude="--exclude virtual-host"
-for bucket in generated; do
-  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude virtual-host --exclude no-bucket-type"
-done
-
-execute_robot_test ${SCM} freon
-execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
+## Run virtual host test cases
+execute_robot_test s3g -N s3-virtual-host s3/awss3virtualhost.robot

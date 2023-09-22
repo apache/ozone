@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,16 +14,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-start_docker_env 5
+version: "3.8"
 
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-execute_robot_test scm -v BUCKET:erasure --exclude virtual-host s3
-
-prefix=${RANDOM}
-execute_robot_test scm -v PREFIX:${prefix} ec/basic.robot
-docker-compose up -d --no-recreate --scale datanode=4
-execute_robot_test scm -v PREFIX:${prefix} -N read-4-datanodes ec/read.robot
-docker-compose up -d --no-recreate --scale datanode=3
-execute_robot_test scm -v PREFIX:${prefix} -N read-3-datanodes ec/read.robot
-docker-compose up -d --no-recreate --scale datanode=5
-execute_robot_test scm -v container:1 -v count:5 -N EC-recovery replication/wait.robot
+x-s3g-virtual-host-config:
+  &s3g-virtual-host-config
+  environment:
+    - OZONE-SITE.XML_ozone.s3g.domain.name=s3g.internal
+services:
+  datanode1:
+    <<: *s3g-virtual-host-config
+  datanode2:
+    <<: *s3g-virtual-host-config
+  datanode3:
+    <<: *s3g-virtual-host-config
+  om1:
+    <<: *s3g-virtual-host-config
+  om2:
+    <<: *s3g-virtual-host-config
+  om3:
+    <<: *s3g-virtual-host-config
+  scm1.org:
+    <<: *s3g-virtual-host-config
+  scm2.org:
+    <<: *s3g-virtual-host-config
+  scm3.org:
+    <<: *s3g-virtual-host-config
+  s3g:
+    <<: *s3g-virtual-host-config
+    extra_hosts:
+      - "bucket1.s3g.internal: 172.25.0.114"
+  recon:
+    <<: *s3g-virtual-host-config

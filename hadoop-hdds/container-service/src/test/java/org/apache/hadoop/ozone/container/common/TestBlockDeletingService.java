@@ -143,6 +143,8 @@ public class TestBlockDeletingService {
 
   @Before
   public void init() throws IOException {
+    CodecBuffer.enableLeakDetection();
+
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
     if (testRoot.exists()) {
