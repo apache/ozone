@@ -28,18 +28,26 @@ Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit t
 
 
 *** Test Cases ***
-Test OM Fetch-Key with OM Service ID
+Fetch Key with Valid ServiceID Specified
     ${result} =              Execute                        ozone admin om fetch-key --service-id=omservice
     Should Contain           ${result}                      Current Secret Key ID
+
+Fetch Key with Multiple ServiceIDs, Valid ServiceID Specified
     ${result} =              Execute                        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om fetch-key --service-id=omservice
     Should Contain           ${result}                      Current Secret Key ID
+
+Fetch Key with Multiple ServiceIDs, Unconfigured ServiceID Specified
     ${result} =              Execute And Ignore Error       ozone admin --set=ozone.om.service.ids=omservice,omservice2 om fetch-key --service-id=omservice3
     Should Contain           ${result}                      Service ID specified does not match
+
+Fetch Key with Multiple ServiceIDs, Invalid ServiceID Specified
     ${result} =              Execute And Ignore Error       ozone admin --set=ozone.om.service.ids=omservice,omservice2 om fetch-key --service-id=omservice2
     Should Contain           ${result}                      Could not find any configured addresses for OM.
 
-Test OM Fetch-Key without OM Service ID
+Fetch Key without OM Service ID
     ${result} =              Execute                        ozone admin om fetch-key
     Should Contain           ${result}                      Current Secret Key ID
+
+Fetch Key with Multiple ServiceIDs, No ServiceID Specified
     ${result} =              Execute And Ignore Error       ozone admin --set=ozone.om.service.ids=omservice,ozone1 om fetch-key
     Should Contain           ${result}                      no Ozone Manager service ID specified
