@@ -362,7 +362,6 @@ public class ContainerManagerImpl implements ContainerManager {
       Pipeline pipeline, String owner) throws IOException {
     NavigableSet<ContainerID> containerIDs =
         pipelineManager.getContainersInPipeline(pipeline.getId());
-    containerIDs = new TreeSet<>(containerIDs);
     final Set<ContainerID> containerIDsByOwner =
         containerStateManager.getContainerIDs(owner);
     containerIDs.retainAll(containerIDsByOwner);
