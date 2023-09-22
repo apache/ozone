@@ -47,7 +47,7 @@ import static java.lang.String.format;
  * Invariant: If a pipeline exists in PipelineStateMap, both pipelineMap and
  * pipeline2container would have a non-null mapping for it.
  */
-class PipelineStateMap {
+class PipelineStateMap implements PipelineMap {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       PipelineStateMap.class);
@@ -71,7 +71,7 @@ class PipelineStateMap {
    * @param pipeline - Pipeline to add
    * @throws IOException if pipeline with provided pipelineID already exists
    */
-  void addPipeline(Pipeline pipeline) throws IOException {
+  public void addPipeline(Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(pipeline, "Pipeline cannot be null");
     Preconditions.checkArgument(
         pipeline.getNodes().size() == pipeline.getReplicationConfig()
@@ -99,7 +99,7 @@ class PipelineStateMap {
    * @param containerID - ContainerID of the container to add
    * @throws IOException if pipeline is not in open state or does not exist
    */
-  void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
@@ -120,7 +120,7 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline to which container is added
    * @param containerID - ContainerID of the container to add
    */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID,
       ContainerID containerID) throws IOException {
     Preconditions.checkNotNull(pipelineID,
             "Pipeline Id cannot be null");
@@ -148,7 +148,7 @@ class PipelineStateMap {
    * @return Pipeline
    * @throws PipelineNotFoundException if pipeline is not found
    */
-  Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
+  public Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
 
@@ -174,7 +174,7 @@ class PipelineStateMap {
    * @param replicationConfig - ReplicationConfig
    * @return List of pipelines which have the specified replication type
    */
-  List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
 
@@ -197,7 +197,7 @@ class PipelineStateMap {
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
-  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
@@ -229,7 +229,7 @@ class PipelineStateMap {
    * @param state             - Required PipelineState
    * @return Count of pipelines with the specified replication config and state
    */
-  int getPipelineCount(ReplicationConfig replicationConfig,
+  public int getPipelineCount(ReplicationConfig replicationConfig,
       PipelineState state) {
     Preconditions
         .checkNotNull(replicationConfig, "ReplicationConfig cannot be null");
@@ -261,7 +261,7 @@ class PipelineStateMap {
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
-  List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
+  public List<Pipeline> getPipelines(ReplicationConfig replicationConfig,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     Preconditions
@@ -310,7 +310,7 @@ class PipelineStateMap {
    * @return Set of containerIDs belonging to the pipeline
    * @throws PipelineNotFoundException if pipeline is not found
    */
-  NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
+  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
@@ -330,7 +330,7 @@ class PipelineStateMap {
    * @return Number of containers belonging to the pipeline
    * @throws PipelineNotFoundException if pipeline is not found
    */
-  int getNumberOfContainers(PipelineID pipelineID)
+  public int getNumberOfContainers(PipelineID pipelineID)
       throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
@@ -349,7 +349,7 @@ class PipelineStateMap {
    * @param pipelineID - PipelineID of the pipeline to be removed
    * @throws IOException if the pipeline is not empty or does not exist
    */
-  Pipeline removePipeline(PipelineID pipelineID) throws IOException {
+  public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
 
     Pipeline pipeline = getPipeline(pipelineID);
@@ -371,7 +371,7 @@ class PipelineStateMap {
    * @param containerID - ContainerID of the container to remove
    * @throws IOException if pipeline does not exist
    */
-  void removeContainerFromPipeline(PipelineID pipelineID,
+  public void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException {
     Preconditions.checkNotNull(pipelineID,
         "Pipeline Id cannot be null");
@@ -395,7 +395,7 @@ class PipelineStateMap {
    * @return Pipeline with the updated state
    * @throws PipelineNotFoundException if pipeline does not exist
    */
-  Pipeline updatePipelineState(PipelineID pipelineID, PipelineState state)
+  public Pipeline updatePipelineState(PipelineID pipelineID, PipelineState state)
       throws PipelineNotFoundException {
     Preconditions.checkNotNull(pipelineID, "Pipeline Id cannot be null");
     Preconditions.checkNotNull(state, "Pipeline LifeCycleState cannot be null");

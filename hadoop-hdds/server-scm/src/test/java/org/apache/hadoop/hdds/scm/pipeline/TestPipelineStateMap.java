@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestPipelineStateMap {
 
-  private PipelineStateMap map;
+  private PipelineMap map;
 
   @BeforeEach
   public void setup() {
