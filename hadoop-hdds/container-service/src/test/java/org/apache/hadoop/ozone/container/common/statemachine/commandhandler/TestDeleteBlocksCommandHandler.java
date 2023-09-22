@@ -285,7 +285,7 @@ public class TestDeleteBlocksCommandHandler {
   private static class TestSchemaHandler implements SchemaHandler {
     @Override
     public void handle(KeyValueContainerData containerData,
-                       DeletedBlocksTransaction tx) throws IOException {
+        DeletedBlocksTransaction tx) throws IOException {
       // doNoting just for Test
     }
   }
