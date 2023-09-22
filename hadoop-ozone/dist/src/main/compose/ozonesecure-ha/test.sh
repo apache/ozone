@@ -50,6 +50,8 @@ done
 
 execute_robot_test s3g admincli
 
+execute_robot_test s3g omha/om-fetch-key.robot
+
 execute_robot_test s3g omha/om-leader-transfer.robot
 
 execute_robot_test s3g httpfs
