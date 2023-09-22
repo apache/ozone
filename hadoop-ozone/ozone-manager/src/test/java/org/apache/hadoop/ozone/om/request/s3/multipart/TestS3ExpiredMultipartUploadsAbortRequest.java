@@ -233,7 +233,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
 
   /**
    * Tests on cleaning up the MPUs whose open keys have been
-   * cleaned by open key clean up service prior to SPDI-97585.
+   * cleaned by open key clean up service prior to HDDS-9098.
    * Where for normal MPU complete/abort request, the request
    * should fail if the MPU open key doesn't exist in MPU table,
    * aborting expired orphan MPUs should not fail.
