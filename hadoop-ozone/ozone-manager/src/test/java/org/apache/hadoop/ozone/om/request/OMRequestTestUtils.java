@@ -1275,10 +1275,18 @@ public final class OMRequestTestUtils {
             .setSnapshotName(snapshotName)
             .build();
 
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("remote-address")
+            .build();
+
     return OMRequest.newBuilder()
         .setCreateSnapshotRequest(createSnapshotRequest)
         .setCmdType(Type.CreateSnapshot)
         .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
         .build();
   }
 
@@ -1298,10 +1306,18 @@ public final class OMRequestTestUtils {
             .setDeletionTime(Time.now())
             .build();
 
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("0.0.0.0")
+            .build();
+
     return OMRequest.newBuilder()
         .setDeleteSnapshotRequest(deleteSnapshotRequest)
         .setCmdType(Type.DeleteSnapshot)
         .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
         .build();
   }
 

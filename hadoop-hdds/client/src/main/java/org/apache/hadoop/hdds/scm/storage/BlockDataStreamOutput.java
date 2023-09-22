@@ -376,8 +376,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
-          commitWatcher.streamWatchOnFirstIndex() :
-          commitWatcher.streamWatchOnLastIndex();
+          commitWatcher.watchOnFirstIndex() :
+          commitWatcher.watchOnLastIndex();
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -454,7 +454,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Adding index " + asyncReply.getLogIndex() +
                     " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + commitWatcher.getCommitIndexMap().size() + " flushLength "
                     + flushPos + " blockID " + blockID);
               }
               // for standalone protocol, logIndex will always be 0.

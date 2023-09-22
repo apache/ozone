@@ -165,7 +165,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * to save space.
    */
   static final String SST_FILE_EXTENSION = ".sst";
-  private static final int SST_FILE_EXTENSION_LENGTH =
+  public static final int SST_FILE_EXTENSION_LENGTH =
       SST_FILE_EXTENSION.length();
 
   private static final int LONG_MAX_STR_LEN =

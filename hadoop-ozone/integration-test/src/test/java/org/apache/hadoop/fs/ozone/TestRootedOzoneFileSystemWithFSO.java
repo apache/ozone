@@ -240,7 +240,8 @@ public class TestRootedOzoneFileSystemWithFSO
      */
 
     long prevDeletes = getOMMetrics().getNumKeyDeletes();
-    Assert.assertTrue(getFs().delete(volumePath1, true));
+    Assert.assertTrue(getFs().delete(bucketPath2, true));
+    Assert.assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
     Assert.assertTrue(deletes == prevDeletes + 1);
   }

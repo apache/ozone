@@ -288,7 +288,7 @@ public class TestKeyValueHandler {
           volumeSet, metrics, c -> {
       });
       assertEquals("org.apache.hadoop.ozone.container.common" +
-          ".volume.RoundRobinVolumeChoosingPolicy",
+          ".volume.CapacityVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
               .getClass().getName());
 

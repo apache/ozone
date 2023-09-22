@@ -40,6 +40,8 @@ public class DatanodeConfiguration {
 
   static final String CONTAINER_DELETE_THREADS_MAX_KEY =
       "hdds.datanode.container.delete.threads.max";
+  static final String CONTAINER_CLOSE_THREADS_MAX_KEY =
+      "hdds.datanode.container.close.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY =
       "hdds.datanode.periodic.disk.check.interval.minutes";
   public static final String DISK_CHECK_FILE_SIZE_KEY =
@@ -115,6 +117,7 @@ public class DatanodeConfiguration {
   private int numReadThreadPerVolume = 10;
 
   static final int CONTAINER_DELETE_THREADS_DEFAULT = 2;
+  static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
   /**
@@ -129,6 +132,19 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  /**
+   * The maximum number of threads used to close containers on a datanode
+   * simultaneously.
+   */
+  @Config(key = "container.close.threads.max",
+      type = ConfigType.INT,
+      defaultValue = "3",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to close containers " +
+          "on a datanode"
+  )
+  private int containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
 
   /**
    * The maximum number of threads used to handle delete block commands.
@@ -229,6 +245,30 @@ public class DatanodeConfiguration {
 
   public int getBlockDeletionLimit() {
     return blockLimitPerInterval;
+  }
+
+  @Config(key = "block.deleting.max.lock.holding.time",
+      defaultValue = "1s",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION },
+      description =
+          "This configuration controls the maximum time that the block "
+          + "deleting service can hold the lock during the deletion of blocks. "
+          + "Once this configured time period is reached, the service will "
+          + "release and re-acquire the lock. This is not a hard limit as the "
+          + "time check only occurs after the completion of each transaction, "
+          + "which means the actual execution time may exceed this limit. "
+          + "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private long blockDeletingMaxLockHoldingTime =
+      Duration.ofSeconds(1).toMillis();
+
+  public Duration getBlockDeletingMaxLockHoldingTime() {
+    return Duration.ofMillis(blockDeletingMaxLockHoldingTime);
+  }
+
+  public void setBlockDeletingMaxLockHoldingTime(Duration maxLockHoldingTime) {
+    blockDeletingMaxLockHoldingTime = maxLockHoldingTime.toMillis();
   }
 
   public void setBlockDeletionLimit(int limit) {
@@ -479,6 +519,13 @@ public class DatanodeConfiguration {
       containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
     }
 
+    if (containerCloseThreads < 1) {
+      LOG.warn(CONTAINER_CLOSE_THREADS_MAX_KEY + " must be greater than zero" +
+              " and was set to {}. Defaulting to {}",
+          containerCloseThreads, CONTAINER_CLOSE_THREADS_DEFAULT);
+      containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
+    }
+
     if (periodicDiskCheckIntervalMinutes < 1) {
       LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
               " must be greater than zero and was set to {}. Defaulting to {}",
@@ -595,6 +642,14 @@ public class DatanodeConfiguration {
 
   public int getContainerDeleteThreads() {
     return containerDeleteThreads;
+  }
+
+  public void setContainerCloseThreads(int containerCloseThreads) {
+    this.containerCloseThreads = containerCloseThreads;
+  }
+
+  public int getContainerCloseThreads() {
+    return containerCloseThreads;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {

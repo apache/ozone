@@ -1901,6 +1901,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void clearThreadLocalS3Auth() {
     this.threadLocalS3Auth.remove();
   }
+
+  @Override
+  public ThreadLocal<S3Auth> getS3CredentialsProvider() {
+    return this.threadLocalS3Auth;
+  }
+
   @Override
   public S3Auth getThreadLocalS3Auth() {
     return this.threadLocalS3Auth.get();

@@ -50,8 +50,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
@@ -174,22 +176,34 @@ public class TestS3GatewayMetrics {
 
     long oriMetric = metrics.getCreateBucketSuccess();
 
-    bucketEndpoint.put(bucketName, null,
-        null, null);
-    long curMetric = metrics.getCreateBucketSuccess();
+    try {
+      bucketEndpoint.put("newBucket", null, null, null);
 
-    assertEquals(1L, curMetric - oriMetric);
+      long curMetric = metrics.getCreateBucketSuccess();
+      assertEquals(1L, curMetric - oriMetric);
+
+    } catch (OS3Exception ex) {
+      fail(); // Should not throw error for new bucket
+    }
+
   }
 
   @Test
   public void testCreateBucketFailure() throws Exception {
-    // Creating an error by trying to create a bucket that already exists
     long oriMetric = metrics.getCreateBucketFailure();
 
-    bucketEndpoint.put(bucketName, null, null, null);
+    try {
+      // Creating an error by trying to create a bucket that already exists
+      bucketEndpoint.put(bucketName, null, null, null);
+      fail();
 
-    long curMetric = metrics.getCreateBucketFailure();
-    assertEquals(1L, curMetric - oriMetric);
+    } catch (OS3Exception ex) {
+      Assert.assertEquals(HTTP_CONFLICT, ex.getHttpCode());
+      Assert.assertEquals(BUCKET_ALREADY_EXISTS.getCode(), ex.getCode());
+
+      long curMetric = metrics.getCreateBucketFailure();
+      assertEquals(1L, curMetric - oriMetric);
+    }
   }
 
   @Test

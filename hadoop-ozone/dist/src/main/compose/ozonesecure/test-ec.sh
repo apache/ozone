@@ -15,15 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:EC
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-export SECURITY_ENABLED=false
-export COMPOSE_FILE=docker-compose.yaml:../common/s3-haproxy.yaml
+export SECURITY_ENABLED=true
+export OZONE_REPLICATION_FACTOR=3
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-start_docker_env
-
-execute_robot_test scm s3
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../common/ec-test.sh"
