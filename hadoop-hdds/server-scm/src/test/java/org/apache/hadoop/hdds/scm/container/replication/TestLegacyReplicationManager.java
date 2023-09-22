@@ -71,7 +71,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Disabled;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -2739,7 +2739,7 @@ public class TestLegacyReplicationManager {
 
 
     @Test
-    @Disabled("This test doesn't properly test Rack Placement Policy as" +
+    @Unhealthy("This test doesn't properly test Rack Placement Policy as" +
         " LegacyReplicationManager doesn't handle rack aware delete properly.")
     public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted()
             throws IOException, TimeoutException {

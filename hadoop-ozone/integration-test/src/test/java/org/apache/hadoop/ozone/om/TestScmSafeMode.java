@@ -43,12 +43,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +73,7 @@ import static org.junit.Assert.fail;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore("HDDS-3260")
+@Category(UnhealthyTest.class) @Unhealthy("HDDS-3260")
 public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory
