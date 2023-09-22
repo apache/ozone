@@ -669,7 +669,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
    */
   public interface SchemaHandler {
     void handle(KeyValueContainerData containerData,
-                DeletedBlocksTransaction tx) throws IOException;
+        DeletedBlocksTransaction tx) throws IOException;
   }
 
   @VisibleForTesting
