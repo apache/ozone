@@ -49,7 +49,7 @@ public class TestOmConf {
   static void assertWaitTimeMin(TimeDuration expected,
       OzoneConfiguration conf) {
     final RaftProperties p = OzoneManagerRatisServer.newRaftProperties(
-        conf, 1000, "/test/dir");
+        conf, 1000, "dummy/dir");
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     Assertions.assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
