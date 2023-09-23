@@ -378,12 +378,12 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String partName2 = uploadPart(bucket, keyName, uploadID, 2, data);
     partsMap.put(2, partName2);
 
-    // Upload part 3 but do not add it to the partsMap for completing the
+    // Upload part 3 but do not add it to the partsMap.
     String partName3 = uploadPart(bucket, keyName, uploadID, 3, data);
 
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
-    // Check the bucket size. Since part number 2 was not added to the partsMap,
+    // Check the bucket size. Since part number 3 was not added to the partsMap,
     // the unused part size should be discarded from the bucket size,
     // 30000000 - 10000000 = 20000000
     long bucketSize = volume.getBucket(bucketName).getUsedBytes();
