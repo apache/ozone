@@ -396,8 +396,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
-                this::reconfOzoneReadOnlyAdmins)
-            .register(conf.getObject(ScmConfig.class));
+                this::reconfOzoneReadOnlyAdmins);
 
     initializeSystemManagers(conf, configurator);
 
@@ -2176,6 +2175,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
   }
 
+  @Override
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
   }

@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -99,7 +100,7 @@ public class SCMBlockDeletingService extends BackgroundService
              SCMContext scmContext, SCMServiceManager serviceManager,
              ConfigurationSource conf,
              ScmBlockDeletingServiceMetrics metrics,
-             Clock clock) {
+             Clock clock, ReconfigurationHandler reconfigurationHandler) {
     super("SCMBlockDeletingService",
         conf.getObject(ScmConfig.class)
             .getBlockDeletionInterval().toMillis(),
@@ -119,7 +120,7 @@ public class SCMBlockDeletingService extends BackgroundService
     this.scmContext = scmContext;
     this.metrics = metrics;
     scmConf = conf.getObject(ScmConfig.class);
-
+    reconfigurationHandler.register(scmConf);
     blockDeleteLimitSize = scmConf.getBlockDeletionLimit();
     Preconditions.checkArgument(blockDeleteLimitSize > 0,
         "Block deletion limit should be positive.");

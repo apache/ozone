@@ -31,6 +31,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.datanode.metadata.DatanodeCRLStore;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -131,6 +132,7 @@ public class DatanodeStateMachine implements Closeable {
       reconstructECContainersCommandHandler;
 
   private final DatanodeQueueMetrics queueMetrics;
+  private final ReconfigurationHandler reconfigurationHandler;
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -143,10 +145,13 @@ public class DatanodeStateMachine implements Closeable {
                               CertificateClient certClient,
                               SecretKeyClient secretKeyClient,
                               HddsDatanodeStopService hddsDatanodeStopService,
-                              DatanodeCRLStore crlStore) throws IOException {
+                              DatanodeCRLStore crlStore,
+                              ReconfigurationHandler reconfigurationHandler)
+      throws IOException {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
 
+    this.reconfigurationHandler = reconfigurationHandler;
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -266,8 +271,9 @@ public class DatanodeStateMachine implements Closeable {
 
   @VisibleForTesting
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-                              OzoneConfiguration conf) throws IOException {
-    this(datanodeDetails, conf, null, null, null, null);
+                              ConfigurationSource conf) throws IOException {
+    this(datanodeDetails, conf, null, null, null, null,
+        new ReconfigurationHandler("DN", (OzoneConfiguration) conf, op -> { }));
   }
 
   private int getEndPointTaskThreadPoolSize() {
@@ -748,5 +754,9 @@ public class DatanodeStateMachine implements Closeable {
 
   public DatanodeQueueMetrics getQueueMetrics() {
     return queueMetrics;
+  }
+
+  public ReconfigurationHandler getReconfigurationHandler() {
+    return reconfigurationHandler;
   }
 }

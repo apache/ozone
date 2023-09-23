@@ -287,8 +287,17 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           secretKeyClient.start(conf);
         }
       }
+
+      reconfigurationHandler =
+          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
+                  this::reconfigBlockDeleteThreadMax)
+              .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
+                  this::reconfigDeletingServiceWorkers);
+
       datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore);
+          dnCertClient, secretKeyClient, this::terminateDatanode, dnCRLStore,
+          reconfigurationHandler);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
@@ -305,13 +314,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         LOG.error("HttpServer failed to start.", ex);
       }
 
-      reconfigurationHandler =
-          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
-              .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
-                  this::reconfigBlockDeleteThreadMax)
-              .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
-                  this::reconfigDeletingServiceWorkers)
-              .register(conf.getObject(DatanodeConfiguration.class));
 
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
