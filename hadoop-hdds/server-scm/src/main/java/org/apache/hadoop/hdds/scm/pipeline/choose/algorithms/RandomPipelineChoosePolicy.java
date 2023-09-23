@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
@@ -29,6 +30,9 @@ import java.util.List;
  * utilization.
  */
 public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
+
+  public RandomPipelineChoosePolicy(NodeManager nodeManager) {
+  }
 
   @Override
   @SuppressWarnings("java:S2245") // no need for secure random
