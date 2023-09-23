@@ -34,7 +34,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
  */
 @ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
     + RaftServerConfigKeys.PREFIX)
-public class DatanodeRatisServerConfig extends RatisServerConfig {
+public class DatanodeRatisServerConfig {
 
   @Config(key = "rpc.request.timeout",
       defaultValue = "60s",
@@ -189,5 +189,22 @@ public class DatanodeRatisServerConfig extends RatisServerConfig {
 
   public void setPreVote(boolean preVote) {
     this.preVoteEnabled = preVote;
+  }
+
+  /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
+  @Config(key = "log.appender.wait-time.min",
+      defaultValue = "1ms",
+      type = ConfigType.TIME,
+      tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
+      description = "Minimum wait time between two appendEntries calls."
+  )
+  private long logAppenderWaitTimeMin;
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
   }
 }

@@ -17,14 +17,36 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.RatisServerConfig;
+import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.ratis.server.RaftServerConfigKeys;
+
+import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
 /**
  * SCM Ratis Server config.
  */
 @ConfigGroup(prefix = ScmConfigKeys.OZONE_SCM_HA_PREFIX
     + "." + RaftServerConfigKeys.PREFIX)
-public class ScmRatisServerConfig extends RatisServerConfig {
+public class ScmRatisServerConfig {
+  /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
+  @Config(key = "log.appender.wait-time.min",
+      defaultValue = "1ms",
+      type = ConfigType.TIME,
+      tags = {OZONE, SCM, RATIS, PERFORMANCE},
+      description = "Minimum wait time between two appendEntries calls."
+  )
+  private long logAppenderWaitTimeMin;
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
 }
