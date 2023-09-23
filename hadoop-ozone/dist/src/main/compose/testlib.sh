@@ -337,8 +337,17 @@ stop_docker_env(){
   copy_daemon_logs
   save_container_logs
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose --ansi never down
+    down_repeats=3
+    for i in $(seq 1 $down_repeats)
+    do
+      if docker-compose --ansi never down; then
+        return
+      fi
+      sleep 5
+    done
   fi
+  echo "Failed to remove all docker containers in $down_repeats attempts."
+  return 1
 }
 
 ## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
