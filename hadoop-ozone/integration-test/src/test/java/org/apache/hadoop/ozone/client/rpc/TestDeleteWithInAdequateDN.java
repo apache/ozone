@@ -277,8 +277,6 @@ public class TestDeleteWithInAdequateDN {
         ozoneContainer.getContainerSet().getContainer(blockID.getContainerID());
     KeyValueContainerData containerData =
         ((KeyValueContainerData) container.getContainerData());
-    long delTrxId = containerData.getDeleteTransactionId();
-    long numPendingDeletionBlocks = containerData.getNumPendingDeletionBlocks();
     BlockData blockData =
         keyValueHandler.getBlockManager().getBlock(container, blockID);
     //cluster.getOzoneManager().deleteKey(keyArgs);
