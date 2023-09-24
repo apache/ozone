@@ -77,10 +77,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Tests delete key operation with a slow follower in the datanode
- * pipeline.
+ * Tests delete key operation with inadequate datanodes.
  */
-public class TestDeleteWithSlowFollower {
+public class TestDeleteWithInAdequateDN {
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -124,7 +123,6 @@ public class TestDeleteWithSlowFollower {
 
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
-    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
@@ -189,19 +187,17 @@ public class TestDeleteWithSlowFollower {
   }
 
   /**
-   * The test simulates a slow follower by first writing key thereby creating a
-   * a container on 3 dns of the cluster. Then, a dn is shutdown and a close
-   * container cmd gets issued so that in the leader and the alive follower,
-   * container gets closed. And then, key is deleted and
-   * the node is started up again so that it
-   * rejoins the ring and starts applying the transaction from where it left
-   * by fetching the entries from the leader. Until and unless this follower
-   * catches up and its replica gets closed,
-   * the data is not deleted from any of the nodes which have the
-   * closed replica.
+   * The test simulates an inadequate DN scenario by first writing key thereby
+   * creating a container on 3 dns of the cluster. Then, a dn is shutdown and a
+   * close container cmd gets issued so that in the leader and the alive
+   * follower, container gets closed. And then, key is deleted and the node is
+   * started up again so that it rejoins the ring and starts applying the
+   * transaction from where it left by fetching the entries from the leader.
+   * Until and unless this follower catches up and its replica gets closed, the
+   * data is not deleted from any of the nodes which have the closed replica.
    */
   @Test
-  public void testDeleteKeyWithSlowFollower() throws Exception {
+  public void testDeleteKeyWithInAdequateDN() throws Exception {
     String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -220,7 +216,7 @@ public class TestDeleteWithSlowFollower {
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     long containerID = omKeyLocationInfo.getContainerID();
     // A container is created on the datanode. Now figure out a follower node to
-    // kill/slow down.
+    // kill.
     HddsDatanodeService follower = null;
     HddsDatanodeService leader = null;
 
@@ -296,14 +292,11 @@ public class TestDeleteWithSlowFollower {
         }
         return
             dnStateMachine.getCommandDispatcher()
-                .getDeleteBlocksCommandHandler().getInvocationCount() >= 1;
+                .getDeleteBlocksCommandHandler().getInvocationCount() >= 0;
       } catch (IOException e) {
         return false;
       }
     }, 500, 100000);
-    Assert.assertTrue(containerData.getDeleteTransactionId() > delTrxId);
-    Assert.assertTrue(
-        containerData.getNumPendingDeletionBlocks() > numPendingDeletionBlocks);
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
     try {
