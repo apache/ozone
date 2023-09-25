@@ -349,6 +349,8 @@ public class TestContainerReader {
     KeyValueContainer conflict02 = null;
     KeyValueContainer conflict11 = null;
     KeyValueContainer conflict12 = null;
+    KeyValueContainer conflict21 = null;
+    KeyValueContainer conflict22 = null;
     long baseBCSID = 10L;
 
     for (int i = 0; i < containerCount; i++) {
@@ -362,6 +364,10 @@ public class TestContainerReader {
         conflict11 = createContainerWithId(1, volumeSets, policy, baseBCSID);
         conflict12 = createContainerWithId(
             1, volumeSets, policy, baseBCSID - 1);
+      } else if (i == 2) {
+        conflict21 = createContainerWithId(i, volumeSets, policy, baseBCSID);
+        conflict22 = createContainerWithId(i, volumeSets, policy, baseBCSID);
+        conflict22.close();
       } else {
         createContainerWithId(i, volumeSets, policy, baseBCSID);
       }
@@ -413,6 +419,12 @@ public class TestContainerReader {
         conflict12.getContainerData().getContainerPath())));
     Assert.assertEquals(conflict11.getContainerData().getContainerPath(),
         containerSet.getContainer(1).getContainerData().getContainerPath());
+
+    // For conflict2, the closed on (conflict22) should win.
+    Assert.assertFalse(Files.exists(Paths.get(
+        conflict21.getContainerData().getContainerPath())));
+    Assert.assertEquals(conflict22.getContainerData().getContainerPath(),
+        containerSet.getContainer(2).getContainerData().getContainerPath());
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.

@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State.RECOVERING;
@@ -253,7 +254,33 @@ public class ContainerReader implements Runnable {
 
     // Keep the copy with the largest BCSID
     long existingBCSID = existing.getBlockCommitSequenceId();
+    ContainerProtos.ContainerDataProto.State
+        existingState = existing.getContainerState();
     long toAddBCSID = toAdd.getBlockCommitSequenceId();
+    ContainerProtos.ContainerDataProto.State
+        toAddState = toAdd.getContainerState();
+
+    if (existingState != toAddState) {
+      if (existingState == CLOSED) {
+        // If we have mis-matched states, always pick a closed one
+        LOG.warn("Container {} is present at {} with state CLOSED and at " +
+                "{} with state {}. Removing the latter container.",
+            existing.getContainerData().getContainerID(),
+            existing.getContainerData().getContainerPath(),
+            toAdd.getContainerData().getContainerPath(), toAddState);
+        KeyValueContainerUtil.removeContainer(toAdd.getContainerData(),
+            hddsVolume.getConf());
+        return;
+      } else if (toAddState == CLOSED) {
+        LOG.warn("Container {} is present at {} with state CLOSED and at " +
+                "{} with state {}. Removing the latter container.",
+            toAdd.getContainerData().getContainerID(),
+            toAdd.getContainerData().getContainerPath(),
+            existing.getContainerData().getContainerPath(), existingState);
+        swapAndRemoveContainer(existing, toAdd);
+        return;
+      }
+    }
 
     if (existingBCSID >= toAddBCSID) {
       // existing is newer or equal, so remove the one we have yet to load.
@@ -270,12 +297,17 @@ public class ContainerReader implements Runnable {
           existing.getContainerData().getContainerID(),
           existing.getContainerData().getContainerPath(),
           toAdd.getContainerData().getContainerPath());
-      containerSet.removeContainer(
-          existing.getContainerData().getContainerID());
-      containerSet.addContainer(toAdd);
-      KeyValueContainerUtil.removeContainer(existing.getContainerData(),
-          hddsVolume.getConf());
+      swapAndRemoveContainer(existing, toAdd);
     }
+  }
+
+  private void swapAndRemoveContainer(KeyValueContainer existing,
+      KeyValueContainer toAdd) throws IOException {
+    containerSet.removeContainer(
+        existing.getContainerData().getContainerID());
+    containerSet.addContainer(toAdd);
+    KeyValueContainerUtil.removeContainer(existing.getContainerData(),
+        hddsVolume.getConf());
   }
 
   private void cleanupContainer(
