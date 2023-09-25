@@ -1216,6 +1216,7 @@ public class KeyManagerImpl implements KeyManager {
     Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIterator =
         keyTable.cacheIterator();
+    Set<String> deletedKeys = new HashSet<>();
     while (cacheIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> cacheEntry =
           cacheIterator.next();
@@ -1227,6 +1228,12 @@ public class KeyManagerImpl implements KeyManager {
           && !Objects.equals(cacheKey, targetKey)) {
         LOG.debug("Fake dir {} required for {}", targetKey, cacheKey);
         return createDirectoryKey(cacheValue.getCacheValue(), dirKey);
+      }
+      // deletedKeys may contain deleted entry while iterating cache iterator
+      // To avoid race condition of flush of cache while iterating
+      // table iterator.
+      if (!exists) {
+        deletedKeys.add(cacheKey);
       }
     }
 
@@ -1242,7 +1249,7 @@ public class KeyManagerImpl implements KeyManager {
           // in different volume/bucket, such as "/vol1/bucket2/dir2/key2".
           if (key.startsWith(targetKey)) {
             if (!Objects.equals(key, targetKey)
-                && !isKeyDeleted(key, keyTable)) {
+                && !deletedKeys.contains(key)) {
               LOG.debug("Fake dir {} required for {}", targetKey, key);
               return createDirectoryKey(keyValue.getValue(), dirKey);
             }

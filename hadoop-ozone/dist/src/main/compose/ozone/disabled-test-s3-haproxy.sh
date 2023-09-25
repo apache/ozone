@@ -26,4 +26,5 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm s3
+## Exclude virtual-host tests. This is tested separately as it requires additional config.
+execute_robot_test scm --exclude virtual-host s3
