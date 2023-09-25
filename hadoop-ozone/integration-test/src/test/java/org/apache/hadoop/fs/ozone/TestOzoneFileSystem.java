@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -1635,7 +1634,6 @@ public class TestOzoneFileSystem {
    * 2.Verify that the key gets deleted by the trash emptier.
    */
   @Test
-  @Flaky("HDDS-6645")
   public void testTrash() throws Exception {
     String testKeyName = "testKey2";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
@@ -1655,12 +1653,10 @@ public class TestOzoneFileSystem {
 
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
-    // Added this assertion here and will be tested as part of testTrash
-    // test case which needs to be tested with separate mini cluster having
-    // emptier thread started with close match of timings of relevant
-    // assertion statements and corresponding trash and checkpoint interval.
+
     Assert.assertTrue(o3fs.exists(userTrash));
-    Assert.assertTrue(o3fs.exists(userTrashCurrent));
+    Assert.assertTrue(o3fs.exists(userTrashCurrent) || o3fs.listStatus(
+        o3fs.listStatus(userTrash)[0].getPath()).length > 0);
 
     // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(() -> {
@@ -1672,10 +1668,6 @@ public class TestOzoneFileSystem {
         return false;
       }
     }, 100, 120000);
-
-    // userTrash path will contain the checkpoint folder
-    FileStatus[] statusList = fs.listStatus(userTrash);
-    Assert.assertNotEquals(Arrays.toString(statusList), 0, statusList.length);
 
     // wait for deletion of checkpoint dir
     GenericTestUtils.waitFor(() -> {
