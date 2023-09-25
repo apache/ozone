@@ -393,7 +393,7 @@ public class OzoneListStatusHelper {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
         if (entryKey.startsWith(prefixKey)) {
-          if (table.isExist(entryKey)) {
+          if (!KeyManagerImpl.isKeyDeleted(entryKey, table)) {
             currentKey = new HeapEntry(iterType, entryKey, entry.getValue());
           }
         } else {
