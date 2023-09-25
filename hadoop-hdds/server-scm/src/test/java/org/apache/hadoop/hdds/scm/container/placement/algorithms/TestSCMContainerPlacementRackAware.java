@@ -797,4 +797,44 @@ public class TestSCMContainerPlacementRackAware {
     Assertions.assertTrue(tryCount >= 1, "Not enough try count");
     Assertions.assertEquals(0, compromiseCount);
   }
+
+  @Test
+  public void chooseNodeWithUsedAndFavouredNodesMultipleRack()
+      throws SCMException {
+    int datanodeCount = 12;
+    setup(datanodeCount);
+    int nodeNum = 1;
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    List<DatanodeDetails> favouredNodes = new ArrayList<>();
+
+    // 2 replica
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(2));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // Favoured node should not be returned,
+    // as favoured node is in the same rack as both used nodes.
+    Assertions.assertFalse(favouredNodes.get(0).getUuid() ==
+        datanodeDetails.get(0).getUuid());
+
+    favouredNodes.clear();
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(6));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Favoured node should be returned,
+    // as favoured node is in the different rack as used nodes.
+    Assertions.assertTrue(favouredNodes.get(0).getUuid() ==
+        datanodeDetails.get(0).getUuid());
+
+  }
 }
