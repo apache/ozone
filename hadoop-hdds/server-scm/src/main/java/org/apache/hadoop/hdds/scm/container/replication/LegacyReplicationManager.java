@@ -410,8 +410,9 @@ public class LegacyReplicationManager {
             */
             containerManager.updateContainerState(container.containerID(),
                 HddsProtos.LifeCycleEvent.QUASI_CLOSE);
-            LOG.debug("Moved container {} to QUASI_CLOSED because it has only" +
-                " UNHEALTHY replicas: {}.", container, replicas);
+            LOG.debug("Moved container {} from CLOSING to QUASI_CLOSED " +
+                "because it has only UNHEALTHY replicas: {}.", container,
+                replicas);
           }
 
           return;
