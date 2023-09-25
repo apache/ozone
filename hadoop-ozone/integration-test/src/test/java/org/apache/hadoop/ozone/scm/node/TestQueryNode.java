@@ -25,9 +25,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -68,7 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test Query Node Operation.
  */
-@Disabled
+@Unhealthy
 public class TestQueryNode {
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;

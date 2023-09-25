@@ -51,4 +51,7 @@ cd "$DIST_DIR/kubernetes/examples" || exit 1
 RES=$?
 cp -r result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
+
+grep -A1 FAIL "${REPORT_DIR}/output.log" > "${REPORT_DIR}/summary.txt"
+
 exit $RES

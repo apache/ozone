@@ -75,6 +75,8 @@ public class TestRDBStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);

@@ -25,10 +25,10 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -38,7 +38,7 @@ import java.util.UUID;
  * Integration test to verify that if snapshot feature is disabled, OM start up
  * will fail when there are still snapshots remaining.
  */
-@Disabled("HDDS-8945")
+@Unhealthy("HDDS-8945")
 public class TestOmSnapshotDisabledRestart {
 
   private static MiniOzoneHAClusterImpl cluster = null;
