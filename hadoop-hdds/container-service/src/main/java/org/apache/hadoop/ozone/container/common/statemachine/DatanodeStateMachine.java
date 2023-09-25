@@ -225,10 +225,11 @@ public class DatanodeStateMachine implements Closeable {
     // When we add new handlers just adding a new handler here should do the
     // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
-        .addHandler(new CloseContainerCommandHandler())
+        .addHandler(new CloseContainerCommandHandler(
+            dnConf.getContainerCloseThreads(),
+            dnConf.getCommandQueueLimit()))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf.getBlockDeleteThreads(),
-            dnConf.getBlockDeleteQueueLimit()))
+            conf, dnConf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor,
             pullReplicatorWithMetrics, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
