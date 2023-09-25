@@ -351,25 +351,35 @@ public class TestContainerReader {
     KeyValueContainer conflict12 = null;
     KeyValueContainer conflict21 = null;
     KeyValueContainer conflict22 = null;
+    KeyValueContainer ec1 = null;
+    KeyValueContainer ec2 = null;
     long baseBCSID = 10L;
 
     for (int i = 0; i < containerCount; i++) {
       if (i == 0) {
         // Create a duplicate container with ID 0. Both have the same BSCID
-        conflict01 = createContainerWithId(0, volumeSets, policy, baseBCSID);
-        conflict02 = createContainerWithId(0, volumeSets, policy, baseBCSID);
+        conflict01 =
+            createContainerWithId(0, volumeSets, policy, baseBCSID, 0);
+        conflict02 =
+            createContainerWithId(0, volumeSets, policy, baseBCSID, 0);
       } else if (i == 1) {
         // Create a duplicate container with ID 1 so that the one has a
         // larger BCSID
-        conflict11 = createContainerWithId(1, volumeSets, policy, baseBCSID);
+        conflict11 =
+            createContainerWithId(1, volumeSets, policy, baseBCSID, 0);
         conflict12 = createContainerWithId(
-            1, volumeSets, policy, baseBCSID - 1);
+            1, volumeSets, policy, baseBCSID - 1, 0);
       } else if (i == 2) {
-        conflict21 = createContainerWithId(i, volumeSets, policy, baseBCSID);
-        conflict22 = createContainerWithId(i, volumeSets, policy, baseBCSID);
+        conflict21 =
+            createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
+        conflict22 =
+            createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
         conflict22.close();
+      } else if (i == 3) {
+        ec1 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec2 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
       } else {
-        createContainerWithId(i, volumeSets, policy, baseBCSID);
+        createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
       }
     }
     // Close the RocksDB instance for this container and remove from the cache
@@ -426,17 +436,25 @@ public class TestContainerReader {
     Assert.assertEquals(conflict22.getContainerData().getContainerPath(),
         containerSet.getContainer(2).getContainerData().getContainerPath());
 
+    // For the EC conflict, both containers should be left on disk
+    Assert.assertTrue(Files.exists(Paths.get(
+        ec1.getContainerData().getContainerPath())));
+    Assert.assertTrue(Files.exists(Paths.get(
+        ec2.getContainerData().getContainerPath())));
+
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
     Assert.assertEquals(0, cache.size());
   }
 
   private KeyValueContainer createContainerWithId(int id, VolumeSet volSet,
-      VolumeChoosingPolicy policy, long bcsid) throws Exception {
+      VolumeChoosingPolicy policy, long bcsid, int replicaIndex)
+      throws Exception {
     KeyValueContainerData keyValueContainerData =
         new KeyValueContainerData(id, layout,
             (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
             datanodeId.toString());
+    keyValueContainerData.setReplicaIndex(replicaIndex);
 
     KeyValueContainer keyValueContainer =
         new KeyValueContainer(keyValueContainerData,

@@ -251,14 +251,27 @@ public class ContainerReader implements Runnable {
 
   private void resolveDuplicate(KeyValueContainer existing,
       KeyValueContainer toAdd) throws IOException {
+    if (existing.getContainerData().getReplicaIndex() != 0 ||
+        toAdd.getContainerData().getReplicaIndex() != 0) {
+      // This is an EC container. As EC Containers don't have a BSCID, we can't
+      // know which one has the most recent data. Additionally, it is possible
+      // for both copies to have a different replica index for the same
+      // container. Therefore we just let whatever one is loaded first win AND
+      // leave the other one on disk.
+      LOG.warn("Container {} is present at {} and at {}. Both are EC " +
+              "containers. Leaving both containers on disk.",
+          existing.getContainerData().getContainerID(),
+          existing.getContainerData().getContainerPath(),
+          toAdd.getContainerData().getContainerPath());
+      return;
+    }
 
-    // Keep the copy with the largest BCSID
     long existingBCSID = existing.getBlockCommitSequenceId();
-    ContainerProtos.ContainerDataProto.State
-        existingState = existing.getContainerState();
+    ContainerProtos.ContainerDataProto.State existingState
+        = existing.getContainerState();
     long toAddBCSID = toAdd.getBlockCommitSequenceId();
-    ContainerProtos.ContainerDataProto.State
-        toAddState = toAdd.getContainerState();
+    ContainerProtos.ContainerDataProto.State toAddState
+        = toAdd.getContainerState();
 
     if (existingState != toAddState) {
       if (existingState == CLOSED) {
