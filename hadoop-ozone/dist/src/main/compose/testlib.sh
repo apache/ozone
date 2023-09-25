@@ -345,9 +345,10 @@ stop_docker_env(){
       fi
       sleep 5
     done
+
+    echo "Failed to remove all docker containers in $down_repeats attempts."
+    return 1
   fi
-  echo "Failed to remove all docker containers in $down_repeats attempts."
-  return 1
 }
 
 ## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
