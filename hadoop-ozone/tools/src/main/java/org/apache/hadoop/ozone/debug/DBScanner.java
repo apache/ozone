@@ -61,7 +61,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -244,7 +246,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       try {
         if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
           threadPool.shutdownNow();
-          System.err.println("Thread pool did not terminate; forced shutdown.");
+          err().println("Thread pool did not terminate; forced shutdown.");
         }
       } catch (InterruptedException ie) {
         threadPool.shutdownNow();
@@ -273,6 +275,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     long sequenceId = FIRST_SEQUENCE_ID;
     // Count number of keys printed so far
     long count = 0;
+    List<Future<Void>> futures = new ArrayList<>();
     while (withinLimit(count) && iterator.get().isValid() && !exception) {
       batch.add(new ByteArrayKeyValue(
           iterator.get().key(), iterator.get().value()));
@@ -286,16 +289,26 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
           // consuming too much memory.
           Thread.sleep(100);
         }
-        threadPool.submit(
+        Future<Void> future = threadPool.submit(
             new Task(dbColumnFamilyDef, batch, logWriter, sequenceId,
                 withKey, schemaV3));
+        futures.add(future);
         batch = new ArrayList<>(BATCH_SIZE);
         sequenceId++;
       }
     }
     if (!batch.isEmpty()) {
-      threadPool.submit(new Task(dbColumnFamilyDef, batch, logWriter,
-          sequenceId, withKey, schemaV3));
+      Future<Void> future = threadPool.submit(new Task(dbColumnFamilyDef,
+          batch, logWriter, sequenceId, withKey, schemaV3));
+      futures.add(future);
+    }
+
+    for (Future<Void> future : futures) {
+      try {
+        future.get();
+      } catch (ExecutionException e) {
+        LOG.error("Task execution failed", e);
+      }
     }
   }
 
