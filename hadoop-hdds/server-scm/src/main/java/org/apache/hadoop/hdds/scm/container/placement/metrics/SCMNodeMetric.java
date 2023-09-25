@@ -73,7 +73,7 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
     if (Math.abs(thisNodeWeight - oNodeWeight) > 0.000001) {
       return thisNodeWeight > oNodeWeight;
     }
-    // if these nodes are have similar weight then return the node with more
+    // if these nodes have similar weight then return the node with more
     // used space as the greater node.
     return stat.getScmUsed().isGreater(o.getScmUsed().get());
   }
