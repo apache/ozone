@@ -55,7 +55,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -275,8 +274,6 @@ public class TestDeleteWithInAdequateDN {
             .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
     Container container =
         ozoneContainer.getContainerSet().getContainer(blockID.getContainerID());
-    KeyValueContainerData containerData =
-        ((KeyValueContainerData) container.getContainerData());
     BlockData blockData =
         keyValueHandler.getBlockManager().getBlock(container, blockID);
     //cluster.getOzoneManager().deleteKey(keyArgs);
