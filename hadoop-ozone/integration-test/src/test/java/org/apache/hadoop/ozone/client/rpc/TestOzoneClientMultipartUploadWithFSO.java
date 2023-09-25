@@ -379,7 +379,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     partsMap.put(2, partName2);
 
     // Upload part 3 but do not add it to the partsMap.
-    String partName3 = uploadPart(bucket, keyName, uploadID, 3, data);
+    uploadPart(bucket, keyName, uploadID, 3, data);
 
     completeMultipartUpload(bucket, keyName, uploadID, partsMap);
 
