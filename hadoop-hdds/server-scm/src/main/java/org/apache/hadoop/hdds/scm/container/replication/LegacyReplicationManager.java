@@ -403,7 +403,8 @@ public class LegacyReplicationManager {
             return;
           }
 
-          if (!foundHealthy) {
+          if (!foundHealthy && container.getReplicationType().equals(
+              HddsProtos.ReplicationType.RATIS)) {
             /* If we get here, then this container has replicas and all are
             UNHEALTHY. Move it from CLOSING to QUASI_CLOSED so RM can then try
             to maintain replication factor number of replicas.
