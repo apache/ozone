@@ -57,9 +57,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests TestOMSnapshotSizeRequest TestOMSnapshotSizeResponse class.
+ * Tests TestOMSnapshotSetPropertyRequest
+ * TestOMSnapshotSetPropertyResponse class.
  */
-public class TestOMSnapshotSizeRequestAndResponse {
+public class TestOMSnapshotSetPropertyRequestAndResponse {
   private BatchOperation batchOperation;
   private OzoneManager ozoneManager;
   private OMMetadataManager omMetadataManager;

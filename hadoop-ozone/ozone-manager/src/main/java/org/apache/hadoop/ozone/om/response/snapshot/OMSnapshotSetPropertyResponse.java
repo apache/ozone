@@ -41,7 +41,7 @@ public class OMSnapshotSetPropertyResponse extends OMClientResponse {
 
   public OMSnapshotSetPropertyResponse(
       @Nonnull OMResponse omResponse,
-      Map<String, SnapshotInfo> updatedSnapInfos) {
+      @Nonnull Map<String, SnapshotInfo> updatedSnapInfos) {
     super(omResponse);
     this.updatedSnapInfos = updatedSnapInfos;
   }
