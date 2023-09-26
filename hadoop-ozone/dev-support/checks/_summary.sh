@@ -16,14 +16,24 @@
 
 REPORT_FILE="$1"
 
+: ${ITERATIONS:="1"}
+
+declare -i ITERATIONS
+
 rc=0
 
 if [[ ! -e "${REPORT_FILE}" ]]; then
   echo "Report file missing, check logs for details"
   rc=255
-fi
 
-if [[ -s "${REPORT_FILE}" ]]; then
+elif [[ ${ITERATIONS} -gt 1 ]]; then
+  cat "${REPORT_FILE}"
+
+  if grep -q 'exit code: [^0]' "${REPORT_FILE}"; then
+    rc=1
+  fi
+
+elif [[ -s "${REPORT_FILE}" ]]; then
   cat "${REPORT_FILE}"
   rc=1
 fi
