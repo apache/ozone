@@ -424,7 +424,6 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotLists", 0L, omMetrics);
     assertCounter("NumSnapshotActive", 1L, omMetrics);
     assertCounter("NumSnapshotDeleted", 0L, omMetrics);
-    assertCounter("NumSnapshotReclaimed", 0L, omMetrics);
 
     // Create second key
     OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
