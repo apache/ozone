@@ -72,7 +72,7 @@ public final class ChecksumByteBufferFactory {
   };
 
   public static ChecksumByteBuffer crc32Impl() {
-    return new ChecksumByteBufferImpl(new CRC32());
+    return new CRC32ByteBufferImpl(new CRC32());
   }
 
   public static ChecksumByteBuffer crc32CImpl() {
