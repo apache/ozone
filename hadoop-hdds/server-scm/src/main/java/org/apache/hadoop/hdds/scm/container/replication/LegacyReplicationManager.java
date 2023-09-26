@@ -2229,6 +2229,19 @@ public class LegacyReplicationManager {
     // deletion.
     Set<UUID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
+        .filter(
+            r -> {
+              try {
+                return nodeManager.getNodeStatus(r.getDatanodeDetails())
+                    .isHealthy();
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception when checking replica {} for container {}" +
+                    " while deleting excess UNHEALTHY.", r, container, e);
+                return false;
+              }
+            })
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+            .equals(IN_SERVICE))
         .map(ContainerReplica::getOriginDatanodeId)
         .collect(Collectors.toSet());
 
