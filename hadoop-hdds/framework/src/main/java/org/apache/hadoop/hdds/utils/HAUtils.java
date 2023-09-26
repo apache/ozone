@@ -399,18 +399,17 @@ public final class HAUtils {
           }
           return rootCaCertPems;
         }
-        int minimumCACount = 1;
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
         if (scmNodes.size() > 1) {
           // First check if cert client has ca list initialized.
           // This is being done, when this method is called multiple times we
           // don't make call to SCM, we return from in-memory.
           List<String> caCertPemList = certClient.getCAList();
-          if (caCertPemList != null && caCertPemList.size() >= minimumCACount) {
+          if (caCertPemList != null && !caCertPemList.isEmpty()) {
             return caCertPemList;
           }
           return getCAListWithRetry(() ->
-                  waitForCACerts(certClient::updateCAList, minimumCACount),
+                  waitForCACerts(certClient::updateCAList),
               waitDuration);
         } else {
           return generateCAList(certClient);
@@ -432,11 +431,9 @@ public final class HAUtils {
         return caCertPemList;
       } else {
         Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(configuration);
-        int expectedCount = scmNodes.size() + 1;
         if (scmNodes.size() > 1) {
           return getCAListWithRetry(() -> waitForCACerts(
-              scmSecurityProtocolClient::listCACertificate,
-              expectedCount), waitDuration);
+              scmSecurityProtocolClient::listCACertificate), waitDuration);
         } else {
           return scmSecurityProtocolClient.listCACertificate();
         }
@@ -478,19 +475,16 @@ public final class HAUtils {
   }
 
   private static List<String> waitForCACerts(
-      final CheckedSupplier<List<String>, IOException> caCertListSupplier,
-      int expectedCount) throws IOException {
+      final CheckedSupplier<List<String>, IOException> caCertListSupplier)
+      throws IOException {
     // TODO: If SCMs are bootstrapped later, then listCA need to be
     //  refetched if listCA size is less than scm ha config node list size.
     // For now when Client of SCM's are started we compare their node list
     // size and ca list size if it is as expected, we return the ca list.
     List<String> caCertPemList = caCertListSupplier.get();
-    boolean caListUpToDate = caCertPemList.size() >= expectedCount;
-    if (!caListUpToDate) {
-      LOG.info("Expected CA list size {}, where as received CA List size " +
-          "{}.", expectedCount, caCertPemList.size());
-      throw new SCMSecurityException("Expected CA list size " + expectedCount
-          + " is not matching actual count " + caCertPemList.size());
+    if (caCertPemList.isEmpty()) {
+      LOG.info("Expected a non empty CA list");
+      throw new SCMSecurityException("CA list was empty.");
     }
     return caCertPemList;
   }
