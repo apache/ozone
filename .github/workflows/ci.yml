@@ -26,9 +26,10 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      needs-basic-checks: ${{ steps.selective-checks.outputs.needs-basic-checks }}
+      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
+      needs-unit-check: ${{ steps.categorize-basic-checks.outputs.needs-unit-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
-      basic-unit: ${{ steps.categorize-basic-checks.outputs.basic-unit }}
+      unit-checks: ${{ steps.categorize-basic-checks.outputs.unit-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
@@ -172,7 +173,7 @@ jobs:
       - build-info
     runs-on: ubuntu-20.04
     timeout-minutes: 90
-    if: needs.build-info.outputs.needs-basic-checks == 'true'
+    if: needs.build-info.outputs.needs-basic-check == 'true'
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
@@ -225,10 +226,10 @@ jobs:
       - basic
     runs-on: ubuntu-20.04
     timeout-minutes: 90
-    if: needs.build-info.outputs.needs-basic-checks == 'true'
+    if: needs.build-info.outputs.needs-unit-check == 'true'
     strategy:
       matrix:
-        check: ${{ fromJson(needs.build-info.outputs.basic-unit) }}
+        check: ${{ fromJson(needs.build-info.outputs.unit-checks) }}
       fail-fast: false
     steps:
       - name: Checkout project
