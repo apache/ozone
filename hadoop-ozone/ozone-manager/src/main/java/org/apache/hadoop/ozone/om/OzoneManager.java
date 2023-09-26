@@ -2793,12 +2793,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       metrics.incNumBucketInfos();
 
-      ResolvedBucket resolvedBucket =
-          resolveBucketLink(Pair.of(volume, bucket), true);
       OmBucketInfo bucketInfo = bucketManager.getBucketInfo(volume, bucket);
 
-      // If it is a dangling link it means no real bucket exists.
-      if (!resolvedBucket.isDangling() && resolvedBucket.isLink()) {
+      // No links - return the bucket info right away.
+      if (!bucketInfo.isLink()) {
+        return bucketInfo;
+      }
+      // Otherwise follow the links to find the real bucket.
+      // We already know that `bucketInfo` is a linked one,
+      // so we skip one `getBucketInfo` and start with the known link.
+      ResolvedBucket resolvedBucket =
+          resolveBucketLink(Pair.of(
+                  bucketInfo.getSourceVolume(),
+                  bucketInfo.getSourceBucket()),
+              true);
+
+      // If it is a dangling link it means no real bucket exists,
+      // for example, it could have been deleted, but the links still present.
+      if (!resolvedBucket.isDangling()) {
         OmBucketInfo realBucket =
             bucketManager.getBucketInfo(
                 resolvedBucket.realVolume(),
@@ -2817,6 +2829,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setBucketLayout(realBucket.getBucketLayout())
             .build();
       }
+      // If no real bucket exists, return the requested one's info.
       return bucketInfo;
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
@@ -4159,7 +4172,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ResolvedBucket resolveBucketLink(OmKeyArgs args)
       throws IOException {
     return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()), false);
+        Pair.of(args.getVolumeName(), args.getBucketName()));
   }
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,

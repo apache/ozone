@@ -66,7 +66,7 @@ public class BucketManagerImpl implements BucketManager {
    *
    * @param volumeName - Name of the Volume.
    * @param bucketName - Name of the Bucket.
-   * @return
+   * @return Bucket Information.
    * @throws IOException
    */
   @Override

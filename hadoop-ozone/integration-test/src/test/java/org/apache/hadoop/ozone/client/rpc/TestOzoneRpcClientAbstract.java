@@ -921,6 +921,10 @@ public abstract class TestOzoneRpcClientAbstract {
     assertNotNull(linkedBucket);
 
     volume.deleteBucket(bucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> volume.getBucket(bucketName)
+    );
     //now linkedBucketName has become a dangling one
     //should still be possible to get its info
     OzoneBucket danglingLinkedBucket = volume.getBucket(linkedBucketName);
@@ -930,11 +934,10 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.deleteBucket(linkedBucketName);
 
     OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
-        () -> volume.getBucket(bucketName)
-    );
-    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
         () -> volume.getBucket(linkedBucketName)
     );
+
+    store.deleteVolume(volumeName);
   }
 
   private void verifyReplication(String volumeName, String bucketName,
