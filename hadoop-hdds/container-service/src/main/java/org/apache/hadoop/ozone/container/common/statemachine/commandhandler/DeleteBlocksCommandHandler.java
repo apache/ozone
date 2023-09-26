@@ -480,7 +480,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       throws IOException {
     int newDeletionBlocks = 0;
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    //logDeleteTransaction(containerId, containerData, delTX);
+    if (!isTxnIdValid(containerId, containerData, delTX)) {
+      return;
+    }
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -498,11 +501,31 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
   }
 
+  private boolean isTxnIdValid(long containerId,
+                               KeyValueContainerData containerData,
+                               DeletedBlocksTransaction delTX) {
+    boolean b = true;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing Container : {}, DB path : {}", containerId,
+          containerData.getMetadataPath());
+    }
+
+    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Ignoring delete blocks for containerId: %d."
+                + " Outdated delete transactionId %d < %d", containerId,
+            delTX.getTxID(), containerData.getDeleteTransactionId()));
+      }
+      b = false;
+    }
+    return b;
+  }
+
   private void markBlocksForDeletionSchemaV1(
       KeyValueContainerData containerData, DeletedBlocksTransaction delTX)
       throws IOException {
     long containerId = delTX.getContainerID();
-    logDeleteTransaction(containerId, containerData, delTX);
+    //logDeleteTransaction(containerId, containerData, delTX);
     int newDeletionBlocks = 0;
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
@@ -589,22 +612,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // in-memory container status
       containerData.updateDeleteTransactionId(delTX.getTxID());
       containerData.incrPendingDeletionBlocks(newDeletionBlocks);
-    }
-  }
-
-  private void logDeleteTransaction(long containerId,
-      KeyValueContainerData containerData, DeletedBlocksTransaction delTX) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
-          containerId, containerData.getMetadataPath(), delTX.getTxID());
-    }
-
-    if (delTX.getTxID() <= containerData.getDeleteTransactionId()) {
-      blockDeleteMetrics.incOutOfOrderDeleteBlockTransactionCount();
-      LOG.info(String.format("Delete blocks for containerId: %d"
-              + " is either received out of order or retried,"
-              + " %d <= %d", containerId, delTX.getTxID(),
-          containerData.getDeleteTransactionId()));
     }
   }
 
