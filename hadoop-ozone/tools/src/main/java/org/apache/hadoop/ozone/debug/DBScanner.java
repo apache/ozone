@@ -202,14 +202,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                                boolean schemaV3)
       throws IOException {
 
-    ThreadFactory factory = new ThreadFactoryBuilder()
-        .setNameFormat("DBScanner-%d")
-        .build();
-    ExecutorService threadPool = new ThreadPoolExecutor(
-        THREAD_COUNT, THREAD_COUNT, 60, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(), factory,
-        new ThreadPoolExecutor.CallerRunsPolicy());
-
     PrintWriter printWriter = null;
     try {
       if (fileName != null) {
@@ -218,7 +210,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       } else {
         printWriter = out();
       }
-      return displayTable(iterator, dbColumnFamilyDef, printWriter, threadPool,
+      return displayTable(iterator, dbColumnFamilyDef, printWriter,
           schemaV3);
     } finally {
       if (printWriter != null) {
@@ -229,8 +221,14 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
-                               PrintWriter printWriter,
-                               ExecutorService threadPool, boolean schemaV3) {
+                               PrintWriter printWriter, boolean schemaV3) {
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setNameFormat("DBScanner-%d")
+        .build();
+    ExecutorService threadPool = new ThreadPoolExecutor(
+        THREAD_COUNT, THREAD_COUNT, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(1024), factory,
+        new ThreadPoolExecutor.CallerRunsPolicy());
     LogWriter logWriter = new LogWriter(printWriter);
     try {
       // Start JSON object (map) or array
@@ -242,30 +240,19 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       exception = true;
       Thread.currentThread().interrupt();
     } finally {
-      threadPool.shutdown();
-      try {
-        if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
-          threadPool.shutdownNow();
-          err().println("Thread pool did not terminate; forced shutdown.");
-        }
-      } catch (InterruptedException ie) {
-        threadPool.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
+      threadPool.shutdownNow();
       logWriter.stop();
       logWriter.join();
       // End JSON object (map) or array
       printWriter.println(withKey ? " }" : " ]");
     }
-
     return !exception;
   }
 
   private void processRecords(ManagedRocksIterator iterator,
-                                 DBColumnFamilyDefinition dbColumnFamilyDef,
-                                 LogWriter logWriter,
-                                 ExecutorService threadPool,
-                                 boolean schemaV3) throws InterruptedException {
+                              DBColumnFamilyDefinition dbColumnFamilyDef,
+                              LogWriter logWriter, ExecutorService threadPool,
+                              boolean schemaV3) throws InterruptedException {
     if (startKey != null) {
       iterator.get().seek(getValueObject(dbColumnFamilyDef));
     }
@@ -282,7 +269,6 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       iterator.get().next();
       count++;
       if (batch.size() >= BATCH_SIZE) {
-        //
         while (logWriter.getInflightLogCount() > THREAD_COUNT * 10
             && !exception) {
           // Prevents too many unfinished Tasks from
@@ -481,8 +467,9 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
         ArrayList<String> results = new ArrayList<>(batch.size());
         for (ByteArrayKeyValue byteArrayKeyValue : batch) {
           StringBuilder sb = new StringBuilder();
-          if (sequenceId == FIRST_SEQUENCE_ID && !results.isEmpty()) {
-            // If this is not the first entry, append comma
+          if (!(sequenceId == FIRST_SEQUENCE_ID && results.isEmpty())) {
+            // Add a comma before each output entry, starting from the second
+            // one, to ensure valid JSON format.
             sb.append(", ");
           }
           if (withKey) {
