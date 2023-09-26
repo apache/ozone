@@ -24,6 +24,11 @@ import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 import java.util.zip.CRC32;
 
+/**
+ * {@link ChecksumByteBuffer} implementation
+ * that delegates checksum calculation to {@link CRC32}.
+ *
+ */
 public class CRC32ByteBufferImpl implements ChecksumByteBuffer {
 
   public static final BufferPool POOL = CachingBufferPool.getInstance();
@@ -39,6 +44,13 @@ public class CRC32ByteBufferImpl implements ChecksumByteBuffer {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());
     } else {
+      // The buffer that is passed into this method is readOnly,
+      // thus buffer.hasArray() (see hasArray implementation.
+      // So we either need to get data byte-by-byte, which is slow,
+      // or copy it to an intermediate byte array or buffer.
+      // Here we use cached direct byte buffers that we take from the cache
+      // or allocate a new one (if no enough instances in the cache) and
+      // return back to the cache after the checksum is calculated.
       withCachedBuffer(buffer.capacity(), cachedBuffer -> {
         cachedBuffer.put(buffer);
         cachedBuffer.flip();
