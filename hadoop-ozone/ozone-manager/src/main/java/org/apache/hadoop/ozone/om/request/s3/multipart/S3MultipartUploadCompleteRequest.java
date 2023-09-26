@@ -203,12 +203,15 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
                 dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
 
+        long usedBytesDiff = 0;
         //Find all unused parts.
         List<OmKeyInfo> allKeyInfoToRemove = new ArrayList<>();
         for (PartKeyInfo partKeyInfo : partKeyInfoMap) {
           if (!partNumbers.contains(partKeyInfo.getPartNumber())) {
-            allKeyInfoToRemove.add(OmKeyInfo
-                .getFromProtobuf(partKeyInfo.getPartKeyInfo()));
+            OmKeyInfo delPartKeyInfo =
+                OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+            allKeyInfoToRemove.add(delPartKeyInfo);
+            usedBytesDiff -= delPartKeyInfo.getReplicatedSize();
           }
         }
 
@@ -218,7 +221,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // creation after the knob turned on.
         OmKeyInfo keyToDelete =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
-        long usedBytesDiff = 0;
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(

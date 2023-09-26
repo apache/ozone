@@ -149,11 +149,26 @@ public class LeaseManager<T> {
     if (activeLeases.containsKey(resource)) {
       throw new LeaseAlreadyExistException(messageForResource(resource));
     }
-    Lease<T> lease = new Lease<>(resource, timeout);
-    lease.registerCallBack(callback);
+    Lease<T> lease = new Lease<>(resource, timeout, callback);
     activeLeases.put(resource, lease);
     semaphore.release();
     return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the default timeout.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    return acquire(resource, defaultTimeout, callback);
   }
 
   /**

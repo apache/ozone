@@ -63,6 +63,8 @@ import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -71,9 +73,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -503,7 +505,7 @@ public class TestOzoneFileInterfaces {
   }
 
   @Test
-  @Ignore("HDDS-3506")
+  @Category(UnhealthyTest.class) @Unhealthy("HDDS-3506")
   public void testOzoneManagerLocatedFileStatusBlockOffsetsWithMultiBlockFile()
       throws Exception {
     // naive assumption: MiniOzoneCluster will not have larger than ~1GB
