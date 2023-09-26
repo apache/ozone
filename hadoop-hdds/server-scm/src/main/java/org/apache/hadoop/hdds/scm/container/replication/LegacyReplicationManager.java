@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -518,6 +519,20 @@ public class LegacyReplicationManager {
         }
 
         /*
+         * A QUASI_CLOSED container may have some UNHEALTHY replicas with the
+         * same Sequence ID as the container. RM should try to maintain one
+         * copy of such replicas when there are no healthy replicas that
+         * match the container's Sequence ID.
+         */
+        List<ContainerReplica> vulnerableUnhealthy =
+            replicaSet.getVulnerableUnhealthyReplicas(nodeManager);
+        if (!vulnerableUnhealthy.isEmpty()) {
+          handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy,
+              placementStatus);
+          return;
+        }
+
+        /*
          * Check if the container is over replicated and take appropriate
          * action.
          */
@@ -544,6 +559,41 @@ public class LegacyReplicationManager {
       LOG.warn("Missing container {}.", id);
     } catch (Exception ex) {
       LOG.warn("Process container {} error: ", id, ex);
+    }
+  }
+
+  /**
+   * Sends a replicate command for each replica specified in
+   * vulnerableUnhealthy.
+   * @param replicaCount RatisContainerReplicaCount for this container
+   * @param vulnerableUnhealthy List of UNHEALTHY replicas that need to be
+   * replicated
+   * @param placementStatus placement status
+   */
+  private void handleVulnerableUnhealthyReplicas(
+      RatisContainerReplicaCount replicaCount,
+      List<ContainerReplica> vulnerableUnhealthy,
+      ContainerPlacementStatus placementStatus) {
+    ContainerInfo container = replicaCount.getContainer();
+    LOG.debug("Handling vulnerable UNHEALTHY replicas {} for container {}.",
+        vulnerableUnhealthy, container);
+    int pendingAdds = getInflightAdd(container.containerID());
+    if (pendingAdds >= vulnerableUnhealthy.size()) {
+      LOG.debug("There are {} pending adds for container {}, while " +
+              "the number of UNHEALTHY replicas is {}.", pendingAdds,
+          container.containerID(), vulnerableUnhealthy.size());
+      return;
+    }
+
+    for (ContainerReplica replica : vulnerableUnhealthy) {
+      try {
+        replicateAnyWithTopology(container, ImmutableList.of(replica),
+            placementStatus, 1, replicaCount.getReplicas());
+      } catch (SCMException e) {
+        LOG.warn("Exception when replicating {} for container {} while " +
+                "handling vulnerable UNHEALTHY replicas.", replica,
+            container.containerID(), e);
+      }
     }
   }
 
@@ -2229,6 +2279,19 @@ public class LegacyReplicationManager {
     // deletion.
     Set<UUID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
+        .filter(
+            r -> {
+              try {
+                return nodeManager.getNodeStatus(r.getDatanodeDetails())
+                    .isHealthy();
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception when checking node {} for deleting " +
+                    "excess replicas.", r, e);
+                return false;
+              }
+            })
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+            .equals(IN_SERVICE))
         .map(ContainerReplica::getOriginDatanodeId)
         .collect(Collectors.toSet());
 
