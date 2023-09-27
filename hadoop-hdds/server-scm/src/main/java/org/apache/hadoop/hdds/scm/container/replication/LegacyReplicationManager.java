@@ -527,6 +527,8 @@ public class LegacyReplicationManager {
         List<ContainerReplica> vulnerableUnhealthy =
             replicaSet.getVulnerableUnhealthyReplicas(nodeManager);
         if (!vulnerableUnhealthy.isEmpty()) {
+          report.incrementAndSample(HealthState.UNDER_REPLICATED,
+              container.containerID());
           handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy);
           return;
         }
