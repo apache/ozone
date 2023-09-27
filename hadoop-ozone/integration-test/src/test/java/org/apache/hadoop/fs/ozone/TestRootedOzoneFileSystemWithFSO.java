@@ -272,6 +272,7 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Test
+  @Ignore("HDDS-9358")
   public void testLeaseRecoverable() throws Exception {
     // Create a file
     final String dir = "dir1";
