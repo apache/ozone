@@ -835,6 +835,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     LOG.info("Started snap diff report generation for volume: '{}', " +
             "bucket: '{}', fromSnapshot: '{}', toSnapshot: '{}'",
         volumeName, bucketName, fromSnapshotName, toSnapshotName);
+    ozoneManager.getMetrics().incNumSnapshotDiffJobs();
 
     ColumnFamilyHandle fromSnapshotColumnFamily = null;
     ColumnFamilyHandle toSnapshotColumnFamily = null;
@@ -1016,6 +1017,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       }
     } catch (IOException | RocksDBException exception) {
       updateJobStatusToFailed(jobKey, exception.getMessage());
+      ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
       LOG.error("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
@@ -1024,6 +1026,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       throw new RuntimeException(exception);
     } catch (Exception exception) {
       updateJobStatusToFailed(jobKey, exception.getMessage());
+      ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
       LOG.error("Caught unchecked exception during diff report generation " +
               "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);

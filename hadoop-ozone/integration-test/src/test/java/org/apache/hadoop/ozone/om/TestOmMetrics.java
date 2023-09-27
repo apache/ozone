@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.assertj.core.util.Lists;
 import org.junit.After;
 import org.junit.Before;
@@ -424,6 +425,8 @@ public class TestOmMetrics {
     assertCounter("NumSnapshotLists", 0L, omMetrics);
     assertCounter("NumSnapshotActive", 1L, omMetrics);
     assertCounter("NumSnapshotDeleted", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobs", 0L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
 
     // Create second key
     OmKeyArgs keyArgs2 = createKeyArgs(volumeName, bucketName,
@@ -433,6 +436,21 @@ public class TestOmMetrics {
 
     // Create second snapshot
     writeClient.createSnapshot(volumeName, bucketName, snapshot2);
+
+    // Snapshot diff
+    while (true) {
+      SnapshotDiffResponse response =
+          writeClient.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+              null, 100, false, false);
+      if (response.getJobStatus() == SnapshotDiffResponse.JobStatus.DONE) {
+        break;
+      } else {
+        Thread.sleep(response.getWaitTimeInMs());
+      }
+    }
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumSnapshotDiffJobs", 1L, omMetrics);
+    assertCounter("NumSnapshotDiffJobFails", 0L, omMetrics);
 
     // List snapshots
     writeClient.listSnapshot(
