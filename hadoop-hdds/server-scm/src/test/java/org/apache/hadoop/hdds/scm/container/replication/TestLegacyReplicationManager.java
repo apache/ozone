@@ -837,6 +837,34 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
+
+      // now, add a copy of the UNHEALTHY replica on a decommissioning node,
+      // and another on a dead node. The expectation is still that no replica
+      // should be deleted as both these nodes are likely going away soon.
+      final ContainerReplica replica5 = getReplicas(
+          id, UNHEALTHY, 1000L, replica4.getOriginDatanodeId(),
+          randomDatanodeDetails());
+      replica5.getDatanodeDetails().setPersistedOpState(DECOMMISSIONING);
+      DatanodeDetails deadNode = randomDatanodeDetails();
+      nodeManager.register(deadNode, NodeStatus.inServiceDead());
+      final ContainerReplica replica6 = getReplicas(
+          id, UNHEALTHY, 1000L, replica4.getOriginDatanodeId(),
+          deadNode);
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica5);
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica6);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+
+      Assertions.assertEquals(0,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Assertions.assertEquals(0,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.deleteContainerCommand));
     }
 
     /**
