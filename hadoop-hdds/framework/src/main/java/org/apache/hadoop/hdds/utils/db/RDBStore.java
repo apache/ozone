@@ -152,12 +152,12 @@ public class RDBStore implements DBStore {
         rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(
             ssInfoTableCF.getHandle());
         // Set CF handle in differ to be store compaction log entry.
-        ColumnFamily compactionLogTableTableCF =
+        ColumnFamily compactionLogTableCF =
             db.getColumnFamily(COMPACTION_LOG_TABLE);
-        Preconditions.checkNotNull(compactionLogTableTableCF,
+        Preconditions.checkNotNull(compactionLogTableCF,
             "CompactionLogTable column family handle should not be null.");
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
-            compactionLogTableTableCF.getHandle());
+            compactionLogTableCF.getHandle());
         // Set activeRocksDB in differ to access compaction log CF.
         rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb().get());
         // Load all previous compaction logs
