@@ -4,7 +4,7 @@ Apache Ozone Contribution guideline
 Ozone is an Apache project. The bug tracking system for Ozone is under the [Apache Jira project named HDDS](https://issues.apache.org/jira/projects/HDDS/).
 
 This document summarize the contribution process:
-
+TEST
 ## What can I contribute?
 
 We welcome contributions of:
