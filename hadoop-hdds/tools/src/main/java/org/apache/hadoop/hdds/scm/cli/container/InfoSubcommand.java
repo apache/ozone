@@ -87,7 +87,7 @@ public class InfoSubcommand extends ScmSubcommand {
     }
 
     if (json) {
-      if(container.getPipeline().size() != 0) {
+      if (container.getPipeline().size() != 0) {
         ContainerWithPipelineAndReplicas wrapper =
             new ContainerWithPipelineAndReplicas(container.getContainerInfo(),
                 container.getPipeline(), replicas);
@@ -197,7 +197,7 @@ public class InfoSubcommand extends ScmSubcommand {
   }
 
   // All Pipeline information except the ones dependent on datanodes
-  private static class PipelineWithoutDatanodes {
+  private static final class PipelineWithoutDatanodes {
     private final PipelineID id;
     private final ReplicationConfig replicationConfig;
     private final Pipeline.PipelineState state;
