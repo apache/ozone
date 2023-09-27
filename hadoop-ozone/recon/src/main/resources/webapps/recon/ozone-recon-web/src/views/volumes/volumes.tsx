@@ -144,11 +144,8 @@ const COLUMNS: VolumnTableColumn[] = [
       searchParams.append('volume', record.volume);
 
       return (
-        <Link to={`/Buckets?${searchParams.toString()}`}>
-          {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-          <a key='listBuckets'>
+        <Link key="listBuckets" to={`/Buckets?${searchParams.toString()}`}>
             Show buckets
-          </a>
         </Link>
       );
     }
