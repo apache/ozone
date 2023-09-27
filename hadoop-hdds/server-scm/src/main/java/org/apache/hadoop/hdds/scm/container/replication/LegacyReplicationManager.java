@@ -585,16 +585,14 @@ public class LegacyReplicationManager {
       return;
     }
 
-    for (ContainerReplica replica : vulnerableUnhealthy) {
-      try {
-        replicateAnyWithTopology(container, ImmutableList.of(replica),
-            placementStatus, 1, replicaCount.getReplicas());
-      } catch (SCMException e) {
-        LOG.warn("Exception when replicating {} for container {} while " +
-                "handling vulnerable UNHEALTHY replicas.", replica,
-            container.containerID(), e);
-      }
-    }
+    /*
+    Since we're replicating UNHEALTHY replicas, it's possible that
+    replication keeps on failing. Shuffling gives other replicas a chance to be
+    replicated since there's a limit on inflight adds.
+     */
+    Collections.shuffle(vulnerableUnhealthy);
+    replicateEachSource(container, vulnerableUnhealthy,
+        replicaCount.getReplicas());
   }
 
   private void updateCompletedReplicationMetrics(ContainerInfo container,
@@ -2414,6 +2412,45 @@ public class LegacyReplicationManager {
     } catch (IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
           container.getContainerID(), ex);
+    }
+  }
+
+  /**
+   * Replicates each of the ContainerReplica specified in sources to new
+   * Datanodes. Will not consider Datanodes hosting existing replicas and
+   * Datanodes pending adds as targets. Note that this method simply skips
+   * the replica if there's an exception.
+   * @param container Container whose replicas are specified as sources
+   * @param sources List containing replicas, each will be replicated
+   * @param allReplicas all existing replicas of this container
+   */
+  private void replicateEachSource(ContainerInfo container,
+      List<ContainerReplica> sources, List<ContainerReplica> allReplicas) {
+    final List<DatanodeDetails> excludeList = allReplicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+
+    for (ContainerReplica replica : sources) {
+      // also exclude any DNs pending to receive a replica of this container
+      final List<DatanodeDetails> replicationInFlight
+          = inflightReplication.getDatanodeDetails(container.containerID());
+      for (DatanodeDetails dn : replicationInFlight) {
+        if (!excludeList.contains(dn)) {
+          excludeList.add(dn);
+        }
+      }
+
+      try {
+        final List<DatanodeDetails> target =
+            ReplicationManagerUtil.getTargetDatanodes(containerPlacement,
+                1, null, excludeList, currentContainerSize,
+                container);
+        sendReplicateCommand(container, target.iterator().next(),
+            ImmutableList.of(replica.getDatanodeDetails()));
+      } catch (SCMException e) {
+        LOG.warn("Exception while trying to replicate {} of container {}.",
+            replica, container, e);
+      }
     }
   }
 
