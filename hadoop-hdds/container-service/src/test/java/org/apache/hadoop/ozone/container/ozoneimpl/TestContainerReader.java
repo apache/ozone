@@ -429,18 +429,23 @@ public class TestContainerReader {
         conflict12.getContainerData().getContainerPath())));
     Assert.assertEquals(conflict11.getContainerData().getContainerPath(),
         containerSet.getContainer(1).getContainerData().getContainerPath());
+    Assert.assertEquals(baseBCSID, containerSet.getContainer(1)
+        .getContainerData().getBlockCommitSequenceId());
 
     // For conflict2, the closed on (conflict22) should win.
     Assert.assertFalse(Files.exists(Paths.get(
         conflict21.getContainerData().getContainerPath())));
     Assert.assertEquals(conflict22.getContainerData().getContainerPath(),
         containerSet.getContainer(2).getContainerData().getContainerPath());
+    Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+        containerSet.getContainer(2).getContainerData().getState());
 
     // For the EC conflict, both containers should be left on disk
     Assert.assertTrue(Files.exists(Paths.get(
         ec1.getContainerData().getContainerPath())));
     Assert.assertTrue(Files.exists(Paths.get(
         ec2.getContainerData().getContainerPath())));
+    Assert.assertNotNull(containerSet.getContainer(3));
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
