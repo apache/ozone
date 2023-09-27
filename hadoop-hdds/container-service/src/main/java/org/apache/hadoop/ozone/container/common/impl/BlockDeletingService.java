@@ -140,8 +140,10 @@ public class BlockDeletingService extends BackgroundService {
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.info("Queued {} blocks from {} containers for deletion",
-            totalBlocks, containers.size());
+        LOG.info(
+            "Queued {} blocks from {} containers for deletion, Datanode: {}",
+            totalBlocks, containers.size(),
+            ozoneContainer.getDatanodeDetails().getUuid());
       }
     } catch (StorageContainerException e) {
       LOG.warn("Failed to initiate block deleting tasks, "

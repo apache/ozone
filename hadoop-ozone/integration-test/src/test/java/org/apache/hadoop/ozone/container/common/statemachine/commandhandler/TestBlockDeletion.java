@@ -250,12 +250,33 @@ public class TestBlockDeletion {
               .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
     });
 
+
     writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
-    GenericTestUtils.waitFor(() ->
+    GenericTestUtils.waitFor(() -> {
+      scm.getContainerManager().getContainers().forEach(containerInfo -> {
+        try {
+          Set<ContainerReplica> containerReplicas =
+              scm.getContainerManager().getContainerReplicas(
+                  ContainerID.valueOf(containerInfo.getContainerID()));
+          containerReplicas.forEach(containerReplica -> {
+            LOG.info("containerId --- {} , containerKeys --- {}, " +
+                    "containerReplica.getKeyCount()--- {} ," +
+                    "containerReplica.getBytesUsed() -- {}, " +
+                    "containerReplica.getDatanodeDetails()-- {}",
+                containerInfo.getContainerID(), containerInfo.getNumberOfKeys(),
+                containerReplica.getKeyCount(), containerReplica.getBytesUsed(),
+                containerReplica.getDatanodeDetails());
+          });
+        } catch (ContainerNotFoundException e) {
+          throw new RuntimeException(e);
+        }
+      });
+      return
             scm.getContainerManager().getContainers().stream()
                 .allMatch(c -> c.getUsedBytes() == 0 &&
-                    c.getNumberOfKeys() == 0), 500, 5000);
+                    c.getNumberOfKeys() == 0);
+            }, 500, 5000);
     Thread.sleep(5000);
     // Verify that pending block delete num are as expected with resent cmds
     cluster.getHddsDatanodes().forEach(dn -> {
