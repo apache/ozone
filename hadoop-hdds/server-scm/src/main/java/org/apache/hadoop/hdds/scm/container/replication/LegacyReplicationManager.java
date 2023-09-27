@@ -527,6 +527,8 @@ public class LegacyReplicationManager {
         List<ContainerReplica> vulnerableUnhealthy =
             replicaSet.getVulnerableUnhealthyReplicas(nodeManager);
         if (!vulnerableUnhealthy.isEmpty()) {
+          report.incrementAndSample(HealthState.UNDER_REPLICATED,
+              container.containerID());
           handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy);
           return;
         }
@@ -2280,8 +2282,8 @@ public class LegacyReplicationManager {
                 return nodeManager.getNodeStatus(r.getDatanodeDetails())
                     .isHealthy();
               } catch (NodeNotFoundException e) {
-                LOG.warn("Exception when checking node {} for deleting " +
-                    "excess replicas.", r, e);
+                LOG.warn("Exception when checking replica {} for container {}" +
+                    " while deleting excess UNHEALTHY.", r, container, e);
                 return false;
               }
             })

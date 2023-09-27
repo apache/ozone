@@ -837,6 +837,34 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
+
+      // now, add a copy of the UNHEALTHY replica on a decommissioning node,
+      // and another on a dead node. The expectation is still that no replica
+      // should be deleted as both these nodes are likely going away soon.
+      final ContainerReplica replica5 = getReplicas(
+          id, UNHEALTHY, 1000L, replica4.getOriginDatanodeId(),
+          randomDatanodeDetails());
+      replica5.getDatanodeDetails().setPersistedOpState(DECOMMISSIONING);
+      DatanodeDetails deadNode = randomDatanodeDetails();
+      nodeManager.register(deadNode, NodeStatus.inServiceDead());
+      final ContainerReplica replica6 = getReplicas(
+          id, UNHEALTHY, 1000L, replica4.getOriginDatanodeId(),
+          deadNode);
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica5);
+      containerStateManager.updateContainerReplica(container.containerID(),
+          replica6);
+
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+
+      Assertions.assertEquals(0,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.replicateContainerCommand));
+
+      Assertions.assertEquals(0,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.deleteContainerCommand));
     }
 
     /**
@@ -885,10 +913,16 @@ public class TestLegacyReplicationManager {
       replicationManager.processAll();
       eventQueue.processAll(1000);
 
+      // 1 replicate command should have been sent
       Assertions.assertEquals(1,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.replicateContainerCommand));
+      Assertions.assertEquals(1,
+          replicationManager.getContainerReport().getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
 
+      // the following code asserts that replicate was sent for the UNHEALTHY
+      // replica on the decommissioning node
       CommandForDatanode command =
           datanodeCommandHandler.getReceivedCommands().iterator().next();
       Assertions.assertEquals(SCMCommandProto.Type.replicateContainerCommand,
@@ -981,6 +1015,12 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.replicateContainerCommand));
+      Assertions.assertEquals(1,
+          replicationManager.getContainerReport().getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+      // the following code asserts that the replicate command was sent for
+      // either of the QUASI_CLOSED replicas
       CommandForDatanode command =
           datanodeCommandHandler.getReceivedCommands().iterator().next();
       Assertions.assertEquals(SCMCommandProto.Type.replicateContainerCommand,
@@ -1011,6 +1051,9 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.replicateContainerCommand));
+      Assertions.assertEquals(1,
+          replicationManager.getContainerReport().getStat(
+              ReplicationManagerReport.HealthState.UNDER_REPLICATED));
       Assertions.assertEquals(1,
           datanodeCommandHandler.getReceivedCommands().size());
       command = datanodeCommandHandler.getReceivedCommands().iterator().next();
