@@ -359,6 +359,7 @@ export class Volumes extends React.Component<Record<string, object>, IVolumesSta
               hideSelectedOptions={false}
               value={selectedColumns}
               allOption={allColumnsOption}
+              isOptionDisabled={(option) => option.value === "volume"}
               onChange={this._handleColumnChange}
             /> Columns
           </div>

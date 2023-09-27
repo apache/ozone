@@ -526,6 +526,7 @@ export class Buckets extends React.Component<Record<string, object>, IBucketsSta
               hideSelectedOptions={false}
               value={selectedColumns}
               allOption={allColumnsOption}
+              isOptionDisabled={(option) => option.value === "bucketName"}
               onChange={this._handleColumnChange}
             /> Columns
           </div>
