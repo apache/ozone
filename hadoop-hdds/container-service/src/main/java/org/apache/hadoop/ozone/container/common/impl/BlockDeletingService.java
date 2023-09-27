@@ -123,7 +123,7 @@ public class BlockDeletingService extends BackgroundService {
       List<ContainerBlockInfo> containers =
           chooseContainerForBlockDeletion(blockLimitPerInterval,
               containerDeletionPolicy);
-
+      LOG.info("Containers chosen by policy: {}", containers.size());
       BackgroundTask
           containerBlockInfos = null;
       long totalBlocks = 0;
@@ -140,7 +140,7 @@ public class BlockDeletingService extends BackgroundService {
       metrics.incrTotalBlockChosenCount(totalBlocks);
       metrics.incrTotalContainerChosenCount(containers.size());
       if (containers.size() > 0) {
-        LOG.debug("Queued {} blocks from {} containers for deletion",
+        LOG.info("Queued {} blocks from {} containers for deletion",
             totalBlocks, containers.size());
       }
     } catch (StorageContainerException e) {
@@ -175,6 +175,8 @@ public class BlockDeletingService extends BackgroundService {
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
+    LOG.info("Total pending block count: {}, blocklimit: {}",
+        totalPendingBlockCount.get(), blockLimit);
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
@@ -189,6 +191,7 @@ public class BlockDeletingService extends BackgroundService {
         .isValidContainerType(containerData.getContainerType())) {
       return false;
     } else if (!containerData.isClosed()) {
+      LOG.info("isDeletionAllowed: false because containerData not closed");
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -198,6 +201,7 @@ public class BlockDeletingService extends BackgroundService {
         if (originPipelineId == null || originPipelineId.isEmpty()) {
           // In case the pipelineID is empty, just mark it for deletion.
           // TODO: currently EC container goes through this path.
+          LOG.info("isDeletionAllowed: true");
           return true;
         }
         UUID pipelineUUID;
@@ -211,6 +215,7 @@ public class BlockDeletingService extends BackgroundService {
         PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
         // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
+          LOG.info("isDeletionAllowed: true because ratis group not exist");
           return true;
         }
         try {
@@ -218,13 +223,17 @@ public class BlockDeletingService extends BackgroundService {
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex < containerBCSID) {
-            LOG.warn("Close Container log Index {} is not replicated across all"
+            LOG.info("Close Container log Index {} is not replicated across all"
                     + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
                     + "yet.", containerBCSID,
                 containerData.getOriginPipelineId(), minReplicatedIndex);
+            LOG.info(
+                "isDeletionAllowed: false because Close Container log Index " +
+                    "is not replicated across all the servers in the pipeline ");
             return false;
           } else {
+            LOG.info("isDeletionAllowed: true");
             return true;
           }
         } catch (IOException ioe) {

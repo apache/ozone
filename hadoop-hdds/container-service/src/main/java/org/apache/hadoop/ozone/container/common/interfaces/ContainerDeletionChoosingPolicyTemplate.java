@@ -72,11 +72,11 @@ public abstract class ContainerDeletionChoosingPolicyTemplate
         long numBlocksToDelete = Math.min(blockCount, pendingDeletionBlocks);
         blockCount -= numBlocksToDelete;
         result.add(new ContainerBlockInfo(entry, numBlocksToDelete));
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Select container {} for block deletion, "
+        //if (LOG.isDebugEnabled()) {
+          LOG.info("Select container {} for block deletion, "
               + "pending deletion blocks num: {}.", entry.getContainerID(),
               pendingDeletionBlocks);
-        }
+        //}
         if (blockCount == 0) {
           break;
         }

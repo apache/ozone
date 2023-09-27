@@ -349,7 +349,7 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      LOG.debug("Container : {}, To-Delete blocks : {}",
+      LOG.info("Container : {}, To-Delete blocks : {}",
           containerData.getContainerID(), delBlocks.size());
 
       Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
@@ -403,7 +403,7 @@ public class BlockDeletingTask implements BackgroundTask {
         metrics.incrSuccessBytes(releasedBytes);
       }
 
-      LOG.debug("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
+      LOG.info("Container: {}, deleted blocks: {}, space reclaimed: {}, " +
               "task elapsed time: {}ms", containerData.getContainerID(),
           deletedBlocksCount, releasedBytes, Time.monotonicNow() - startTime);
 
@@ -434,7 +434,7 @@ public class BlockDeletingTask implements BackgroundTask {
       for (Long blkLong : entry.getLocalIDList()) {
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
-        LOG.debug("Deleting block {}", blkLong);
+        LOG.info("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {
             handler.deleteUnreferenced(container, blkLong);

@@ -1185,12 +1185,12 @@ public class KeyValueHandler extends Handler {
   public void deleteBlock(Container container, BlockData blockData)
       throws IOException {
     chunkManager.deleteChunks(container, blockData);
-    if (LOG.isDebugEnabled()) {
+    //if (LOG.isDebugEnabled()) {
       for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
         ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
-        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
+        LOG.info("block {} chunk {} deleted", blockData.getBlockID(), info);
       }
-    }
+    //}
   }
 
   @Override
