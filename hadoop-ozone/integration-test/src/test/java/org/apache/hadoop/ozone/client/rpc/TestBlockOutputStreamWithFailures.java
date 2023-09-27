@@ -247,7 +247,8 @@ public class TestBlockOutputStreamWithFailures {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -333,7 +334,8 @@ public class TestBlockOutputStreamWithFailures {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -432,15 +434,12 @@ public class TestBlockOutputStreamWithFailures {
     // now close the stream, It will update the ack length after watchForCommit
 
     key.close();
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     validateData(keyName, data1);
   }
@@ -501,7 +500,8 @@ public class TestBlockOutputStreamWithFailures {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertTrue(keyOutputStream.getLocationInfoList().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -571,7 +571,8 @@ public class TestBlockOutputStreamWithFailures {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -661,7 +662,8 @@ public class TestBlockOutputStreamWithFailures {
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);
@@ -752,7 +754,8 @@ public class TestBlockOutputStreamWithFailures {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
@@ -846,7 +849,8 @@ public class TestBlockOutputStreamWithFailures {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
+    Assert.assertTrue(
+        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     Assert.assertEquals(0, keyOutputStream.getLocationInfoList().size());
     // Written the same data twice
     String dataString = new String(data1, UTF_8);

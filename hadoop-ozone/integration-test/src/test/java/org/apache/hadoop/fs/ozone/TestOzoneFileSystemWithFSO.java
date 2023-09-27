@@ -589,6 +589,17 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     assertTrue(fs.isFileClosed(source));
   }
 
+  @Test
+  public void testFSDeleteLogWarnNoExist() throws Exception {
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
+        .captureLogs(BasicOzoneClientAdapterImpl.LOG);
+    getFs().delete(new Path("/d1/d3/noexist/"), true);
+    assertTrue(logCapture.getOutput().contains(
+        "delete key failed Unable to get file status"));
+    assertTrue(logCapture.getOutput().contains(
+        "WARN  ozone.BasicOzoneClientAdapterImpl"));
+  }
+
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
       long parentID) {
     Assert.assertEquals("Wrong keyName", fileName, omKeyInfo.getKeyName());

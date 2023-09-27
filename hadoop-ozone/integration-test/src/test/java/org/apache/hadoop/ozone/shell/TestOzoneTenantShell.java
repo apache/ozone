@@ -500,7 +500,7 @@ public class TestOzoneTenantShell {
     executeHA(tenantShell, new String[] {
         "user", "getsecret", "finance$bob"});
     checkOutput(out, "export AWS_ACCESS_KEY_ID='finance$bob'\n",
-            false);
+        false);
     checkOutput(err, "", true);
 
     executeHA(tenantShell, new String[] {

@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.ozone.freon.KeyGeneratorUtil.FILE_DIR_SEPARATOR;
 
@@ -73,14 +74,14 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
           + " clients. Example: Write keys 0-1000000 followed by "
           + "keys 1000001-2000000.",
           defaultValue = "0")
-  private int startIndex;
+  private long startIndex;
 
   @CommandLine.Option(names = {"-r", "--range"},
           description = "Range of read/write operations. This in co-ordination"
           + " with --start-index can specify the range to read. "
           + "Example: Read from --start-index 1000 and read --range 1000 keys.",
           defaultValue = "1")
-  private int range;
+  private long range;
 
   @CommandLine.Option(names = {"--size"},
           description = "Object size (in bytes) " +
@@ -96,18 +97,25 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
           defaultValue = "false")
   private boolean keySorted;
 
+  @CommandLine.Option(names = {"--linear"},
+      description = "Generate key names in a linear manner, there is no random"
+      + "selection of keys", defaultValue = "false")
+  private boolean linear;
+
   @CommandLine.Option(names = {"--percentage-read"},
           description = "Percentage of read tasks in mix workload."
           + " The remainder of the percentage will be divided between write"
-          + " and list tasks.",
-          required = true)
+          + " and list tasks. By default this is 0%, to populate a range.",
+          required = false,
+          defaultValue = "0")
   private int percentageRead;
 
   @CommandLine.Option(names = {"--percentage-list"},
           description = "Percentage of list tasks in mix workload."
           + " The remainder of the percentage will be divided between write"
           + " and read tasks.",
-          required = true)
+          required = false,
+          defaultValue = "0")
   private int percentageList;
 
   @CommandLine.Option(names = {"--max-list-result"},
@@ -133,6 +141,7 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
   private static final Logger LOG =
           LoggerFactory.getLogger(OzoneClientKeyReadWriteListOps.class);
 
+  private static AtomicLong nextNumber = new AtomicLong();
   /**
    * Task type of read task, or write task.
    */
@@ -253,17 +262,21 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
 
   public String getKeyName() {
     StringBuilder keyNameSb = new StringBuilder();
-    int randomIdxWithinRange = ThreadLocalRandom.current().
-            nextInt(startIndex, startIndex + range);
+    long next;
+    if (linear) {
+      next = startIndex + nextNumber.getAndUpdate(x -> (x + 1) % range);
+    }  else {
+      next = ThreadLocalRandom.current().
+          nextLong(startIndex, startIndex + range);
+    }
 
     if (keySorted) {
       keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
-              append(randomIdxWithinRange);
+              append(next);
     } else {
       keyNameSb.append(getPrefix()).append(FILE_DIR_SEPARATOR).
-              append(kg.generateMd5KeyName(randomIdxWithinRange));
+              append(kg.generateMd5KeyName(next));
     }
     return keyNameSb.toString();
   }
-
 }

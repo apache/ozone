@@ -394,7 +394,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
-      int remainingBufLimit) {
+      int remainingBufLimit, KeyManager keyManager) {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -408,7 +408,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
         PurgePathRequest request = prepareDeleteDirRequest(
             remainNum, stringOmKeyInfoPair.getValue(),
             stringOmKeyInfoPair.getKey(), allSubDirList,
-            getOzoneManager().getKeyManager());
+            keyManager);
         if (isBufferLimitCrossed(remainingBufLimit, consumedSize,
             request.getSerializedSize())) {
           // ignore further add request
@@ -502,7 +502,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
           volumeId,
           bucketInfo.getObjectID(),
           deletedKeyInfo.getParentObjectID(),
-          deletedKeyInfo.getKeyName());
+          deletedKeyInfo.getFileName());
     } else {
       dbKey = ozoneManager.getMetadataManager().getOzoneKey(
           deletedKeyInfo.getVolumeName(),

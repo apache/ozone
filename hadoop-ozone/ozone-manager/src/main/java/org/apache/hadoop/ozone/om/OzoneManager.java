@@ -154,6 +154,9 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
@@ -1315,6 +1318,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException {
     securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (securityEnabled && testUgi == null) {
+      // Checking certificate duration validity by using
+      // validateCertificateValidityConfig() in SecurityConfig constructor.
+      new SecurityConfig(conf);
       loginOMUser(conf);
     }
   }
@@ -2832,13 +2838,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * {@inheritDoc}
    */
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
+  public ListKeysResult listKeys(String volumeName, String bucketName,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
     try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
-        getReader(volumeName, bucketName, keyPrefix)) {
+             getReader(volumeName, bucketName, keyPrefix)) {
       return rcReader.get().listKeys(
           volumeName, bucketName, startKey, keyPrefix, maxKeys);
     }
+  }
+
+  @Override
+  public ListKeysLightResult listKeysLight(String volumeName,
+                                           String bucketName,
+                                           String startKey, String keyPrefix,
+                                           int maxKeys) throws IOException {
+    ListKeysResult listKeysResult =
+        listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+    List<OmKeyInfo> keys = listKeysResult.getKeys();
+    List<BasicOmKeyInfo> basicKeysList =
+        keys.stream().map(BasicOmKeyInfo::fromOmKeyInfo)
+            .collect(Collectors.toList());
+
+    return new ListKeysLightResult(basicKeysList, listKeysResult.isTruncated());
   }
 
   @Override
@@ -4135,7 +4157,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Pair<String, String> resolved;
     if (isAclEnabled) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
-              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.createUGIForApi(),
+              omClientRequest.getRemoteAddress(),
               omClientRequest.getHostName());
     } else {
       resolved = resolveBucketLink(requested, new HashSet<>(),
@@ -4458,8 +4481,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public EchoRPCResponse echoRPCReq(byte[] payloadReq,
-                                    int payloadSizeResp) {
+  public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeResp,
+                                    boolean writeToRatis) {
     return null;
   }
 

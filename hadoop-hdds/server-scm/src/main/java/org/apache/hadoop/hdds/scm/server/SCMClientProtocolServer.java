@@ -300,8 +300,6 @@ public class SCMClientProtocolServer implements
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    getScm().checkAdminAccess(null, true);
-
     try {
       ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -344,8 +342,6 @@ public class SCMClientProtocolServer implements
   @Override
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
       Iterable<? extends Long> containerIDs) throws IOException {
-    getScm().checkAdminAccess(null, true);
-
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
     StringBuilder strContainerIDs = new StringBuilder();
@@ -364,7 +360,6 @@ public class SCMClientProtocolServer implements
       }
     }
 
-
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
         Collections.singletonMap("containerIDs", strContainerIDs.toString())));
@@ -382,6 +377,7 @@ public class SCMClientProtocolServer implements
         cpList.add(cp);
       } catch (IOException ex) {
         //not found , just go ahead
+        LOG.error("Container with common pipeline not found: {}", ex);
       }
     }
     return cpList;
@@ -595,7 +591,6 @@ public class SCMClientProtocolServer implements
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
       throws IOException {
-
     if (queryScope == HddsProtos.QueryScope.POOL) {
       throw new IllegalArgumentException("Not Supported yet");
     }
@@ -656,6 +651,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public void closeContainer(long containerID) throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
     final UserGroupInformation remoteUser = getRemoteUser();
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("containerID", String.valueOf(containerID));
@@ -684,6 +680,7 @@ public class SCMClientProtocolServer implements
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
       throws IOException {
+    getScm().checkAdminAccess(getRemoteUser(), false);
     Map<String, String> auditMap = Maps.newHashMap();
     if (type != null) {
       auditMap.put("replicationType", type.toString());
@@ -731,6 +728,7 @@ public class SCMClientProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("pipelineID", pipelineID.getId());
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       scm.getPipelineManager().activatePipeline(
           PipelineID.getFromProtobuf(pipelineID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
@@ -963,9 +961,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ReplicationManagerReport getReplicationManagerReport()
-      throws IOException {
-    getScm().checkAdminAccess(getRemoteUser(), true);
+  public ReplicationManagerReport getReplicationManagerReport() {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_REPORT, null));
     return scm.getReplicationManager().getContainerReport();
@@ -1328,6 +1324,7 @@ public class SCMClientProtocolServer implements
         DecommissionScmResponseProto.newBuilder();
 
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       decommissionScmResponseBuilder
           .setSuccess(scm.removePeerFromHARing(scmId));
     } catch (IOException ex) {

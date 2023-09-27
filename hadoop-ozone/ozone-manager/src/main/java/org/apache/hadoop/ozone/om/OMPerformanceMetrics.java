@@ -74,6 +74,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "ACLs check in getKeyInfo")
   private MutableRate getKeyInfoAclCheckLatencyNs;
 
+  @Metric(about = "Sort datanodes latency in getKeyInfo")
+  private MutableRate getKeyInfoSortDatanodesLatencyNs;
+
   @Metric(about = "resolveBucketLink latency in getKeyInfo")
   private MutableRate getKeyInfoResolveBucketLatencyNs;
 
@@ -140,6 +143,10 @@ public class OMPerformanceMetrics {
 
   public MutableRate getGetKeyInfoResolveBucketLatencyNs() {
     return getKeyInfoResolveBucketLatencyNs;
+  }
+
+  public MutableRate getGetKeyInfoSortDatanodesLatencyNs() {
+    return getKeyInfoSortDatanodesLatencyNs;
   }
 
   public void setForceContainerCacheRefresh(boolean value) {

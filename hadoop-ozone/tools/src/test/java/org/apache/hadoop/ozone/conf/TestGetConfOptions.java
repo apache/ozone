@@ -89,9 +89,9 @@ public class TestGetConfOptions {
   public void testGetConfWithTheOptionOzoneManagers()
       throws UnsupportedEncodingException {
     new OzoneGetConf(conf).run(new String[] {"-ozonemanagers"});
-    Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
+    Assert.assertEquals("", bout.toString(DEFAULT_ENCODING));
     bout.reset();
     new OzoneGetConf(conf).run(new String[] {"ozonemanagers"});
-    Assert.assertEquals("{service1=[]}\n", bout.toString(DEFAULT_ENCODING));
+    Assert.assertEquals("", bout.toString(DEFAULT_ENCODING));
   }
 }

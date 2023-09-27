@@ -66,6 +66,10 @@
     <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
   </Match>
   <Match>
+    <Class name="org.apache.hadoop.ozone.container.common.statemachine.commandhandler.TestDeleteBlocksCommandHandler" />
+    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.container.common.volume.TestVolumeSet" />
     <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
   </Match>
