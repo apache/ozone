@@ -248,6 +248,7 @@ public final class OmUtils {
     case GetFileStatus:
     case LookupFile:
     case ListStatus:
+    case ListStatusLight:
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -146,6 +147,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusLightResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
@@ -269,6 +271,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListStatusResponse listStatusResponse =
             listStatus(request.getListStatusRequest(), request.getVersion());
         responseBuilder.setListStatusResponse(listStatusResponse);
+        break;
+      case ListStatusLight:
+        ListStatusLightResponse listStatusLightResponse =
+            listStatusLight(request.getListStatusRequest(),
+                request.getVersion());
+        responseBuilder.setListStatusLightResponse(listStatusLightResponse);
         break;
       case GetAcl:
         GetAclResponse getAclResponse =
@@ -1177,6 +1185,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
     return listStatusResponseBuilder.build();
+  }
+
+  private ListStatusLightResponse listStatusLight(
+      ListStatusRequest request, int clientVersion) throws IOException {
+    KeyArgs keyArgs = request.getKeyArgs();
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
+        .setHeadOp(keyArgs.getHeadOp())
+        .build();
+    boolean allowPartialPrefixes =
+        request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    List<OzoneFileStatusLight> statuses =
+        impl.listStatusLight(omKeyArgs, request.getRecursive(),
+            request.getStartKey(), request.getNumEntries(),
+            allowPartialPrefixes);
+    ListStatusLightResponse.Builder
+        listStatusLightResponseBuilder =
+        ListStatusLightResponse.newBuilder();
+    for (OzoneFileStatusLight status : statuses) {
+      listStatusLightResponseBuilder.addStatuses(status.getProtobuf());
+    }
+    return listStatusLightResponseBuilder.build();
   }
 
   @RequestFeatureValidator(

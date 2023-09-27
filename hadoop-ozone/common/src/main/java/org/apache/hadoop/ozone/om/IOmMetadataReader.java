@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
@@ -64,10 +65,36 @@ public interface IOmMetadataReader {
                                    boolean allowPartialPrefixes)
       throws IOException;
 
+  /**
+   * Lightweight listStatus API.
+   *
+   * @param args    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args, boolean recursive,
+                                   String startKey, long numEntries,
+                                   boolean allowPartialPrefixes)
+      throws IOException;
+
   default List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries)
       throws IOException {
     return listStatus(args, recursive, startKey, numEntries, false);
+  }
+
+  default List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
+                                                     boolean recursive,
+                                                     String startKey,
+                                                     long numEntries)
+      throws IOException {
+    return listStatusLight(args, recursive, startKey, numEntries, false);
   }
 
   /**

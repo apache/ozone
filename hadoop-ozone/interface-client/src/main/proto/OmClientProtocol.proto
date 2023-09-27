@@ -142,6 +142,7 @@ enum Type {
   SetSafeMode = 124;
   PrintCompactionLogDag = 125;
   ListKeysLight = 126;
+  ListStatusLight = 127;
 }
 
 enum SafeMode {
@@ -390,6 +391,7 @@ message OMResponse {
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
+  optional ListStatusLightResponse           listStatusLightResponse       = 127;
 }
 
 enum Status {
@@ -1119,12 +1121,24 @@ message OzoneFileStatusProto {
 
 }
 
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
 message GetFileStatusRequest {
     required KeyArgs keyArgs = 1;
 }
 
 message GetFileStatusResponse {
     required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
 }
 
 message CreateDirectoryRequest {
@@ -1170,6 +1184,10 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
 }
 
 message CreateKeyRequest {
