@@ -297,6 +297,40 @@ public class TestClosingContainerHandler {
         .updateContainerState(containerInfo.containerID(), QUASI_CLOSE);
   }
 
+  @Test
+  public void testClosingECWithUnhealthyReplicas() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        EC_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.UNHEALTHY, 1, 2, 3, 4, 5);
+
+    ReplicationManagerReport report = new ReplicationManagerReport();
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    subject.handle(request);
+
+    Mockito.verify(replicationManager, Mockito.times(1))
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+
+    Mockito.clearInvocations(replicationManager);
+
+    // Now add an open container. This time, the container should not move to
+    // quasi-closed, and a close should be sent for the open replica.
+    containerReplicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 1));
+
+    assertAndVerify(request, true, 1);
+    Mockito.verify(replicationManager, Mockito.times(0))
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+  }
+
   /**
    * Close commands should be sent for Open or Closing replicas.
    */

@@ -87,14 +87,17 @@ public class ClosingContainerHandler extends AbstractCheck {
 
     // Moving a RATIS container that has only unhealthy replicas to QUASI_CLOSED
     // so the unhealthy replicas will be replicated if needed.
-    if (allUnhealthy && !request.getContainerReplicas().isEmpty()
-        && containerInfo.getReplicationConfig().getReplicationType()
-        == ReplicationType.RATIS) {
-      LOG.debug("Container {} has only unhealthy replicas and is closing, so "
-          + "moving it to quasi-closed.", containerInfo);
+    if (allUnhealthy && !request.getContainerReplicas().isEmpty()) {
+      LifeCycleEvent event = LifeCycleEvent.QUASI_CLOSE;
+      if (containerInfo.getReplicationConfig().getReplicationType()
+          == ReplicationType.EC) {
+        event = LifeCycleEvent.CLOSE;
+      }
 
+      LOG.debug("Container {} has only unhealthy replicas and is closing, so "
+          + "executing the {} event.", containerInfo, event);
       replicationManager.updateContainerState(
-          containerInfo.containerID(), LifeCycleEvent.QUASI_CLOSE);
+          containerInfo.containerID(), event);
     }
 
     /*
