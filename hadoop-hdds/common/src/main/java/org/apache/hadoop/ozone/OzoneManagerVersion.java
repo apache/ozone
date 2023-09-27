@@ -37,6 +37,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
   OPTIMIZED_GET_KEY_INFO(3, "OzoneManager version that supports optimized"
       + " key lookups using cached container locations."),
 
+  LIGHTWEIGHT_LIST_KEYS(4, "OzoneManager version that supports lightweight"
+      + " listKeys API."),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

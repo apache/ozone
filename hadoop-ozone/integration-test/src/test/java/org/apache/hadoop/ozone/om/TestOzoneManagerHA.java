@@ -205,7 +205,6 @@ public abstract class TestOzoneManagerHA {
   @AfterEach
   public void resetCluster()
       throws IOException {
-    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
@@ -216,6 +215,7 @@ public abstract class TestOzoneManagerHA {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -240,7 +240,7 @@ public abstract class TestOzoneManagerHA {
   protected OzoneBucket setupBucket() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
     String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + UUID.randomUUID();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

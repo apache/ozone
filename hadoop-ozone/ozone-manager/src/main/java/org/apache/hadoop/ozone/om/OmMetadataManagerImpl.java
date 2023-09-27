@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -1172,12 +1173,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-      String startKey, String keyPrefix, int maxKeys) throws IOException {
+  public ListKeysResult listKeys(String volumeName, String bucketName,
+                                 String startKey, String keyPrefix, int maxKeys)
+      throws IOException {
 
     List<OmKeyInfo> result = new ArrayList<>();
     if (maxKeys <= 0) {
-      return result;
+      return new ListKeysResult(result, false);
     }
 
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -1272,6 +1274,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
+    boolean isTruncated = cacheKeyMap.size() > maxKeys;
+
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
     currentCount = 0;
@@ -1292,7 +1296,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // Clear map and set.
     cacheKeyMap.clear();
 
-    return result;
+    return new ListKeysResult(result, isTruncated);
   }
 
   // TODO: HDDS-2419 - Complete stub below for core logic

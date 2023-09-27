@@ -43,6 +43,10 @@ public final class TestCodec {
   static final Logger LOG = LoggerFactory.getLogger(TestCodec.class);
   static final int NUM_LOOPS = 10;
 
+  static {
+    CodecBuffer.enableLeakDetection();
+  }
+
   @Test
   public void testShortCodec() throws Exception {
     runTestShortCodec((short)0);
