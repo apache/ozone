@@ -381,8 +381,10 @@ public class LegacyReplicationManager {
          */
         if (state == LifeCycleState.CLOSING) {
           setHealthStateForClosing(replicas, container, report);
+          boolean foundHealthy = false;
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
+              foundHealthy = true;
               sendCloseCommand(
                   container, replica.getDatanodeDetails(), false);
             }
@@ -398,7 +400,21 @@ public class LegacyReplicationManager {
            */
           if (replicas.isEmpty() && (container.getNumberOfKeys() == 0)) {
             closeEmptyContainer(container);
+            return;
           }
+
+          if (!foundHealthy) {
+            /* If we get here, then this container has replicas and all are
+            UNHEALTHY. Move it from CLOSING to QUASI_CLOSED so RM can then try
+            to maintain replication factor number of replicas.
+            */
+            containerManager.updateContainerState(container.containerID(),
+                HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+            LOG.debug("Moved container {} from CLOSING to QUASI_CLOSED " +
+                "because it has only UNHEALTHY replicas: {}.", container,
+                replicas);
+          }
+
           return;
         }
 
