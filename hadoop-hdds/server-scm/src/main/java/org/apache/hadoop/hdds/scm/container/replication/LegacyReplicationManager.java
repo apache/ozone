@@ -527,8 +527,7 @@ public class LegacyReplicationManager {
         List<ContainerReplica> vulnerableUnhealthy =
             replicaSet.getVulnerableUnhealthyReplicas(nodeManager);
         if (!vulnerableUnhealthy.isEmpty()) {
-          handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy,
-              placementStatus);
+          handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy);
           return;
         }
 
@@ -568,12 +567,10 @@ public class LegacyReplicationManager {
    * @param replicaCount RatisContainerReplicaCount for this container
    * @param vulnerableUnhealthy List of UNHEALTHY replicas that need to be
    * replicated
-   * @param placementStatus placement status
    */
   private void handleVulnerableUnhealthyReplicas(
       RatisContainerReplicaCount replicaCount,
-      List<ContainerReplica> vulnerableUnhealthy,
-      ContainerPlacementStatus placementStatus) {
+      List<ContainerReplica> vulnerableUnhealthy) {
     ContainerInfo container = replicaCount.getContainer();
     LOG.debug("Handling vulnerable UNHEALTHY replicas {} for container {}.",
         vulnerableUnhealthy, container);
