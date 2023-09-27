@@ -349,8 +349,9 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      LOG.info("Container : {}, To-Delete blocks : {}",
-          containerData.getContainerID(), delBlocks.size());
+      LOG.info("Container : {}, To-Delete blocks : {} at DN: {} ",
+          containerData.getContainerID(), delBlocks.size(),
+          ozoneContainer.getDatanodeDetails().getUuid());
 
       Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
           .getHandler(container.getContainerType()));
@@ -434,7 +435,8 @@ public class BlockDeletingTask implements BackgroundTask {
       for (Long blkLong : entry.getLocalIDList()) {
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
-        LOG.info("Deleting block {}", blkLong);
+        LOG.info("Deleting block {} at DN: {}", blkLong,
+            ozoneContainer.getDatanodeDetails().getUuid());
         if (blkInfo == null) {
           try {
             handler.deleteUnreferenced(container, blkLong);
@@ -453,6 +455,8 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, blkInfo);
           blocksDeleted++;
           deleted = true;
+          LOG.info("Block Deleted at DN: {}",
+              ozoneContainer.getDatanodeDetails().getUuid());
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,
