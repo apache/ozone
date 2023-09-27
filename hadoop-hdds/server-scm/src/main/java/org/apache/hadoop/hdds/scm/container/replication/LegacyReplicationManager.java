@@ -381,8 +381,10 @@ public class LegacyReplicationManager {
          */
         if (state == LifeCycleState.CLOSING) {
           setHealthStateForClosing(replicas, container, report);
+          boolean foundHealthy = false;
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
+              foundHealthy = true;
               sendCloseCommand(
                   container, replica.getDatanodeDetails(), false);
             }
@@ -398,7 +400,21 @@ public class LegacyReplicationManager {
            */
           if (replicas.isEmpty() && (container.getNumberOfKeys() == 0)) {
             closeEmptyContainer(container);
+            return;
           }
+
+          if (!foundHealthy) {
+            /* If we get here, then this container has replicas and all are
+            UNHEALTHY. Move it from CLOSING to QUASI_CLOSED so RM can then try
+            to maintain replication factor number of replicas.
+            */
+            containerManager.updateContainerState(container.containerID(),
+                HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+            LOG.debug("Moved container {} from CLOSING to QUASI_CLOSED " +
+                "because it has only UNHEALTHY replicas: {}.", container,
+                replicas);
+          }
+
           return;
         }
 
@@ -1138,8 +1154,16 @@ public class LegacyReplicationManager {
           container.containerID());
     }
 
+    State matchingReplicaState = State.CLOSED;
+    if (container.getState() == LifeCycleState.QUASI_CLOSED) {
+      // If we are replicating quasi closed replicas, they should have the
+      // same origin node ID and therefore the same BCSID. If they have
+      // different origin node IDs, then we have 2/3 containers and it should
+      // have been closed before replicating.
+      matchingReplicaState = State.QUASI_CLOSED;
+    }
     List<ContainerReplica> replicationSources = getReplicationSources(container,
-        replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
+        replicaSet.getReplicas(), matchingReplicaState);
     // This method will handle topology even if replicasNeeded <= 0.
     try {
       replicateAnyWithTopology(container, replicationSources,
@@ -2221,6 +2245,19 @@ public class LegacyReplicationManager {
     // deletion.
     Set<UUID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
+        .filter(
+            r -> {
+              try {
+                return nodeManager.getNodeStatus(r.getDatanodeDetails())
+                    .isHealthy();
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception when checking replica {} for container {}" +
+                    " while deleting excess UNHEALTHY.", r, container, e);
+                return false;
+              }
+            })
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState()
+            .equals(IN_SERVICE))
         .map(ContainerReplica::getOriginDatanodeId)
         .collect(Collectors.toSet());
 

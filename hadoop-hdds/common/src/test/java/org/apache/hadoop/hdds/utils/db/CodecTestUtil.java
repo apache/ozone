@@ -36,7 +36,7 @@ public final class CodecTestUtil {
   /**
    * Force gc to check leakage.
    */
-  static void gc() throws InterruptedException {
+  public static void gc() throws InterruptedException {
     // use WeakReference to detect gc
     Object obj = new Object();
     final WeakReference<Object> weakRef = new WeakReference<>(obj);

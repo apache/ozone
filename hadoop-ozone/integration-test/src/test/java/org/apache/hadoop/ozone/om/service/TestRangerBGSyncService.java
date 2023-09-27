@@ -68,6 +68,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.UnhealthyTest;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -76,9 +78,9 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
@@ -91,7 +93,7 @@ import org.slf4j.event.Level;
  * Tests Ozone Manager Multi-Tenancy feature Background Sync with Apache Ranger.
  * Marking it as Ignore because it needs Ranger access point.
  */
-@Ignore("TODO: Requires a Ranger endpoint")
+@Category(UnhealthyTest.class) @Unhealthy("Requires a Ranger endpoint")
 public class TestRangerBGSyncService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRangerBGSyncService.class);

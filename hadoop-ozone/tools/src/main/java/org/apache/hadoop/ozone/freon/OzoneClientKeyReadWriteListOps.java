@@ -105,15 +105,17 @@ public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
   @CommandLine.Option(names = {"--percentage-read"},
           description = "Percentage of read tasks in mix workload."
           + " The remainder of the percentage will be divided between write"
-          + " and list tasks.",
-          required = true)
+          + " and list tasks. By default this is 0%, to populate a range.",
+          required = false,
+          defaultValue = "0")
   private int percentageRead;
 
   @CommandLine.Option(names = {"--percentage-list"},
           description = "Percentage of list tasks in mix workload."
           + " The remainder of the percentage will be divided between write"
           + " and read tasks.",
-          required = true)
+          required = false,
+          defaultValue = "0")
   private int percentageList;
 
   @CommandLine.Option(names = {"--max-list-result"},

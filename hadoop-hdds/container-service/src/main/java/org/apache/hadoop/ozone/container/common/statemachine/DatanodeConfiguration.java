@@ -216,6 +216,23 @@ public class DatanodeConfiguration {
   private long recoveringContainerScrubInterval =
       Duration.ofMinutes(10).toMillis();
 
+  /**
+   * The maximum time to wait for acquiring the container lock when processing
+   * a delete block transaction.
+   * If a timeout occurs while attempting to get the lock, the delete block
+   * transaction won't be immediately discarded. Instead, it will be retried
+   * after all the current delete block transactions have been processed.
+   */
+  @Config(key = "block.delete.max.lock.wait.timeout",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DELETION},
+      description = "Timeout for the thread used to process the delete" +
+          " block command to wait for the container lock."
+  )
+  private long blockDeleteMaxLockWaitTimeoutMs =
+      Duration.ofMillis(100).toMillis();
+
   public Duration getBlockDeletionInterval() {
     return Duration.ofMillis(blockDeletionInterval);
   }
@@ -739,6 +756,10 @@ public class DatanodeConfiguration {
 
   public int getBlockDeleteQueueLimit() {
     return blockDeleteQueueLimit;
+  }
+
+  public long getBlockDeleteMaxLockWaitTimeoutMs() {
+    return blockDeleteMaxLockWaitTimeoutMs;
   }
 
   public void setBlockDeleteQueueLimit(int queueLimit) {

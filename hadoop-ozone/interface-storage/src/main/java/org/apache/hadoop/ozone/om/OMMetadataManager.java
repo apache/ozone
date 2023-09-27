@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 
 /**
  * OM metadata manager interface.
@@ -201,8 +203,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return a list of keys.
    * @throws IOException
    */
-  List<OmKeyInfo> listKeys(String volumeName,
-      String bucketName, String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName,
+                          String bucketName, String startKey, String keyPrefix,
+                          int maxKeys)
       throws IOException;
 
   /**
@@ -378,6 +381,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   Table<String, String> getSnapshotRenamedTable();
 
+  Table<String, CompactionLogEntry> getCompactionLogTable();
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

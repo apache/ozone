@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,6 +85,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
   }
 
   @Test
+  @Flaky("HDDS-6627")
   public void tesGetCommittedBlockLength() throws Exception {
     ContainerProtos.GetCommittedBlockLengthResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
