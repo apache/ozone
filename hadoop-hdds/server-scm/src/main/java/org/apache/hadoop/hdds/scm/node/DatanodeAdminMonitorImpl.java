@@ -346,7 +346,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       try {
         ContainerReplicaCount replicaSet =
             replicationManager.getContainerReplicaCount(cid);
-        if (replicaSet.isSufficientlyReplicatedForOffline(dn)) {
+        if (replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager)) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
@@ -359,7 +359,21 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           }
           underReplicated++;
         }
-        if (!replicaSet.isHealthy()) {
+
+        boolean isHealthy;
+        /*
+        If LegacyReplicationManager is enabled, then use the
+        isHealthyEnoughForOffline API. ReplicationManager doesn't support this
+        API yet.
+         */
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
+            ".legacy", false);
+        if (legacyEnabled) {
+          isHealthy = replicaSet.isHealthyEnoughForOffline();
+        } else {
+          isHealthy = replicaSet.isHealthy();
+        }
+        if (!isHealthy) {
           if (LOG.isDebugEnabled()) {
             unhealthyIDs.add(cid);
           }

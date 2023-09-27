@@ -2280,8 +2280,8 @@ public class LegacyReplicationManager {
                 return nodeManager.getNodeStatus(r.getDatanodeDetails())
                     .isHealthy();
               } catch (NodeNotFoundException e) {
-                LOG.warn("Exception when checking node {} for deleting " +
-                    "excess replicas.", r, e);
+                LOG.warn("Exception when checking replica {} for container {}" +
+                    " while deleting excess UNHEALTHY.", r, container, e);
                 return false;
               }
             })

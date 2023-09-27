@@ -16,10 +16,16 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.util.Set;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * When HDDS-6447 was done to improve the LegacyReplicationManager, work on
@@ -58,5 +64,35 @@ public class LegacyRatisContainerReplicaCount extends
   @Override
   public int getUnhealthyReplicaCountAdapter() {
     return getMisMatchedReplicaCount();
+  }
+
+  @Override
+  public boolean isHealthyEnoughForOffline() {
+    LifeCycleState containerState = getContainer().getState();
+    return (containerState == LifeCycleState.CLOSED
+        || containerState == LifeCycleState.QUASI_CLOSED)
+        && getReplicas().stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
+        .filter(r -> r.getState() !=
+            ContainerReplicaProto.State.UNHEALTHY)
+        .allMatch(r -> ReplicationManager.compareState(
+            containerState, r.getState()));
+  }
+
+  /**
+   * For Legacy Replication Manager and Ratis Containers, this method checks
+   * if the container is sufficiently replicated. It also checks whether
+   * there are any UNHEALTHY replicas that need to be replicated.
+   * @param datanode Not used in this implementation
+   * @param nodeManager An instance of NodeManager, used to check the health
+   * status of a node
+   * @return true if the container is sufficiently replicated and there are
+   * no UNHEALTHY replicas that need to be replicated, false otherwise
+   */
+  @Override
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager) {
+    return super.isSufficientlyReplicated() &&
+        super.getVulnerableUnhealthyReplicas(nodeManager).isEmpty();
   }
 }
