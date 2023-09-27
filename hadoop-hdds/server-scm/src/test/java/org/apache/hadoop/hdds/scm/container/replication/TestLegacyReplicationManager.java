@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -120,6 +121,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicaBuilder;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -389,7 +391,7 @@ public class TestLegacyReplicationManager {
      */
     @Test
     public void testClosingMissingContainer()
-            throws IOException, TimeoutException {
+        throws IOException, InvalidStateTransitionException {
       final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
       final ContainerID id = container.containerID();
 
@@ -435,6 +437,10 @@ public class TestLegacyReplicationManager {
               ReplicationManagerReport.HealthState.UNDER_REPLICATED));
       Assertions.assertEquals(1, report.getStat(
               ReplicationManagerReport.HealthState.MIS_REPLICATED));
+
+      Mockito.verify(containerManager, times(0))
+          .updateContainerState(container.containerID(),
+              LifeCycleEvent.QUASI_CLOSE);
     }
 
     @Test
@@ -582,6 +588,83 @@ public class TestLegacyReplicationManager {
    */
   @Nested
   class UnstableReplicas {
+
+    /**
+     * A CLOSING container which has only UNHEALTHY replicas should be moved
+     * to QUASI_CLOSED state so that RM can then maintain replication factor
+     * number of replicas.
+     */
+    @Test
+    public void testClosingContainerWithOnlyUnhealthyReplicas()
+        throws IOException, InvalidStateTransitionException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+      final ContainerID id = container.containerID();
+      containerStateManager.addContainer(container.getProtobuf());
+
+      // all replicas are UNHEALTHY
+      final Set<ContainerReplica> replicas = getReplicas(id, UNHEALTHY,
+          randomDatanodeDetails(), randomDatanodeDetails(),
+          randomDatanodeDetails());
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.updateContainerReplica(id, replica);
+      }
+
+      replicationManager.processAll();
+      Mockito.verify(containerManager, times(1))
+          .updateContainerState(container.containerID(),
+              LifeCycleEvent.QUASI_CLOSE);
+
+      containerStateManager.updateContainerState(
+          container.containerID().getProtobuf(), LifeCycleEvent.QUASI_CLOSE);
+
+      replicationManager.processAll();
+      Assertions.assertEquals(1,
+          replicationManager.getContainerReport().getStat(
+              ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
+    }
+
+    /**
+     * Close command should be sent to the healthy replicas. The container
+     * should not be moved to quasi-closed immediately.
+     */
+    @Test
+    public void testClosingContainerWithSomeUnhealthyReplicas()
+        throws IOException, InvalidStateTransitionException {
+      final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+      final ContainerID id = container.containerID();
+      containerStateManager.addContainer(container.getProtobuf());
+
+      // 2 UNHEALTHY, 1 OPEN
+      final Set<ContainerReplica> replicas = getReplicas(id, UNHEALTHY,
+          randomDatanodeDetails(), randomDatanodeDetails());
+      final DatanodeDetails datanode = randomDatanodeDetails();
+      replicas.addAll(getReplicas(id, State.OPEN, datanode));
+      for (ContainerReplica replica : replicas) {
+        containerStateManager.updateContainerReplica(id, replica);
+      }
+
+      final int currentCloseCommandCount = datanodeCommandHandler
+          .getInvocationCount(SCMCommandProto.Type.closeContainerCommand);
+      replicationManager.processAll();
+      eventQueue.processAll(1000);
+
+      Mockito.verify(containerManager, times(0))
+          .updateContainerState(container.containerID(),
+              LifeCycleEvent.QUASI_CLOSE);
+      Assertions.assertEquals(currentCloseCommandCount + 1,
+          datanodeCommandHandler.getInvocationCount(
+              SCMCommandProto.Type.closeContainerCommand));
+      Assertions.assertEquals(1,
+          datanodeCommandHandler.getReceivedCommands().size());
+      SCMCommand command =
+          datanodeCommandHandler.getReceivedCommands().iterator().next()
+              .getCommand();
+      Assertions.assertSame(SCMCommandProto.Type.closeContainerCommand,
+          command.getType());
+      CloseContainerCommand closeCommand = (CloseContainerCommand) command;
+      Assertions.assertFalse(closeCommand.isForce());
+    }
+
     /**
      * 2 open replicas
      * 1 quasi-closed replica
