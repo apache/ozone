@@ -259,7 +259,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
           // Expand deleted dirs only on active snapshot. Deleted Snapshots
           // will be cleaned up by SnapshotDeletingService.
-          if (!currSnapInfo.getSnapshotStatus().equals(SNAPSHOT_ACTIVE) ||
+          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
               currSnapInfo.getExpandedDeletedDir()) {
             continue;
           }
@@ -316,8 +316,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               remainNum = remainNum - request.getDeletedSubFilesCount();
               remainNum = remainNum - request.getMarkDeletedSubDirsCount();
               // Count up the purgeDeletedDir, subDirs and subFiles
-              if (request.getDeletedDir() != null
-                  && !request.getDeletedDir().isEmpty()) {
+              if (request.hasDeletedDir() &&
+                  !request.getDeletedDir().isEmpty()) {
                 dirNum++;
               }
               subDirNum += request.getMarkDeletedSubDirsCount();

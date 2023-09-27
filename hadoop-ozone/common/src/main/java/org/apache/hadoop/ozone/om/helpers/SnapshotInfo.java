@@ -150,6 +150,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    * @param referencedReplicatedSize - Snapshot referenced size w/ replication.
    * @param exclusiveSize - Snapshot exclusive size.
    * @param exclusiveReplicatedSize - Snapshot exclusive size w/ replication.
+   * @param expandedDeletedDir - Indicates if the deleted dir is expanded.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapshotInfo(UUID snapshotId,
