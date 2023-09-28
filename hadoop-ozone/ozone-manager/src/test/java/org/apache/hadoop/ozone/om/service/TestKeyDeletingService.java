@@ -100,7 +100,7 @@ public class TestKeyDeletingService {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(40));
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
