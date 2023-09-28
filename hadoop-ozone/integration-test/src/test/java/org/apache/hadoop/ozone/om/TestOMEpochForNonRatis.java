@@ -43,7 +43,9 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_ID_SHIFT;
@@ -62,7 +64,7 @@ public class TestOMEpochForNonRatis {
   private static OzoneClient client;
 
   @Rule
-  public Timeout timeout = Timeout.seconds(240);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(240));
 
   @BeforeClass
   public static void init() throws Exception {

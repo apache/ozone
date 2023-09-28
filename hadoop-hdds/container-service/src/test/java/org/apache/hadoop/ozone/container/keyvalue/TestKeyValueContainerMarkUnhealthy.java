@@ -33,7 +33,9 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -65,7 +67,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Rule
-  public Timeout timeout = Timeout.seconds(600);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(600));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();

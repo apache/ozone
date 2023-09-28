@@ -82,7 +82,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
@@ -127,7 +129,7 @@ public class TestOmContainerLocationCache {
    * Set a timeout for each test.
    */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneConfiguration conf;

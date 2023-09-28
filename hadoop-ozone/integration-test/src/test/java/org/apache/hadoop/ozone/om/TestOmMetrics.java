@@ -70,7 +70,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.Mockito;
 
 /**
@@ -82,7 +84,7 @@ public class TestOmMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;

@@ -50,7 +50,9 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -72,7 +74,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -109,7 +110,7 @@ public class TestOmSnapshotFileSystem {
       LoggerFactory.getLogger(TestOmSnapshot.class);
 
   @Rule
-  public Timeout timeout = new Timeout(120, TimeUnit.SECONDS);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {

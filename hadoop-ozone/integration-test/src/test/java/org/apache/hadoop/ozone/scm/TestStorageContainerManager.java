@@ -107,7 +107,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -159,7 +161,7 @@ public class TestStorageContainerManager {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = Timeout.seconds(900);
+  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(900));
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
